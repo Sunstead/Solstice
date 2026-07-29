@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="16"
+   height="16"
+   version="1.1"
+   viewBox="0 0 16 16"
+   id="svg6"
+   sodipodi:docname="icon_transparent.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="38.957164"
+     inkscape:cx="0.78291119"
+     inkscape:cy="1.9251915"
+     inkscape:window-width="3840"
+     inkscape:window-height="2036"
+     inkscape:window-x="-12"
+     inkscape:window-y="-12"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg6" />
+  <defs
+     id="defs6">
+    <linearGradient
+       xlink:href="#linearGradient11"
+       id="linearGradient12-8"
+       x1="10.171145"
+       y1="15.513864"
+       x2="4.6417251"
+       y2="1.2300187"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       id="linearGradient11">
+      <stop
+         style="stop-color:#e25625;stop-opacity:1;"
+         offset="0"
+         id="stop11" />
+      <stop
+         style="stop-color:#f48c23;stop-opacity:1;"
+         offset="0.59882009"
+         id="stop15" />
+      <stop
+         style="stop-color:#f3d22b;stop-opacity:1;"
+         offset="1"
+         id="stop12" />
+    </linearGradient>
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath20">
+      <path
+         style="fill:#ffff00;stroke-width:1.2;stroke-linecap:round;stroke-dasharray:0, 2.04"
+         d="m 7.5498256,14.903115 -4.245718,-0.6909 A 2.0068028,2.0068028 42.603197 0 1 1.679547,12.718188 L 1.3208419,11.283368 A 0.68482743,0.68482743 138.59383 0 1 2.233139,10.478895 l 5.8126168,2.257357 c 0.310549,0.120603 0.4761432,0.474393 0.380041,0.793358 -0.098464,0.326802 -0.1399089,0.519873 -0.1940023,0.872986 -0.050482,0.32954 -0.3531489,0.554027 -0.6819689,0.500519 z"
+         id="path21"
+         transform="matrix(-1.0730333,0,0,1.0730333,16,0)" />
+      <path
+         style="fill:#ffff00;stroke-width:1.2;stroke-linecap:round;stroke-dasharray:0, 2.04"
+         d="M 8.6125591,11.784755 0.91347495,7.5074861 A 1.7759549,1.7759549 59.527302 0 1 0,5.9550222 V 3.7221935 A 0.7814767,0.7814767 155.59296 0 1 1.2960827,3.1340723 L 9.645832,10.440103 a 0.47119175,0.47119175 84.433569 0 1 0.062631,0.642632 l -0.4375388,0.566493 a 0.51552872,0.51552872 168.36791 0 1 -0.6583651,0.135527 z"
+         id="path22"
+         transform="matrix(-1.0730333,0,0,1.0730333,16,0)" />
+      <path
+         style="fill:#ffff00;stroke-width:1.2;stroke-linecap:round;stroke-dasharray:0, 2.04"
+         d="M 11.759197,8.5665554 7.5074861,0.91347495 A 1.7759549,1.7759549 30.472698 0 0 5.9550222,0 H 3.7221935 A 0.7814767,0.7814767 114.40704 0 0 3.1340723,1.2960827 l 7.2713757,8.3101439 a 0.52713989,0.52713989 5.5664308 0 0 0.718937,0.070067 l 0.483193,-0.373201 a 0.57674133,0.57674133 101.63209 0 0 0.151619,-0.7365372 z"
+         id="path23"
+         transform="matrix(-1.0730333,0,0,1.0730333,16,0)" />
+      <path
+         style="fill:#ffff00;stroke-width:1.2;stroke-linecap:round;stroke-dasharray:0, 2.04"
+         d="M 7.5498256,14.903115 3.2981567,14.211247 A 1.9976453,1.9976453 42.603197 0 1 1.6810093,12.724037 L 1.3135305,11.254122 a 0.66922129,0.66922129 138.59383 0 1 0.8915072,-0.78614 l 5.8407181,2.26827 c 0.310549,0.120603 0.4761432,0.474393 0.380041,0.793358 -0.098464,0.326802 -0.1399089,0.519873 -0.1940023,0.872986 -0.050482,0.32954 -0.3531489,0.554027 -0.6819689,0.500519 z"
+         id="path24"
+         transform="matrix(0,1.0730333,-1.0730333,0,16,0)" />
+    </clipPath>
+  </defs>
+  <rect
+     style="display:inline;fill:#808080;stroke-width:1.2;stroke-linecap:round;stroke-dasharray:0, 2.04;fill-opacity:0.50165749"
+     id="rect11"
+     width="16"
+     height="16"
+     x="0"
+     y="0"
+     ry="0.83333331"
+     clip-path="url(#clipPath20)"
+     transform="scale(1.0000333)" />
+</svg>
