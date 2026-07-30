@@ -1,12 +1,11 @@
 // src/routes/index.tsx
-import { ThemeToggle } from '@/components/theme-toggle';
+import TestFlexLayout from '@/components/flex-layout-test';
 import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/')({
   component: () => (
-    <div>
-      Home
-      <ThemeToggle />
+    <div className='h-full w-full'>
+      <TestFlexLayout />
     </div>
   ),
 });

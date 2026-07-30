@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use tauri::{ LogicalPosition, WebviewUrl, WebviewWindowBuilder };
+use tauri::utils::config::WindowConfig;
 
 mod workspace;
 mod files;
@@ -34,7 +35,14 @@ pub fn run() {
         )
 
         .setup(|app| {
-            let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
+            let config = WindowConfig {
+                label: "main".into(),
+                url: WebviewUrl::default(),
+                drag_drop_enabled: false,
+                ..Default::default()
+            };
+
+            let win_builder = WebviewWindowBuilder::from_config(app, &config)?
                 .title("Solstice")
                 .inner_size(1200.0, 800.0);
 

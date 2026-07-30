@@ -33,7 +33,7 @@ export const Route = createRootRoute({
 
     return (
       <ThemeProvider defaultTheme='dark' storageKey='vite-ui-theme'>
-        <div className='h-screen bg-background text-foreground flex flex-col'>
+        <div className='h-screen bg-background text-foreground flex flex-col overflow-hidden'>
           <SidebarProvider
             key={hydrated ? 'hydrated' : 'initial'}
             open={!sidebarCollapsed}
