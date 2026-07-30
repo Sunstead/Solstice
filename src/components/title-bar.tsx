@@ -50,7 +50,7 @@ export default function TitleBar() {
 
   const appWindow = appWindowRef.current;
 
-  const { path } = useWorkspace();
+  const path = useWorkspace((s) => s.path);
 
   return (
     <header className='bg-sidebar w-full h-12 min-h-9 draggable relative flex items-center border-b'>

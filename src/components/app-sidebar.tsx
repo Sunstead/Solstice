@@ -46,7 +46,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
   }
 
-  const { openFolder } = useWorkspace();
+  const openFolder = useWorkspace((s) => s.openFolder);
 
   return (
     <Sidebar
@@ -108,7 +108,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarFooter>
       </Sidebar>
 
-      <Sidebar collapsible='none' className='hidden flex-1 md:flex w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]! min-w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]'>
+      <Sidebar
+        collapsible='none'
+        className='hidden flex-1 md:flex w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]! min-w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]'
+      >
         <SidebarHeader className='px-3 py-2 text-xs font-medium text-muted-foreground'>
           {activeView?.label}
         </SidebarHeader>

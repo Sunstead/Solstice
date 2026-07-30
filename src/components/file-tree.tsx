@@ -1,5 +1,5 @@
 import { ChevronRight, File, Folder } from 'lucide-react';
-import { useFiles, FileTreeNode } from '@/hooks/use-files';
+import { useFiles, FileTreeNode, selectChildren } from '@/hooks/use-files';
 import {
   Collapsible,
   CollapsibleContent,
@@ -17,9 +17,8 @@ type FileTreeProps = {
 };
 
 export function FileTree({ path }: FileTreeProps) {
-  const getChildren = useFiles((s) => s.getChildren);
-
-  const children = getChildren(path);
+  const entries = useFiles((s) => s.entries);
+  const children = selectChildren(entries, path);
 
   return (
     <>
@@ -33,9 +32,9 @@ export function FileTree({ path }: FileTreeProps) {
 function FileTreeItem({ node }: { node: FileTreeNode }) {
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const collapseDirectory = useFiles((s) => s.collapseDirectory);
-  const getChildren = useFiles((s) => s.getChildren);
+  const entries = useFiles((s) => s.entries);
 
-  const children = getChildren(node.path);
+  const children = selectChildren(entries, node.path);
 
   if (!node.is_dir) {
     return (
@@ -74,7 +73,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
         />
 
         <CollapsibleContent>
-          <SidebarMenuSub className='pr-0 pl-1 mr-0 ml-3'>
+          <SidebarMenuSub className='pr-0 pl-1 mr-0 ml-3 gap-0 py-0'>
             {children.map((child) => (
               <FileTreeItem key={child.path} node={child} />
             ))}

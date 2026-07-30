@@ -1,27 +1,26 @@
+import { useEffect } from 'react';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useFiles } from '@/hooks/use-files';
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
 } from './ui/resizable-sidebar';
-import { useFiles } from '@/hooks/use-files';
-import { useEffect } from 'react';
 import { FileTree } from './file-tree';
 
 export function NotesSidebar() {
-  const { path } = useWorkspace();
-  const { entries, loadDirectory } = useFiles();
+  const path = useWorkspace((s) => s.path);
+  const loading = useWorkspace((s) => s.loading);
+  const loadDirectory = useFiles((s) => s.loadDirectory);
 
   useEffect(() => {
     if (!path) return;
-
-    console.log('loading path', path);
     loadDirectory(path);
   }, [path, loadDirectory]);
 
-  useEffect(() => {
-    console.log(entries);
-  }, [entries]);
+  if (loading) {
+    return null;
+  }
 
   if (!path) {
     return <div>No workspace open</div>;
@@ -30,7 +29,7 @@ export function NotesSidebar() {
   return (
     <SidebarGroup>
       <SidebarGroupContent className='max-w-(--sidebar-width)'>
-        <SidebarMenu className='max-w-(--sidebar-width)'>
+        <SidebarMenu className='max-w-(--sidebar-width) gap-0'>
           <FileTree path={path} />
         </SidebarMenu>
       </SidebarGroupContent>

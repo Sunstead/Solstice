@@ -9,7 +9,7 @@ export type FileTreeNode = FileEntry & {
 };
 
 function getParentPath(path: string) {
-  const normalized = path.replace(/\\/g, '/')
+  const normalized = path.replace(/\\/g, '/');
   const index = normalized.lastIndexOf('/');
 
   if (index === -1) return '';
@@ -20,15 +20,27 @@ function getParentPath(path: string) {
 type FilesState = {
   entries: Record<string, FileTreeNode>;
 
+  reset: () => void;
   loadDirectory: (path: string) => Promise<FileTreeNode[]>;
   expandDirectory: (path: string) => Promise<void>;
   collapseDirectory: (path: string) => void;
-
-  getChildren: (path: string) => FileTreeNode[];
 };
+
+export function selectChildren(
+  entries: Record<string, FileTreeNode>,
+  path: string,
+) {
+  const normalized = path.replace(/\\/g, '/');
+
+  return Object.values(entries).filter((entry) => {
+    return getParentPath(entry.path) === normalized;
+  });
+}
 
 export const useFiles = create<FilesState>((set, get) => ({
   entries: {},
+
+  reset: () => set({ entries: {} }),
 
   loadDirectory: async (path) => {
     const files = await invoke<FileEntry[]>('list_directory', { path });
@@ -84,13 +96,5 @@ export const useFiles = create<FilesState>((set, get) => ({
         },
       },
     }));
-  },
-
-  getChildren: (path) => {
-    const normalized = path.replace(/\\/g, '/');
-
-    return Object.values(get().entries).filter((entry) => {
-      return getParentPath(entry.path) === normalized;
-    });
   },
 }));
