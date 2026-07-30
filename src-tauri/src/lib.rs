@@ -2,6 +2,8 @@
 use tauri::{ LogicalPosition, WebviewUrl, WebviewWindowBuilder };
 
 mod workspace;
+mod files;
+mod types;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -14,8 +16,23 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(workspace::WorkspaceState::new())
         .invoke_handler(
-            tauri::generate_handler![workspace::set_workspace, workspace::get_workspace]
+            tauri::generate_handler![
+                files::list_directory,
+                files::read_file,
+                files::write_file,
+                files::create_file,
+                files::create_directory,
+                files::rename_path,
+                files::delete_file,
+                files::delete_directory,
+                files::copy_path,
+                files::move_path,
+                files::exists,
+                workspace::set_workspace,
+                workspace::get_workspace
+            ]
         )
+
         .setup(|app| {
             let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("Solstice")

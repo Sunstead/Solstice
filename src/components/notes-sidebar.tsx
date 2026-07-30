@@ -1,10 +1,39 @@
+import { useWorkspace } from '@/hooks/use-workspace';
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+} from './ui/resizable-sidebar';
+import { useFiles } from '@/hooks/use-files';
+import { useEffect } from 'react';
+import { FileTree } from './file-tree';
+
 export function NotesSidebar() {
-  // Placeholder — wire up your actual notes tree/list here. Clicking a note
-  // should call the same dockview addPanel()/openTab() API described
-  // earlier, not push a route.
+  const { path } = useWorkspace();
+  const { entries, loadDirectory } = useFiles();
+
+  useEffect(() => {
+    if (!path) return;
+
+    console.log('loading path', path);
+    loadDirectory(path);
+  }, [path, loadDirectory]);
+
+  useEffect(() => {
+    console.log(entries);
+  }, [entries]);
+
+  if (!path) {
+    return <div>No workspace open</div>;
+  }
+
   return (
-    <div className='px-3 py-2 text-sm text-muted-foreground'>
-      Notes go here.
-    </div>
+    <SidebarGroup>
+      <SidebarGroupContent className='max-w-(--sidebar-width)'>
+        <SidebarMenu className='max-w-(--sidebar-width)'>
+          <FileTree path={path} />
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }

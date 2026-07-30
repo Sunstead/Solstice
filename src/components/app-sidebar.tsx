@@ -92,7 +92,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </Button>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <Button variant='ghost' size='icon' className='size-10' onClick={openFolder}>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className='size-10'
+                    onClick={openFolder}
+                  >
                     <Settings className='size-5' />
                     <span className='sr-only'>Settings</span>
                   </Button>
@@ -103,16 +108,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarFooter>
       </Sidebar>
 
-      <Sidebar collapsible='none' className='hidden flex-1 md:flex'>
+      <Sidebar collapsible='none' className='hidden flex-1 md:flex w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]! min-w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]'>
         <SidebarHeader className='px-3 py-2 text-xs font-medium text-muted-foreground'>
           {activeView?.label}
         </SidebarHeader>
         <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              {ActiveSidebarContent && <ActiveSidebarContent />}
-            </SidebarGroupContent>
-          </SidebarGroup>
+          {ActiveSidebarContent && <ActiveSidebarContent />}
         </SidebarContent>
       </Sidebar>
       <SidebarRail />
