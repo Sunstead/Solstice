@@ -1,0 +1,138 @@
+.flexlayout-custom .flexlayout__tab {
+  border-radius: 0px;
+}
+
+.flexlayout-custom .flexlayout__tab_toolbar_button {
+  padding: 4px;
+  border-radius: var(--radius-md);
+}
+
+/* tab button */
+.flexlayout-custom .flexlayout__tab_button {
+  position: relative;
+  flex: 1 1 0%;
+  height: 100%;
+  min-width: 52px; /* Chrome uses ~52px collapsed, ~180px expanded */
+  max-width: 12rem;
+  padding-top: 0;
+  padding-right: 4px;
+  padding-bottom: 0;
+  overflow: visible; /* lets the selected-tab curve pseudo-elements bleed outside the box */
+  border-bottom: none;
+}
+
+.flexlayout-custom
+  .flexlayout__tab_button:not(.flexlayout__tab_button--selected) {
+  margin-bottom: 2px;
+  margin-left: 2px;
+  margin-right: 2px;
+}
+
+.flexlayout-custom
+  .flexlayout__tab_button:hover:not(.flexlayout__tab_button--selected) {
+  background-color: var(--color-muted);
+  height: 32px;
+  border-radius: var(--radius-md);
+  border: none;
+}
+
+.flexlayout-custom .flexlayout__tab_button--selected {
+  padding-bottom: 2px !important;
+  min-width: 56px; /* base 52px + 4 */
+  max-width: calc(12rem + 4px);
+  padding-left: 14px;
+  padding-right: 6px;
+}
+
+.flexlayout-custom .flexlayout__tab_button_content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flexlayout-custom .flexlayout__tab_button_trailing {
+  margin-left: auto;
+  padding: 4px;
+  border-radius: var(--radius-md);
+}
+
+/* tab strip layout */
+.flexlayout-custom .flexlayout__tabset_tabbar_outer {
+  height: 40px;
+  align-items: stretch;
+}
+
+.flexlayout-custom .flexlayout__tabset_tabbar_inner {
+  align-items: stretch;
+}
+
+.flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container {
+  align-items: center;
+  width: 100%;
+}
+
+/* spacers/dividers: fixed size, never grow or shrink */
+.flexlayout-custom .flexlayout__tabset_tab_spacer,
+.flexlayout-custom .flexlayout__tabset_tab_divider_selected_before,
+.flexlayout-custom .flexlayout__tabset_tab_divider_selected_after {
+  flex: 0 0 auto;
+}
+
+.flexlayout-custom .flexlayout__tabset_tab_divider_selected_before,
+.flexlayout-custom .flexlayout__tabset_tab_divider_selected_after {
+  background-color: transparent;
+}
+
+.flexlayout-custom .flexlayout__tabset_tab_spacer {
+  width: 1px;
+  height: 1rem;
+  margin: 0 0px;
+}
+
+.flexlayout-custom .flexlayout__tabset_tab_divider_inner {
+  display: none;
+}
+
+/* selected-tab curve, drawn via pseudo-elements */
+.flexlayout-custom {
+  --tab-curve-r: var(--radius-lg);
+}
+
+.flexlayout-custom .flexlayout__tab_button--selected::before,
+.flexlayout-custom .flexlayout__tab_button--selected::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: var(--tab-curve-r);
+  height: var(--tab-curve-r);
+  pointer-events: none;
+}
+
+.flexlayout-custom .flexlayout__tab_button--selected::before {
+  left: calc(var(--tab-curve-r) * -1);
+  background: radial-gradient(
+    circle at top left,
+    transparent var(--tab-curve-r),
+    var(--color-tab-selected-background) calc(var(--tab-curve-r) + 1px)
+  );
+}
+
+.flexlayout-custom .flexlayout__tab_button--selected::after {
+  right: calc(var(--tab-curve-r) * -1);
+  background: radial-gradient(
+    circle at top right,
+    transparent var(--tab-curve-r),
+    var(--color-tab-selected-background) calc(var(--tab-curve-r) + 1px)
+  );
+}
+
+.flexlayout-custom .flexlayout__tabset_tab_divider {
+  background-color: var(--border);
+}
+
+.flexlayout-custom
+  .flexlayout__tabset_tab_divider.flexlayout__tabset_tab_divider_selected_before,
+.flexlayout-custom
+  .flexlayout__tabset_tab_divider.flexlayout__tabset_tab_divider_selected_after {
+  background-color: transparent;
+}

@@ -42,13 +42,13 @@ pub fn read_file(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn write_file(request: WriteFileRequest) -> Result<(), String> {
-    if let Some(parent) = Path::new(&request.path).parent() {
+pub fn write_file(path: String, contents: String) -> Result<(), String> {
+    if let Some(parent) = Path::new(&path).parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    let mut file = fs::File::create(request.path).map_err(|e| e.to_string())?;
-    file.write_all(request.contents.as_bytes()).map_err(|e| e.to_string())
+    let mut file = fs::File::create(path).map_err(|e| e.to_string())?;
+    file.write_all(contents.as_bytes()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
