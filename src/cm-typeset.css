@@ -52,6 +52,7 @@
   --cm-font-heading: var(--font-heading);
   --cm-font-mono: var(--font-mono);
   --cm-flow: 1.25em;
+  --cm-bullet-size: 1.5em;
   --cm-muted: var(
     --color-muted-foreground,
     color-mix(in oklab, currentColor 60%, transparent)
@@ -83,7 +84,12 @@
  * upstream that underlines text generally (e.g. a global `a` style
  * leaking in in a heading built from a link, or an editor base style)
  * would otherwise show through. Match shadcn's un-underlined heading
- * look explicitly instead of relying on inherited absence. */
+ * look explicitly instead of relying on inherited absence.
+ *
+ * NOTE this reset only cancels the line THIS span would draw for its
+ * own plain text — text-decoration isn't inherited, so it has no power
+ * over a nested <a> further down the tree. See the .cm-typeset a
+ * override further down for the other half of this fix. */
 .cm-typeset .cm-heading-1 {
   font-family: var(--cm-font-heading);
   font-weight: 600;
@@ -205,6 +211,19 @@
   outline-offset: 2px;
   border-radius: 0.125em;
 }
+/* Links inside headings: `.cm-heading-N { text-decoration: none }` above
+ * only resets the line the HEADING SPAN would draw for its own plain
+ * text. It can't reach into a nested <a> — that <a> matches the
+ * `.cm-typeset a` rule above and sets an underline directly on itself,
+ * independent of whatever its ancestor decided (text-decoration isn't
+ * an inherited property, so there's nothing for the descendant to
+ * "inherit away"). A heading built from, or containing, a link needs
+ * its own explicit reset here, or the underline shows straight through
+ * — this is the fix for the underline that "didn't work." Specificity
+ * note: this selector has two classes (.cm-typeset + one of the
+ * :is(...) heading classes) plus a type, which beats .cm-typeset a's
+ * one class + one type regardless of source order, so no !important
+ * is needed. */
 .cm-typeset
   :is(
     .cm-heading-1,
@@ -216,6 +235,7 @@
   )
   a {
   font-weight: inherit;
+  text-decoration-line: none;
 }
 
 /* Inline code */
@@ -388,4 +408,21 @@
 .cm-typeset .cm-list-marker-ordered {
   font-variant-numeric: tabular-nums;
   color: var(--cm-muted);
+}
+
+/* Bullet glyph, sized up via --cm-bullet-size (default 1.5em). This is
+ * its own inline-block nested INSIDE .cm-list-marker-bullet (see
+ * ListMarkerWidget in live-preview.ts) rather than the same box that
+ * carries width/margin above — those are `em`-based and resolve
+ * against whatever element they're declared on, so scaling the outer
+ * box's own font-size would also scale its own width/margin and shift
+ * the hanging indent. Keeping the size bump on a separate child avoids
+ * that. line-height: 1 keeps the bigger glyph from inflating the
+ * .cm-line's line-box height; vertical-align nudges it back onto the
+ * text baseline visually — tweak both to taste for your font. */
+.cm-typeset .cm-list-marker-glyph {
+  display: inline-block;
+  font-size: var(--cm-bullet-size);
+  line-height: 1;
+  vertical-align: -0.1em;
 }

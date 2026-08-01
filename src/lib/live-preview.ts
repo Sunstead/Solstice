@@ -68,8 +68,20 @@ class ListMarkerWidget extends WidgetType {
       // Match shadcn's disc / circle / square rotation (ul: disc,
       // ul ul: circle, ul ul ul+: square). depth is 1-indexed (a
       // top-level list is depth 1), so index by depth - 1.
+      //
+      // The glyph lives in its own inner span (cm-list-marker-glyph)
+      // instead of as this outer span's own textContent, so its
+      // font-size can be bumped up in CSS (--cm-bullet-size, see
+      // cm-typeset.css) without also inflating the width/margin below.
+      // Those are `em`-based and resolve against THIS element's own
+      // font-size — if the bigger font-size lived on the same node,
+      // "width: 1.1em" would silently mean "1.1 x the enlarged size"
+      // and throw off the hanging-indent math.
       const glyphs = ['\u2022', '\u25E6', '\u25AA'];
-      span.textContent = glyphs[Math.min(this.depth - 1, glyphs.length - 1)];
+      const glyph = document.createElement('span');
+      glyph.className = 'cm-list-marker-glyph';
+      glyph.textContent = glyphs[Math.min(this.depth - 1, glyphs.length - 1)];
+      span.appendChild(glyph);
     }
     return span;
   }

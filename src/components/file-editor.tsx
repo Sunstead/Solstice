@@ -7,6 +7,8 @@ import { markdown } from '@codemirror/lang-markdown';
 import { defaultKeymap } from '@codemirror/commands';
 import { ScrollArea } from './ui/scroll-area';
 import { livePreviewPlugin } from '@/lib/live-preview';
+import { normalizeBulletMarkers, bulletNormalizationChanges } from '@/lib/list-markers';
+import { listIndentKeymap } from '@/lib/list-indent';
 import { GFM } from '@lezer/markdown';
 
 type FileEditorProps = {
@@ -48,7 +50,10 @@ export function FileEditor({ path }: FileEditorProps) {
       extensions: [
         minimalSetup,
         markdown({ extensions: [GFM] }),
-        keymap.of(defaultKeymap),
+        // listIndentKeymap goes first: it only claims Tab/Shift-Tab when
+        // the selection is inside a list item and falls through to
+        // defaultKeymap (and then the browser default) otherwise.
+        keymap.of([...listIndentKeymap, ...defaultKeymap]),
         EditorView.lineWrapping,
         EditorView.theme({
           '&': { height: '100%' },
@@ -56,14 +61,23 @@ export function FileEditor({ path }: FileEditorProps) {
           '.cm-gutters': { display: 'none' },
         }),
         livePreviewPlugin,
-        
+        normalizeBulletMarkers,
       ],
     });
 
-    viewRef.current = new EditorView({
+    const view = new EditorView({
       state,
       parent: containerRef.current,
     });
+    viewRef.current = view;
+
+    // A freshly loaded file can already mix "*"/"+"/"-" bullets --
+    // normalizeBulletMarkers only fires on edits made after the editor
+    // exists, so run the same fix once up front against the loaded doc.
+    const initialFix = bulletNormalizationChanges(view.state);
+    if (initialFix.length) {
+      view.dispatch({ changes: initialFix });
+    }
 
     return () => {
       viewRef.current?.destroy();
