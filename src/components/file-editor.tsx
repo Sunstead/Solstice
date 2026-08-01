@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 
 type FileEditorProps = {
   path: string;
@@ -14,7 +14,7 @@ export function FileEditor({ path }: FileEditorProps) {
 
     if (!path) return;
 
-    readTextFile(path)
+    invoke<string>('read_file', { path })
       .then((text) => {
         if (!cancelled) setContent(text);
       })
@@ -28,7 +28,11 @@ export function FileEditor({ path }: FileEditorProps) {
   }, [path]);
 
   if (error) {
-    return <div className='p-4 text-destructive'>Failed to load {path}: {error}</div>;
+    return (
+      <div className='p-4 text-destructive'>
+        Failed to load {path}: {error}
+      </div>
+    );
   }
 
   if (content === null) {

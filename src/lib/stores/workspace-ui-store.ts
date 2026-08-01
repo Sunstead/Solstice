@@ -1,28 +1,6 @@
 import { create } from 'zustand';
-import {
-  createJSONStorage,
-  persist,
-  type StateStorage,
-} from 'zustand/middleware';
-import { load } from '@tauri-apps/plugin-store';
-
-const storePromise = load('workspace-ui.json', { autoSave: true });
-
-const tauriStoreStorage: StateStorage = {
-  getItem: async (name) => {
-    const store = await storePromise;
-    const value = await store.get(name);
-    return value ? JSON.stringify(value) : null;
-  },
-  setItem: async (name, value) => {
-    const store = await storePromise;
-    await store.set(name, JSON.parse(value));
-  },
-  removeItem: async (name) => {
-    const store = await storePromise;
-    await store.delete(name);
-  },
-};
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { createScopedStorage } from './scoped-storage';
 
 interface WorkspaceUIState {
   activePrimaryView: string;
@@ -45,7 +23,7 @@ export const useWorkspaceUIStore = create<WorkspaceUIState>()(
     }),
     {
       name: 'workspace-ui',
-      storage: createJSONStorage(() => tauriStoreStorage),
+      storage: createJSONStorage(() => createScopedStorage('workspace-ui.json')),
     },
   ),
 );
