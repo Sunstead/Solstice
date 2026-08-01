@@ -1,13 +1,17 @@
+import { useEffect } from 'react';
 import { Layout, Model, TabNode } from 'flexlayout-react';
 import 'flexlayout-react/style/alpha_dark.css';
 import { Maximize, Minimize, X } from 'lucide-react';
+import { useLayout } from '@/hooks/use-layout';
+import { FileEditor } from '@/components/file-editor';
 
 const jsonModel = {
   global: {
     tabSetHeaderHeight: 80,
     tabSetTabStripHeight: 80,
-    tabMinWidth: 200,
+    tabMinWidth:  200,
     tabEnableRename: false,
+    enableEdgeDockIndicators: false,
   },
   layout: {
     type: 'row',
@@ -17,9 +21,7 @@ const jsonModel = {
         type: 'tabset',
         weight: 50,
         children: [
-          { type: 'tab', name: 'Panel 1', component: 'default' },
-          { type: 'tab', name: 'Panel 2', component: 'default' },
-          { type: 'tab', name: 'Panel 3', component: 'default' },
+
         ],
       },
     ],
@@ -29,10 +31,23 @@ const jsonModel = {
 const model = Model.fromJson(jsonModel);
 
 const factory = (node: TabNode) => {
+  const component = node.getComponent();
+
+  if (component === 'editor') {
+    const config = node.getConfig() as { path?: string } | undefined;
+    return <FileEditor path={config?.path ?? ''} />;
+  }
+
   return <div className='p-4'>{node.getName()}</div>;
 };
 
-export default function TestFlexLayout() {
+export default function FlexLayoutRoot() {
+  const setModel = useLayout((s) => s.setModel);
+
+  useEffect(() => {
+    setModel(model);
+  }, [setModel]);
+
   return (
     <div className='flexlayout-custom h-full w-full'>
       <Layout
@@ -40,13 +55,12 @@ export default function TestFlexLayout() {
         realtimeResize
         factory={factory}
         icons={{
-          close: <X className='size-4' />,  
+          close: <X className='size-4' />,
           maximize: <Maximize className='size-4 text-muted-foreground' />,
-          restore: <Minimize className='size-4 text-muted-foreground' />
+          restore: <Minimize className='size-4 text-muted-foreground' />,
         }}
         tabDragSpeed={0.1}
       />
-      ;
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { ChevronRight, File, Folder } from 'lucide-react';
 import { useFiles, FileTreeNode, selectChildren } from '@/hooks/use-files';
+import { useLayout } from '@/hooks/use-layout';
 import {
   Collapsible,
   CollapsibleContent,
@@ -33,12 +34,16 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const collapseDirectory = useFiles((s) => s.collapseDirectory);
   const entries = useFiles((s) => s.entries);
+  const openFile = useLayout((s) => s.openFile);
 
   const children = selectChildren(entries, node.path);
 
   if (!node.is_dir) {
     return (
-      <SidebarMenuButton className='data-[active=true]:bg-transparent w-full max-w-full truncate'>
+      <SidebarMenuButton
+        className='data-[active=true]:bg-transparent w-full max-w-full truncate'
+        onClick={() => openFile(node.path, node.name)}
+      >
         <File />
         <span className='text-nowrap w-full truncate'>{node.name}</span>
       </SidebarMenuButton>
