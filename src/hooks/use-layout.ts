@@ -26,6 +26,8 @@ const defaultLayoutJson: IJsonModel = {
 type LayoutState = {
   model: Model | null;
   workspacePath: string | null;
+  activeTabId: string | null;
+  setActiveTabId: (id: string | null) => void;
   loadForWorkspace: (path: string) => Promise<void>;
   persistCurrent: () => void;
   openFile: (path: string, name: string) => void;
@@ -39,17 +41,30 @@ function findFirstTabset(model: Model): TabSetNode | undefined {
   return found;
 }
 
+export function getActiveTabId(model: Model | null): string | null {
+  if (!model) return null;
+  const activeTabset = model.getActiveTabset();
+  if (!activeTabset) return null;
+  const selected = activeTabset.getSelectedNode();
+  return selected?.getId() ?? null;
+}
+
 let saveTimeout: ReturnType<typeof setTimeout> | undefined;
 
 export const useLayout = create<LayoutState>((set, get) => ({
   model: null,
   workspacePath: null,
+  activeTabId: null,
+
+  setActiveTabId: (id) => set({ activeTabId: id }),
 
   loadForWorkspace: async (path) => {
     const stored = await getStoredLayout();
+    const model = Model.fromJson(stored ?? defaultLayoutJson);
     set({
-      model: Model.fromJson(stored ?? defaultLayoutJson),
+      model,
       workspacePath: path,
+      activeTabId: getActiveTabId(model),
     });
   },
 

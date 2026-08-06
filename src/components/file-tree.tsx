@@ -11,7 +11,8 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
 } from './ui/resizable-sidebar';
-import { cn } from '@/lib/utils';
+import { cn, getFileExtension } from '@/lib/utils';
+import { getFileIcon, getFolderIcon } from '@/assets/icons';
 
 type FileTreeProps = {
   path: string;
@@ -35,16 +36,23 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const collapseDirectory = useFiles((s) => s.collapseDirectory);
   const entries = useFiles((s) => s.entries);
   const openFile = useLayout((s) => s.openFile);
+  
+  const activeTabId = useLayout((s) => s.activeTabId);
 
   const children = selectChildren(entries, node.path);
+
+  const FolderIcon = getFolderIcon();
+  const FileIcon = getFileIcon(getFileExtension(node.name));
 
   if (!node.is_dir) {
     return (
       <SidebarMenuButton
-        className='data-[active=true]:bg-transparent w-full max-w-full truncate'
+        isActive={activeTabId === node.path}
+        className='data-active:font-normal w-full max-w-full truncate'
         onClick={() => openFile(node.path, node.name)}
       >
-        <File />
+        <FileIcon />
+        {/* <File /> */}
         <span className='text-nowrap w-full truncate'>{node.name}</span>
       </SidebarMenuButton>
     );
@@ -71,7 +79,8 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
                   node.expanded && 'rotate-90',
                 )}
               />
-              <Folder className='size-4 min-w-4' />
+              <FolderIcon className='size-4 min-w-4' />
+              {/* <Folder className='size-4 min-w-4' /> */}
               <span className='text-nowrap truncate'>{node.name}</span>
             </SidebarMenuButton>
           }

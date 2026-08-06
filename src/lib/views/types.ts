@@ -7,3 +7,5 @@ export interface PrimaryView {
   label: string;
   sidebarComponent: React.ComponentType;
 }
+
+export type SvgComponent = React.FC<React.SVGProps<SVGSVGElement>>;

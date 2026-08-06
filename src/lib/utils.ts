@@ -16,3 +16,14 @@ export function toPx(value: string): number {
   // fallback: just strip units and hope for the best
   return parseFloat(value)
 }
+
+export function getFileExtension(filename: string): string {
+  const lastDotIndex = filename.lastIndexOf('.');
+  
+  // Return empty string if no dot exists or if it's a hidden file like ".htaccess"
+  if (lastDotIndex <= 0) {
+    return '';
+  }
+  
+  return filename.substring(lastDotIndex + 1);
+}

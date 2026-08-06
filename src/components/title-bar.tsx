@@ -5,7 +5,7 @@ import {
 } from '@tauri-apps/api/window';
 import { SidebarTrigger } from '@/components/ui/resizable-sidebar';
 import { Button } from '@/components/ui/button';
-import SolsticeIcon from '@/assets/icon/icon.svg?react';
+import SolsticeIcon from '@/assets/icons/app/icon.svg?react';
 import { useWorkspace } from '@/hooks/use-workspace';
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
