@@ -11,11 +11,13 @@ impl WorkspaceState {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_workspace(window: tauri::Window, state: tauri::State<WorkspaceState>, path: String) {
     state.0.lock().unwrap().insert(window.label().to_string(), path);
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_workspace(window: tauri::Window, state: tauri::State<WorkspaceState>) -> Option<String> {
     state.0.lock().unwrap().get(window.label()).cloned()
 }

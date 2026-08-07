@@ -6,6 +6,7 @@ import { resetScopedStoreCache } from '@/lib/stores/scoped-storage';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useFiles } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
+import { commands } from '@/bindings';
 
 type WorkspaceState = {
   path: string | null;
@@ -47,7 +48,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   setWorkspace: async (path) => {
-    await invoke('set_workspace', { path });
+    await commands.setWorkspace(path);
     await touchKnownWorkspace(path);
     useFiles.getState().reset();
     set({ path });

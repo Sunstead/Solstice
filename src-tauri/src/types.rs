@@ -1,8 +1,7 @@
-use serde::{ Deserialize, Serialize };
-use ts_rs::TS;
+use serde::{Deserialize, Serialize};
+use specta::Type;
 
-#[derive(Serialize, Deserialize, TS, Debug, Clone)]
-#[ts(export, export_to = "../../src/generated/")]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct FileEntry {
     pub name: String,
     pub path: String,

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 
-import { FileEntry } from '@/generated/FileEntry';
+import { FileEntry } from '@/bindings';
 
 export type FileTreeNode = FileEntry & {
   childrenLoaded: boolean;

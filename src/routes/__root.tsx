@@ -10,6 +10,9 @@ import { AppSidebar } from '@/components/app-sidebar';
 import TitleBar from '@/components/title-bar';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { registerCommand } from '@/lib/commands';
+import { useKeymapStore } from '@/lib/stores/keymap';
+import { useGlobalKeybinds } from '@/hooks/use-global-keybinds';
 
 export const Route = createRootRoute({
   component: () => {
@@ -30,6 +33,19 @@ export const Route = createRootRoute({
         setHydrated(true),
       );
     }, []);
+
+    useEffect(() => {
+      // Register what each command id actually does, once.
+      registerCommand('file.new', () => console.log("file.new"));
+      registerCommand('edit.bold', () => console.log("edit.bold"));
+      registerCommand('view.toggle_sidebar', () => console.log("view.toggle_sidebar"));
+
+      // Fetch the resolved registry + subscribe to keymap-changed.
+      void useKeymapStore.getState().init();
+    }, []);
+
+    // Registers/re-registers tinykeys bindings whenever the registry updates.
+    useGlobalKeybinds();
 
     return (
       <ThemeProvider defaultTheme='dark' storageKey='vite-ui-theme'>

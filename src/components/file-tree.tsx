@@ -1,4 +1,4 @@
-import { ChevronRight, File, Folder } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useFiles, FileTreeNode, selectChildren } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
 import {
