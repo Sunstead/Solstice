@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo } from 'react';
+import { useEffect, useId } from 'react';
 import {
   Editor,
   rootCtx,
@@ -40,9 +40,6 @@ import { commands } from '@/bindings';
 import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useKeymapStore } from '@/lib/stores/keymap';
-import { buildDynamicEditKeymap } from '@/lib/dynamic-keymap';
-import { toProseMirrorFormat } from '@/lib/accelerator';
-import type { CommandMeta } from '@/bindings';
 
 type MilkdownEditorProps = {
   path: string;
@@ -56,118 +53,103 @@ type PresetBinding = {
   keymapKey: any;
   // action name within that slice, e.g. 'TurnIntoH1'
   action: string;
-  // callCommand(...) result; invoke via editor.action(run)
-  run: (ctx: any) => boolean;
+  // The preset's exported command plugin (e.g. toggleStrongCommand).
+  // IMPORTANT: command.key does not exist until Milkdown has actually run
+  // this plugin's setup for a live editor -- it's undefined at module
+  // load. Don't build callCommand(command.key) here; resolve it lazily
+  // via run() at invocation time, once an editor exists.
+  command: { key: any };
+  payload?: unknown;
 };
 
+function run(binding: PresetBinding) {
+  return callCommand(binding.command.key, binding.payload);
+}
+
+const HEADING_BINDINGS: PresetBinding[] = Array.from({ length: 6 }, (_, i) => {
+  const level = i + 1;
+  return {
+    id: `edit.heading${level}`,
+    keymapKey: headingKeymap.key,
+    action: `TurnIntoH${level}`,
+    command: wrapInHeadingCommand,
+    payload: level,
+  };
+});
+
 const PRESET_BINDINGS: PresetBinding[] = [
-  // Headings
-  {
-    id: 'edit.heading1',
-    keymapKey: headingKeymap.key,
-    action: 'TurnIntoH1',
-    run: callCommand(wrapInHeadingCommand.key, 1),
-  },
-  {
-    id: 'edit.heading2',
-    keymapKey: headingKeymap.key,
-    action: 'TurnIntoH2',
-    run: callCommand(wrapInHeadingCommand.key, 2),
-  },
-  {
-    id: 'edit.heading3',
-    keymapKey: headingKeymap.key,
-    action: 'TurnIntoH3',
-    run: callCommand(wrapInHeadingCommand.key, 3),
-  },
-  {
-    id: 'edit.heading4',
-    keymapKey: headingKeymap.key,
-    action: 'TurnIntoH4',
-    run: callCommand(wrapInHeadingCommand.key, 4),
-  },
-  {
-    id: 'edit.heading5',
-    keymapKey: headingKeymap.key,
-    action: 'TurnIntoH5',
-    run: callCommand(wrapInHeadingCommand.key, 5),
-  },
-  {
-    id: 'edit.heading6',
-    keymapKey: headingKeymap.key,
-    action: 'TurnIntoH6',
-    run: callCommand(wrapInHeadingCommand.key, 6),
-  },
+  ...HEADING_BINDINGS,
   // Block elements
   {
     id: 'edit.blockquote',
     keymapKey: blockquoteKeymap.key,
     action: 'WrapInBlockquote',
-    run: callCommand(wrapInBlockquoteCommand.key),
+    command: wrapInBlockquoteCommand,
   },
   {
     id: 'edit.bullet_list',
     keymapKey: bulletListKeymap.key,
     action: 'WrapInBulletList',
-    run: callCommand(wrapInBulletListCommand.key),
+    command: wrapInBulletListCommand,
   },
   {
     id: 'edit.ordered_list',
     keymapKey: orderedListKeymap.key,
     action: 'WrapInOrderedList',
-    run: callCommand(wrapInOrderedListCommand.key),
+    command: wrapInOrderedListCommand,
   },
   {
     id: 'edit.code_block',
     keymapKey: codeBlockKeymap.key,
     action: 'CreateCodeBlock',
-    run: callCommand(createCodeBlockCommand.key),
+    command: createCodeBlockCommand,
   },
   {
     id: 'edit.hard_break',
     keymapKey: hardbreakKeymap.key,
     action: 'InsertHardbreak',
-    run: callCommand(insertHardbreakCommand.key),
+    command: insertHardbreakCommand,
   },
   {
     id: 'edit.paragraph',
     keymapKey: paragraphKeymap.key,
     action: 'TurnIntoText',
-    run: callCommand(turnIntoTextCommand.key),
+    command: turnIntoTextCommand,
   },
   // Text formatting
   {
     id: 'edit.bold',
     keymapKey: strongKeymap.key,
     action: 'ToggleBold',
-    run: callCommand(toggleStrongCommand.key),
+    command: toggleStrongCommand,
   },
   {
     id: 'edit.italic',
     keymapKey: emphasisKeymap.key,
     action: 'ToggleEmphasis',
-    run: callCommand(toggleEmphasisCommand.key),
+    command: toggleEmphasisCommand,
   },
   {
     id: 'edit.inline_code',
     keymapKey: inlineCodeKeymap.key,
     action: 'ToggleInlineCode',
-    run: callCommand(toggleInlineCodeCommand.key),
+    command: toggleInlineCodeCommand,
   },
   // GFM
   {
     id: 'edit.strikethrough',
     keymapKey: strikethroughKeymap.key,
     action: 'ToggleStrikethrough',
-    run: callCommand(toggleStrikethroughCommand.key),
+    command: toggleStrikethroughCommand,
   },
 ];
 
-const PRESET_OWNED_IDS = new Set(PRESET_BINDINGS.map((b) => b.id));
-
-function findAccelerator(cmds: CommandMeta[], id: string): string | null {
-  return cmds.find((c) => c.id === id)?.default_accelerator ?? null;
-}
+const PRESET_BINDINGS_BY_KEYMAP = PRESET_BINDINGS.reduce((map, binding) => {
+  const group = map.get(binding.keymapKey) ?? [];
+  group.push(binding);
+  map.set(binding.keymapKey, group);
+  return map;
+}, new Map<any, PresetBinding[]>());
 
 const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
   path,
@@ -175,19 +157,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
   onError,
 }) => {
   const instanceId = useId();
-
   const loaded = useKeymapStore((s) => s.loaded);
-  const allCmds = useKeymapStore((s) => s.commands);
-  const editCmds = useMemo(
-    () => allCmds.filter((c) => c.group === 'edit'),
-    [allCmds],
-  );
-
-  const keymapFingerprint = useMemo(
-    () =>
-      editCmds.map((c) => `${c.id}:${c.default_accelerator ?? ''}`).join('|'),
-    [editCmds],
-  );
 
   const { get, loading } = useEditor(
     (root) => {
@@ -203,39 +173,24 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
               .catch((err) => onError(String(err)));
           });
 
-          const byKeymap = new Map<any, PresetBinding[]>();
-          for (const binding of PRESET_BINDINGS) {
-            const group = byKeymap.get(binding.keymapKey) ?? [];
-            group.push(binding);
-            byKeymap.set(binding.keymapKey, group);
-          }
-
-          for (const [keymapKey, bindings] of byKeymap) {
+          for (const [keymapKey, bindings] of PRESET_BINDINGS_BY_KEYMAP) {
             const patch = {
               ...(ctx.get(keymapKey) as Record<
                 string,
                 { shortcuts: string[] }
               >),
             };
-            for (const { action, id } of bindings) {
-              const accel = findAccelerator(editCmds, id);
-              patch[action] = {
-                shortcuts: accel ? [toProseMirrorFormat(accel)] : [],
-              };
+            for (const { action } of bindings) {
+              patch[action] = { shortcuts: [] };
             }
             ctx.set(keymapKey, patch);
           }
         })
         .use(listener)
         .use(commonmark)
-        .use(gfm)
-        .use(
-          buildDynamicEditKeymap(
-            editCmds.filter((c) => !PRESET_OWNED_IDS.has(c.id)),
-          ),
-        );
+        .use(gfm);
     },
-    [path, loaded, keymapFingerprint],
+    [path, loaded],
   );
 
   useEffect(() => {
@@ -243,9 +198,12 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     const editor = get();
     if (!editor) return;
 
-    for (const { id, run } of PRESET_BINDINGS) {
-      registerScopedCommand(instanceId, id, () => {
-        editor.action(run);
+    for (const binding of PRESET_BINDINGS) {
+      registerScopedCommand(instanceId, binding.id, () => {
+        // binding.command.key is resolved now, not at module load --
+        // by this point the editor has run commonmark/gfm's setup and
+        // populated it.
+        editor.action(run(binding));
       });
     }
 
@@ -259,8 +217,13 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     };
     editor.action((ctx) => {
       dom = ctx.get(editorViewCtx).dom;
+      dom.setAttribute('data-command-surface', 'true');
       dom.addEventListener('focus', handleFocus);
       dom.addEventListener('blur', handleBlur);
+
+      if (document.activeElement === dom) {
+        handleFocus();
+      }
     });
 
     return () => {

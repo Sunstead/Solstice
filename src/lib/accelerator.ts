@@ -14,16 +14,18 @@ function normalizeBaseKey(key: string): string {
   return key.length === 1 ? key.toLowerCase() : key;
 }
 
+function convert(accelerator: string, modToken: string, separator: string): string {
+  const parts = accelerator.replace(/CmdOrCtrl/gi, modToken).split("+");
+  const key = normalizeBaseKey(parts.pop()!);
+  return [...parts, key].join(separator);
+}
+
 /** "CmdOrCtrl+Shift+B" -> "$mod+Shift+b" */
 export function toTinykeysFormat(accelerator: string): string {
-  const parts = accelerator.replace(/CmdOrCtrl/gi, "$mod").split("+");
-  const key = normalizeBaseKey(parts.pop()!);
-  return [...parts, key].join("+");
+  return convert(accelerator, "$mod", "+");
 }
 
 /** "CmdOrCtrl+Shift+B" -> "Mod-Shift-b" (prosemirror-keymap style) */
 export function toProseMirrorFormat(accelerator: string): string {
-  const parts = accelerator.replace(/CmdOrCtrl/gi, "Mod").split("+");
-  const key = normalizeBaseKey(parts.pop()!);
-  return [...parts, key].join("-");
+  return convert(accelerator, "Mod", "-");
 }

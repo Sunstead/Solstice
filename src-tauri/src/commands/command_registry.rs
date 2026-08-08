@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 use specta::Type;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -130,7 +130,7 @@ pub fn default_commands() -> Vec<CommandMeta> {
             label: "Strikethrough".into(),
             group: CommandGroup::Edit,
             default_accelerator: Some("CmdOrCtrl+Alt+X".into()),
-        },
+        }
         // ...rest of your commands
     ]
 }

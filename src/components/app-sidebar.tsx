@@ -20,9 +20,11 @@ import { Button } from './ui/button';
 import { primaryViews } from '@/lib/views/registry';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useEffect } from 'react';
+import { registerCommand, unregisterCommand } from '@/lib/commands';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { open, setOpen } = useSidebar();
+  const { open, setOpen, toggleSidebar } = useSidebar();
 
   const activePrimaryView = useWorkspaceUIStore((s) => s.activePrimaryView);
   const setActivePrimaryView = useWorkspaceUIStore(
@@ -45,6 +47,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       setSidebarCollapsed(false);
     }
   }
+
+  useEffect(() => {
+    registerCommand('view.toggle_sidebar', toggleSidebar);
+    return () => unregisterCommand('view.toggle_sidebar');
+  }, [toggleSidebar]);
 
   const openFolder = useWorkspace((s) => s.openFolder);
 
