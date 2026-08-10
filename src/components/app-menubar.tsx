@@ -1,136 +1,132 @@
+import { useEffect, useState } from 'react';
 import {
   Menubar,
-  MenubarCheckboxItem,
   MenubarContent,
-  MenubarGroup,
   MenubarItem,
   MenubarMenu,
-  MenubarRadioGroup,
-  MenubarRadioItem,
   MenubarSeparator,
-  MenubarShortcut,
   MenubarSub,
   MenubarSubContent,
   MenubarSubTrigger,
+  MenubarShortcut,
   MenubarTrigger,
-} from "@/components/ui/menubar"
+} from '@/components/ui/menubar';
+import { commands, events, type ResolvedMenu, type ResolvedMenuEntry, type NativeItem } from '@/bindings';
+import { runCommand } from '@/lib/commands';
+import { toDisplayFormat } from '@/lib/accelerator';
+
+const NATIVE_SCOPED_COMMAND_IDS: Partial<Record<NativeItem, string>> = {
+  Undo: 'native.undo',
+  Redo: 'native.redo',
+};
+
+function runNativeItem(item: NativeItem) {
+  switch (item) {
+    case 'Cut':
+      document.execCommand('cut');
+      return;
+    case 'Copy':
+      document.execCommand('copy');
+      return;
+    case 'Paste':
+      // execCommand('paste') is blocked in most Chromium builds
+      // regardless of context -- Clipboard API instead. May prompt for
+      // permission the first time on some platforms; worth testing
+      // rather than assuming it's silent.
+      navigator.clipboard.readText().then((text) => {
+        document.execCommand('insertText', false, text);
+      });
+      return;
+    case 'SelectAll':
+      document.execCommand('selectAll');
+      return;
+    case 'Undo':
+    case 'Redo': {
+      const id = NATIVE_SCOPED_COMMAND_IDS[item];
+      if (id) void runCommand(id);
+      return;
+    }
+  }
+}
+
+function useMenuLayout() {
+  const [layout, setLayout] = useState<ResolvedMenu[]>([]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    const refresh = () => {
+      commands.getMenuLayout().then(setLayout).catch((err) => {
+        console.error('Failed to load menu layout:', err);
+      });
+    };
+
+    refresh();
+    events.keymapChanged.listen(refresh).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => unlisten?.();
+  }, []);
+
+  return layout;
+}
+
+function MenuEntryView({ entry, keyPrefix }: { entry: ResolvedMenuEntry; keyPrefix: string }) {
+  if (entry === 'Separator') {
+    return <MenubarSeparator />;
+  }
+
+  if ('Command' in entry) {
+    const c = entry.Command!;
+    return (
+      <MenubarItem onClick={() => void runCommand(c.id)}>
+        {c.label}
+        {c.default_accelerator && (
+          <MenubarShortcut className='tracking-wide'>{toDisplayFormat(c.default_accelerator)}</MenubarShortcut>
+        )}
+      </MenubarItem>
+    );
+  }
+
+  if ('Native' in entry) {
+    const n = entry.Native!;
+    return (
+      <MenubarItem onClick={() => runNativeItem(n.item)}>
+        {n.label}
+        <MenubarShortcut className='tracking-wide'>{toDisplayFormat(n.accelerator)}</MenubarShortcut>
+      </MenubarItem>
+    );
+  }
+
+  const { title, entries } = entry.Submenu;
+  return (
+    <MenubarSub>
+      <MenubarSubTrigger>{title}</MenubarSubTrigger>
+      <MenubarSubContent>
+        {entries.map((child, i) => (
+          <MenuEntryView key={`${keyPrefix}-${i}`} entry={child} keyPrefix={`${keyPrefix}-${i}`} />
+        ))}
+      </MenubarSubContent>
+    </MenubarSub>
+  );
+}
 
 export function AppMenubar() {
+  const layout = useMenuLayout();
+
   return (
     <Menubar className="border-none">
-      <MenubarMenu>
-        <MenubarTrigger>File</MenubarTrigger>
-        <MenubarContent>
-          <MenubarGroup>
-            <MenubarItem>
-              New Tab <MenubarShortcut>⌘T</MenubarShortcut>
-            </MenubarItem>
-            <MenubarItem>
-              New Window <MenubarShortcut>⌘N</MenubarShortcut>
-            </MenubarItem>
-            <MenubarItem disabled>New Incognito Window</MenubarItem>
-          </MenubarGroup>
-          <MenubarSeparator />
-          <MenubarGroup>
-            <MenubarSub>
-              <MenubarSubTrigger>Share</MenubarSubTrigger>
-              <MenubarSubContent>
-                <MenubarGroup>
-                  <MenubarItem>Email link</MenubarItem>
-                  <MenubarItem>Messages</MenubarItem>
-                  <MenubarItem>Notes</MenubarItem>
-                </MenubarGroup>
-              </MenubarSubContent>
-            </MenubarSub>
-          </MenubarGroup>
-          <MenubarSeparator />
-          <MenubarGroup>
-            <MenubarItem>
-              Print... <MenubarShortcut>⌘P</MenubarShortcut>
-            </MenubarItem>
-          </MenubarGroup>
-        </MenubarContent>
-      </MenubarMenu>
-      <MenubarMenu>
-        <MenubarTrigger>Edit</MenubarTrigger>
-        <MenubarContent>
-          <MenubarGroup>
-            <MenubarItem>
-              Undo <MenubarShortcut>⌘Z</MenubarShortcut>
-            </MenubarItem>
-            <MenubarItem>
-              Redo <MenubarShortcut>⇧⌘Z</MenubarShortcut>
-            </MenubarItem>
-          </MenubarGroup>
-          <MenubarSeparator />
-          <MenubarGroup>
-            <MenubarSub>
-              <MenubarSubTrigger>Find</MenubarSubTrigger>
-              <MenubarSubContent>
-                <MenubarGroup>
-                  <MenubarItem>Search the web</MenubarItem>
-                </MenubarGroup>
-                <MenubarSeparator />
-                <MenubarGroup>
-                  <MenubarItem>Find...</MenubarItem>
-                  <MenubarItem>Find Next</MenubarItem>
-                  <MenubarItem>Find Previous</MenubarItem>
-                </MenubarGroup>
-              </MenubarSubContent>
-            </MenubarSub>
-          </MenubarGroup>
-          <MenubarSeparator />
-          <MenubarGroup>
-            <MenubarItem>Cut</MenubarItem>
-            <MenubarItem>Copy</MenubarItem>
-            <MenubarItem>Paste</MenubarItem>
-          </MenubarGroup>
-        </MenubarContent>
-      </MenubarMenu>
-      <MenubarMenu>
-        <MenubarTrigger>View</MenubarTrigger>
-        <MenubarContent className="w-44">
-          <MenubarGroup>
-            <MenubarCheckboxItem>Bookmarks Bar</MenubarCheckboxItem>
-            <MenubarCheckboxItem checked>Full URLs</MenubarCheckboxItem>
-          </MenubarGroup>
-          <MenubarSeparator />
-          <MenubarGroup>
-            <MenubarItem inset>
-              Reload <MenubarShortcut>⌘R</MenubarShortcut>
-            </MenubarItem>
-            <MenubarItem disabled inset>
-              Force Reload <MenubarShortcut>⇧⌘R</MenubarShortcut>
-            </MenubarItem>
-          </MenubarGroup>
-          <MenubarSeparator />
-          <MenubarGroup>
-            <MenubarItem inset>Toggle Fullscreen</MenubarItem>
-          </MenubarGroup>
-          <MenubarSeparator />
-          <MenubarGroup>
-            <MenubarItem inset>Hide Sidebar</MenubarItem>
-          </MenubarGroup>
-        </MenubarContent>
-      </MenubarMenu>
-      <MenubarMenu>
-        <MenubarTrigger>Profiles</MenubarTrigger>
-        <MenubarContent>
-          <MenubarRadioGroup value="benoit">
-            <MenubarRadioItem value="andy">Andy</MenubarRadioItem>
-            <MenubarRadioItem value="benoit">Benoit</MenubarRadioItem>
-            <MenubarRadioItem value="Luis">Luis</MenubarRadioItem>
-          </MenubarRadioGroup>
-          <MenubarSeparator />
-          <MenubarGroup>
-            <MenubarItem inset>Edit...</MenubarItem>
-          </MenubarGroup>
-          <MenubarSeparator />
-          <MenubarGroup>
-            <MenubarItem inset>Add Profile...</MenubarItem>
-          </MenubarGroup>
-        </MenubarContent>
-      </MenubarMenu>
+      {layout.map((menu) => (
+        <MenubarMenu key={menu.title}>
+          <MenubarTrigger>{menu.title}</MenubarTrigger>
+          <MenubarContent className='w-max min-w-64'>
+            {menu.entries.map((entry, i) => (
+              <MenuEntryView key={`${menu.title}-${i}`} entry={entry} keyPrefix={`${menu.title}-${i}`} />
+            ))}
+          </MenubarContent>
+        </MenubarMenu>
+      ))}
     </Menubar>
-  )
+  );
 }

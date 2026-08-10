@@ -1,56 +1,53 @@
 use tauri::{
-    menu::{Menu, MenuBuilder, MenuItemBuilder, Submenu, SubmenuBuilder},
+    menu::{ Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, Submenu, SubmenuBuilder },
     AppHandle,
 };
 
-use crate::commands::command_registry::{CommandGroup, CommandMeta};
-use crate::commands::keymap::resolved_commands;
+use crate::commands::menu_layout::{ resolve_menu_layout, NativeItem, ResolvedMenuEntry };
 
-fn filter(cmds: &[CommandMeta], g: CommandGroup) -> Vec<CommandMeta> {
-    cmds.iter().filter(|c| c.group == g).cloned().collect()
-}
-
-fn plain_submenu(app: &AppHandle, title: &str, cmds: &[CommandMeta]) -> tauri::Result<Submenu<tauri::Wry>> {
+fn build_submenu(
+    app: &AppHandle,
+    title: &str,
+    entries: &[ResolvedMenuEntry]
+) -> tauri::Result<Submenu<tauri::Wry>> {
     let mut b = SubmenuBuilder::new(app, title);
-    for c in cmds {
-        let mut item = MenuItemBuilder::new(&c.label).id(&c.id);
-        if let Some(a) = &c.default_accelerator {
-            item = item.accelerator(a);
-        }
-        b = b.item(&item.build(app)?);
-    }
-    b.build()
-}
-
-fn edit_submenu(app: &AppHandle, cmds: &[CommandMeta]) -> tauri::Result<Submenu<tauri::Wry>> {
-    let mut b = SubmenuBuilder::new(app, "Edit")
-        .undo()
-        .redo()
-        .separator()
-        .cut()
-        .copy()
-        .paste()
-        .select_all()
-        .separator();
-    for c in cmds {
-        let mut item = MenuItemBuilder::new(&c.label).id(&c.id);
-        if let Some(a) = &c.default_accelerator {
-            item = item.accelerator(a);
-        }
-        b = b.item(&item.build(app)?);
+    for entry in entries {
+        b = match entry {
+            ResolvedMenuEntry::Command(c) => {
+                let mut item = MenuItemBuilder::new(&c.label).id(&c.id);
+                if let Some(a) = &c.default_accelerator {
+                    item = item.accelerator(a);
+                }
+                b.item(&item.build(app)?)
+            }
+            // Native items map straight to Tauri's OS-linked predefined
+            // items -- same free, zero-JS behavior as before.
+            ResolvedMenuEntry::Native { item, .. } => {
+                let predefined = match item {
+                    NativeItem::Undo => PredefinedMenuItem::undo(app, None)?,
+                    NativeItem::Redo => PredefinedMenuItem::redo(app, None)?,
+                    NativeItem::Cut => PredefinedMenuItem::cut(app, None)?,
+                    NativeItem::Copy => PredefinedMenuItem::copy(app, None)?,
+                    NativeItem::Paste => PredefinedMenuItem::paste(app, None)?,
+                    NativeItem::SelectAll => PredefinedMenuItem::select_all(app, None)?,
+                };
+                b.item(&predefined)
+            }
+            ResolvedMenuEntry::Separator => b.separator(),
+            ResolvedMenuEntry::Submenu { title, entries } => {
+                b.item(&build_submenu(app, title, entries)?)
+            }
+        };
     }
     b.build()
 }
 
 pub fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, String> {
-    let cmds = resolved_commands(app);
-    let file = plain_submenu(app, "File", &filter(&cmds, CommandGroup::File)).map_err(|e| e.to_string())?;
-    let edit = edit_submenu(app, &filter(&cmds, CommandGroup::Edit)).map_err(|e| e.to_string())?;
-    let view = plain_submenu(app, "View", &filter(&cmds, CommandGroup::View)).map_err(|e| e.to_string())?;
-    MenuBuilder::new(app)
-        .item(&file)
-        .item(&edit)
-        .item(&view)
-        .build()
-        .map_err(|e| e.to_string())
+    let layout = resolve_menu_layout(app);
+    let mut b = MenuBuilder::new(app);
+    for menu in &layout {
+        let submenu = build_submenu(app, &menu.title, &menu.entries).map_err(|e| e.to_string())?;
+        b = b.item(&submenu);
+    }
+    b.build().map_err(|e| e.to_string())
 }

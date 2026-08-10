@@ -30,6 +30,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             workspace::get_workspace,
             commands::keymap::get_command_registry,
             commands::keymap::set_keybind,
+            commands::menu_layout::get_menu_layout,
         ])
         .events(tauri_specta::collect_events![KeymapChanged])
 }

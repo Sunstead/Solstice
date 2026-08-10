@@ -6,6 +6,11 @@ import {
   editorViewCtx,
 } from '@milkdown/kit/core';
 import {
+  history,
+  redoCommand,
+  undoCommand,
+} from '@milkdown/kit/plugin/history';
+import {
   commonmark,
   toggleStrongCommand,
   toggleEmphasisCommand,
@@ -188,7 +193,8 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         })
         .use(listener)
         .use(commonmark)
-        .use(gfm);
+        .use(gfm)
+        .use(history);
     },
     [path, loaded],
   );
@@ -207,19 +213,30 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       });
     }
 
+    registerScopedCommand(instanceId, 'native.undo', () => {
+      editor.action(callCommand(undoCommand.key));
+    });
+    registerScopedCommand(instanceId, 'native.redo', () => {
+      editor.action(callCommand(redoCommand.key));
+    });
+
     let dom: HTMLElement | null = null;
     const handleFocus = () =>
       useActiveEditorStore.getState().setActiveEditor(instanceId);
-    const handleBlur = () => {
-      if (useActiveEditorStore.getState().activeEditorId === instanceId) {
-        useActiveEditorStore.getState().setActiveEditor(null);
-      }
-    };
+
+    // Intentionally no blur handler here. Clicking the Edit menu (native
+    // menubar, or anything outside this editor) moves DOM focus away
+    // from `dom` first, firing blur, before the menu's click/invoke
+    // handler actually runs -- so a blur-driven "clear active editor"
+    // would race ahead and null out the target before Undo/Redo ever
+    // gets dispatched. Instead we let `activeEditorId` stay sticky: it's
+    // only ever overwritten by another editor's own `handleFocus`, or
+    // cleared below on unmount. That keeps this editor as the scoped
+    // command target even while focus is elsewhere.
     editor.action((ctx) => {
       dom = ctx.get(editorViewCtx).dom;
       dom.setAttribute('data-command-surface', 'true');
       dom.addEventListener('focus', handleFocus);
-      dom.addEventListener('blur', handleBlur);
 
       if (document.activeElement === dom) {
         handleFocus();
@@ -228,10 +245,15 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
 
     return () => {
       dom?.removeEventListener('focus', handleFocus);
-      dom?.removeEventListener('blur', handleBlur);
       for (const { id } of PRESET_BINDINGS) {
         unregisterScopedCommand(instanceId, id);
       }
+
+      unregisterScopedCommand(instanceId, 'native.undo');
+      unregisterScopedCommand(instanceId, 'native.redo');
+
+      // Only clear here, on unmount -- so a closed/unmounted editor never
+      // stays the active command target.
       if (useActiveEditorStore.getState().activeEditorId === instanceId) {
         useActiveEditorStore.getState().setActiveEditor(null);
       }

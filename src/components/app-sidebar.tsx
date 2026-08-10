@@ -19,7 +19,6 @@ import { ThemeToggle } from './theme-toggle';
 import { Button } from './ui/button';
 import { primaryViews } from '@/lib/views/registry';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
-import { useWorkspace } from '@/hooks/use-workspace';
 import { useEffect } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 
@@ -52,8 +51,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     registerCommand('view.toggle_sidebar', toggleSidebar);
     return () => unregisterCommand('view.toggle_sidebar');
   }, [toggleSidebar]);
-
-  const openFolder = useWorkspace((s) => s.openFolder);
 
   return (
     <Sidebar
@@ -94,17 +91,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <Button variant='ghost' size='icon' className='size-10'>
-                    <Settings className='size-5' />
-                    <span className='sr-only'>Settings</span>
-                  </Button>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    className='size-10'
-                    onClick={openFolder}
-                  >
                     <Settings className='size-5' />
                     <span className='sr-only'>Settings</span>
                   </Button>

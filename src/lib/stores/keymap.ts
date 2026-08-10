@@ -36,7 +36,3 @@ export const useKeymapStore = create<KeymapState>((set) => ({
     return null;
   },
 }));
-
-export function selectCommandsByGroup(group: CommandMeta["group"]) {
-  return (state: KeymapState) => state.commands.filter((c) => c.group === group);
-}

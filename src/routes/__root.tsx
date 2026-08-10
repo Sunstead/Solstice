@@ -1,4 +1,3 @@
-// src/routes/__root.tsx
 import { useEffect, useState } from 'react';
 import { createRootRoute, Outlet } from '@tanstack/react-router';
 import { ThemeProvider } from '../components/theme-provider';
@@ -7,7 +6,7 @@ import {
   SidebarProvider,
 } from '@/components/ui/resizable-sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
-import TitleBar from '@/components/title-bar';
+import { TitleBarShell } from '@/components/title-bar';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand } from '@/lib/commands';
@@ -27,6 +26,8 @@ export const Route = createRootRoute({
       useWorkspaceUIStore.persist.hasHydrated(),
     );
 
+    const openFolder = useWorkspace((s) => s.openFolder);
+
     useEffect(() => {
       useWorkspace.getState().init();
       return useWorkspaceUIStore.persist.onFinishHydration(() =>
@@ -36,9 +37,12 @@ export const Route = createRootRoute({
 
     useEffect(() => {
       // Register what each command id actually does, once.
-      registerCommand('file.new', () => console.log("file.new"));
-      registerCommand('edit.bold', () => console.log("edit.bold"));
-      registerCommand('view.toggle_sidebar', () => console.log("view.toggle_sidebar"));
+      registerCommand('file.new', () => console.log('file.new'));
+      registerCommand('edit.bold', () => console.log('edit.bold'));
+      registerCommand('view.toggle_sidebar', () =>
+        console.log('view.toggle_sidebar'),
+      );
+      registerCommand('file.open_folder', () => openFolder());
 
       // Fetch the resolved registry + subscribe to keymap-changed.
       void useKeymapStore.getState().init();
@@ -49,7 +53,7 @@ export const Route = createRootRoute({
 
     return (
       <ThemeProvider defaultTheme='dark' storageKey='vite-ui-theme'>
-        <div className='h-screen bg-background text-foreground flex flex-col overflow-hidden'>
+        <div className='h-screen bg-sidebar text-foreground flex flex-col overflow-hidden'>
           <SidebarProvider
             key={hydrated ? 'hydrated' : 'initial'}
             open={!sidebarCollapsed}
@@ -58,9 +62,14 @@ export const Route = createRootRoute({
             onWidthChange={setSidebarWidth}
             className='flex-col'
           >
-            <TitleBar />
             <div className='flex flex-1 min-h-0 relative w-full max-w-full'>
-              <AppSidebar />
+              <div className='h-full'>
+                <TitleBarShell />
+
+                <div className='relative h-full'>
+                  <AppSidebar />
+                </div>
+              </div>
               <SidebarInset>
                 <Outlet />
               </SidebarInset>

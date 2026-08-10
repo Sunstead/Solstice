@@ -23,15 +23,15 @@
 
 .flexlayout-custom
   .flexlayout__tab_button:not(.flexlayout__tab_button--selected) {
-  margin-bottom: 2px;
+  margin-bottom: 3px;
   margin-left: 2px;
   margin-right: 2px;
+  height: 30px;
 }
 
 .flexlayout-custom
   .flexlayout__tab_button:hover:not(.flexlayout__tab_button--selected) {
   background-color: var(--color-muted);
-  height: 32px;
   border-radius: var(--radius-md);
   border: none;
 }
@@ -135,4 +135,12 @@
 .flexlayout-custom
   .flexlayout__tabset_tab_divider.flexlayout__tabset_tab_divider_selected_after {
   background-color: transparent;
+}
+
+.flexlayout-custom .flexlayout__tab_toolbar:has(.window-controls) {
+  padding-right: 0;
+}
+
+.flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container_top {
+  padding-top: 4px;
 }

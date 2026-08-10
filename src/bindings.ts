@@ -20,6 +20,7 @@ export const commands = {
 	getWorkspace: () => __TAURI_INVOKE<string | null>("get_workspace"),
 	getCommandRegistry: () => __TAURI_INVOKE<CommandMeta[]>("get_command_registry"),
 	setKeybind: (commandId: string, accelerator: string) => typedError<null, string>(__TAURI_INVOKE("set_keybind", { commandId, accelerator })),
+	getMenuLayout: () => __TAURI_INVOKE<ResolvedMenu[]>("get_menu_layout"),
 };
 
 /** Events */
@@ -28,12 +29,9 @@ export const events = {
 };
 
 /* Types */
-export type CommandGroup = "file" | "edit" | "view";
-
 export type CommandMeta = {
 	id: string,
 	label: string,
-	group: CommandGroup,
 	default_accelerator: string | null,
 };
 
@@ -49,6 +47,32 @@ export type FileEntry = {
  *  keymap plugin — listens for this instead of polling.
  */
 export type KeymapChanged = null;
+
+/**
+ *  OS-provided editing actions. Deliberately NOT CommandMeta -- no id in
+ *  the command registry, no rebindable accelerator, never registered as
+ *  a keybind. A real Ctrl+C/Ctrl+Z keystroke is already handled natively
+ *  by the browser/ProseMirror with zero JS involved; the only thing that
+ *  actually needs wiring per-platform is a MENU CLICK on one of these
+ *  (mac: free via the native menu, Windows: needs a small real handler
+ *  in the React menu bar -- see NativeItem below for the label/accel
+ *  shown there).
+ */
+export type NativeItem = "Undo" | "Redo" | "Cut" | "Copy" | "Paste" | "SelectAll";
+
+export type ResolvedMenu = {
+	title: string,
+	entries: ResolvedMenuEntry[],
+};
+
+export type ResolvedMenuEntry = ({ Command: CommandMeta }) & { Native?: never; Submenu?: never } | ({ Native: {
+	item: NativeItem,
+	label: string,
+	accelerator: string,
+} }) & { Command?: never; Submenu?: never } | "Separator" | ({ Submenu: {
+	title: string,
+	entries: ResolvedMenuEntry[],
+} }) & { Command?: never; Native?: never };
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
