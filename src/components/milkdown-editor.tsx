@@ -1,15 +1,18 @@
 import { useEffect, useId } from 'react';
+import type { Ctx } from '@milkdown/kit/ctx';
 import {
   Editor,
   rootCtx,
   defaultValueCtx,
   editorViewCtx,
+  commandsCtx,
 } from '@milkdown/kit/core';
 import {
   history,
   redoCommand,
   undoCommand,
 } from '@milkdown/kit/plugin/history';
+import { clipboard } from '@milkdown/kit/plugin/clipboard';
 import {
   commonmark,
   toggleStrongCommand,
@@ -39,7 +42,8 @@ import {
   strikethroughKeymap,
 } from '@milkdown/kit/preset/gfm';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
-import { callCommand } from '@milkdown/kit/utils';
+import { callCommand, $prose } from '@milkdown/kit/utils';
+import { Plugin, AllSelection } from '@milkdown/kit/prose/state';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
 import { commands } from '@/bindings';
 import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
@@ -54,21 +58,27 @@ type MilkdownEditorProps = {
 
 type PresetBinding = {
   id: string;
-  // ctx slice for the owning $useKeymap plugin, e.g. headingKeymap.key
   keymapKey: any;
-  // action name within that slice, e.g. 'TurnIntoH1'
   action: string;
-  // The preset's exported command plugin (e.g. toggleStrongCommand).
-  // IMPORTANT: command.key does not exist until Milkdown has actually run
-  // this plugin's setup for a live editor -- it's undefined at module
-  // load. Don't build callCommand(command.key) here; resolve it lazily
-  // via run() at invocation time, once an editor exists.
   command: { key: any };
   payload?: unknown;
 };
 
 function run(binding: PresetBinding) {
   return callCommand(binding.command.key, binding.payload);
+}
+
+function canRun(key: any, payload?: unknown) {
+  return (ctx: Ctx) => {
+    try {
+      const view = ctx.get(editorViewCtx);
+      const command = ctx.get(commandsCtx).get(key)(payload);
+      return command(view.state, undefined, view);
+    } catch (err) {
+      console.error('Failed to check command availability', err);
+      return false;
+    }
+  };
 }
 
 const HEADING_BINDINGS: PresetBinding[] = Array.from({ length: 6 }, (_, i) => {
@@ -84,7 +94,6 @@ const HEADING_BINDINGS: PresetBinding[] = Array.from({ length: 6 }, (_, i) => {
 
 const PRESET_BINDINGS: PresetBinding[] = [
   ...HEADING_BINDINGS,
-  // Block elements
   {
     id: 'edit.blockquote',
     keymapKey: blockquoteKeymap.key,
@@ -121,7 +130,6 @@ const PRESET_BINDINGS: PresetBinding[] = [
     action: 'TurnIntoText',
     command: turnIntoTextCommand,
   },
-  // Text formatting
   {
     id: 'edit.bold',
     keymapKey: strongKeymap.key,
@@ -140,7 +148,6 @@ const PRESET_BINDINGS: PresetBinding[] = [
     action: 'ToggleInlineCode',
     command: toggleInlineCodeCommand,
   },
-  // GFM
   {
     id: 'edit.strikethrough',
     keymapKey: strikethroughKeymap.key,
@@ -168,6 +175,27 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     (root) => {
       if (!loaded) return undefined;
 
+      const commandStateTracker = $prose(
+        () =>
+          new Plugin({
+            view: () => ({
+              update: (view, prevState) => {
+                if (
+                  view.state.selection.eq(prevState.selection) &&
+                  view.state.doc.eq(prevState.doc)
+                ) {
+                  return;
+                }
+                if (
+                  useActiveEditorStore.getState().activeEditorId === instanceId
+                ) {
+                  useActiveEditorStore.getState().bumpCommandVersion();
+                }
+              },
+            }),
+          }),
+      );
+
       return Editor.make()
         .config((ctx) => {
           ctx.set(rootCtx, root);
@@ -194,7 +222,9 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         .use(listener)
         .use(commonmark)
         .use(gfm)
-        .use(history);
+        .use(history)
+        .use(clipboard)
+        .use(commandStateTracker);
     },
     [path, loaded],
   );
@@ -204,38 +234,120 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     const editor = get();
     if (!editor) return;
 
-    for (const binding of PRESET_BINDINGS) {
-      registerScopedCommand(instanceId, binding.id, () => {
-        // binding.command.key is resolved now, not at module load --
-        // by this point the editor has run commonmark/gfm's setup and
-        // populated it.
-        editor.action(run(binding));
+    const focusView = () => {
+      editor.action((ctx) => {
+        ctx.get(editorViewCtx).focus();
       });
+    };
+
+    const pasteFromClipboard = async () => {
+      focusView();
+      const dataTransfer = new DataTransfer();
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          for (const type of item.types) {
+            if (type !== 'text/plain' && type !== 'text/html') continue;
+            const blob = await item.getType(type);
+            dataTransfer.setData(type, await blob.text());
+          }
+        }
+      } catch {
+        try {
+          dataTransfer.setData(
+            'text/plain',
+            await navigator.clipboard.readText(),
+          );
+        } catch (err) {
+          console.error('Paste failed: clipboard unavailable', err);
+          return;
+        }
+      }
+      if (dataTransfer.types.length === 0) return;
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+
+        view.dom.dispatchEvent(
+          new ClipboardEvent('paste', {
+            clipboardData: dataTransfer,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      });
+    };
+
+    for (const binding of PRESET_BINDINGS) {
+      registerScopedCommand(
+        instanceId,
+        binding.id,
+        () => {
+          focusView();
+          editor.action(run(binding));
+        },
+        () => editor.action(canRun(binding.command.key, binding.payload)),
+      );
     }
 
-    registerScopedCommand(instanceId, 'native.undo', () => {
-      editor.action(callCommand(undoCommand.key));
+    registerScopedCommand(
+      instanceId,
+      'native.undo',
+      () => {
+        editor.action(callCommand(undoCommand.key));
+      },
+      () => editor.action(canRun(undoCommand.key)),
+    );
+    registerScopedCommand(
+      instanceId,
+      'native.redo',
+      () => {
+        editor.action(callCommand(redoCommand.key));
+      },
+      () => editor.action(canRun(redoCommand.key)),
+    );
+
+    registerScopedCommand(
+      instanceId,
+      'native.cut',
+      () => {
+        focusView();
+        document.execCommand('cut');
+      },
+      () =>
+        editor.action((ctx) => !ctx.get(editorViewCtx).state.selection.empty),
+    );
+    registerScopedCommand(
+      instanceId,
+      'native.copy',
+      () => {
+        focusView();
+        document.execCommand('copy');
+      },
+      () =>
+        editor.action((ctx) => !ctx.get(editorViewCtx).state.selection.empty),
+    );
+    registerScopedCommand(instanceId, 'native.paste', () => {
+      void pasteFromClipboard();
     });
-    registerScopedCommand(instanceId, 'native.redo', () => {
-      editor.action(callCommand(redoCommand.key));
+
+    registerScopedCommand(instanceId, 'native.select_all', () => {
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        view.dispatch(
+          view.state.tr.setSelection(new AllSelection(view.state.doc)),
+        );
+      });
+      focusView();
     });
 
     let dom: HTMLElement | null = null;
     const handleFocus = () =>
       useActiveEditorStore.getState().setActiveEditor(instanceId);
 
-    // Intentionally no blur handler here. Clicking the Edit menu (native
-    // menubar, or anything outside this editor) moves DOM focus away
-    // from `dom` first, firing blur, before the menu's click/invoke
-    // handler actually runs -- so a blur-driven "clear active editor"
-    // would race ahead and null out the target before Undo/Redo ever
-    // gets dispatched. Instead we let `activeEditorId` stay sticky: it's
-    // only ever overwritten by another editor's own `handleFocus`, or
-    // cleared below on unmount. That keeps this editor as the scoped
-    // command target even while focus is elsewhere.
     editor.action((ctx) => {
       dom = ctx.get(editorViewCtx).dom;
       dom.setAttribute('data-command-surface', 'true');
+      dom.setAttribute('data-editor-id', instanceId);
       dom.addEventListener('focus', handleFocus);
 
       if (document.activeElement === dom) {
@@ -251,6 +363,10 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
 
       unregisterScopedCommand(instanceId, 'native.undo');
       unregisterScopedCommand(instanceId, 'native.redo');
+      unregisterScopedCommand(instanceId, 'native.cut');
+      unregisterScopedCommand(instanceId, 'native.copy');
+      unregisterScopedCommand(instanceId, 'native.paste');
+      unregisterScopedCommand(instanceId, 'native.select_all');
 
       // Only clear here, on unmount -- so a closed/unmounted editor never
       // stays the active command target.

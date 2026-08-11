@@ -1,0 +1,11 @@
+[data-milkdown-root='true'] {
+  height: 100%;
+}
+
+.milkdown {
+  height: 100%;
+}
+
+.milkdown ::selection {
+  background-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
+}

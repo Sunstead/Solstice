@@ -5,6 +5,7 @@
 @import './typeset.css';
 @import './flexlayout.css';
 @import './prosemirror.css';
+@import './milkdown.css';
 
 @custom-variant dark (&:is(.dark *));
 

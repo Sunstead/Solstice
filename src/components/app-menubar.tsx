@@ -11,42 +11,49 @@ import {
   MenubarShortcut,
   MenubarTrigger,
 } from '@/components/ui/menubar';
-import { commands, events, type ResolvedMenu, type ResolvedMenuEntry, type NativeItem } from '@/bindings';
-import { runCommand } from '@/lib/commands';
+import {
+  commands,
+  events,
+  type ResolvedMenu,
+  type ResolvedMenuEntry,
+  type NativeItem,
+} from '@/bindings';
+import { isCommandEnabled, runCommand } from '@/lib/commands';
 import { toDisplayFormat } from '@/lib/accelerator';
+import { useActiveEditorStore } from '@/lib/stores/active-editor';
 
-const NATIVE_SCOPED_COMMAND_IDS: Partial<Record<NativeItem, string>> = {
+// Every native item is now backed by a scoped command registered per
+// editor instance (milkdown-editor.tsx) -- Undo/Redo always were, and
+// Cut/Copy/Paste/SelectAll now are too, so they get a real
+// enabled/disabled reading and operate on the sticky active editor
+// instead of document.execCommand against whatever currently has DOM
+// focus (which, by the time a menu click fires, is no longer the
+// editor -- see milkdown-editor.tsx for why).
+const NATIVE_SCOPED_COMMAND_IDS: Record<NativeItem, string> = {
   Undo: 'native.undo',
   Redo: 'native.redo',
+  Cut: 'native.cut',
+  Copy: 'native.copy',
+  Paste: 'native.paste',
+  SelectAll: 'native.select_all',
 };
 
-function runNativeItem(item: NativeItem) {
-  switch (item) {
-    case 'Cut':
-      document.execCommand('cut');
-      return;
-    case 'Copy':
-      document.execCommand('copy');
-      return;
-    case 'Paste':
-      // execCommand('paste') is blocked in most Chromium builds
-      // regardless of context -- Clipboard API instead. May prompt for
-      // permission the first time on some platforms; worth testing
-      // rather than assuming it's silent.
-      navigator.clipboard.readText().then((text) => {
-        document.execCommand('insertText', false, text);
-      });
-      return;
-    case 'SelectAll':
-      document.execCommand('selectAll');
-      return;
-    case 'Undo':
-    case 'Redo': {
-      const id = NATIVE_SCOPED_COMMAND_IDS[item];
-      if (id) void runCommand(id);
-      return;
-    }
+function collectCommandIds(
+  entries: ResolvedMenuEntry[],
+  out: string[] = [],
+): string[] {
+  for (const entry of entries) {
+    if (entry === 'Separator') continue;
+    if ('Command' in entry) out.push(entry.Command!.id);
+    else if ('Native' in entry)
+      out.push(NATIVE_SCOPED_COMMAND_IDS[entry.Native!.item]);
+    else if ('Submenu' in entry) collectCommandIds(entry.Submenu.entries, out);
   }
+  return out;
+}
+
+function runNativeItem(item: NativeItem) {
+  void runCommand(NATIVE_SCOPED_COMMAND_IDS[item]);
 }
 
 function useMenuLayout() {
@@ -56,9 +63,12 @@ function useMenuLayout() {
     let unlisten: (() => void) | undefined;
 
     const refresh = () => {
-      commands.getMenuLayout().then(setLayout).catch((err) => {
-        console.error('Failed to load menu layout:', err);
-      });
+      commands
+        .getMenuLayout()
+        .then(setLayout)
+        .catch((err) => {
+          console.error('Failed to load menu layout:', err);
+        });
     };
 
     refresh();
@@ -72,18 +82,27 @@ function useMenuLayout() {
   return layout;
 }
 
-function MenuEntryView({ entry, keyPrefix }: { entry: ResolvedMenuEntry; keyPrefix: string }) {
-  if (entry === 'Separator') {
-    return <MenubarSeparator />;
-  }
+function MenuEntryView({
+  entry,
+  keyPrefix,
+  enabled,
+}: {
+  entry: ResolvedMenuEntry;
+  keyPrefix: string;
+  enabled: Record<string, boolean>;
+}) {
+  if (entry === 'Separator') return <MenubarSeparator />;
 
   if ('Command' in entry) {
     const c = entry.Command!;
+    const isEnabled = enabled[c.id] ?? true;
     return (
-      <MenubarItem onClick={() => void runCommand(c.id)}>
+      <MenubarItem disabled={!isEnabled} onClick={() => void runCommand(c.id)}>
         {c.label}
         {c.default_accelerator && (
-          <MenubarShortcut className='tracking-wide'>{toDisplayFormat(c.default_accelerator)}</MenubarShortcut>
+          <MenubarShortcut className='tracking-wide'>
+            {toDisplayFormat(c.default_accelerator)}
+          </MenubarShortcut>
         )}
       </MenubarItem>
     );
@@ -91,10 +110,13 @@ function MenuEntryView({ entry, keyPrefix }: { entry: ResolvedMenuEntry; keyPref
 
   if ('Native' in entry) {
     const n = entry.Native!;
+    const isEnabled = enabled[NATIVE_SCOPED_COMMAND_IDS[n.item]] ?? true;
     return (
-      <MenubarItem onClick={() => runNativeItem(n.item)}>
+      <MenubarItem disabled={!isEnabled} onClick={() => runNativeItem(n.item)}>
         {n.label}
-        <MenubarShortcut className='tracking-wide'>{toDisplayFormat(n.accelerator)}</MenubarShortcut>
+        <MenubarShortcut className='tracking-wide'>
+          {toDisplayFormat(n.accelerator)}
+        </MenubarShortcut>
       </MenubarItem>
     );
   }
@@ -105,7 +127,12 @@ function MenuEntryView({ entry, keyPrefix }: { entry: ResolvedMenuEntry; keyPref
       <MenubarSubTrigger>{title}</MenubarSubTrigger>
       <MenubarSubContent>
         {entries.map((child, i) => (
-          <MenuEntryView key={`${keyPrefix}-${i}`} entry={child} keyPrefix={`${keyPrefix}-${i}`} />
+          <MenuEntryView
+            key={`${keyPrefix}-${i}`}
+            entry={child}
+            keyPrefix={`${keyPrefix}-${i}`}
+            enabled={enabled}
+          />
         ))}
       </MenubarSubContent>
     </MenubarSub>
@@ -115,18 +142,32 @@ function MenuEntryView({ entry, keyPrefix }: { entry: ResolvedMenuEntry; keyPref
 export function AppMenubar() {
   const layout = useMenuLayout();
 
+  useActiveEditorStore((s) => s.activeEditorId);
+  useActiveEditorStore((s) => s.commandStateVersion);
+
   return (
-    <Menubar className="border-none">
-      {layout.map((menu) => (
-        <MenubarMenu key={menu.title}>
-          <MenubarTrigger>{menu.title}</MenubarTrigger>
-          <MenubarContent className='w-max min-w-64'>
-            {menu.entries.map((entry, i) => (
-              <MenuEntryView key={`${menu.title}-${i}`} entry={entry} keyPrefix={`${menu.title}-${i}`} />
-            ))}
-          </MenubarContent>
-        </MenubarMenu>
-      ))}
+    <Menubar className='border-none'>
+      {layout.map((menu) => {
+        const ids = collectCommandIds(menu.entries);
+        const enabled: Record<string, boolean> = {};
+        for (const id of ids) enabled[id] = isCommandEnabled(id);
+
+        return (
+          <MenubarMenu key={menu.title}>
+            <MenubarTrigger>{menu.title}</MenubarTrigger>
+            <MenubarContent className='w-max min-w-64'>
+              {menu.entries.map((entry, i) => (
+                <MenuEntryView
+                  key={`${menu.title}-${i}`}
+                  entry={entry}
+                  keyPrefix={`${menu.title}-${i}`}
+                  enabled={enabled}
+                />
+              ))}
+            </MenubarContent>
+          </MenubarMenu>
+        );
+      })}
     </Menubar>
   );
 }

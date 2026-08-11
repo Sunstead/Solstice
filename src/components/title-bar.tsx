@@ -4,10 +4,10 @@ import {
   type Window as TauriWindow,
 } from '@tauri-apps/api/window';
 import SolsticeIcon from '@/assets/icons/app/icon.svg?react';
-import { AppMenubar } from './app-menubar';
 import { useIsMac } from '@/hooks/use-platform';
 import { useSidebar } from './ui/resizable-sidebar';
 import { cn } from '@/lib/utils';
+import { AppMenubar } from './app-menu-dropdown';
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
