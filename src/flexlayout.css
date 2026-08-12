@@ -76,13 +76,12 @@
 .flexlayout-custom .flexlayout__mini_scrollbar_container {
   width: max-content;
 }
-
 .flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container {
   align-items: center;
   width: fit-content;
   max-width: 100%;
-  padding-left: 0;
-  padding-right: 0;
+  padding-left: calc(var(--tab-curve-r) + 2px);
+  padding-right: calc(var(--tab-curve-r) + 2px);
 }
 
 /* spacers/dividers: fixed size, never grow or shrink */
