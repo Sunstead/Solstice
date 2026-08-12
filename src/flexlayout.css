@@ -2,9 +2,29 @@
   border-radius: 0px;
 }
 
+.flexlayout-custom .flexlayout__tab:focus-within {
+  outline: none;
+}
+
 .flexlayout-custom .flexlayout__tab_toolbar_button {
-  padding: 4px;
+  padding: 4px 8px;
+  min-width: 32px;
+  width: max-content;
+  height: 32px;
   border-radius: var(--radius-md);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--color-muted-foreground);
+}
+
+.flexlayout-custom .flexlayout__tab_toolbar_button:hover {
+  background-color: var(--color-muted);
+  color: var(--color-foreground);
+}
+
+.dark .flexlayout-custom .flexlayout__tab_toolbar_button:hover {
+  background-color: color-mix(in oklab, var(--color-muted) 50%, transparent);
 }
 
 /* tab button */

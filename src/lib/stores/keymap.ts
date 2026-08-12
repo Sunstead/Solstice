@@ -1,11 +1,11 @@
 import { create } from "zustand";
-import { commands, events, type CommandMeta } from "@/bindings";
+import { CommandId, commands, events, type CommandMeta } from "@/bindings";
 
 interface KeymapState {
   commands: CommandMeta[];
   loaded: boolean;
   init: () => Promise<void>;
-  rebind: (commandId: string, accelerator: string) => Promise<string | null>;
+  rebind: (commandId: CommandId, accelerator: string) => Promise<string | null>;
 }
 
 let unlisten: (() => void) | null = null;

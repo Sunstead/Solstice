@@ -55,7 +55,19 @@ fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
     use NativeItem::*;
     use CommandId::*;
     vec![
-        ("File", vec![Command(FileNew), Separator, Command(FileOpenFolder)]),
+        (
+            "File",
+            vec![
+                Command(FileNewNote),
+                Command(FileNewFolder),
+                Command(FileNewTab),
+                Separator,
+                Command(FileOpenFile),
+                Command(FileOpenFolder),
+                Separator,
+                Command(FileCloseTab)
+            ],
+        ),
         (
             "Edit",
             vec![

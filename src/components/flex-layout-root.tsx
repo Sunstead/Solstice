@@ -11,6 +11,7 @@ import 'flexlayout-react/style/alpha_dark.css';
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronDown,
   Maximize,
   Minimize,
   Plus,
@@ -19,6 +20,7 @@ import {
 import { useLayout, getActiveTabId } from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { FileEditor } from '@/components/file-editor';
+import { BlankTab } from '@/components/blank-tab';
 import { WindowControls } from './window-controls';
 import { useIsMac } from '@/hooks/use-platform';
 import {
@@ -39,6 +41,9 @@ const factory = (node: TabNode) => {
   if (component === 'editor') {
     const config = node.getConfig() as { path?: string } | undefined;
     return <FileEditor path={config?.path ?? ''} />;
+  }
+  if (component === 'blank') {
+    return <BlankTab tabId={node.getId()} />;
   }
   return <div className='p-4'>{node.getName()}</div>;
 };
@@ -152,9 +157,43 @@ export default function FlexLayoutRoot() {
       goForward,
       () => useNavigationHistory.getState().future.length > 0,
     );
+    registerCommand(
+      'file.new_tab',
+      () => {
+        const m = modelRef.current;
+        if (!m) return;
+        const activeTabset =
+          m.getActiveTabset() ?? findCornerTabset(m, 'top-left');
+        if (!activeTabset) return;
+        useLayout.getState().newBlankTab(activeTabset.getId());
+      },
+      () => modelRef.current != null,
+    );
+    registerCommand(
+      'file.close_tab',
+      () => {
+        const m = modelRef.current;
+        if (!m) return;
+        const activeTabId = getActiveTabId(m);
+        if (!activeTabId) return;
+        const node = m.getNodeById(activeTabId);
+        if (!(node instanceof TabNode) || !node.isEnableClose()) return;
+        m.doAction(Actions.deleteTab(activeTabId));
+      },
+      () => {
+        const m = modelRef.current;
+        if (!m) return false;
+        const activeTabId = getActiveTabId(m);
+        if (!activeTabId) return false;
+        const node = m.getNodeById(activeTabId);
+        return node instanceof TabNode && node.isEnableClose();
+      },
+    );
     return () => {
       unregisterCommand('navigation.back');
       unregisterCommand('navigation.forward');
+      unregisterCommand('file.new_tab');
+      unregisterCommand('file.close_tab');
     };
   }, [goBack, goForward]);
 
@@ -179,8 +218,9 @@ export default function FlexLayoutRoot() {
         onAuxMouseClick={handleAuxMouseClick}
         icons={{
           close: <X className='size-4' />,
-          maximize: <Maximize className='size-4 text-muted-foreground' />,
-          restore: <Minimize className='size-4 text-muted-foreground' />,
+          maximize: <Maximize className='size-4' />,
+          restore: <Minimize className='size-4' />,
+          more: () => <ChevronDown className='size-4' />,
         }}
         tabDragSpeed={0.1}
         onRenderTabSet={(node, renderValues) => {
@@ -189,10 +229,11 @@ export default function FlexLayoutRoot() {
 
           renderValues.stickyButtons.push(
             <Button
-              key={node.getId() + "_addTabButton"}
+              key={node.getId() + '_addTabButton'}
               variant='ghost'
               size='icon-sm'
               className='no-drag text-muted-foreground'
+              onClick={() => useLayout.getState().newBlankTab(node.getId())}
             >
               <Plus />
             </Button>,
@@ -227,13 +268,14 @@ export default function FlexLayoutRoot() {
           }
         }}
         onRenderTab={(node, renderValues) => {
-          const Icon = getFileIcon(getFileExtension(node.getId()));
-
-          renderValues.leading = (
-            <div className='size-4'>
-              <Icon />
-            </div>
-          );
+          if (node.getComponent() === 'editor') {
+            const Icon = getFileIcon(getFileExtension(node.getId()));
+            renderValues.leading = (
+              <div className='size-4'>
+                <Icon />
+              </div>
+            );
+          }
         }}
       />
     </div>

@@ -3,6 +3,7 @@ import {
   Model,
   Actions,
   DockLocation,
+  TabNode,
   TabSetNode,
   IJsonModel,
 } from 'flexlayout-react';
@@ -31,6 +32,7 @@ type LayoutState = {
   loadForWorkspace: (path: string) => Promise<void>;
   persistCurrent: () => void;
   openFile: (path: string, name: string) => void;
+  newBlankTab: (tabsetId?: string) => void;
 };
 
 function findFirstTabset(model: Model): TabSetNode | undefined {
@@ -47,6 +49,25 @@ export function getActiveTabId(model: Model | null): string | null {
   if (!activeTabset) return null;
   const selected = activeTabset.getSelectedNode();
   return selected?.getId() ?? null;
+}
+
+function nextBlankTabName(model: Model): string {
+  let count = 0;
+  model.visitNodes((node) => {
+    if (
+      node.getType() === 'tab' &&
+      (node as TabNode).getComponent() === 'blank'
+    ) {
+      count += 1;
+    }
+  });
+  return count === 0 ? 'New Tab' : `New Tab ${count + 1}`;
+}
+
+function makeBlankTabId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `blank-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -95,6 +116,30 @@ export const useLayout = create<LayoutState>((set, get) => ({
       Actions.addNode(
         { type: 'tab', id: path, name, component: 'editor', config: { path } },
         activeTabset.getId(),
+        DockLocation.CENTER,
+        -1,
+      ),
+    );
+  },
+
+  newBlankTab: (tabsetId) => {
+    const { model } = get();
+    if (!model) return;
+
+    const targetTabset = tabsetId
+      ? (model.getNodeById(tabsetId) as TabSetNode | undefined)
+      : (model.getActiveTabset() ?? findFirstTabset(model));
+    if (!targetTabset) return;
+
+    model.doAction(
+      Actions.addNode(
+        {
+          type: 'tab',
+          id: makeBlankTabId(),
+          name: nextBlankTabName(model),
+          component: 'blank',
+        },
+        targetTabset.getId(),
         DockLocation.CENTER,
         -1,
       ),

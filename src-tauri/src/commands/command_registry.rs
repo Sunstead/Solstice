@@ -25,8 +25,12 @@ macro_rules! command_id {
 }
 
 command_id! {
-    FileNew => "file.new",
+    FileNewNote => "file.new_note",
+    FileOpenFile => "file.open_file",
+    FileNewTab => "file.new_tab",
+    FileNewFolder => "file.new_folder",
     FileOpenFolder => "file.open_folder",
+    FileCloseTab => "file.close_tab",
 
     EditBold => "edit.bold",
     EditItalic => "edit.italic",
@@ -69,9 +73,29 @@ pub struct CommandMeta {
 pub fn default_commands() -> Vec<CommandMeta> {
     vec![
         CommandMeta {
-            id: CommandId::FileNew,
-            label: "New note".into(),
+            id: CommandId::FileNewNote,
+            label: "New Note".into(),
             default_accelerator: Some("CmdOrCtrl+N".into()),
+        },
+        CommandMeta {
+            id: CommandId::FileNewFolder,
+            label: "New Folder".into(),
+            default_accelerator: Some("CmdOrCtrl+Alt+N".into()),
+        },
+        CommandMeta {
+            id: CommandId::FileOpenFile,
+            label: "Open File".into(),
+            default_accelerator: Some("CmdOrCtrl+O".into()),
+        },
+        CommandMeta {
+            id: CommandId::FileNewTab,
+            label: "New Tab".into(),
+            default_accelerator: Some("CmdOrCtrl+T".into()),
+        },
+        CommandMeta {
+            id: CommandId::FileCloseTab,
+            label: "Close Tab".into(),
+            default_accelerator: Some("CmdOrCtrl+W".into()),
         },
         CommandMeta {
             id: CommandId::FileOpenFolder,
