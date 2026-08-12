@@ -1,49 +1,67 @@
 use serde::{ Deserialize, Serialize };
 use specta::Type;
 
-/// Every command's id lives here, once. Both `default_commands()` below
-/// and `menu_layout.rs`'s declarative spec reference these constants
-/// instead of raw string literals -- a typo in either place becomes a
-/// compile error (unresolved identifier) instead of a silently-missing
-/// menu item or an unbindable command.
-///
-/// Undo/Redo/Cut/Copy/Paste/Select All are deliberately NOT here -- they
-/// stayed as menu_layout.rs's `NativeItem`, not CommandMeta. They're
-/// OS-conventional (Cmd+C etc.), already handled natively by the
-/// browser/ProseMirror with zero JS involved, and were never meant to
-/// be rebindable, so they never belonged in the same registry as things
-/// like Bold that genuinely need a custom accelerator + handler.
-pub mod command_ids {
-    pub const FILE_NEW: &str = "file.new";
-    pub const FILE_OPEN_FOLDER: &str = "file.open_folder";
+macro_rules! command_id {
+    ($($variant:ident => $str:literal),* $(,)?) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
+        pub enum CommandId {
+            $(
+                #[serde(rename = $str)]
+                $variant,
+            )*
+        }
 
-    pub const EDIT_BOLD: &str = "edit.bold";
-    pub const EDIT_ITALIC: &str = "edit.italic";
-    pub const EDIT_INLINE_CODE: &str = "edit.inline_code";
-    pub const EDIT_STRIKETHROUGH: &str = "edit.strikethrough";
-
-    pub const EDIT_HEADING1: &str = "edit.heading1";
-    pub const EDIT_HEADING2: &str = "edit.heading2";
-    pub const EDIT_HEADING3: &str = "edit.heading3";
-    pub const EDIT_HEADING4: &str = "edit.heading4";
-    pub const EDIT_HEADING5: &str = "edit.heading5";
-    pub const EDIT_HEADING6: &str = "edit.heading6";
-
-    pub const EDIT_BLOCKQUOTE: &str = "edit.blockquote";
-    pub const EDIT_BULLET_LIST: &str = "edit.bullet_list";
-    pub const EDIT_ORDERED_LIST: &str = "edit.ordered_list";
-    pub const EDIT_CODE_BLOCK: &str = "edit.code_block";
-    pub const EDIT_HARD_BREAK: &str = "edit.hard_break";
-    pub const EDIT_PARAGRAPH: &str = "edit.paragraph";
-
-    pub const VIEW_TOGGLE_SIDEBAR: &str = "view.toggle_sidebar";
+        impl CommandId {
+            /// The dotted wire-format string for this id, e.g. `"edit.bold"`.
+            /// Handy anywhere you need the raw string (logging, non-serde
+            /// comparisons) without round-tripping through serde_json.
+            pub fn as_str(self) -> &'static str {
+                match self {
+                    $( CommandId::$variant => $str, )*
+                }
+            }
+        }
+    };
 }
 
-use command_ids::*;
+command_id! {
+    FileNew => "file.new",
+    FileOpenFolder => "file.open_folder",
+
+    EditBold => "edit.bold",
+    EditItalic => "edit.italic",
+    EditInlineCode => "edit.inline_code",
+    EditStrikethrough => "edit.strikethrough",
+
+    EditHeading1 => "edit.heading1",
+    EditHeading2 => "edit.heading2",
+    EditHeading3 => "edit.heading3",
+    EditHeading4 => "edit.heading4",
+    EditHeading5 => "edit.heading5",
+    EditHeading6 => "edit.heading6",
+
+    EditBlockquote => "edit.blockquote",
+    EditBulletList => "edit.bullet_list",
+    EditOrderedList => "edit.ordered_list",
+    EditCodeBlock => "edit.code_block",
+    EditHardBreak => "edit.hard_break",
+    EditParagraph => "edit.paragraph",
+
+    ViewToggleSidebar => "view.toggle_sidebar",
+
+    NavigationBack => "navigation.back",
+    NavigationForward => "navigation.forward",
+}
+
+impl std::fmt::Display for CommandId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct CommandMeta {
-    pub id: String,
+    pub id: CommandId,
     pub label: String,
     pub default_accelerator: Option<String>,
 }
@@ -51,104 +69,114 @@ pub struct CommandMeta {
 pub fn default_commands() -> Vec<CommandMeta> {
     vec![
         CommandMeta {
-            id: FILE_NEW.into(),
+            id: CommandId::FileNew,
             label: "New note".into(),
             default_accelerator: Some("CmdOrCtrl+N".into()),
         },
         CommandMeta {
-            id: FILE_OPEN_FOLDER.into(),
+            id: CommandId::FileOpenFolder,
             label: "Open Folder".into(),
             default_accelerator: Some("CmdOrCtrl+Shift+O".into()),
         },
         // -- Text formatting (commonmark) --
         CommandMeta {
-            id: EDIT_BOLD.into(),
+            id: CommandId::EditBold,
             label: "Bold".into(),
             default_accelerator: Some("CmdOrCtrl+B".into()),
         },
         CommandMeta {
-            id: EDIT_ITALIC.into(),
+            id: CommandId::EditItalic,
             label: "Italic".into(),
             default_accelerator: Some("CmdOrCtrl+I".into()),
         },
         CommandMeta {
-            id: EDIT_INLINE_CODE.into(),
+            id: CommandId::EditInlineCode,
             label: "Inline code".into(),
             default_accelerator: Some("CmdOrCtrl+E".into()),
         },
         CommandMeta {
-            id: EDIT_STRIKETHROUGH.into(),
+            id: CommandId::EditStrikethrough,
             label: "Strikethrough".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+X".into()),
         },
         // -- Headings (commonmark) --
         CommandMeta {
-            id: EDIT_HEADING1.into(),
+            id: CommandId::EditHeading1,
             label: "Heading 1".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+1".into()),
         },
         CommandMeta {
-            id: EDIT_HEADING2.into(),
+            id: CommandId::EditHeading2,
             label: "Heading 2".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+2".into()),
         },
         CommandMeta {
-            id: EDIT_HEADING3.into(),
+            id: CommandId::EditHeading3,
             label: "Heading 3".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+3".into()),
         },
         CommandMeta {
-            id: EDIT_HEADING4.into(),
+            id: CommandId::EditHeading4,
             label: "Heading 4".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+4".into()),
         },
         CommandMeta {
-            id: EDIT_HEADING5.into(),
+            id: CommandId::EditHeading5,
             label: "Heading 5".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+5".into()),
         },
         CommandMeta {
-            id: EDIT_HEADING6.into(),
+            id: CommandId::EditHeading6,
             label: "Heading 6".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+6".into()),
         },
         // -- Block elements (commonmark) --
         CommandMeta {
-            id: EDIT_BLOCKQUOTE.into(),
+            id: CommandId::EditBlockquote,
             label: "Blockquote".into(),
             default_accelerator: Some("CmdOrCtrl+Shift+B".into()),
         },
         CommandMeta {
-            id: EDIT_BULLET_LIST.into(),
+            id: CommandId::EditBulletList,
             label: "Bullet list".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+8".into()),
         },
         CommandMeta {
-            id: EDIT_ORDERED_LIST.into(),
+            id: CommandId::EditOrderedList,
             label: "Ordered list".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+7".into()),
         },
         CommandMeta {
-            id: EDIT_CODE_BLOCK.into(),
+            id: CommandId::EditCodeBlock,
             label: "Code block".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+C".into()),
         },
         CommandMeta {
-            id: EDIT_HARD_BREAK.into(),
+            id: CommandId::EditHardBreak,
             label: "Insert hard break".into(),
             default_accelerator: Some("Shift+Enter".into()),
         },
         CommandMeta {
-            id: EDIT_PARAGRAPH.into(),
+            id: CommandId::EditParagraph,
             label: "Paragraph".into(),
             default_accelerator: Some("CmdOrCtrl+Alt+0".into()),
         },
         // -- View --
         CommandMeta {
-            id: VIEW_TOGGLE_SIDEBAR.into(),
+            id: CommandId::ViewToggleSidebar,
             label: "Toggle sidebar".into(),
             default_accelerator: Some("CmdOrCtrl+Shift+E".into()),
+        },
+        // -- Navigation --
+        CommandMeta {
+            id: CommandId::NavigationBack,
+            label: "Go Back".into(),
+            default_accelerator: Some("Alt+ArrowLeft".into()),
+        },
+        CommandMeta {
+            id: CommandId::NavigationForward,
+            label: "Go Forward".into(),
+            default_accelerator: Some("Alt+ArrowRight".into()),
         }
-        // ...rest of your commands
     ]
 }

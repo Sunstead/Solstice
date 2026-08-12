@@ -3,11 +3,15 @@ import {
   getCurrentWindow,
   type Window as TauriWindow,
 } from '@tauri-apps/api/window';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import SolsticeIcon from '@/assets/icons/app/icon.svg?react';
 import { useIsMac } from '@/hooks/use-platform';
 import { useSidebar } from './ui/resizable-sidebar';
 import { cn } from '@/lib/utils';
 import { AppMenubar } from './app-menu-dropdown';
+import { Button } from './ui/button';
+import { useNavigationHistory } from '@/lib/stores/navigation-history';
+import { runCommand } from '@/lib/commands';
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
@@ -40,6 +44,9 @@ export default function TitleBar() {
 
   const isMac = useIsMac();
 
+  const canGoBack = useNavigationHistory((s) => s.past.length > 0);
+  const canGoForward = useNavigationHistory((s) => s.future.length > 0);
+
   return (
     <header className='bg-sidebar w-full h-10 min-h-9 draggable relative flex items-center border-b border-r'>
       <div data-tauri-drag-region className='size-full absolute inset-0' />
@@ -54,7 +61,25 @@ export default function TitleBar() {
             )}
           </div>
           <AppMenubar />
-          {/* <SidebarTrigger className='size-10 no-drag z-50 select-all' /> */}
+
+          <div className='no-drag flex items-center gap-x-1 ml-1'>
+            <Button
+              variant='ghost'
+              size='icon-sm'
+              disabled={!canGoBack}
+              onClick={() => runCommand('navigation.back')}
+            >
+              <ArrowLeft />
+            </Button>
+            <Button
+              variant='ghost'
+              size='icon-sm'
+              disabled={!canGoForward}
+              onClick={() => runCommand('navigation.forward')}
+            >
+              <ArrowRight />
+            </Button>
+          </div>
         </div>
       </div>
     </header>

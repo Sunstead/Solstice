@@ -1,4 +1,15 @@
+import { CommandId } from '@/bindings';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
+
+export type NativeCommandId =
+  | 'native.undo'
+  | 'native.redo'
+  | 'native.cut'
+  | 'native.copy'
+  | 'native.paste'
+  | 'native.select_all';
+
+export type ScopedCommandId = CommandId | NativeCommandId;
 
 type Handler = () => void | Promise<void>;
 type IsEnabled = () => boolean;
@@ -8,20 +19,20 @@ const globalHandlers = new Map<string, Entry>();
 const scopedHandlers = new Map<string, Map<string, Entry>>();
 
 export function registerCommand(
-  id: string,
+  id: ScopedCommandId,
   handler: Handler,
   isEnabled?: IsEnabled,
 ) {
   globalHandlers.set(id, { handler, isEnabled });
 }
 
-export function unregisterCommand(id: string) {
+export function unregisterCommand(id: ScopedCommandId) {
   globalHandlers.delete(id);
 }
 
 export function registerScopedCommand(
   scopeId: string,
-  id: string,
+  id: ScopedCommandId,
   handler: Handler,
   isEnabled?: IsEnabled,
 ) {
@@ -33,22 +44,13 @@ export function registerScopedCommand(
   byScope.set(scopeId, { handler, isEnabled });
 }
 
-export function unregisterScopedCommand(scopeId: string, id: string) {
+export function unregisterScopedCommand(scopeId: string, id: ScopedCommandId) {
   const byScope = scopedHandlers.get(id);
   if (!byScope) return;
   byScope.delete(scopeId);
   if (byScope.size === 0) scopedHandlers.delete(id);
 }
 
-/**
- * Resolves a command id to the Entry that would actually run for it right
- * now: the focused editor's scoped handler if the id is editor-scoped,
- * otherwise the global handler. isCommandEnabled and runCommand both go
- * through this so they can never disagree on what a command id resolves
- * to -- previously each had its own copy of this lookup, and only one of
- * them checked `isEnabled`, which is how a menu item could show disabled
- * while its keyboard shortcut still fired.
- */
 function resolveEntry(id: string): Entry | undefined {
   const byScope = scopedHandlers.get(id);
   if (byScope && byScope.size > 0) {
@@ -58,7 +60,7 @@ function resolveEntry(id: string): Entry | undefined {
   return globalHandlers.get(id);
 }
 
-export async function runCommand(id: string) {
+export async function runCommand(id: CommandId | NativeCommandId) {
   const entry = resolveEntry(id);
   if (!entry) {
     console.warn(
@@ -72,7 +74,6 @@ export async function runCommand(id: string) {
     console.warn(`Command "${id}" is disabled, ignoring run request`);
     return;
   }
-  console.log('running command:', id);
   await entry.handler();
 }
 

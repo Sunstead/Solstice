@@ -19,7 +19,7 @@ import {
   type ResolvedMenuEntry,
   type NativeItem,
 } from '@/bindings';
-import { isCommandEnabled, runCommand } from '@/lib/commands';
+import { isCommandEnabled, NativeCommandId, runCommand } from '@/lib/commands';
 import { toDisplayFormat } from '@/lib/accelerator';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 
@@ -30,7 +30,7 @@ import { useActiveEditorStore } from '@/lib/stores/active-editor';
 // instead of document.execCommand against whatever currently has DOM
 // focus (which, by the time a menu click fires, is no longer the
 // editor -- see milkdown-editor.tsx for why).
-const NATIVE_SCOPED_COMMAND_IDS: Record<NativeItem, string> = {
+const NATIVE_SCOPED_COMMAND_IDS: Record<NativeItem, NativeCommandId> = {
   Undo: 'native.undo',
   Redo: 'native.redo',
   Cut: 'native.cut',
@@ -177,10 +177,10 @@ export function AppMenubar() {
         render={
           <Button
             variant='ghost'
-            size='icon'
+            size='icon-sm'
             onMouseDown={preventFocusSteal}
             onDragStart={(e) => e.preventDefault()}
-            className='no-drag'
+            className='no-drag text-muted-foreground'
           >
             <Menu className='h-4 w-4' />
           </Button>

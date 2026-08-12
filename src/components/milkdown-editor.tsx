@@ -45,7 +45,7 @@ import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { callCommand, $prose } from '@milkdown/kit/utils';
 import { Plugin, AllSelection } from '@milkdown/kit/prose/state';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
-import { commands } from '@/bindings';
+import { commands, CommandId } from '@/bindings';
 import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useKeymapStore } from '@/lib/stores/keymap';
@@ -57,7 +57,7 @@ type MilkdownEditorProps = {
 };
 
 type PresetBinding = {
-  id: string;
+  id: CommandId;
   keymapKey: any;
   action: string;
   command: { key: any };
@@ -84,7 +84,7 @@ function canRun(key: any, payload?: unknown) {
 const HEADING_BINDINGS: PresetBinding[] = Array.from({ length: 6 }, (_, i) => {
   const level = i + 1;
   return {
-    id: `edit.heading${level}`,
+    id: `edit.heading${level}` as CommandId,
     keymapKey: headingKeymap.key,
     action: `TurnIntoH${level}`,
     command: wrapInHeadingCommand,

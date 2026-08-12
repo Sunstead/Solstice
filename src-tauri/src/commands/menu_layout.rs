@@ -4,7 +4,7 @@ use serde::{ Deserialize, Serialize };
 use specta::Type;
 use tauri::AppHandle;
 
-use crate::commands::command_registry::{ command_ids::*, CommandMeta };
+use crate::commands::command_registry::{ CommandId, CommandMeta };
 use crate::commands::keymap::resolved_commands;
 
 /// OS-provided editing actions. Deliberately NOT CommandMeta -- no id in
@@ -44,7 +44,7 @@ impl NativeItem {
 // ---------------------------------------------------------------------
 
 enum MenuEntrySpec {
-    Command(&'static str),
+    Command(CommandId),
     Native(NativeItem),
     Separator,
     Submenu(&'static str, Vec<MenuEntrySpec>),
@@ -53,8 +53,9 @@ enum MenuEntrySpec {
 fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
     use MenuEntrySpec::*;
     use NativeItem::*;
+    use CommandId::*;
     vec![
-        ("File", vec![Command(FILE_NEW), Separator, Command(FILE_OPEN_FOLDER)]),
+        ("File", vec![Command(FileNew), Separator, Command(FileOpenFolder)]),
         (
             "Edit",
             vec![
@@ -67,34 +68,34 @@ fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                 Native(SelectAll)
             ],
         ),
-        ("View", vec![Command(VIEW_TOGGLE_SIDEBAR)]),
+        ("View", vec![Command(ViewToggleSidebar)]),
         (
             "Format",
             vec![
-                Command(EDIT_BOLD),
-                Command(EDIT_ITALIC),
-                Command(EDIT_INLINE_CODE),
-                Command(EDIT_STRIKETHROUGH),
+                Command(EditBold),
+                Command(EditItalic),
+                Command(EditInlineCode),
+                Command(EditStrikethrough),
                 Separator,
                 Submenu(
                     "Turn into",
                     vec![
-                        Command(EDIT_PARAGRAPH),
-                        Command(EDIT_HEADING1),
-                        Command(EDIT_HEADING2),
-                        Command(EDIT_HEADING3),
-                        Command(EDIT_HEADING4),
-                        Command(EDIT_HEADING5),
-                        Command(EDIT_HEADING6),
+                        Command(EditParagraph),
+                        Command(EditHeading1),
+                        Command(EditHeading2),
+                        Command(EditHeading3),
+                        Command(EditHeading4),
+                        Command(EditHeading5),
+                        Command(EditHeading6),
                         Separator,
-                        Command(EDIT_BLOCKQUOTE),
-                        Command(EDIT_BULLET_LIST),
-                        Command(EDIT_ORDERED_LIST),
-                        Command(EDIT_CODE_BLOCK)
+                        Command(EditBlockquote),
+                        Command(EditBulletList),
+                        Command(EditOrderedList),
+                        Command(EditCodeBlock)
                     ]
                 ),
                 Separator,
-                Command(EDIT_HARD_BREAK)
+                Command(EditHardBreak)
             ],
         )
     ]
@@ -127,15 +128,19 @@ pub struct ResolvedMenu {
 
 fn resolve_entry(
     spec: &MenuEntrySpec,
-    lookup: &HashMap<&str, &CommandMeta>
+    lookup: &HashMap<CommandId, &CommandMeta>
 ) -> Option<ResolvedMenuEntry> {
     match spec {
         MenuEntrySpec::Command(id) =>
             match lookup.get(id) {
                 Some(meta) => Some(ResolvedMenuEntry::Command((*meta).clone())),
                 None => {
-                    debug_assert!(false, "menu_layout references unknown command id: {id}");
-                    eprintln!("menu_layout: unknown command id \"{id}\", skipping");
+                    debug_assert!(
+                        false,
+                        "menu_layout references unresolved command id: {}",
+                        id.as_str()
+                    );
+                    eprintln!("menu_layout: unresolved command id \"{}\", skipping", id.as_str());
                     None
                 }
             }
@@ -160,9 +165,9 @@ fn resolve_entry(
 
 pub fn resolve_menu_layout(app: &AppHandle) -> Vec<ResolvedMenu> {
     let commands = resolved_commands(app);
-    let lookup: HashMap<&str, &CommandMeta> = commands
+    let lookup: HashMap<CommandId, &CommandMeta> = commands
         .iter()
-        .map(|c| (c.id.as_str(), c))
+        .map(|c| (c.id, c))
         .collect();
 
     menu_spec()

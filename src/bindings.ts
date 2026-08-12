@@ -19,7 +19,7 @@ export const commands = {
 	setWorkspace: (path: string) => __TAURI_INVOKE<void>("set_workspace", { path }),
 	getWorkspace: () => __TAURI_INVOKE<string | null>("get_workspace"),
 	getCommandRegistry: () => __TAURI_INVOKE<CommandMeta[]>("get_command_registry"),
-	setKeybind: (commandId: string, accelerator: string) => typedError<null, string>(__TAURI_INVOKE("set_keybind", { commandId, accelerator })),
+	setKeybind: (commandId: CommandId, accelerator: string) => typedError<null, string>(__TAURI_INVOKE("set_keybind", { commandId, accelerator })),
 	getMenuLayout: () => __TAURI_INVOKE<ResolvedMenu[]>("get_menu_layout"),
 };
 
@@ -29,8 +29,10 @@ export const events = {
 };
 
 /* Types */
+export type CommandId = "file.new" | "file.open_folder" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward";
+
 export type CommandMeta = {
-	id: string,
+	id: CommandId,
 	label: string,
 	default_accelerator: string | null,
 };

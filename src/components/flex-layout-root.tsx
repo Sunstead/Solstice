@@ -8,7 +8,14 @@ import {
   TabSetNode,
 } from 'flexlayout-react';
 import 'flexlayout-react/style/alpha_dark.css';
-import { Maximize, Minimize, Plus, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Maximize,
+  Minimize,
+  Plus,
+  X,
+} from 'lucide-react';
 import { useLayout, getActiveTabId } from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { FileEditor } from '@/components/file-editor';
@@ -24,6 +31,8 @@ import { AppMenubar } from './app-menu-dropdown';
 import { getFileIcon } from '@/assets/icons';
 import { getFileExtension } from '@/lib/utils';
 import { Button } from './ui/button';
+import { useNavigationHistory } from '@/lib/stores/navigation-history';
+import { registerCommand, runCommand, unregisterCommand } from '@/lib/commands';
 
 const factory = (node: TabNode) => {
   const component = node.getComponent();
@@ -44,8 +53,21 @@ export default function FlexLayoutRoot() {
   const isMac = useIsMac();
   const { open: isSidebarOpen } = useSidebar();
 
+  const { visit } = useNavigationHistory();
+
+  const canGoBack = useNavigationHistory((s) => s.past.length > 0);
+  const canGoForward = useNavigationHistory((s) => s.future.length > 0);
+
+  const modelRef = useRef<Model | null>(null);
   useEffect(() => {
-    if (workspacePath) loadForWorkspace(workspacePath);
+    modelRef.current = model;
+  }, [model]);
+
+  useEffect(() => {
+    if (workspacePath) {
+      loadForWorkspace(workspacePath);
+      useNavigationHistory.getState().reset();
+    }
   }, [workspacePath, loadForWorkspace]);
 
   useEffect(() => {
@@ -93,8 +115,53 @@ export default function FlexLayoutRoot() {
     model?.doAction(Actions.deleteTab(node.getId()));
   };
 
+  // Selects a tab by id, skipping ids whose tab was closed in the meantime.
+  // `getId` is called repeatedly so it must pop the *next* history entry
+  // each time it's invoked (which is what store.back()/forward() do).
+  const navigateTo = useCallback((getId: () => string | undefined) => {
+    const m = modelRef.current;
+    if (!m) return;
+    let id = getId();
+    while (id) {
+      const node = m.getNodeById(id);
+      if (node instanceof TabNode) {
+        m.doAction(Actions.selectTab(id));
+        return;
+      }
+      id = getId();
+    }
+  }, []);
+
+  const goBack = useCallback(
+    () => navigateTo(() => useNavigationHistory.getState().back()),
+    [navigateTo],
+  );
+  const goForward = useCallback(
+    () => navigateTo(() => useNavigationHistory.getState().forward()),
+    [navigateTo],
+  );
+
+  useEffect(() => {
+    registerCommand(
+      'navigation.back',
+      goBack,
+      () => useNavigationHistory.getState().past.length > 0,
+    );
+    registerCommand(
+      'navigation.forward',
+      goForward,
+      () => useNavigationHistory.getState().future.length > 0,
+    );
+    return () => {
+      unregisterCommand('navigation.back');
+      unregisterCommand('navigation.forward');
+    };
+  }, [goBack, goForward]);
+
   const handleModelChange = (changedModel: Model) => {
-    setActiveTabId(getActiveTabId(changedModel));
+    const activeTabId = getActiveTabId(changedModel);
+    setActiveTabId(activeTabId);
+    if (activeTabId) visit(activeTabId);
     persistCurrent();
     syncDrag();
     requestAnimationFrame(applyDragRegions);
@@ -121,7 +188,12 @@ export default function FlexLayoutRoot() {
           const topRightTabset = findCornerTabset(model, 'top-right');
 
           renderValues.stickyButtons.push(
-            <Button variant='ghost' size='icon-sm' className='no-drag text-muted-foreground'>
+            <Button
+              key={node.getId() + "_addTabButton"}
+              variant='ghost'
+              size='icon-sm'
+              className='no-drag text-muted-foreground'
+            >
               <Plus />
             </Button>,
           );
@@ -130,6 +202,22 @@ export default function FlexLayoutRoot() {
             renderValues.leading = (
               <div className='no-drag flex h-full items-center gap-x-2'>
                 <AppMenubar />
+                <Button
+                  variant='ghost'
+                  size='icon-sm'
+                  disabled={!canGoBack}
+                  onClick={() => runCommand('navigation.back')}
+                >
+                  <ArrowLeft />
+                </Button>
+                <Button
+                  variant='ghost'
+                  size='icon-sm'
+                  disabled={!canGoForward}
+                  onClick={() => runCommand('navigation.forward')}
+                >
+                  <ArrowRight />
+                </Button>
               </div>
             );
           }

@@ -9,7 +9,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { TitleBarShell } from '@/components/title-bar';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { registerCommand } from '@/lib/commands';
+import { registerCommand, runCommand } from '@/lib/commands';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { useGlobalKeybinds } from '@/hooks/use-global-keybinds';
 
@@ -46,6 +46,19 @@ export const Route = createRootRoute({
 
       // Fetch the resolved registry + subscribe to keymap-changed.
       void useKeymapStore.getState().init();
+
+      document.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+      });
+
+      document.addEventListener('mousedown', (event) => {
+        if (event.button !== 3 && event.button !== 4) return;
+
+        event.preventDefault();
+
+        if (event.button === 3) runCommand('navigation.back');
+        if (event.button === 4) runCommand('navigation.forward');
+      });
     }, []);
 
     // Registers/re-registers tinykeys bindings whenever the registry updates.
@@ -63,10 +76,10 @@ export const Route = createRootRoute({
             className='flex-col'
           >
             <div className='flex flex-1 min-h-0 relative w-full max-w-full'>
-              <div className='h-full'>
+              <div className='h-full flex flex-col'>
                 <TitleBarShell />
 
-                <div className='relative h-full'>
+                <div className='relative flex-1 min-h-0'>
                   <AppSidebar />
                 </div>
               </div>
