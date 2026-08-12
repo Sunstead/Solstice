@@ -175,7 +175,13 @@ export function AppMenubar() {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant='ghost' size='icon' onMouseDown={preventFocusSteal}>
+          <Button
+            variant='ghost'
+            size='icon'
+            onMouseDown={preventFocusSteal}
+            onDragStart={(e) => e.preventDefault()}
+            className='no-drag'
+          >
             <Menu className='h-4 w-4' />
           </Button>
         }

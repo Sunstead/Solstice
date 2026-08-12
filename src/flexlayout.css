@@ -12,13 +12,16 @@
   position: relative;
   flex: 1 1 0%;
   height: 100%;
-  min-width: 52px; /* Chrome uses ~52px collapsed, ~180px expanded */
+  min-width: 68px; /* Chrome uses ~52px collapsed, ~180px expanded */
+  width: 12rem;
   max-width: 12rem;
   padding-top: 0;
   padding-right: 4px;
   padding-bottom: 0;
+  padding-left: 8px;
   overflow: visible; /* lets the selected-tab curve pseudo-elements bleed outside the box */
   border-bottom: none;
+  gap: 8px;
 }
 
 .flexlayout-custom
@@ -37,11 +40,13 @@
 }
 
 .flexlayout-custom .flexlayout__tab_button--selected {
-  padding-bottom: 2px !important;
-  min-width: 56px; /* base 52px + 4 */
+  padding-bottom: 3px !important;
+  min-width: 70px; /* base 52px + 4 */
   max-width: calc(12rem + 4px);
   padding-left: 14px;
   padding-right: 6px;
+  padding-left: 10px;
+  gap: 8px;
 }
 
 .flexlayout-custom .flexlayout__tab_button_content {
@@ -64,11 +69,20 @@
 
 .flexlayout-custom .flexlayout__tabset_tabbar_inner {
   align-items: stretch;
+  scroll-behavior: smooth;
+  width: max-content;
+}
+
+.flexlayout-custom .flexlayout__mini_scrollbar_container {
+  width: max-content;
 }
 
 .flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container {
   align-items: center;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 /* spacers/dividers: fixed size, never grow or shrink */
@@ -109,20 +123,26 @@
 }
 
 .flexlayout-custom .flexlayout__tab_button--selected::before {
-  left: calc(var(--tab-curve-r) * -1);
+  left: 0; /* flush — inside the tab's own box, contributes nothing to scrollable overflow */
   background: radial-gradient(
     circle at top left,
     transparent var(--tab-curve-r),
     var(--color-tab-selected-background) calc(var(--tab-curve-r) + 1px)
   );
+  filter: drop-shadow(
+    calc(var(--tab-curve-r) * -1) 0 0 var(--color-tab-selected-background)
+  );
 }
 
 .flexlayout-custom .flexlayout__tab_button--selected::after {
-  right: calc(var(--tab-curve-r) * -1);
+  right: 0;
   background: radial-gradient(
     circle at top right,
     transparent var(--tab-curve-r),
     var(--color-tab-selected-background) calc(var(--tab-curve-r) + 1px)
+  );
+  filter: drop-shadow(
+    var(--tab-curve-r) 0 0 var(--color-tab-selected-background)
   );
 }
 
@@ -143,4 +163,30 @@
 
 .flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container_top {
   padding-top: 4px;
+}
+
+.flexlayout-custom .flexlayout__tab_button_trailing {
+  display: none;
+}
+
+.flexlayout-custom
+  .flexlayout__tab_button--selected
+  .flexlayout__tab_button_trailing,
+.flexlayout-custom
+  .flexlayout__tab_button:hover
+  .flexlayout__tab_button_trailing {
+  display: flex;
+}
+
+.flexlayout-custom .flexlayout__tab_button_content {
+  display: block; /* neutralize any flex/grid display from base styles */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 0%; /* still needs to shrink as a flex ITEM of its parent */
+  min-width: 0;
+}
+
+.flexlayout-custom .flexlayout__tab_toolbar_sticky_buttons_container {
+  padding-left: 2px;
 }
