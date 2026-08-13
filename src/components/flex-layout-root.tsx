@@ -17,7 +17,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import { useLayout, getActiveTabId } from '@/hooks/use-layout';
+import { useLayout, getActiveTabId, modelHasNoTabs } from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { FileEditor } from '@/components/file-editor';
 import { BlankTab } from '@/components/blank-tab';
@@ -204,6 +204,10 @@ export default function FlexLayoutRoot() {
     persistCurrent();
     syncDrag();
     requestAnimationFrame(applyDragRegions);
+
+    if (modelHasNoTabs(changedModel)) {
+      useLayout.getState().newBlankTab();
+    }
   };
 
   if (!model) return null;

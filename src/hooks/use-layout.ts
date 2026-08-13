@@ -20,7 +20,14 @@ const defaultLayoutJson: IJsonModel = {
   layout: {
     type: 'row',
     weight: 100,
-    children: [{ type: 'tabset', weight: 50, children: [] }],
+    children: [
+      {
+        type: 'tabset',
+        weight: 50,
+        children: [],
+        enableDeleteWhenEmpty: false,
+      },
+    ],
   },
 };
 
@@ -49,6 +56,14 @@ export function getActiveTabId(model: Model | null): string | null {
   if (!activeTabset) return null;
   const selected = activeTabset.getSelectedNode();
   return selected?.getId() ?? null;
+}
+
+export function modelHasNoTabs(model: Model): boolean {
+  let found = false;
+  model.visitNodes((node) => {
+    if (node.getType() === 'tab') found = true;
+  });
+  return !found;
 }
 
 function nextBlankTabName(model: Model): string {
@@ -82,6 +97,16 @@ export const useLayout = create<LayoutState>((set, get) => ({
   loadForWorkspace: async (path) => {
     const stored = await getStoredLayout();
     const model = Model.fromJson(stored ?? defaultLayoutJson);
+
+    const homeTabset = findFirstTabset(model);
+    if (homeTabset && homeTabset.isEnableDeleteWhenEmpty()) {
+      model.doAction(
+        Actions.updateNodeAttributes(homeTabset.getId(), {
+          enableDeleteWhenEmpty: false,
+        }),
+      );
+    }
+
     set({
       model,
       workspacePath: path,
