@@ -8,8 +8,12 @@ import {
 
 export function FileTreeItemContextMenuContent({
   node,
+  renameEnabled = true,
+  deleteEnabled = true,
 }: {
   node: FileTreeNode;
+  renameEnabled?: boolean;
+  deleteEnabled?: boolean;
 }) {
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
@@ -56,12 +60,16 @@ export function FileTreeItemContextMenuContent({
           <ContextMenuSeparator />
         </>
       )}
-      <ContextMenuItem onClick={() => startRename(node)}>
+      <ContextMenuItem
+        onClick={() => startRename(node)}
+        disabled={!renameEnabled}
+      >
         Rename
       </ContextMenuItem>
       <ContextMenuItem
         variant='destructive'
         onClick={() => console.log('Delete', node.path)}
+        disabled={!deleteEnabled}
       >
         Delete
       </ContextMenuItem>

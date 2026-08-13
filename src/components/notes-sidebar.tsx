@@ -42,6 +42,8 @@ export function NotesSidebar() {
         }
       />
       <FileTreeItemContextMenuContent
+        renameEnabled={false}
+        deleteEnabled={false}
         node={{
           name: path,
           path,
