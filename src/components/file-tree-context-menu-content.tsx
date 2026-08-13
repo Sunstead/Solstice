@@ -1,5 +1,5 @@
 import { FileTreeNode, useFiles } from '@/hooks/use-files';
-import { useNewFileInput } from '@/lib/stores/new-file-input';
+import { useEntryInput, FILE_TYPE_PRESETS } from '@/lib/stores/entry-input';
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -12,29 +12,51 @@ export function FileTreeItemContextMenuContent({
   node: FileTreeNode;
 }) {
   const expandDirectory = useFiles((s) => s.expandDirectory);
-  const startNewFile = useNewFileInput((s) => s.startNewFile);
+  const startCreateFile = useEntryInput((s) => s.startCreateFile);
+  const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
+  const startRename = useEntryInput((s) => s.startRename);
 
-  const handleNewFile = () => {
+  const ensureExpanded = () => {
     if (!node.expanded) {
       expandDirectory(node.path);
     }
-    startNewFile(node.path);
   };
 
   return (
     <ContextMenuContent>
       {node.is_dir && (
         <>
-          <ContextMenuItem onClick={handleNewFile}>New File</ContextMenuItem>
+          {Object.values(FILE_TYPE_PRESETS).map((preset) => (
+            <ContextMenuItem
+              key={preset.id}
+              onClick={() => {
+                ensureExpanded();
+                startCreateFile(node.path, preset);
+              }}
+            >
+              New {preset.label}
+            </ContextMenuItem>
+          ))}
           <ContextMenuItem
-            onClick={() => console.log('New folder in', node.path)}
+            onClick={() => {
+              ensureExpanded();
+              startCreateFolder(node.path);
+            }}
           >
             New Folder
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => {
+              ensureExpanded();
+              startCreateFile(node.path);
+            }}
+          >
+            New File
           </ContextMenuItem>
           <ContextMenuSeparator />
         </>
       )}
-      <ContextMenuItem onClick={() => console.log('Rename', node.path)}>
+      <ContextMenuItem onClick={() => startRename(node)}>
         Rename
       </ContextMenuItem>
       <ContextMenuItem

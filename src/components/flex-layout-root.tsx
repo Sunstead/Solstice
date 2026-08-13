@@ -35,6 +35,7 @@ import { getFileExtension } from '@/lib/utils';
 import { Button } from './ui/button';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { registerCommand, runCommand, unregisterCommand } from '@/lib/commands';
+import { stripPresetExtension } from '@/lib/stores/entry-input';
 
 const factory = (node: TabNode) => {
   const component = node.getComponent();
@@ -280,6 +281,8 @@ export default function FlexLayoutRoot() {
               </div>
             );
           }
+          
+          renderValues.content = stripPresetExtension(node.getName()).name;
         }}
       />
     </div>
