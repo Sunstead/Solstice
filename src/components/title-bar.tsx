@@ -48,7 +48,7 @@ export default function TitleBar() {
   const canGoForward = useNavigationHistory((s) => s.future.length > 0);
 
   return (
-    <header className='bg-sidebar w-full h-10 min-h-9 draggable relative flex items-center border-b border-r'>
+    <header className='bg-sidebar w-full h-10 min-h-9 draggable relative flex items-center border-b'>
       <div data-tauri-drag-region className='size-full absolute inset-0' />
 
       <div className='flex items-center z-0 w-max h-max'>

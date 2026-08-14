@@ -1,7 +1,11 @@
 import { ChevronRight } from 'lucide-react';
 import { useFiles, FileTreeNode, selectChildren } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
-import { useEntryInput, FILE_TYPE_PRESETS, stripPresetExtension } from '@/lib/stores/entry-input';
+import {
+  useEntryInput,
+  FILE_TYPE_PRESETS,
+  stripPresetExtension,
+} from '@/lib/stores/entry-input';
 import { EntryInput } from './entry-input';
 import {
   Collapsible,
@@ -170,7 +174,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
         )}
 
         <CollapsibleContent>
-          <SidebarMenuSub className='pr-0 pl-1 mr-0 ml-3 gap-0 py-0'>
+          <SidebarMenuSub className='pr-0 pl-0.5 mr-0 ml-3.5 gap-0 py-0'>
             {children.map((child) => (
               <FileTreeItem key={child.path} node={child} />
             ))}
@@ -198,5 +202,9 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
 }
 
 function FormattedFileName({ name }: { name: string }) {
-  return <span className='text-nowrap w-full truncate'>{stripPresetExtension(name).name}</span>;
+  return (
+    <span className='text-nowrap w-full truncate'>
+      {stripPresetExtension(name).name}
+    </span>
+  );
 }

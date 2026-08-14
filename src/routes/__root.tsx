@@ -12,6 +12,7 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand, runCommand } from '@/lib/commands';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { useGlobalKeybinds } from '@/hooks/use-global-keybinds';
+import { useDevicePixelRatio } from '@/hooks/use-device-pixel-ratio';
 
 export const Route = createRootRoute({
   component: () => {
@@ -28,6 +29,8 @@ export const Route = createRootRoute({
 
     const openFolder = useWorkspace((s) => s.openFolder);
 
+    useDevicePixelRatio();
+
     useEffect(() => {
       useWorkspace.getState().init();
       return useWorkspaceUIStore.persist.onFinishHydration(() =>
@@ -37,7 +40,6 @@ export const Route = createRootRoute({
 
     useEffect(() => {
       // Register what each command id actually does, once.
-      registerCommand('file.new', () => console.log('file.new'));
       registerCommand('edit.bold', () => console.log('edit.bold'));
       registerCommand('view.toggle_sidebar', () =>
         console.log('view.toggle_sidebar'),

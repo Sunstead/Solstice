@@ -1,12 +1,12 @@
 import { Files } from 'lucide-react';
-import { NotesSidebar } from '@/components/notes-sidebar';
+import { NotesSidebar } from '@/components/explorer-sidebar';
 import type { PrimaryView } from './types';
 
 export const primaryViews: PrimaryView[] = [
   {
-    id: 'notes',
+    id: 'explorer',
     icon: Files,
-    label: 'Notes',
+    label: 'Explorer',
     sidebarComponent: NotesSidebar,
   },
 ];

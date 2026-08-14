@@ -84,8 +84,11 @@ export default function FlexLayoutRoot() {
       if (event.button === 1) event.preventDefault();
     };
 
-    container.addEventListener('mousedown', onMouseDown);
-    return () => container.removeEventListener('mousedown', onMouseDown);
+    container.addEventListener('mousedown', onMouseDown, { capture: true });
+    return () =>
+      container.removeEventListener('mousedown', onMouseDown, {
+        capture: true,
+      });
   }, []);
 
   const syncDrag = useCallback(() => {
@@ -246,7 +249,7 @@ export default function FlexLayoutRoot() {
 
           if (node === topLeftTabset && !isSidebarOpen) {
             renderValues.leading = (
-              <div className='no-drag flex h-full items-center gap-x-2'>
+              <div className='no-drag flex h-full items-center gap-x-1'>
                 <AppMenubar />
                 <Button
                   variant='ghost'
@@ -281,7 +284,7 @@ export default function FlexLayoutRoot() {
               </div>
             );
           }
-          
+
           renderValues.content = stripPresetExtension(node.getName()).name;
         }}
       />

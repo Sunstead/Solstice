@@ -9,7 +9,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarRail,
@@ -21,6 +20,7 @@ import { primaryViews } from '@/lib/views/registry';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useEffect } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
+import { WorkspaceSwitcher } from './workspace-switcher';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { open, setOpen, toggleSidebar } = useSidebar();
@@ -105,12 +105,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         collapsible='none'
         className='hidden flex-1 md:flex w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]! min-w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]'
       >
-        <SidebarHeader className='px-3 py-2 text-xs font-medium text-muted-foreground'>
-          {activeView?.label}
-        </SidebarHeader>
-        <SidebarContent>
-          {ActiveSidebarContent && <ActiveSidebarContent />}
-        </SidebarContent>
+        {ActiveSidebarContent && <ActiveSidebarContent />}
+        <SidebarFooter className='border-t'>
+          <WorkspaceSwitcher />
+        </SidebarFooter>
       </Sidebar>
       <SidebarRail />
     </Sidebar>

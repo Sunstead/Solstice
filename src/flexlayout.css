@@ -190,12 +190,18 @@
 
 .flexlayout-custom .flexlayout__tab_button--selected {
   padding-bottom: 3px !important;
-  min-width: 70px; /* base 52px + 4 */
+  min-width: 70px;
   max-width: calc(12rem + 4px);
-  padding-left: 14px;
-  padding-right: 6px;
   padding-left: 10px;
+  padding-right: 6px;
   gap: 8px;
+
+  position: relative;
+  outline: none;
+  box-shadow:
+    -1px 0 0 0 var(--color-tab-outline),
+    1px 0 0 0 var(--color-tab-outline),
+    0 -1px 0 0 var(--color-tab-outline);
 }
 
 .flexlayout-custom .flexlayout__tab_button_content {
@@ -214,6 +220,7 @@
 .flexlayout-custom .flexlayout__tabset_tabbar_outer {
   height: 40px;
   align-items: stretch;
+  box-shadow: inset 0 calc(-1px / var(--dpr, 1)) 0 0 var(--color-tab-outline);
 }
 
 .flexlayout-custom .flexlayout__tabset_tabbar_inner {
@@ -273,26 +280,22 @@
 }
 
 .flexlayout-custom .flexlayout__tab_button--selected::before {
-  left: 0; /* flush — inside the tab's own box, contributes nothing to scrollable overflow */
+  left: calc(var(--tab-curve-r) * -1);
   background: radial-gradient(
     circle at top left,
-    transparent var(--tab-curve-r),
-    var(--color-tab-selected-background) calc(var(--tab-curve-r) + 1px)
-  );
-  filter: drop-shadow(
-    calc(var(--tab-curve-r) * -1) 0 0 var(--color-tab-selected-background)
+    transparent calc(var(--tab-curve-r) - 1px),
+    var(--color-tab-outline) calc(var(--tab-curve-r)),
+    var(--color-tab-selected-background) calc(var(--tab-curve-r) + 0.571px)
   );
 }
 
 .flexlayout-custom .flexlayout__tab_button--selected::after {
-  right: 0;
+  right: calc(var(--tab-curve-r) * -1);
   background: radial-gradient(
     circle at top right,
-    transparent var(--tab-curve-r),
-    var(--color-tab-selected-background) calc(var(--tab-curve-r) + 1px)
-  );
-  filter: drop-shadow(
-    var(--tab-curve-r) 0 0 var(--color-tab-selected-background)
+    transparent calc(var(--tab-curve-r) - 1px),
+    var(--color-tab-outline) calc(var(--tab-curve-r)),
+    var(--color-tab-selected-background) calc(var(--tab-curve-r) + 0.571px)
   );
 }
 
