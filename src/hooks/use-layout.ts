@@ -25,7 +25,6 @@ const defaultLayoutJson: IJsonModel = {
         type: 'tabset',
         weight: 50,
         children: [],
-        enableDeleteWhenEmpty: false,
       },
     ],
   },
@@ -40,6 +39,7 @@ type LayoutState = {
   persistCurrent: () => void;
   openFile: (path: string, name: string) => void;
   newBlankTab: (tabsetId?: string) => void;
+  normalizeTabsetDeletion: () => void;
 };
 
 function findFirstTabset(model: Model): TabSetNode | undefined {
@@ -48,6 +48,29 @@ function findFirstTabset(model: Model): TabSetNode | undefined {
     if (!found && node.getType() === 'tabset') found = node as TabSetNode;
   });
   return found;
+}
+
+function collectTabsets(model: Model): TabSetNode[] {
+  const tabsets: TabSetNode[] = [];
+  model.visitNodes((node) => {
+    if (node.getType() === 'tabset') tabsets.push(node as TabSetNode);
+  });
+  return tabsets;
+}
+
+function syncTabsetDeletion(model: Model): void {
+  const tabsets = collectTabsets(model);
+  const desiredEnableDeleteWhenEmpty = tabsets.length > 1;
+
+  for (const tabset of tabsets) {
+    if (tabset.isEnableDeleteWhenEmpty() !== desiredEnableDeleteWhenEmpty) {
+      model.doAction(
+        Actions.updateNodeAttributes(tabset.getId(), {
+          enableDeleteWhenEmpty: desiredEnableDeleteWhenEmpty,
+        }),
+      );
+    }
+  }
 }
 
 export function getActiveTabId(model: Model | null): string | null {
@@ -96,16 +119,16 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
   loadForWorkspace: async (path) => {
     const stored = await getStoredLayout();
-    const model = Model.fromJson(stored ?? defaultLayoutJson);
+    let model = Model.fromJson(stored ?? defaultLayoutJson);
 
-    const homeTabset = findFirstTabset(model);
-    if (homeTabset && homeTabset.isEnableDeleteWhenEmpty()) {
-      model.doAction(
-        Actions.updateNodeAttributes(homeTabset.getId(), {
-          enableDeleteWhenEmpty: false,
-        }),
-      );
+    // Safety net: if a stored layout was somehow saved with zero tabsets,
+    // fall back to a fresh default rather than ending up with nowhere to
+    // open a tab.
+    if (collectTabsets(model).length === 0) {
+      model = Model.fromJson(defaultLayoutJson);
     }
+
+    syncTabsetDeletion(model);
 
     set({
       model,
@@ -169,5 +192,11 @@ export const useLayout = create<LayoutState>((set, get) => ({
         -1,
       ),
     );
+  },
+
+  normalizeTabsetDeletion: () => {
+    const { model } = get();
+    if (!model) return;
+    syncTabsetDeletion(model);
   },
 }));

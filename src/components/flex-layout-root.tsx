@@ -54,6 +54,7 @@ export default function FlexLayoutRoot() {
   const loadForWorkspace = useLayout((s) => s.loadForWorkspace);
   const persistCurrent = useLayout((s) => s.persistCurrent);
   const setActiveTabId = useLayout((s) => s.setActiveTabId);
+  const normalizeTabsetDeletion = useLayout((s) => s.normalizeTabsetDeletion);
   const workspacePath = useWorkspace((s) => s.path);
   const containerRef = useRef<HTMLDivElement>(null);
   const isMac = useIsMac();
@@ -200,6 +201,8 @@ export default function FlexLayoutRoot() {
     persistCurrent();
     syncDrag();
     requestAnimationFrame(applyDragRegions);
+
+    normalizeTabsetDeletion();
 
     if (modelHasNoTabs(changedModel)) {
       useLayout.getState().newBlankTab();

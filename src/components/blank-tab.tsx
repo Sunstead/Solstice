@@ -35,7 +35,7 @@ export function BlankTab({}: { tabId: string }) {
   const commands = useKeymapStore((s) => s.commands);
 
   return (
-    <ScrollArea className='h-full [&>div]:!block'>
+    <ScrollArea className='h-full [&>div]:block!'>
       <div className='flex flex-col w-full min-h-full py-16'>
         <div className='flex flex-1 w-full flex-col items-center justify-center gap-y-16 text-muted-foreground'>
           <MonochromeIcon className='size-40 opacity-50 min-h-40' />
