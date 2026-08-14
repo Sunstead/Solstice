@@ -82,7 +82,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
 
   const children = selectChildren(entries, node.path);
 
-  const FolderIcon = getFolderIcon();
+  const FolderIcon = getFolderIcon(node.expanded);
   const FileIcon = getFileIcon(getFileExtension(node.name));
 
   const isRenaming =
@@ -148,6 +148,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
               cancel();
             }}
             onCancel={cancel}
+            expanded={node.expanded}
           />
         ) : (
           <ContextMenu>

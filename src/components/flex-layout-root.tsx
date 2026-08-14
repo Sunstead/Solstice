@@ -124,31 +124,18 @@ export default function FlexLayoutRoot() {
     model?.doAction(Actions.deleteTab(node.getId()));
   };
 
-  // Selects a tab by id, skipping ids whose tab was closed in the meantime.
-  // `getId` is called repeatedly so it must pop the *next* history entry
-  // each time it's invoked (which is what store.back()/forward() do).
-  const navigateTo = useCallback((getId: () => string | undefined) => {
+  const navigateTo = useCallback((direction: 'back' | 'forward') => {
     const m = modelRef.current;
     if (!m) return;
-    let id = getId();
-    while (id) {
-      const node = m.getNodeById(id);
-      if (node instanceof TabNode) {
-        m.doAction(Actions.selectTab(id));
-        return;
-      }
-      id = getId();
-    }
+    const isOpenTab = (id: string) => m.getNodeById(id) instanceof TabNode;
+    const store = useNavigationHistory.getState();
+    const id =
+      direction === 'back' ? store.back(isOpenTab) : store.forward(isOpenTab);
+    if (id) m.doAction(Actions.selectTab(id));
   }, []);
 
-  const goBack = useCallback(
-    () => navigateTo(() => useNavigationHistory.getState().back()),
-    [navigateTo],
-  );
-  const goForward = useCallback(
-    () => navigateTo(() => useNavigationHistory.getState().forward()),
-    [navigateTo],
-  );
+  const goBack = useCallback(() => navigateTo('back'), [navigateTo]);
+  const goForward = useCallback(() => navigateTo('forward'), [navigateTo]);
 
   useEffect(() => {
     registerCommand(
@@ -205,6 +192,11 @@ export default function FlexLayoutRoot() {
     const activeTabId = getActiveTabId(changedModel);
     setActiveTabId(activeTabId);
     if (activeTabId) visit(activeTabId);
+
+    useNavigationHistory
+      .getState()
+      .prune((id) => changedModel.getNodeById(id) instanceof TabNode);
+
     persistCurrent();
     syncDrag();
     requestAnimationFrame(applyDragRegions);

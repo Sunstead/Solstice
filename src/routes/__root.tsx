@@ -49,18 +49,26 @@ export const Route = createRootRoute({
       // Fetch the resolved registry + subscribe to keymap-changed.
       void useKeymapStore.getState().init();
 
-      document.addEventListener('contextmenu', (event) => {
+      const preventDefault = (event: MouseEvent) => {
         event.preventDefault();
-      });
+      };
 
-      document.addEventListener('mousedown', (event) => {
+      const handleMouseDown = (event: MouseEvent) => {
         if (event.button !== 3 && event.button !== 4) return;
 
         event.preventDefault();
 
         if (event.button === 3) runCommand('navigation.back');
         if (event.button === 4) runCommand('navigation.forward');
-      });
+      };
+
+      document.addEventListener('contextmenu', preventDefault);
+      document.addEventListener('mousedown', handleMouseDown);
+
+      return () => {
+        document.removeEventListener('mousedown', handleMouseDown);
+        document.removeEventListener('contextmenu', preventDefault);
+      };
     }, []);
 
     // Registers/re-registers tinykeys bindings whenever the registry updates.

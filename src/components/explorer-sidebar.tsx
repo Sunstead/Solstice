@@ -12,9 +12,21 @@ import { FileTree } from './file-tree';
 import { ContextMenu, ContextMenuTrigger } from './ui/context-menu';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
 import { Button } from './ui/button';
-import { FilePlusCorner } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import {
+  FILE_TYPE_PRESETS,
+  FileTypePreset,
+  useEntryInput,
+} from '@/lib/stores/entry-input';
+import { getFileIcon } from '@/assets/icons';
 
-export function NotesSidebar() {
+export function ExplorerSidebar() {
   const path = useWorkspace((s) => s.path);
   const loading = useWorkspace((s) => s.loading);
   const loadDirectory = useFiles((s) => s.loadDirectory);
@@ -23,6 +35,8 @@ export function NotesSidebar() {
     if (!path) return;
     loadDirectory(path);
   }, [path, loadDirectory]);
+
+  const startCreateFile = useEntryInput((s) => s.startCreateFile);
 
   if (loading) {
     return null;
@@ -38,9 +52,38 @@ export function NotesSidebar() {
         <div className='flex items-center justify-between'>
           <p>Explorer</p>
           <div className='flex items-center'>
-            <Button variant='ghost' size='icon-sm'>
-              <FilePlusCorner />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant='ghost' size='icon-sm'>
+                    <Plus />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent>
+                {Object.values(FILE_TYPE_PRESETS).map(
+                  (value: FileTypePreset) => {
+                    const Icon = getFileIcon(value.extension);
+                    return (
+                      <DropdownMenuItem
+                        key={value.id}
+                        onClick={() => startCreateFile(path, value)}
+                      >
+                        <Icon />
+                        {value.label}
+                      </DropdownMenuItem>
+                    );
+                  },
+                )}
+                <DropdownMenuItem onClick={() => startCreateFile(path)}>
+                  {(() => {
+                    const Icon = getFileIcon('');
+                    return <Icon />;
+                  })()}
+                  File
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </SidebarHeader>

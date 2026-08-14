@@ -8,11 +8,13 @@ import { ChevronRight } from 'lucide-react';
 export function EntryInput({
   kind,
   initialValue = '',
+  expanded = false,
   onSubmit,
   onCancel,
 }: {
   kind: EntryKind;
   initialValue?: string;
+  expanded?: boolean;
   onSubmit: (finalName: string) => void;
   onCancel: () => void;
 }) {
@@ -40,7 +42,10 @@ export function EntryInput({
 
   return (
     <InputGroup
-      className={cn('h-8', !isFolder && 'pl-6')}
+      style={{
+        paddingLeft: !isFolder ? 'calc((1 / var(--dpr)) * -1px + 24px)' : '0px',
+      }}
+      className={cn('h-8' /* !isFolder && 'pl-5.75' */)}
       onBlur={onCancel}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
@@ -57,8 +62,17 @@ export function EntryInput({
         className='pl-2! h-8'
         autoFocus
       />
-      <InputGroupAddon>
-        {isFolder && <ChevronRight className='text-foreground' />}
+      <InputGroupAddon
+        className={cn(isFolder && '' /* "pl-1.75" */)}
+        style={{
+          paddingLeft: isFolder ? 'calc((1 / var(--dpr)) * -1px + 8px)' : '',
+        }}
+      >
+        {isFolder && (
+          <ChevronRight
+            className={cn('text-foreground', expanded && 'rotate-90')}
+          />
+        )}
         <Icon />
       </InputGroupAddon>
     </InputGroup>

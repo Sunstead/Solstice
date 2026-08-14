@@ -61,7 +61,9 @@ export function FileTreeItemContextMenuContent({
         </>
       )}
       <ContextMenuItem
-        onClick={() => startRename(node)}
+        onClick={() => {
+          setTimeout(() => startRename(node), 0);
+        }}
         disabled={!renameEnabled}
       >
         Rename

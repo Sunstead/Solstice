@@ -5,7 +5,9 @@ import { FilePlusCorner, LucideIcon, Search, X } from 'lucide-react';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { CommandId } from '@/bindings';
 import { Keybind } from './keybind';
-import MonochromeIcon from "@/assets/icons/app/icon_transparent.svg?react";
+import MonochromeIcon from '@/assets/icons/app/icon_transparent.svg?react';
+import React from 'react';
+import { ScrollArea } from './ui/scroll-area';
 
 const blankTabActions: {
   label: string;
@@ -33,33 +35,35 @@ export function BlankTab({}: { tabId: string }) {
   const commands = useKeymapStore((s) => s.commands);
 
   return (
-    <div className='flex h-full w-full flex-col items-center justify-center gap-3 text-muted-foreground gap-y-16'>
-      <MonochromeIcon className='size-40 opacity-50' />
-      <div className='grid grid-cols-2 items-center gap-x-8'>
-        {blankTabActions.map((action) => {
-          return (
-            <>
-              <Button
-                variant='link'
-                size='lg'
-                className='text-muted-foreground justify-end'
-                onClick={() => runCommand(action.commandId)}
-              >
-                <action.icon />
-                {action.label}
-              </Button>
-              <div>
-                <Keybind
-                  accelerator={
-                    commands.find((c) => c.id === action.commandId)
-                      ?.default_accelerator ?? ''
-                  }
-                />
-              </div>
-            </>
-          );
-        })}
+    <ScrollArea className='h-full [&>div]:!block'>
+      <div className='flex flex-col w-full min-h-full py-16'>
+        <div className='flex flex-1 w-full flex-col items-center justify-center gap-y-16 text-muted-foreground'>
+          <MonochromeIcon className='size-40 opacity-50 min-h-40' />
+          <div className='grid grid-cols-2 items-center gap-x-8'>
+            {blankTabActions.map((action) => (
+              <React.Fragment key={action.commandId}>
+                <Button
+                  variant='link'
+                  size='lg'
+                  className='text-muted-foreground justify-end'
+                  onClick={() => runCommand(action.commandId)}
+                >
+                  <action.icon />
+                  {action.label}
+                </Button>
+                <div>
+                  <Keybind
+                    accelerator={
+                      commands.find((c) => c.id === action.commandId)
+                        ?.default_accelerator ?? ''
+                    }
+                  />
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
+    </ScrollArea>
   );
 }
