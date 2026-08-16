@@ -8,8 +8,12 @@ export type FileTreeNode = FileEntry & {
   expanded: boolean;
 };
 
+function normalize(path: string) {
+  return path.replace(/\\/g, '/');
+}
+
 function getParentPath(path: string) {
-  const normalized = path.replace(/\\/g, '/');
+  const normalized = normalize(path);
   const index = normalized.lastIndexOf('/');
 
   if (index === -1) return '';
@@ -17,24 +21,58 @@ function getParentPath(path: string) {
   return normalized.substring(0, index);
 }
 
+function isWithinSubtree(entryPath: string, rootPath: string) {
+  const normalizedEntry = normalize(entryPath);
+  const normalizedRoot = normalize(rootPath);
+
+  return (
+    normalizedEntry === normalizedRoot ||
+    normalizedEntry.startsWith(`${normalizedRoot}/`)
+  );
+}
+
+function pruneSubtree(
+  entries: Record<string, FileTreeNode>,
+  path: string,
+): Record<string, FileTreeNode> {
+  return Object.fromEntries(
+    Object.entries(entries).filter(
+      ([entryPath]) => !isWithinSubtree(entryPath, path),
+    ),
+  );
+}
+
 type FilesState = {
   entries: Record<string, FileTreeNode>;
 
   reset: () => void;
   loadDirectory: (path: string) => Promise<FileTreeNode[]>;
+  refreshDirectory: (path: string) => Promise<void>;
+  removeSubtree: (path: string) => void;
   expandDirectory: (path: string) => Promise<void>;
   collapseDirectory: (path: string) => void;
 };
+
+function compareEntries(a: FileTreeNode, b: FileTreeNode) {
+  if (a.is_dir !== b.is_dir) {
+    return a.is_dir ? -1 : 1;
+  }
+
+  return a.name.localeCompare(b.name, undefined, {
+    sensitivity: 'base',
+    numeric: true,
+  });
+}
 
 export function selectChildren(
   entries: Record<string, FileTreeNode>,
   path: string,
 ) {
-  const normalized = path.replace(/\\/g, '/');
+  const normalized = normalize(path);
 
-  return Object.values(entries).filter((entry) => {
-    return getParentPath(entry.path) === normalized;
-  });
+  return Object.values(entries)
+    .filter((entry) => getParentPath(entry.path) === normalized)
+    .sort(compareEntries);
 }
 
 export const useFiles = create<FilesState>((set, get) => ({
@@ -59,6 +97,46 @@ export const useFiles = create<FilesState>((set, get) => ({
     }));
 
     return nodes;
+  },
+
+  refreshDirectory: async (path) => {
+    const normalizedPath = normalize(path);
+    const files = await invoke<FileEntry[]>('list_directory', { path });
+    const freshPaths = new Set(files.map((file) => file.path));
+
+    set((state) => {
+      let entries = state.entries;
+
+      for (const entry of Object.values(state.entries)) {
+        const isStaleChild =
+          getParentPath(entry.path) === normalizedPath &&
+          !freshPaths.has(entry.path);
+
+        if (isStaleChild) {
+          entries = pruneSubtree(entries, entry.path);
+        }
+      }
+
+      const nextEntries = { ...entries };
+
+      for (const file of files) {
+        const existing = nextEntries[file.path];
+
+        nextEntries[file.path] = {
+          ...file,
+          childrenLoaded: existing?.childrenLoaded ?? false,
+          expanded: existing?.expanded ?? false,
+        };
+      }
+
+      return { entries: nextEntries };
+    });
+  },
+
+  removeSubtree: (path) => {
+    set((state) => ({
+      entries: pruneSubtree(state.entries, path),
+    }));
   },
 
   expandDirectory: async (path) => {

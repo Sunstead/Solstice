@@ -33,7 +33,7 @@ const SIDEBAR_WIDTH_ICON = "3rem"
 // const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 const MIN_SIDEBAR_WIDTH = "12rem"
-const MAX_SIDEBAR_WIDTH = "28rem"
+const MAX_SIDEBAR_WIDTH = "40rem"
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"

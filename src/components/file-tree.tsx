@@ -6,6 +6,7 @@ import {
   FILE_TYPE_PRESETS,
   stripPresetExtension,
 } from '@/lib/stores/entry-input';
+import { fileOperations } from '@/lib/file-operations';
 import { EntryInput } from './entry-input';
 import {
   Collapsible,
@@ -55,13 +56,11 @@ export function FileTree({ path }: FileTreeProps) {
         <EntryInput
           kind={operation.kind}
           onSubmit={(finalName) => {
-            console.log(
-              operation.kind.type === 'folder'
-                ? 'Creating folder: '
-                : 'Creating file: ',
-              path,
-              finalName,
-            );
+            if (operation.kind.type === 'folder') {
+              fileOperations.createFolder(path, finalName);
+            } else {
+              fileOperations.createFile(path, finalName);
+            }
             cancel();
           }}
           onCancel={cancel}
@@ -100,7 +99,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
           kind={operation.kind}
           initialValue={operation.initialName}
           onSubmit={(finalName) => {
-            console.log('Renaming: ', node.path, '->', finalName);
+            fileOperations.rename(node.path, finalName);
             cancel();
           }}
           onCancel={cancel}
@@ -144,7 +143,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
             kind={operation.kind}
             initialValue={operation.initialName}
             onSubmit={(finalName) => {
-              console.log('Renaming: ', node.path, '->', finalName);
+              fileOperations.rename(node.path, finalName);
               cancel();
             }}
             onCancel={cancel}
@@ -183,13 +182,11 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
               <EntryInput
                 kind={operation.kind}
                 onSubmit={(finalName) => {
-                  console.log(
-                    operation.kind.type === 'folder'
-                      ? 'Creating folder: '
-                      : 'Creating file: ',
-                    node.path,
-                    finalName,
-                  );
+                  if (operation.kind.type === 'folder') {
+                    fileOperations.createFolder(node.path, finalName);
+                  } else {
+                    fileOperations.createFile(node.path, finalName);
+                  }
                   cancel();
                 }}
                 onCancel={cancel}

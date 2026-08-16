@@ -1,10 +1,24 @@
 import { FileTreeNode, useFiles } from '@/hooks/use-files';
 import { useEntryInput, FILE_TYPE_PRESETS } from '@/lib/stores/entry-input';
+import { fileOperations } from '@/lib/file-operations';
 import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
 } from './ui/context-menu';
+import { Trash2Icon } from 'lucide-react';
+import {
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+  AlertDialog,
+} from './ui/alert-dialog';
+import { useState } from 'react';
 
 export function FileTreeItemContextMenuContent({
   node,
@@ -15,6 +29,7 @@ export function FileTreeItemContextMenuContent({
   renameEnabled?: boolean;
   deleteEnabled?: boolean;
 }) {
+  const [dialogOpen, setDialogOpen] = useState(false);
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
   const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
@@ -26,55 +41,81 @@ export function FileTreeItemContextMenuContent({
     }
   };
 
+  const itemName = node.is_dir ? 'folder' : 'file';
+
   return (
-    <ContextMenuContent>
-      {node.is_dir && (
-        <>
-          {Object.values(FILE_TYPE_PRESETS).map((preset) => (
+    <>
+      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <AlertDialogContent size='sm'>
+          <AlertDialogHeader>
+            <AlertDialogMedia className='bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive'>
+              <Trash2Icon />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Delete {itemName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This {itemName} will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant='outline'>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant='destructive'
+              onClick={() => fileOperations.remove(node)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <ContextMenuContent>
+        {node.is_dir && (
+          <>
+            {Object.values(FILE_TYPE_PRESETS).map((preset) => (
+              <ContextMenuItem
+                key={preset.id}
+                onClick={() => {
+                  ensureExpanded();
+                  startCreateFile(node.path, preset);
+                }}
+              >
+                New {preset.label}
+              </ContextMenuItem>
+            ))}
             <ContextMenuItem
-              key={preset.id}
               onClick={() => {
                 ensureExpanded();
-                startCreateFile(node.path, preset);
+                startCreateFolder(node.path);
               }}
             >
-              New {preset.label}
+              New Folder
             </ContextMenuItem>
-          ))}
-          <ContextMenuItem
-            onClick={() => {
-              ensureExpanded();
-              startCreateFolder(node.path);
-            }}
-          >
-            New Folder
-          </ContextMenuItem>
-          <ContextMenuItem
-            onClick={() => {
-              ensureExpanded();
-              startCreateFile(node.path);
-            }}
-          >
-            New File
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-        </>
-      )}
-      <ContextMenuItem
-        onClick={() => {
-          setTimeout(() => startRename(node), 0);
-        }}
-        disabled={!renameEnabled}
-      >
-        Rename
-      </ContextMenuItem>
-      <ContextMenuItem
-        variant='destructive'
-        onClick={() => console.log('Delete', node.path)}
-        disabled={!deleteEnabled}
-      >
-        Delete
-      </ContextMenuItem>
-    </ContextMenuContent>
+            <ContextMenuItem
+              onClick={() => {
+                ensureExpanded();
+                startCreateFile(node.path);
+              }}
+            >
+              New File
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
+        <ContextMenuItem
+          onClick={() => {
+            setTimeout(() => startRename(node), 0);
+          }}
+          disabled={!renameEnabled}
+        >
+          Rename
+        </ContextMenuItem>
+        <ContextMenuItem
+          variant='destructive'
+          onClick={() => setDialogOpen(true)}
+          disabled={!deleteEnabled}
+        >
+          Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </>
   );
 }

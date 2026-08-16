@@ -58,6 +58,20 @@ function collectTabsets(model: Model): TabSetNode[] {
   return tabsets;
 }
 
+function findBlankTab(model: Model): TabNode | undefined {
+  let found: TabNode | undefined;
+  model.visitNodes((node) => {
+    if (
+      !found &&
+      node.getType() === 'tab' &&
+      (node as TabNode).getComponent() === 'blank'
+    ) {
+      found = node as TabNode;
+    }
+  });
+  return found;
+}
+
 function syncTabsetDeletion(model: Model): void {
   const tabsets = collectTabsets(model);
   const desiredEnableDeleteWhenEmpty = tabsets.length > 1;
@@ -154,6 +168,30 @@ export const useLayout = create<LayoutState>((set, get) => ({
     const existing = model.getNodeById(path);
     if (existing) {
       model.doAction(Actions.selectTab(path));
+      return;
+    }
+
+    const blankTab = findBlankTab(model);
+    const blankTabParent = blankTab?.getParent();
+
+    if (blankTab && blankTabParent instanceof TabSetNode) {
+      const index = blankTabParent.getChildren().indexOf(blankTab);
+
+      model.doAction(Actions.deleteTab(blankTab.getId()));
+      model.doAction(
+        Actions.addNode(
+          {
+            type: 'tab',
+            id: path,
+            name,
+            component: 'editor',
+            config: { path },
+          },
+          blankTabParent.getId(),
+          DockLocation.CENTER,
+          index,
+        ),
+      );
       return;
     }
 

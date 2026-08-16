@@ -24,7 +24,7 @@ import {
   FileTypePreset,
   useEntryInput,
 } from '@/lib/stores/entry-input';
-import { getFileIcon } from '@/assets/icons';
+import { getFileIcon, getFolderIcon } from '@/assets/icons';
 
 export function ExplorerSidebar() {
   const path = useWorkspace((s) => s.path);
@@ -37,6 +37,7 @@ export function ExplorerSidebar() {
   }, [path, loadDirectory]);
 
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
+  const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
 
   if (loading) {
     return null;
@@ -75,6 +76,13 @@ export function ExplorerSidebar() {
                     );
                   },
                 )}
+                <DropdownMenuItem onClick={() => startCreateFolder(path)}>
+                  {(() => {
+                    const Icon = getFolderIcon();
+                    return <Icon />;
+                  })()}
+                  Folder
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => startCreateFile(path)}>
                   {(() => {
                     const Icon = getFileIcon('');
