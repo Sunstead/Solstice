@@ -4,8 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { ScrollArea } from './ui/scroll-area';
 import { MilkdownEditorWrapper } from './milkdown-editor';
 import FileBreadcrumb from './file-breadcrumb';
-import { Button } from './ui/button';
-import { MoreVertical } from 'lucide-react';
+import { FileActionsDropdown } from './file-actions-dropdown';
 
 type FileEditorProps = {
   path: string;
@@ -47,23 +46,24 @@ export function FileEditor({ path }: FileEditorProps) {
   }
 
   return (
-    <ScrollArea className='h-full flex flex-col'>
-      {/* <div className='sticky top-0 bg-background p-2 pr-4 grid grid-cols-[max-content_1fr_max-content] justify-items-center items-center'>
-        <div className='flex items-center'>
+    <ScrollArea className='h-full'>
+      <div className='flex flex-col h-max min-h-full'>
+        <div className='sticky top-0 bg-background p-2 pr-4 grid grid-cols-[max-content_1fr_max-content] justify-items-center items-center'>
+          <div className='flex items-center'></div>
+          <div className='flex items-center justify-center min-w-0 w-full justify-self-stretch'>
+            <FileBreadcrumb filePath={path} className='min-w-0 max-w-full' />
+          </div>
+          <div className='flex items-center'>
+            <FileActionsDropdown />
+          </div>
         </div>
-        <FileBreadcrumb />
-        <div className='flex items-center'>
-          <Button variant='ghost' size='icon-sm'>
-            <MoreVertical />
-          </Button>
+        <div className='typeset w-full text-sm flex-1 min-h-0 text-[16px]'>
+          <MilkdownEditorWrapper
+            path={path}
+            initialContent={content}
+            onError={setError}
+          />
         </div>
-      </div> */}
-      <div className='typeset w-full text-sm flex-1 min-h-0 text-[16px]'>
-        <MilkdownEditorWrapper
-          path={path}
-          initialContent={content}
-          onError={setError}
-        />
       </div>
     </ScrollArea>
   );

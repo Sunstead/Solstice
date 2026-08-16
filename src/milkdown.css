@@ -1,9 +1,11 @@
 [data-milkdown-root='true'] {
-  height: 100%;
+  min-height: 100%;
+  height: max-content;
 }
 
 .milkdown {
-  height: 100%;
+  min-height: 100%;
+  height: max-content;
 }
 
 .milkdown ::selection {

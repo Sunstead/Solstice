@@ -6,7 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from './ui/context-menu';
-import { Trash2Icon } from 'lucide-react';
+import { PencilLine, Trash, Trash2Icon } from 'lucide-react';
 import {
   AlertDialogContent,
   AlertDialogHeader,
@@ -18,18 +18,20 @@ import {
   AlertDialogAction,
   AlertDialog,
 } from './ui/alert-dialog';
-import { useState } from 'react';
 
 export function FileTreeItemContextMenuContent({
   node,
   renameEnabled = true,
   deleteEnabled = true,
+  deleteDialogOpen = false,
+  onDeleteDialogOpenChange,
 }: {
   node: FileTreeNode;
   renameEnabled?: boolean;
   deleteEnabled?: boolean;
+  deleteDialogOpen?: boolean;
+  onDeleteDialogOpenChange?: (open: boolean) => void;
 }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
   const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
@@ -45,7 +47,10 @@ export function FileTreeItemContextMenuContent({
 
   return (
     <>
-      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={onDeleteDialogOpenChange}
+      >
         <AlertDialogContent size='sm'>
           <AlertDialogHeader>
             <AlertDialogMedia className='bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive'>
@@ -106,13 +111,20 @@ export function FileTreeItemContextMenuContent({
           }}
           disabled={!renameEnabled}
         >
+          <PencilLine />
           Rename
         </ContextMenuItem>
         <ContextMenuItem
           variant='destructive'
-          onClick={() => setDialogOpen(true)}
+          onClick={() => {
+            setTimeout(
+              () => onDeleteDialogOpenChange && onDeleteDialogOpenChange(true),
+              0,
+            );
+          }}
           disabled={!deleteEnabled}
         >
+          <Trash />
           Delete
         </ContextMenuItem>
       </ContextMenuContent>

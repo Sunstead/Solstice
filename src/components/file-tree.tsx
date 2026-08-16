@@ -21,8 +21,9 @@ import {
 } from './ui/resizable-sidebar';
 import { cn, getFileExtension } from '@/lib/utils';
 import { getFileIcon, getFolderIcon } from '@/assets/icons';
-import { useEffect } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
+import { useIsMac } from '@/hooks/use-platform';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
 
 type FileTreeProps = {
@@ -78,6 +79,8 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const activeTabId = useLayout((s) => s.activeTabId);
   const operation = useEntryInput((s) => s.operation);
   const cancel = useEntryInput((s) => s.cancel);
+  const isMac = useIsMac();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const children = selectChildren(entries, node.path);
 
@@ -91,6 +94,15 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
     node.is_dir &&
     operation?.mode === 'create' &&
     operation.parentPath === node.path;
+
+  const handleDeleteKeyDown = (event: KeyboardEvent) => {
+    const isDeleteKey =
+      event.key === 'Delete' || (isMac && event.key === 'Backspace');
+    if (!isDeleteKey) return;
+
+    event.preventDefault();
+    setDeleteDialogOpen(true);
+  };
 
   if (!node.is_dir) {
     if (isRenaming) {
@@ -115,13 +127,18 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
               isActive={activeTabId === node.path}
               className='data-active:font-normal w-full max-w-full truncate pl-8'
               onClick={() => openFile(node.path, node.name)}
+              onKeyDown={handleDeleteKeyDown}
             >
               <FileIcon />
               <FormattedFileName name={node.name} />
             </SidebarMenuButton>
           }
         />
-        <FileTreeItemContextMenuContent node={node} />
+        <FileTreeItemContextMenuContent
+          node={node}
+          deleteDialogOpen={deleteDialogOpen}
+          onDeleteDialogOpenChange={setDeleteDialogOpen}
+        />
       </ContextMenu>
     );
   }
@@ -155,7 +172,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
               render={
                 <CollapsibleTrigger
                   render={
-                    <SidebarMenuButton>
+                    <SidebarMenuButton onKeyDown={handleDeleteKeyDown}>
                       <ChevronRight
                         className={cn(
                           'transition-transform',
@@ -169,7 +186,11 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
                 />
               }
             />
-            <FileTreeItemContextMenuContent node={node} />
+            <FileTreeItemContextMenuContent
+              node={node}
+              deleteDialogOpen={deleteDialogOpen}
+              onDeleteDialogOpenChange={setDeleteDialogOpen}
+            />
           </ContextMenu>
         )}
 
