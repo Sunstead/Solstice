@@ -48,7 +48,7 @@ export function FileEditor({ path }: FileEditorProps) {
   return (
     <ScrollArea className='h-full'>
       <div className='flex flex-col h-max min-h-full'>
-        <div className='sticky top-0 bg-background p-2 pr-4 grid grid-cols-[max-content_1fr_max-content] justify-items-center items-center'>
+        <div className='sticky top-0 bg-background p-2 pr-4 grid grid-cols-[max-content_1fr_max-content] justify-items-center items-center z-10'>
           <div className='flex items-center'></div>
           <div className='flex items-center justify-center min-w-0 w-full justify-self-stretch'>
             <FileBreadcrumb filePath={path} className='min-w-0 max-w-full' />

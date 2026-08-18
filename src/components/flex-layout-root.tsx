@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useLayout, getActiveTabId, modelHasNoTabs } from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useFileTreeDragState } from '@/hooks/use-file-tree-drag-state';
+import { useFileTreeExternalDropZone } from '@/hooks/use-file-tree-dnd';
 import { FileEditor } from '@/components/file-editor';
 import { BlankTab } from '@/components/blank-tab';
 import { WindowControls } from './window-controls';
@@ -36,6 +38,12 @@ import { Button } from './ui/button';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { registerCommand, runCommand, unregisterCommand } from '@/lib/commands';
 import { stripPresetExtension } from '@/lib/stores/entry-input';
+
+function makeDraggedTabId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `dragged-tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 const factory = (node: TabNode) => {
   const component = node.getComponent();
@@ -59,6 +67,14 @@ export default function FlexLayoutRoot() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isMac = useIsMac();
   const { open: isSidebarOpen } = useSidebar();
+
+  // Registers containerRef as a react-dnd drop target so react-dnd's own
+  // cursor/drop-permission logic doesn't fight with FlexLayout's — see
+  // useFileTreeExternalDropZone for why this is necessary. FlexLayout's
+  // onExternalDrag (below) still does the actual work of accepting the
+  // drop and creating the tab.
+  const externalDrop = useFileTreeExternalDropZone();
+  externalDrop(containerRef);
 
   const { visit } = useNavigationHistory();
 
@@ -209,6 +225,51 @@ export default function FlexLayoutRoot() {
     }
   };
 
+  // Lets a file dragged from the explorer be dropped directly onto a
+  // specific tabset/position in the editor area. FlexLayout owns the drag
+  // affordances here (insertion indicator, target tabset resolution) — we
+  // only decide *whether* to accept the drag and *what* tab it becomes.
+  //
+  // The native DragEvent can't tell us which file is being dragged: browsers
+  // withhold dataTransfer payload data until the actual `drop`, and this
+  // drag isn't a react-dnd consumer to begin with. So we read the currently-
+  // dragged entry out of useFileTreeDragState instead — see that store for
+  // why. If nothing's there, this is some other external drag (e.g. from the
+  // OS) and we reject it.
+  //
+  // Deliberately does NOT dedup against already-open tabs the way clicking
+  // a file in the explorer does. Dragging is a positional gesture — the
+  // person is choosing *where* to put a view of the file, which is a
+  // reasonable way to open a second view of something already open
+  // elsewhere (e.g. side-by-side). So the tab id is generated fresh each
+  // time rather than reusing `entry.path`, since FlexLayout requires unique
+  // ids and this can now create more than one tab for the same file.
+  // `config.path` — not `id` — is what carries the file's identity from
+  // here on; anything that needs to know which file a tab points to
+  // (FileEditor's factory, onRenderTab below, closeFileTab) reads that.
+  const handleExternalDrag = useCallback(
+    (_event: React.DragEvent<HTMLElement>) => {
+      const entry = useFileTreeDragState.getState().draggedEntry;
+      if (!entry || entry.is_dir) return undefined;
+
+      return {
+        json: {
+          id: makeDraggedTabId(),
+          name: entry.name,
+          component: 'editor',
+          config: { path: entry.path },
+        },
+        // Called once this specific drag's drop completes (or is
+        // cancelled) — the natural place to clear the tracked drag entry,
+        // since it's scoped to this drag rather than a global Layout event.
+        onDrop: () => {
+          useFileTreeDragState.getState().setDraggedEntry(null);
+        },
+      };
+    },
+    [],
+  );
+
   if (!model) return null;
 
   return (
@@ -219,6 +280,7 @@ export default function FlexLayoutRoot() {
         factory={factory}
         onModelChange={handleModelChange}
         onAuxMouseClick={handleAuxMouseClick}
+        onExternalDrag={handleExternalDrag}
         icons={{
           close: <X className='size-4' />,
           maximize: <Maximize className='size-4' />,
@@ -272,7 +334,12 @@ export default function FlexLayoutRoot() {
         }}
         onRenderTab={(node, renderValues) => {
           if (node.getComponent() === 'editor') {
-            const Icon = getFileIcon(getFileExtension(node.getId()));
+            // Read the file path from config, not the tab id — drag-opened
+            // tabs no longer use the path as their id (see
+            // handleExternalDrag), since more than one such tab can now
+            // point at the same file.
+            const config = node.getConfig() as { path?: string } | undefined;
+            const Icon = getFileIcon(getFileExtension(config?.path ?? ''));
             renderValues.leading = (
               <div className='size-4'>
                 <Icon />

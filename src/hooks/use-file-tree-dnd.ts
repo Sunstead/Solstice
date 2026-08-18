@@ -4,6 +4,7 @@ import { getEmptyImage } from 'react-dnd-html5-backend';
 import { canMove, type MovableEntry } from '@/lib/file-operations';
 import { fileOperations } from '@/lib/file-operations';
 import { useDragHoverStore } from '@/hooks/use-drag-hover';
+import { useFileTreeDragState } from '@/hooks/use-file-tree-drag-state';
 
 export const FILE_TREE_ITEM_TYPE = 'file-tree-node';
 
@@ -18,15 +19,37 @@ interface DropCollectedProps {
 
 /** Makes a file tree node (file or folder) a drag source. */
 export function useFileTreeDrag(node: MovableEntry) {
-  const [{ isDragging }, drag, preview] = useDrag<MovableEntry, unknown, DragCollectedProps>(
+  const setDraggedEntry = useFileTreeDragState((s) => s.setDraggedEntry);
+
+  const [{ isDragging }, drag, preview] = useDrag<
+    MovableEntry,
+    unknown,
+    DragCollectedProps
+  >(
     () => ({
       type: FILE_TREE_ITEM_TYPE,
-      item: { path: node.path, name: node.name, is_dir: node.is_dir },
+      // `item` as a function is invoked once, at drag start — the natural
+      // place to also record the entry in useFileTreeDragState for
+      // non-react-dnd consumers (see that store for why it's needed).
+      item: () => {
+        const entry: MovableEntry = {
+          path: node.path,
+          name: node.name,
+          is_dir: node.is_dir,
+        };
+        setDraggedEntry(entry);
+        return entry;
+      },
+      // Fires when the drag ends, whether it was dropped or cancelled —
+      // either way the drag is over, so clear the tracked entry.
+      end: () => {
+        setDraggedEntry(null);
+      },
       collect: (monitor) => ({
         isDragging: monitor.isDragging(),
       }),
     }),
-    [node.path, node.name, node.is_dir],
+    [node.path, node.name, node.is_dir, setDraggedEntry],
   );
 
   // The HTML5 backend otherwise renders a screenshot of the dragged DOM node
@@ -60,7 +83,11 @@ export function useFileTreeDrop(
   const setHoverTarget = useDragHoverStore((s) => s.setHoverTarget);
   const clearHoverTarget = useDragHoverStore((s) => s.clearHoverTarget);
 
-  const [{ isOver, canDrop }, drop] = useDrop<MovableEntry, unknown, DropCollectedProps>(
+  const [{ isOver, canDrop }, drop] = useDrop<
+    MovableEntry,
+    unknown,
+    DropCollectedProps
+  >(
     () => ({
       accept: FILE_TREE_ITEM_TYPE,
       canDrop: (item) => canMove(item, targetParentPath),
@@ -107,4 +134,46 @@ export function useFileTreeDrop(
   }, [autoExpand, expanded, isOver, canDrop]);
 
   return { drop, isOver, canDrop };
+}
+
+/**
+ * Registers an element as a react-dnd drop target for file tree items
+ * without performing any move — used to cover areas (like the FlexLayout
+ * editor region) where a *different* system handles the actual drop.
+ *
+ * Why this needs to exist at all: react-dnd-html5-backend attaches its own
+ * `dragover` listener on `document`, and on every `dragover` — anywhere on
+ * the page — it checks whether the pointer is currently over a DOM node
+ * covered by a registered react-dnd `useDrop` target. If it finds none, it
+ * force-sets `dataTransfer.dropEffect = 'none'`, which is what produces the
+ * browser's no-drop cursor. Because that listener lives on `document`, it
+ * runs *after* any listener attached directly to a more specific element
+ * further down the tree (events bubble outward), so it silently overrides
+ * whatever cursor state that other element's own drag handling set —
+ * exactly what happens over FlexLayout's editor area, since nothing there
+ * is a registered react-dnd target. In most browsers an explicit
+ * `dropEffect: 'none'` on the final `dragover` also suppresses the `drop`
+ * event entirely, which is why the drop silently did nothing on top of
+ * showing the wrong cursor.
+ *
+ * Mounting this on the editor container gives react-dnd a target to find,
+ * so it stops overriding the cursor — the actual drop is still handled
+ * entirely by FlexLayout's own `onExternalDrag` (see FlexLayoutRoot).
+ */
+export function useFileTreeExternalDropZone() {
+  const [, drop] = useDrop<MovableEntry, unknown, Record<string, never>>(
+    () => ({
+      accept: FILE_TREE_ITEM_TYPE,
+      // Mirrors the same folder-rejection FlexLayoutRoot's onExternalDrag
+      // applies — keep the two in sync if that rule ever changes.
+      canDrop: (item) => !item.is_dir,
+      // Deliberately a no-op. FlexLayout's own onExternalDrag/DragState
+      // machinery does the actual tab creation; this target exists purely
+      // for react-dnd's internal cursor/drop-permission bookkeeping.
+      drop: () => {},
+    }),
+    [],
+  );
+
+  return drop;
 }
