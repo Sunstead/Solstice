@@ -72,6 +72,24 @@ function findBlankTab(model: Model): TabNode | undefined {
   return found;
 }
 
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+function findTabForPath(model: Model, path: string): TabNode | undefined {
+  const wanted = normalizePath(path);
+  let found: TabNode | undefined;
+
+  model.visitNodes((node) => {
+    if (found || node.getType() !== 'tab') return;
+    const tab = node as TabNode;
+    const config = tab.getConfig() as { path?: string } | undefined;
+    if (config?.path && normalizePath(config.path) === wanted) found = tab;
+  });
+
+  return found;
+}
+
 function syncTabsetDeletion(model: Model): void {
   const tabsets = collectTabsets(model);
   const desiredEnableDeleteWhenEmpty = tabsets.length > 1;
@@ -165,9 +183,9 @@ export const useLayout = create<LayoutState>((set, get) => ({
     const { model } = get();
     if (!model) return;
 
-    const existing = model.getNodeById(path);
+    const existing = findTabForPath(model, path);
     if (existing) {
-      model.doAction(Actions.selectTab(path));
+      model.doAction(Actions.selectTab(existing.getId()));
       return;
     }
 

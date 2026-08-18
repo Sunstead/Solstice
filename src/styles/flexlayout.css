@@ -134,16 +134,16 @@
   overflow: visible;
   border-bottom: none;
   gap: 8px;
-  transition:
+  /* transition:
     width var(--tab-motion-duration) var(--tab-motion-ease),
     min-width var(--tab-motion-duration) var(--tab-motion-ease),
     max-width var(--tab-motion-duration) var(--tab-motion-ease),
     padding-left var(--tab-motion-duration) var(--tab-motion-ease),
     padding-right var(--tab-motion-duration) var(--tab-motion-ease),
     margin-left var(--tab-motion-duration) var(--tab-motion-ease),
-    margin-right var(--tab-motion-duration) var(--tab-motion-ease);
-  animation: flexlayout-tab-enter var(--tab-motion-duration)
-    var(--tab-motion-ease);
+    margin-right var(--tab-motion-duration) var(--tab-motion-ease); */
+  /* animation: flexlayout-tab-enter var(--tab-motion-duration)
+    var(--tab-motion-ease); */
 }
 
 @media (prefers-reduced-motion: reduce) {

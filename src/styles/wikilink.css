@@ -1,0 +1,44 @@
+/*
+ * Collapsed source: still selectable and copyable, just not laid out. The
+ * zero height matters as much as the zero width -- an inline-block with
+ * hidden overflow takes its baseline from its bottom edge, so a box left at
+ * its natural height would push the whole line taller than its neighbours.
+ */
+.wikilink-hidden {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.wikilink {
+  color: var(--primary, #5b8def);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}
+
+.wikilink[data-wikilink-target] {
+  cursor: pointer;
+}
+
+.wikilink[data-wikilink-target]:hover {
+  border-bottom-color: currentColor;
+}
+
+.wikilink-ambiguous {
+  color: var(--destructive, #e5484d);
+  border-bottom: 1px dotted currentColor;
+}
+
+.wikilink-unresolved {
+  color: var(--muted-foreground, #8b8d98);
+  border-bottom: 1px dashed currentColor;
+}
+
+/* Brackets are only ever visible while the selection is inside the link. */
+.wikilink-bracket {
+  color: var(--muted-foreground, #8b8d98);
+  opacity: 0.55;
+}

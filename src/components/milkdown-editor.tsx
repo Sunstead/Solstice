@@ -49,6 +49,8 @@ import { commands, CommandId } from '@/bindings';
 import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useKeymapStore } from '@/lib/stores/keymap';
+import { wikilink, useWikilinkIndexSync } from '@/lib/wikilink';
+import '@/styles/wikilink.css';
 
 type MilkdownEditorProps = {
   path: string;
@@ -224,6 +226,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         .use(gfm)
         .use(history)
         .use(clipboard)
+        .use(wikilink)
         .use(commandStateTracker);
     },
     [path, loaded],
@@ -383,8 +386,12 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
   return <Milkdown />;
 };
 
-export const MilkdownEditorWrapper: React.FC<MilkdownEditorProps> = (props) => (
-  <MilkdownProvider>
-    <MilkdownEditor {...props} />
-  </MilkdownProvider>
-);
+export const MilkdownEditorWrapper: React.FC<MilkdownEditorProps> = (props) => {
+  useWikilinkIndexSync();
+
+  return (
+    <MilkdownProvider>
+      <MilkdownEditor {...props} />
+    </MilkdownProvider>
+  );
+};
