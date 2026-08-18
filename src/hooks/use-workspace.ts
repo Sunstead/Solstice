@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { touchKnownWorkspace } from '@/lib/stores/known-workspaces';
+import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { resetScopedStoreCache } from '@/lib/stores/scoped-storage';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useFiles } from '@/hooks/use-files';
@@ -35,7 +35,24 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   init: async () => {
     if (!get().loading) return;
-    const path = await invoke<string | null>('get_workspace');
+
+    await useKnownWorkspaces.getState().load();
+
+    let path = await invoke<string | null>('get_workspace');
+
+    if (!path) {
+      const lastOpened =
+        useKnownWorkspaces.getState().workspaces[0]?.path ?? null;
+      if (lastOpened) {
+        try {
+          await commands.setWorkspace(lastOpened);
+          path = lastOpened;
+        } catch (error) {
+          console.error('Failed to restore last workspace:', error);
+        }
+      }
+    }
+
     set({ path, loading: false });
     await syncScopedStores(path);
   },
@@ -49,7 +66,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   setWorkspace: async (path) => {
     await commands.setWorkspace(path);
-    await touchKnownWorkspace(path);
+    await useKnownWorkspaces.getState().touch(path);
     useFiles.getState().reset();
     set({ path });
     await syncScopedStores(path);

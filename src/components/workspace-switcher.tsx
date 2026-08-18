@@ -1,5 +1,4 @@
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
-import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -14,16 +13,19 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from './ui/resizable-sidebar';
-
-const workspaces = [
-  { id: '1', name: 'Acme Inc' },
-  { id: '2', name: 'Personal' },
-  { id: '3', name: 'Side Project' },
-];
+import { useWorkspace } from '@/hooks/use-workspace';
+import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 
 export function WorkspaceSwitcher() {
-  const [activeId, setActiveId] = useState(workspaces[0].id);
-  const active = workspaces.find((w) => w.id === activeId) ?? workspaces[0];
+  const activePath = useWorkspace((s) => s.path);
+  const setWorkspace = useWorkspace((s) => s.setWorkspace);
+  const openFolder = useWorkspace((s) => s.openFolder);
+  const workspaces = useKnownWorkspaces((s) => s.workspaces);
+
+  const active = workspaces.find((w) => w.path === activePath);
+  const activeName =
+    active?.name ??
+    (activePath ? activePath.split(/[\\/]/).pop() : 'No workspace open');
 
   return (
     <SidebarMenu>
@@ -36,7 +38,7 @@ export function WorkspaceSwitcher() {
                 className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
               >
                 <div className='grid flex-1 text-left text-sm leading-tight'>
-                  <span className='truncate font-medium'>{active.name}</span>
+                  <span className='truncate font-medium'>{activeName}</span>
                 </div>
                 <ChevronsUpDown className='ml-auto size-4' />
               </SidebarMenuButton>
@@ -48,22 +50,28 @@ export function WorkspaceSwitcher() {
             align='start'
             sideOffset={4}
           >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className='text-xs text-muted-foreground'>
-                Workspaces
-              </DropdownMenuLabel>
-              {workspaces.map((workspace) => (
-                <DropdownMenuItem
-                  key={workspace.id}
-                  onClick={() => setActiveId(workspace.id)}
-                >
-                  <span className='flex-1 truncate'>{workspace.name}</span>
-                  {workspace.id === activeId && <Check className='size-4' />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            {workspaces.length > 0 && (
+              <>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className='text-xs text-muted-foreground'>
+                    Workspaces
+                  </DropdownMenuLabel>
+                  {workspaces.map((workspace) => (
+                    <DropdownMenuItem
+                      key={workspace.path}
+                      onClick={() => setWorkspace(workspace.path)}
+                    >
+                      <span className='flex-1 truncate'>{workspace.name}</span>
+                      {workspace.path === activePath && (
+                        <Check className='size-4' />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuItem onClick={() => openFolder()}>
               <Plus />
               New workspace
             </DropdownMenuItem>
