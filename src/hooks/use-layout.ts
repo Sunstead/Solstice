@@ -40,6 +40,8 @@ type LayoutState = {
   openFile: (path: string, name: string) => void;
   newBlankTab: (tabsetId?: string) => void;
   normalizeTabsetDeletion: () => void;
+  closeFileTab: (path: string) => void;
+  closeFolderTabs: (path: string) => void;
 };
 
 function findFirstTabset(model: Model): TabSetNode | undefined {
@@ -254,5 +256,41 @@ export const useLayout = create<LayoutState>((set, get) => ({
     const { model } = get();
     if (!model) return;
     syncTabsetDeletion(model);
+  },
+
+  closeFileTab: (path) => {
+    const { model } = get();
+    if (!model) return;
+
+    const tab = findTabForPath(model, path);
+    if (tab) {
+      model.doAction(Actions.deleteTab(tab.getId()));
+    }
+  },
+
+  closeFolderTabs: (path) => {
+    const { model } = get();
+    if (!model) return;
+
+    const wanted = normalizePath(path);
+    const idsToClose: string[] = [];
+
+    // Collect matching tab ids first; deleting nodes while visitNodes is
+    // iterating would mutate the tree out from under it.
+    model.visitNodes((node) => {
+      if (node.getType() !== 'tab') return;
+      const tab = node as TabNode;
+      const config = tab.getConfig() as { path?: string } | undefined;
+      if (!config?.path) return;
+
+      const tabPath = normalizePath(config.path);
+      if (tabPath === wanted || tabPath.startsWith(`${wanted}/`)) {
+        idsToClose.push(tab.getId());
+      }
+    });
+
+    for (const id of idsToClose) {
+      model.doAction(Actions.deleteTab(id));
+    }
   },
 }));

@@ -6,7 +6,9 @@ import {
   FILE_TYPE_PRESETS,
   stripPresetExtension,
 } from '@/lib/stores/entry-input';
-import { fileOperations } from '@/lib/file-operations';
+import { fileOperations, parentOf } from '@/lib/file-operations';
+import { useFileTreeDrag, useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
+import { useDragHoverStore } from '@/hooks/use-drag-hover';
 import { EntryInput } from './entry-input';
 import {
   Collapsible,
@@ -21,7 +23,7 @@ import {
 } from './ui/resizable-sidebar';
 import { cn, getFileExtension } from '@/lib/utils';
 import { getFileIcon, getFolderIcon } from '@/assets/icons';
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { useIsMac } from '@/hooks/use-platform';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
@@ -104,6 +106,55 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
     setDeleteDialogOpen(true);
   };
 
+  // Every node is a drag source. Its drop target depends on its type:
+  // dropping onto a folder moves the dragged entry inside it, while
+  // dropping onto a file moves the entry alongside it (into the same
+  // directory), matching how most desktop file explorers behave.
+  const nodeRef = useRef<HTMLButtonElement>(null);
+  const { drag, isDragging } = useFileTreeDrag(node);
+  const dropTargetPath = node.is_dir ? node.path : parentOf(node.path);
+  const { drop } = useFileTreeDrop(dropTargetPath, {
+    autoExpand: node.is_dir ? () => expandDirectory(node.path) : undefined,
+    expanded: node.expanded,
+  });
+  drag(drop(nodeRef));
+
+  // Folders get a second, independent drop target scoped to their contents
+  // area, so dropping on empty space inside the folder (not on a specific
+  // child) still resolves to this folder instead of bubbling up to an
+  // ancestor. This is deliberately its own `useDrop` instance rather than
+  // reusing the row's connector: react-dnd prioritizes nested drop targets
+  // over their ancestors via native DOM containment (`isOver({shallow})`),
+  // and that only works cleanly when each DOM region maps to exactly one
+  // handler. Sharing a single handler across two disjoint elements (the row
+  // and this container) broke that — a nested folder's own row would lose
+  // priority to this container whenever it sat inside it.
+  const childrenDropRef = useRef<HTMLDivElement>(null);
+  const { drop: dropOnChildren } = useFileTreeDrop(node.path);
+  if (node.is_dir) {
+    dropOnChildren(childrenDropRef);
+  }
+
+  // Only folders highlight, and only as the *current drop destination* —
+  // whether the pointer is directly over the folder's own row, or over one
+  // of its files (whose drop zone resolves to this same folder path).
+  // Files themselves never show a highlight; hovering one just indicates
+  // where inside the folder the drop would land.
+  const hoverTargetPath = useDragHoverStore((s) => s.hoverTargetPath);
+  const isDropDestination = node.is_dir && hoverTargetPath === node.path;
+
+  const dropHighlightClassName = cn(
+    isDragging && 'opacity-50',
+    isDropDestination &&
+      'bg-accent/50 outline outline-1 -outline-offset-1 outline-accent-foreground/40',
+  );
+
+  // A softer wash across the whole "contents" area, so it's clear the
+  // folder as a whole — not just the row — is where the drop will land.
+  const childrenHighlightClassName = cn(
+    isDropDestination && 'bg-accent/20 rounded-sm',
+  );
+
   if (!node.is_dir) {
     if (isRenaming) {
       return (
@@ -124,8 +175,12 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
         <ContextMenuTrigger
           render={
             <SidebarMenuButton
+              ref={nodeRef}
               isActive={activeTabId === node.path}
-              className='data-active:font-normal w-full max-w-full truncate pl-8'
+              className={cn(
+                'data-active:font-normal w-full max-w-full truncate pl-8',
+                dropHighlightClassName,
+              )}
               onClick={() => openFile(node.path, node.name)}
               onKeyDown={handleDeleteKeyDown}
             >
@@ -147,6 +202,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
     <SidebarMenuItem>
       <Collapsible
         open={node.expanded}
+        className={childrenHighlightClassName}
         onOpenChange={(open) => {
           if (open) {
             expandDirectory(node.path);
@@ -172,7 +228,11 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
               render={
                 <CollapsibleTrigger
                   render={
-                    <SidebarMenuButton onKeyDown={handleDeleteKeyDown}>
+                    <SidebarMenuButton
+                      ref={nodeRef}
+                      className={dropHighlightClassName}
+                      onKeyDown={handleDeleteKeyDown}
+                    >
                       <ChevronRight
                         className={cn(
                           'transition-transform',
@@ -194,7 +254,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
           </ContextMenu>
         )}
 
-        <CollapsibleContent>
+        <CollapsibleContent ref={childrenDropRef}>
           <SidebarMenuSub className='pr-0 pl-0.5 mr-0 ml-3.5 gap-0 py-0'>
             {children.map((child) => (
               <FileTreeItem key={child.path} node={child} />

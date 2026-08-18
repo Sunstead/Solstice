@@ -1,7 +1,6 @@
 import { create } from 'zustand';
-import { invoke } from '@tauri-apps/api/core';
 
-import { FileEntry } from '@/bindings';
+import { commands, FileEntry } from '@/bindings';
 
 export type FileTreeNode = FileEntry & {
   childrenLoaded: boolean;
@@ -75,13 +74,21 @@ export function selectChildren(
     .sort(compareEntries);
 }
 
+const fetchVisibleEntries = async (path: string) => {
+  const res = await commands.listDirectory(path);
+
+  if (res.status === 'error') return [];
+
+  return res.data.filter((d) => !d.name.startsWith('.'));
+};
+
 export const useFiles = create<FilesState>((set, get) => ({
   entries: {},
 
   reset: () => set({ entries: {} }),
 
   loadDirectory: async (path) => {
-    const files = await invoke<FileEntry[]>('list_directory', { path });
+    const files = await fetchVisibleEntries(path);
 
     const nodes = files.map((file) => ({
       ...file,
@@ -101,7 +108,7 @@ export const useFiles = create<FilesState>((set, get) => ({
 
   refreshDirectory: async (path) => {
     const normalizedPath = normalize(path);
-    const files = await invoke<FileEntry[]>('list_directory', { path });
+    const files = await fetchVisibleEntries(path);
     const freshPaths = new Set(files.map((file) => file.path));
 
     set((state) => {

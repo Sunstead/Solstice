@@ -13,6 +13,8 @@ import { registerCommand, runCommand } from '@/lib/commands';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { useGlobalKeybinds } from '@/hooks/use-global-keybinds';
 import { useDevicePixelRatio } from '@/hooks/use-device-pixel-ratio';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 export const Route = createRootRoute({
   component: () => {
@@ -75,31 +77,33 @@ export const Route = createRootRoute({
     useGlobalKeybinds();
 
     return (
-      <ThemeProvider defaultTheme='dark' storageKey='vite-ui-theme'>
-        <div className='h-screen bg-sidebar text-foreground flex flex-col overflow-hidden'>
-          <SidebarProvider
-            key={hydrated ? 'hydrated' : 'initial'}
-            open={!sidebarCollapsed}
-            onOpenChange={(open) => setSidebarCollapsed(!open)}
-            defaultWidth={`${sidebarWidth}px`}
-            onWidthChange={setSidebarWidth}
-            className='flex-col'
-          >
-            <div className='flex flex-1 min-h-0 relative w-full max-w-full'>
-              <div className='h-full flex flex-col'>
-                <TitleBarShell />
+      <DndProvider backend={HTML5Backend}>
+        <ThemeProvider defaultTheme='dark' storageKey='vite-ui-theme'>
+          <div className='h-screen bg-sidebar text-foreground flex flex-col overflow-hidden'>
+            <SidebarProvider
+              key={hydrated ? 'hydrated' : 'initial'}
+              open={!sidebarCollapsed}
+              onOpenChange={(open) => setSidebarCollapsed(!open)}
+              defaultWidth={`${sidebarWidth}px`}
+              onWidthChange={setSidebarWidth}
+              className='flex-col'
+            >
+              <div className='flex flex-1 min-h-0 relative w-full max-w-full'>
+                <div className='h-full flex flex-col'>
+                  <TitleBarShell />
 
-                <div className='relative flex-1 min-h-0'>
-                  <AppSidebar />
+                  <div className='relative flex-1 min-h-0'>
+                    <AppSidebar />
+                  </div>
                 </div>
+                <SidebarInset>
+                  <Outlet />
+                </SidebarInset>
               </div>
-              <SidebarInset>
-                <Outlet />
-              </SidebarInset>
-            </div>
-          </SidebarProvider>
-        </div>
-      </ThemeProvider>
+            </SidebarProvider>
+          </div>
+        </ThemeProvider>
+      </DndProvider>
     );
   },
 });
