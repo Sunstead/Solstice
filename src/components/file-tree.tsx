@@ -27,6 +27,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { useIsMac } from '@/hooks/use-platform';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
+import { useFileActionDialog } from '@/lib/stores/file-action-dialog';
 
 type FileTreeProps = {
   path: string;
@@ -82,7 +83,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const operation = useEntryInput((s) => s.operation);
   const cancel = useEntryInput((s) => s.cancel);
   const isMac = useIsMac();
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const requestDelete = useFileActionDialog((s) => s.requestDelete);
 
   const children = selectChildren(entries, node.path);
 
@@ -103,7 +104,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
     if (!isDeleteKey) return;
 
     event.preventDefault();
-    setDeleteDialogOpen(true);
+    requestDelete(node);
   };
 
   // Every node is a drag source. Its drop target depends on its type:
@@ -189,11 +190,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
             </SidebarMenuButton>
           }
         />
-        <FileTreeItemContextMenuContent
-          node={node}
-          deleteDialogOpen={deleteDialogOpen}
-          onDeleteDialogOpenChange={setDeleteDialogOpen}
-        />
+        <FileTreeItemContextMenuContent node={node} />
       </ContextMenu>
     );
   }
@@ -201,7 +198,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   return (
     <SidebarMenuItem>
       <Collapsible
-        open={node.expanded}
+        open={node.expanded && node.childrenLoaded}
         className={childrenHighlightClassName}
         onOpenChange={(open) => {
           if (open) {
@@ -246,11 +243,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
                 />
               }
             />
-            <FileTreeItemContextMenuContent
-              node={node}
-              deleteDialogOpen={deleteDialogOpen}
-              onDeleteDialogOpenChange={setDeleteDialogOpen}
-            />
+            <FileTreeItemContextMenuContent node={node} />
           </ContextMenu>
         )}
 
@@ -280,7 +273,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   );
 }
 
-function FormattedFileName({ name }: { name: string }) {
+export function FormattedFileName({ name }: { name: string }) {
   return (
     <span className='text-nowrap w-full truncate'>
       {stripPresetExtension(name).name}

@@ -1,11 +1,15 @@
 [data-milkdown-root='true'] {
-  min-height: 100%;
-  height: max-content;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%; /* fallback if ever rendered outside a flex ancestor */
 }
 
 .milkdown {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   min-height: 100%;
-  height: max-content;
 }
 
 .milkdown ::selection {

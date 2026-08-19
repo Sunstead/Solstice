@@ -5,6 +5,7 @@ import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { resetScopedStoreCache } from '@/lib/stores/scoped-storage';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useFiles } from '@/hooks/use-files';
+import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useLayout } from '@/hooks/use-layout';
 import { commands } from '@/bindings';
 
@@ -20,10 +21,13 @@ type WorkspaceState = {
 async function syncScopedStores(path: string | null) {
   resetScopedStoreCache();
   await useWorkspaceUIStore.persist.rehydrate();
+
   if (path) {
     await useLayout.getState().loadForWorkspace(path);
+    await useFileIndex.getState().loadIndex(path);
   } else {
     useLayout.setState({ model: null, workspacePath: null });
+    useFileIndex.getState().reset();
   }
 }
 

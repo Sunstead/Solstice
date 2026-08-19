@@ -1,6 +1,6 @@
 .ProseMirror {
   outline: none;
-  height: max-content;
+  flex: 1;
   min-height: 100%;
   padding-left: max(1rem, calc((100% - 80ch) / 2));
   padding-right: max(1rem, calc((100% - 80ch) / 2));

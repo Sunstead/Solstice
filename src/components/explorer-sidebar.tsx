@@ -11,6 +11,7 @@ import {
 import { FileTree } from './file-tree';
 import { ContextMenu, ContextMenuTrigger } from './ui/context-menu';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
+import { FileActionDialogs } from './file-action-dialogs';
 import { FileTreeDragLayer } from './file-tree-drag-layer';
 import { useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { cn } from '@/lib/utils';
@@ -67,6 +68,7 @@ export function ExplorerSidebar() {
   return (
     <>
       <FileTreeDragLayer />
+      <FileActionDialogs />
       <SidebarHeader className='px-4 py-2 text-xs font-medium text-muted-foreground'>
         <div className='flex items-center justify-between'>
           <p>Explorer</p>
@@ -135,6 +137,7 @@ export function ExplorerSidebar() {
           <FileTreeItemContextMenuContent
             renameEnabled={false}
             deleteEnabled={false}
+            moveEnabled={false}
             node={{
               name: path,
               path,

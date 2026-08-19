@@ -10,16 +10,13 @@ import {
 } from './ui/breadcrumb';
 import { getFileIcon } from '@/assets/icons';
 import { cn, getFileExtension } from '@/lib/utils';
+import { getWorkspaceRelativeSegments } from '@/lib/path-utils';
+import { FormattedFileName } from './file-tree';
 
 interface FileBreadcrumbProps {
   filePath: string;
   onNavigate?: (path: string) => void;
   className?: string;
-}
-
-// Windows paths use backslashes; normalize so splitting/comparison is consistent
-function normalize(path: string) {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '');
 }
 
 export default function FileBreadcrumb({
@@ -31,21 +28,8 @@ export default function FileBreadcrumb({
 
   if (!workspacePath) return null;
 
-  const normalizedWorkspace = normalize(workspacePath);
-  const normalizedFile = normalize(filePath);
-  const workspaceName = normalizedWorkspace.split('/').pop() ?? 'Home';
-
-  const relative = normalizedFile.startsWith(normalizedWorkspace)
-    ? normalizedFile.slice(normalizedWorkspace.length)
-    : normalizedFile;
-
-  const segments = relative.split('/').filter(Boolean);
-
-  const crumbs = segments.map((segment, index) => ({
-    label: segment,
-    path: `${normalizedWorkspace}/${segments.slice(0, index + 1).join('/')}`,
-    isLast: index === segments.length - 1,
-  }));
+  const { workspaceName, normalizedWorkspace, crumbs } =
+    getWorkspaceRelativeSegments(filePath, workspacePath);
 
   const Icon = getFileIcon(getFileExtension(filePath));
 
@@ -83,7 +67,7 @@ export default function FileBreadcrumb({
                     <span className='shrink-0'>
                       <Icon />
                     </span>
-                    {crumb.label}
+                    <FormattedFileName name={crumb.label} />
                   </div>
                 </BreadcrumbPage>
               ) : (

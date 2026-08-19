@@ -163,3 +163,7 @@
 ::-webkit-scrollbar-thumb {
     @apply rounded-full bg-(--color-border) border border-transparent border-solid bg-clip-padding;
 }
+
+[data-slot="scroll-area-thumb"] {
+  z-index: 20;
+}

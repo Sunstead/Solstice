@@ -203,7 +203,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
           {
             type: 'tab',
             id: path,
-            name,
+            name: name,
             component: 'editor',
             config: { path },
           },

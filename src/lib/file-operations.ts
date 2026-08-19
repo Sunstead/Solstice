@@ -2,6 +2,8 @@ import { commands } from '@/bindings';
 import { useFiles } from '@/hooks/use-files';
 import type { FileTreeNode } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
+import { useWorkspace } from '@/hooks/use-workspace';
+import { useFileIndex } from '@/lib/stores/use-file-index';
 
 function joinPath(parentPath: string, name: string): string {
   const separator = parentPath.includes('\\') ? '\\' : '/';
@@ -14,6 +16,20 @@ export function parentOf(path: string): string {
   const separator = path.includes('\\') ? '\\' : '/';
   const index = path.lastIndexOf(separator);
   return index === -1 ? '' : path.slice(0, index);
+}
+
+/**
+ * The flat search index (`useFileIndex`) has no per-directory expand/collapse
+ * state to reconcile — unlike `useFiles`, a surgical patch after a folder
+ * rename/move would need to rewrite every descendant path by hand. A full
+ * re-walk is simpler, still cheap (these operations are user-triggered, not
+ * hot-path), and can't drift the way a partial patch could.
+ */
+async function refreshFileIndex() {
+  const root = useWorkspace.getState().path;
+  if (root) {
+    await useFileIndex.getState().loadIndex(root);
+  }
 }
 
 /** The subset of a FileTreeNode needed to move it. Matches what a react-dnd drag item carries. */
@@ -61,6 +77,7 @@ async function createFile(parentPath: string, name: string) {
   }
 
   await useFiles.getState().refreshDirectory(parentPath);
+  await refreshFileIndex();
   useLayout.getState().openFile(path, name);
   return result;
 }
@@ -75,6 +92,7 @@ async function createFolder(parentPath: string, name: string) {
   }
 
   await useFiles.getState().refreshDirectory(parentPath);
+  await refreshFileIndex();
   return result;
 }
 
@@ -90,6 +108,7 @@ async function rename(path: string, newName: string) {
 
   useFiles.getState().removeSubtree(path);
   await useFiles.getState().refreshDirectory(parentPath);
+  await refreshFileIndex();
   return result;
 }
 
@@ -120,6 +139,7 @@ async function move(entry: MovableEntry, targetParentPath: string) {
     useFiles.getState().refreshDirectory(currentParent),
     useFiles.getState().refreshDirectory(targetParentPath),
   ]);
+  await refreshFileIndex();
 
   return result;
 }
@@ -135,6 +155,7 @@ async function remove(node: FileTreeNode) {
   }
 
   useFiles.getState().removeSubtree(node.path);
+  await refreshFileIndex();
 
   if (node.is_dir) {
     useLayout.getState().closeFolderTabs(node.path);

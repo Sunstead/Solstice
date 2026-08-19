@@ -16,6 +16,7 @@ export const commands = {
 	copyPath: (from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("copy_path", { from, to })),
 	movePath: (from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("move_path", { from, to })),
 	exists: (path: string) => __TAURI_INVOKE<boolean>("exists", { path }),
+	listWorkspaceFilesRecursive: (path: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_workspace_files_recursive", { path })),
 	setWorkspace: (path: string) => __TAURI_INVOKE<void>("set_workspace", { path }),
 	getWorkspace: () => __TAURI_INVOKE<string | null>("get_workspace"),
 	getCommandRegistry: () => __TAURI_INVOKE<CommandMeta[]>("get_command_registry"),

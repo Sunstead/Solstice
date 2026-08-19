@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/resizable-sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { TitleBarShell } from '@/components/title-bar';
+import { QuickOpenDialog } from '@/components/quick-open-dialog';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand, runCommand } from '@/lib/commands';
@@ -15,6 +16,8 @@ import { useGlobalKeybinds } from '@/hooks/use-global-keybinds';
 import { useDevicePixelRatio } from '@/hooks/use-device-pixel-ratio';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { useLayout } from '@/hooks/use-layout';
+import { getFileNameFromPath } from '@/lib/path-utils';
 
 export const Route = createRootRoute({
   component: () => {
@@ -28,6 +31,9 @@ export const Route = createRootRoute({
     const [hydrated, setHydrated] = useState(
       useWorkspaceUIStore.persist.hasHydrated(),
     );
+
+    const [quickOpenOpen, setQuickOpenOpen] = useState(false);
+    const openFile = useLayout((s) => s.openFile);
 
     const openFolder = useWorkspace((s) => s.openFolder);
 
@@ -47,6 +53,7 @@ export const Route = createRootRoute({
         console.log('view.toggle_sidebar'),
       );
       registerCommand('file.open_folder', () => openFolder());
+      registerCommand('file.open_file', () => setQuickOpenOpen(true));
 
       // Fetch the resolved registry + subscribe to keymap-changed.
       void useKeymapStore.getState().init();
@@ -102,6 +109,14 @@ export const Route = createRootRoute({
               </div>
             </SidebarProvider>
           </div>
+
+          <QuickOpenDialog
+            open={quickOpenOpen}
+            onOpenChange={setQuickOpenOpen}
+            onOpenFile={(path) => {
+              openFile(path, getFileNameFromPath(path))
+            }}
+          />
         </ThemeProvider>
       </DndProvider>
     );

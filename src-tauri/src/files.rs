@@ -108,3 +108,40 @@ pub fn move_path(from: String, to: String) -> Result<(), String> {
 pub fn exists(path: String) -> bool {
     Path::new(&path).exists()
 }
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_workspace_files_recursive(path: String) -> Result<Vec<FileEntry>, String> {
+    let mut entries = Vec::new();
+ 
+    collect_entries_recursive(Path::new(&path), &mut entries)?;
+ 
+    Ok(entries)
+}
+ 
+fn collect_entries_recursive(dir: &Path, entries: &mut Vec<FileEntry>) -> Result<(), String> {
+    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let metadata = entry.metadata().map_err(|e| e.to_string())?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+ 
+        if name.starts_with('.') {
+            continue;
+        }
+ 
+        let is_dir = metadata.is_dir();
+        let path = entry.path();
+ 
+        entries.push(FileEntry {
+            name,
+            path: path.to_string_lossy().into_owned(),
+            is_dir,
+        });
+ 
+        if is_dir {
+            collect_entries_recursive(&path, entries)?;
+        }
+    }
+ 
+    Ok(())
+}

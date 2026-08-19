@@ -26,6 +26,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             files::copy_path,
             files::move_path,
             files::exists,
+            files::list_workspace_files_recursive,
             workspace::set_workspace,
             workspace::get_workspace,
             commands::keymap::get_command_registry,
