@@ -21,6 +21,21 @@ macro_rules! command_id {
                 }
             }
         }
+
+        /// Native menu items carry their `CommandId` as that same dotted
+        /// string, so menu activations parse straight back into an id.
+        /// Predefined OS items (undo/copy/...) are not in the registry and
+        /// simply fail to parse.
+        impl std::str::FromStr for CommandId {
+            type Err = ();
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $( $str => Ok(CommandId::$variant), )*
+                    _ => Err(()),
+                }
+            }
+        }
     };
 }
 

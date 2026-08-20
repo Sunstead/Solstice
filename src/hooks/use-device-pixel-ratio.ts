@@ -1,26 +1,34 @@
 import { useEffect } from 'react';
+import { useIsMac } from './use-platform';
 
 /**
  * Keeps --dpr on the document root in sync with window.devicePixelRatio,
  * including across monitor drags (which change DPR without a resize event).
  */
 export function useDevicePixelRatio() {
+  const isMac = useIsMac();
+
   useEffect(() => {
-    let cleanup: (() => void) | undefined;
+    let mql: MediaQueryList | null = null;
 
     const updateDPR = () => {
-      const dpr = window.devicePixelRatio;
+      const dpr = isMac ? 1 : window.devicePixelRatio;
       document.documentElement.style.setProperty('--dpr', String(dpr));
 
-      // matchMedia is only valid for the DPR it was created at, so we
-      // tear down the old listener and re-arm a fresh one each time.
-      cleanup?.();
-      const mql = matchMedia(`(resolution: ${dpr}dppx)`);
+      if (mql) {
+        mql.removeEventListener('change', updateDPR);
+      }
+
+      mql = window.matchMedia(`(resolution: ${dpr}dppx)`);
       mql.addEventListener('change', updateDPR, { once: true });
-      cleanup = () => mql.removeEventListener('change', updateDPR);
     };
 
     updateDPR();
-    return () => cleanup?.();
-  }, []);
+
+    return () => {
+      if (mql) {
+        mql.removeEventListener('change', updateDPR);
+      }
+    };
+  }, [isMac]);
 }

@@ -13,6 +13,7 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand, runCommand } from '@/lib/commands';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { useGlobalKeybinds } from '@/hooks/use-global-keybinds';
+import { useNativeMenuCommands } from '@/hooks/use-native-menu-commands';
 import { useDevicePixelRatio } from '@/hooks/use-device-pixel-ratio';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -82,6 +83,7 @@ export const Route = createRootRoute({
 
     // Registers/re-registers tinykeys bindings whenever the registry updates.
     useGlobalKeybinds();
+    useNativeMenuCommands();
 
     return (
       <DndProvider backend={HTML5Backend}>

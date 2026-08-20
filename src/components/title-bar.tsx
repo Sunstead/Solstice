@@ -55,12 +55,12 @@ export default function TitleBar() {
         <div data-tauri-drag-region className='flex items-center select-none'>
           <div className='min-w-12 flex items-center justify-center'>
             {isDesktop && isMac ? (
-              !isFullscreen && <span className='w-16' />
+              !isFullscreen && <span className='w-20' />
             ) : (
               <SolsticeIcon className='mx-2 size-5 pointer-events-none select-none [-webkit-user-drag:none]' />
             )}
           </div>
-          <AppMenubar />
+          {!isMac && <AppMenubar />}
 
           <div className='no-drag flex items-center gap-x-1 ml-1'>
             <Button

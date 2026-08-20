@@ -62,7 +62,9 @@ export function ExplorerSidebar() {
   }
 
   if (!path) {
-    return <div>No workspace open</div>;
+    return <SidebarContent>
+      No workspace open
+    </SidebarContent>;
   }
 
   return (
