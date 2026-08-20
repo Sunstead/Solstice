@@ -1,13 +1,16 @@
 #[allow(unused_imports)]
 use tauri::{ Emitter, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder };
 use tauri::utils::config::WindowConfig;
+use tauri_specta::Event as _;
 
 mod workspace;
 mod files;
 mod types;
 mod commands;
 
+use commands::command_registry::CommandId;
 use commands::keymap::KeymapChanged;
+use commands::menu_layout::MenuCommand;
 
 /// Single source of truth for the typed command/event surface. Built once so
 /// the same collected set backs both the runtime invoke_handler and the
@@ -32,8 +35,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::keymap::get_command_registry,
             commands::keymap::set_keybind,
             commands::menu_layout::get_menu_layout,
+            commands::menu_layout::get_native_menu_command_ids,
         ])
-        .events(tauri_specta::collect_events![KeymapChanged])
+        .events(tauri_specta::collect_events![KeymapChanged, MenuCommand])
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -87,19 +91,43 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             let win_builder = win_builder.decorations(false);
 
-            let _window = win_builder.build()?;
+            let window = win_builder.build()?;
 
             #[cfg(target_os = "macos")]
             {
                 let native_menu = commands::menu::build_menu(app.handle())
                     .map_err(|e| tauri::Error::Anyhow(anyhow::anyhow!(e)))?;
                 app.set_menu(native_menu)?;
+
             }
 
             Ok(())
         })
         .on_menu_event(|app, event| {
-            app.emit("menu", event.id().0.clone()).ok();
+            #[cfg(debug_assertions)]
+            {
+                match event.id().0.as_str() {
+                    "debug.reload" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.eval("window.location.reload()");
+                        }
+                        return;
+                    }
+                    "debug.toggle_devtools" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            window.open_devtools();
+                        }
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+
+            // Predefined OS items carry ids outside the registry and are
+            // already handled natively, so they simply fail to parse here.
+            if let Ok(id) = event.id().0.parse::<CommandId>() {
+                MenuCommand(id).emit(app).ok();
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

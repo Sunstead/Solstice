@@ -17,7 +17,12 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import { useLayout, getActiveTabId, modelHasNoTabs } from '@/hooks/use-layout';
+import {
+  useLayout,
+  getActiveTabId,
+  modelHasNoTabs,
+  isReplacingBlankTab,
+} from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useFileTreeDragState } from '@/hooks/use-file-tree-drag-state';
 import { useFileTreeExternalDropZone } from '@/hooks/use-file-tree-dnd';
@@ -220,7 +225,7 @@ export default function FlexLayoutRoot() {
 
     normalizeTabsetDeletion();
 
-    if (modelHasNoTabs(changedModel)) {
+    if (modelHasNoTabs(changedModel) && !isReplacingBlankTab()) {
       useLayout.getState().newBlankTab();
     }
   };
@@ -307,7 +312,7 @@ export default function FlexLayoutRoot() {
           if (node === topLeftTabset && !isSidebarOpen) {
             renderValues.leading = (
               <div className='no-drag flex h-full items-center gap-x-1'>
-                <AppMenubar />
+                {isMac ? <span className='w-8' /> : <AppMenubar />}
                 <Button
                   variant='ghost'
                   size='icon-sm'

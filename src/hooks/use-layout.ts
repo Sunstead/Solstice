@@ -143,6 +143,11 @@ function makeBlankTabId(): string {
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | undefined;
+let replacingBlankTab = false;
+
+export function isReplacingBlankTab(): boolean {
+  return replacingBlankTab;
+}
 
 export const useLayout = create<LayoutState>((set, get) => ({
   model: null,
@@ -155,9 +160,6 @@ export const useLayout = create<LayoutState>((set, get) => ({
     const stored = await getStoredLayout();
     let model = Model.fromJson(stored ?? defaultLayoutJson);
 
-    // Safety net: if a stored layout was somehow saved with zero tabsets,
-    // fall back to a fresh default rather than ending up with nowhere to
-    // open a tab.
     if (collectTabsets(model).length === 0) {
       model = Model.fromJson(defaultLayoutJson);
     }
@@ -197,13 +199,14 @@ export const useLayout = create<LayoutState>((set, get) => ({
     if (blankTab && blankTabParent instanceof TabSetNode) {
       const index = blankTabParent.getChildren().indexOf(blankTab);
 
+      replacingBlankTab = true;
       model.doAction(Actions.deleteTab(blankTab.getId()));
       model.doAction(
         Actions.addNode(
           {
             type: 'tab',
             id: path,
-            name: name,
+            name,
             component: 'editor',
             config: { path },
           },
@@ -212,6 +215,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
           index,
         ),
       );
+      replacingBlankTab = false;
       return;
     }
 

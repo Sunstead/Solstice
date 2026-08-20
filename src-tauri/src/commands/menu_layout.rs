@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use serde::{ Deserialize, Serialize };
 use specta::Type;
 use tauri::AppHandle;
+use tauri_specta::Event;
 
 use crate::commands::command_registry::{ CommandId, CommandMeta };
 use crate::commands::keymap::resolved_commands;
@@ -38,6 +39,13 @@ impl NativeItem {
         }
     }
 }
+
+/// A registry command was activated from the native menu bar -- either by
+/// click or by the OS dispatching its accelerator. The frontend runs it
+/// through the same handler registry a keybind would, so both paths are
+/// indistinguishable downstream.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct MenuCommand(pub CommandId);
 
 // ---------------------------------------------------------------------
 // Declarative spec
@@ -194,8 +202,38 @@ pub fn resolve_menu_layout(app: &AppHandle) -> Vec<ResolvedMenu> {
         .collect()
 }
 
+fn collect_accelerated_commands(entries: &[ResolvedMenuEntry], out: &mut Vec<CommandId>) {
+    for entry in entries {
+        match entry {
+            ResolvedMenuEntry::Command(c) if c.default_accelerator.is_some() => out.push(c.id),
+            ResolvedMenuEntry::Submenu { entries, .. } =>
+                collect_accelerated_commands(entries, out),
+            _ => {}
+        }
+    }
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_menu_layout(app: AppHandle) -> Vec<ResolvedMenu> {
     resolve_menu_layout(&app)
+}
+
+/// Commands whose accelerator is dispatched by the OS before the webview
+/// ever sees the keystroke. Only macOS installs a native menu, so every
+/// other platform leaves the whole registry to the frontend; the frontend
+/// binds exactly what is missing from this list, which keeps one
+/// accelerator to one dispatcher and rules out double-firing.
+#[tauri::command]
+#[specta::specta]
+pub fn get_native_menu_command_ids(app: AppHandle) -> Vec<CommandId> {
+    if !cfg!(target_os = "macos") {
+        return Vec::new();
+    }
+
+    let mut ids = Vec::new();
+    for menu in resolve_menu_layout(&app) {
+        collect_accelerated_commands(&menu.entries, &mut ids);
+    }
+    ids
 }

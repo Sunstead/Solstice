@@ -22,11 +22,20 @@ export const commands = {
 	getCommandRegistry: () => __TAURI_INVOKE<CommandMeta[]>("get_command_registry"),
 	setKeybind: (commandId: CommandId, accelerator: string) => typedError<null, string>(__TAURI_INVOKE("set_keybind", { commandId, accelerator })),
 	getMenuLayout: () => __TAURI_INVOKE<ResolvedMenu[]>("get_menu_layout"),
+	/**
+	 *  Commands whose accelerator is dispatched by the OS before the webview
+	 *  ever sees the keystroke. Only macOS installs a native menu, so every
+	 *  other platform leaves the whole registry to the frontend; the frontend
+	 *  binds exactly what is missing from this list, which keeps one
+	 *  accelerator to one dispatcher and rules out double-firing.
+	 */
+	getNativeMenuCommandIds: () => __TAURI_INVOKE<CommandId[]>("get_native_menu_command_ids"),
 };
 
 /** Events */
 export const events = {
 	keymapChanged: makeEvent<KeymapChanged>("keymap-changed"),
+	menuCommand: makeEvent<MenuCommand>("menu-command"),
 };
 
 /* Types */
@@ -50,6 +59,14 @@ export type FileEntry = {
  *  keymap plugin — listens for this instead of polling.
  */
 export type KeymapChanged = null;
+
+/**
+ *  A registry command was activated from the native menu bar -- either by
+ *  click or by the OS dispatching its accelerator. The frontend runs it
+ *  through the same handler registry a keybind would, so both paths are
+ *  indistinguishable downstream.
+ */
+export type MenuCommand = CommandId;
 
 /**
  *  OS-provided editing actions. Deliberately NOT CommandMeta -- no id in
