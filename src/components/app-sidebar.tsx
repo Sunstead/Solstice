@@ -21,6 +21,7 @@ import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useEffect } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { WorkspaceSwitcher } from './workspace-switcher';
+import { SettingsDialog } from './settings-dialog';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { open, setOpen, toggleSidebar } = useSidebar();
@@ -90,10 +91,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <ThemeToggle />
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <Button variant='ghost' size='icon' className='size-10'>
-                    <Settings className='size-5' />
-                    <span className='sr-only'>Settings</span>
-                  </Button>
+                  <SettingsDialog />
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
