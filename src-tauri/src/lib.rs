@@ -85,7 +85,7 @@ pub fn run() {
                 win_builder
                     .title_bar_style(TitleBarStyle::Overlay)
                     .hidden_title(true)
-                    .traffic_light_position(LogicalPosition::new(16.0, 20.0))
+                    .traffic_light_position(LogicalPosition::new(16.0, 22.0))
             };
 
             #[cfg(not(target_os = "macos"))]
