@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Actions,
   BorderNode,
@@ -15,7 +15,6 @@ import {
   Maximize,
   Minimize,
   Plus,
-  X,
 } from 'lucide-react';
 import {
   useLayout,
@@ -43,6 +42,8 @@ import { Button } from './ui/button';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { registerCommand, runCommand, unregisterCommand } from '@/lib/commands';
 import { stripPresetExtension } from '@/lib/stores/entry-input';
+import { useSetting } from '@/lib/settings/store';
+import { TabCloseIcon } from './tab-close-icon';
 
 function makeDraggedTabId(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -72,6 +73,9 @@ export default function FlexLayoutRoot() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isMac = useIsMac();
   const { open: isSidebarOpen } = useSidebar();
+  // Subscribed here so flipping the setting re-renders <Layout>, which is what
+  // makes onRenderTab below run again with the new value.
+  const showExtensions = useSetting('explorer.showFileExtensions');
 
   // Registers containerRef as a react-dnd drop target so react-dnd's own
   // cursor/drop-permission logic doesn't fight with FlexLayout's — see
@@ -80,6 +84,18 @@ export default function FlexLayoutRoot() {
   // drop and creating the tab.
   const externalDrop = useFileTreeExternalDropZone();
   externalDrop(containerRef);
+
+  // Stable, so swapping the close icon for a save spinner is driven by
+  // TabCloseIcon's own subscription rather than by re-rendering every tab.
+  const layoutIcons = useMemo(
+    () => ({
+      close: (tabNode: TabNode) => <TabCloseIcon node={tabNode} />,
+      maximize: <Maximize className='size-4' />,
+      restore: <Minimize className='size-4' />,
+      more: () => <ChevronDown className='size-4' />,
+    }),
+    [],
+  );
 
   const { visit } = useNavigationHistory();
 
@@ -286,12 +302,7 @@ export default function FlexLayoutRoot() {
         onModelChange={handleModelChange}
         onAuxMouseClick={handleAuxMouseClick}
         onExternalDrag={handleExternalDrag}
-        icons={{
-          close: <X className='size-4' />,
-          maximize: <Maximize className='size-4' />,
-          restore: <Minimize className='size-4' />,
-          more: () => <ChevronDown className='size-4' />,
-        }}
+        icons={layoutIcons}
         tabDragSpeed={0.1}
         onRenderTabSet={(node, renderValues) => {
           const topLeftTabset = findCornerTabset(model, 'top-left');
@@ -352,7 +363,9 @@ export default function FlexLayoutRoot() {
             );
           }
 
-          renderValues.content = stripPresetExtension(node.getName()).name;
+          renderValues.content = showExtensions
+            ? node.getName()
+            : stripPresetExtension(node.getName()).name;
         }}
       />
     </div>

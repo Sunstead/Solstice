@@ -58,6 +58,14 @@ enum MenuEntrySpec {
     Submenu(&'static str, Vec<MenuEntrySpec>),
 }
 
+/// Items that belong in the macOS application menu (Solstice > ...) rather
+/// than in any top-level menu of their own. Kept in the same declarative
+/// form as `menu_spec` so `get_native_menu_command_ids` can see them -- an
+/// accelerator the OS claims here must not also be bound in the frontend.
+fn app_menu_spec() -> Vec<MenuEntrySpec> {
+    vec![MenuEntrySpec::Command(CommandId::AppSettings)]
+}
+
 fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
     use MenuEntrySpec::*;
     use NativeItem::*;
@@ -65,16 +73,25 @@ fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
     vec![
         (
             "File",
-            vec![
-                Command(FileNewNote),
-                Command(FileNewFolder),
-                Command(FileNewTab),
-                Separator,
-                Command(FileOpenFile),
-                Command(FileOpenFolder),
-                Separator,
-                Command(FileCloseTab)
-            ],
+            {
+                let mut items = vec![
+                    Command(FileNewNote),
+                    Command(FileNewFolder),
+                    Command(FileNewTab),
+                    Separator,
+                    Command(FileOpenFile),
+                    Command(FileOpenFolder),
+                    Separator,
+                    Command(FileCloseTab)
+                ];
+                // Only macOS has an application menu to put Settings in;
+                // everywhere else it belongs at the bottom of File.
+                if !cfg!(target_os = "macos") {
+                    items.push(Separator);
+                    items.push(Command(AppSettings));
+                }
+                items
+            },
         ),
         (
             "Edit",
@@ -183,12 +200,32 @@ fn resolve_entry(
     }
 }
 
-pub fn resolve_menu_layout(app: &AppHandle) -> Vec<ResolvedMenu> {
-    let commands = resolved_commands(app);
-    let lookup: HashMap<CommandId, &CommandMeta> = commands
+fn command_lookup(commands: &[CommandMeta]) -> HashMap<CommandId, &CommandMeta> {
+    commands
         .iter()
         .map(|c| (c.id, c))
-        .collect();
+        .collect()
+}
+
+/// The custom entries for the macOS application menu, with accelerators
+/// resolved against any keymap overrides. Empty on other platforms, where
+/// these items are folded into `menu_spec` instead.
+pub fn resolve_app_menu(app: &AppHandle) -> Vec<ResolvedMenuEntry> {
+    if !cfg!(target_os = "macos") {
+        return Vec::new();
+    }
+
+    let commands = resolved_commands(app);
+    let lookup = command_lookup(&commands);
+    app_menu_spec()
+        .iter()
+        .filter_map(|e| resolve_entry(e, &lookup))
+        .collect()
+}
+
+pub fn resolve_menu_layout(app: &AppHandle) -> Vec<ResolvedMenu> {
+    let commands = resolved_commands(app);
+    let lookup = command_lookup(&commands);
 
     menu_spec()
         .into_iter()
@@ -232,6 +269,7 @@ pub fn get_native_menu_command_ids(app: AppHandle) -> Vec<CommandId> {
     }
 
     let mut ids = Vec::new();
+    collect_accelerated_commands(&resolve_app_menu(&app), &mut ids);
     for menu in resolve_menu_layout(&app) {
         collect_accelerated_commands(&menu.entries, &mut ids);
     }

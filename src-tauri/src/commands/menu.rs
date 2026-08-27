@@ -3,7 +3,26 @@ use tauri::{
     AppHandle,
 };
 
-use crate::commands::menu_layout::{ resolve_menu_layout, NativeItem, ResolvedMenuEntry };
+use crate::commands::menu_layout::{
+    resolve_app_menu,
+    resolve_menu_layout,
+    NativeItem,
+    ResolvedMenuEntry,
+};
+
+fn command_item(
+    app: &AppHandle,
+    entry: &ResolvedMenuEntry
+) -> tauri::Result<Option<tauri::menu::MenuItem<tauri::Wry>>> {
+    let ResolvedMenuEntry::Command(c) = entry else {
+        return Ok(None);
+    };
+    let mut item = MenuItemBuilder::new(&c.label).id(&c.id);
+    if let Some(a) = &c.default_accelerator {
+        item = item.accelerator(a);
+    }
+    Ok(Some(item.build(app)?))
+}
 
 fn build_submenu(
     app: &AppHandle,
@@ -13,12 +32,11 @@ fn build_submenu(
     let mut b = SubmenuBuilder::new(app, title);
     for entry in entries {
         b = match entry {
-            ResolvedMenuEntry::Command(c) => {
-                let mut item = MenuItemBuilder::new(&c.label).id(&c.id);
-                if let Some(a) = &c.default_accelerator {
-                    item = item.accelerator(a);
+            ResolvedMenuEntry::Command(_) => {
+                match command_item(app, entry)? {
+                    Some(item) => b.item(&item),
+                    None => b,
                 }
-                b.item(&item.build(app)?)
             }
             // Native items map straight to Tauri's OS-linked predefined
             // items -- same free, zero-JS behavior as before.
@@ -51,8 +69,20 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, String> {
     // (our actual first item) would silently take that slot instead of
     // appearing as its own menu. `None` on each predefined item lets Tauri
     // fill in the app's real name (matching "Quit Solstice" etc.).
-    let app_menu = SubmenuBuilder::new(app, "Solstice")
+    let mut app_menu_builder = SubmenuBuilder::new(app, "Solstice")
         .item(&PredefinedMenuItem::about(app, None, None).map_err(|e| e.to_string())?)
+        .separator();
+
+    // Registry commands that belong in the app menu rather than a top-level
+    // one -- Settings, on macOS. They resolve through the keymap like any
+    // other command, so an override changes this accelerator too.
+    for entry in resolve_app_menu(app) {
+        if let Some(item) = command_item(app, &entry).map_err(|e| e.to_string())? {
+            app_menu_builder = app_menu_builder.item(&item);
+        }
+    }
+
+    let app_menu = app_menu_builder
         .separator()
         .item(&PredefinedMenuItem::services(app, None).map_err(|e| e.to_string())?)
         .separator()

@@ -39,7 +39,7 @@ export const events = {
 };
 
 /* Types */
-export type CommandId = "file.new_note" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.open_folder" | "file.close_tab" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward";
+export type CommandId = "app.settings" | "file.new_note" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.open_folder" | "file.close_tab" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward";
 
 export type CommandMeta = {
 	id: CommandId,
