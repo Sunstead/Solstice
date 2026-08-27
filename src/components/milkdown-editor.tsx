@@ -179,6 +179,24 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     (root) => {
       if (!loaded) return undefined;
 
+      const saver = createAutosaver(path, onError);
+      autosaver.current = saver;
+
+      // Marks the file dirty synchronously with the transaction. Milkdown's
+      // listener debounces markdownUpdated by 200ms, so driving the tab's
+      // saving indicator off the write schedule would leave it trailing every
+      // edit by that much.
+      const dirtyTracker = $prose(
+        () =>
+          new Plugin({
+            view: () => ({
+              update: (view, prevState) => {
+                if (!view.state.doc.eq(prevState.doc)) saver.markDirty();
+              },
+            }),
+          }),
+      );
+
       const commandStateTracker = $prose(
         () =>
           new Plugin({
@@ -204,8 +222,6 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         .config((ctx) => {
           ctx.set(rootCtx, root);
           ctx.set(defaultValueCtx, initialContent);
-          const saver = createAutosaver(path, onError);
-          autosaver.current = saver;
           ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
             saver.schedule(markdown);
           });
@@ -229,19 +245,21 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         .use(history)
         .use(clipboard)
         .use(wikilink)
+        .use(dirtyTracker)
         .use(commandStateTracker);
     },
     [path, loaded],
   );
 
   // A debounced write must not outlive the editor that scheduled it: flush on
-  // unmount, on a path change, and when the window is going away.
+  // a path change and when the window is going away, and dispose on unmount so
+  // a closed tab leaves no saving indicator behind.
   useEffect(() => {
     const flushPending = () => autosaver.current?.flush();
     window.addEventListener('pagehide', flushPending);
     return () => {
       window.removeEventListener('pagehide', flushPending);
-      flushPending();
+      autosaver.current?.dispose();
     };
   }, [path]);
 

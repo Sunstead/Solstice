@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   Dialog,
   DialogClose,
@@ -20,6 +21,8 @@ import { ScrollArea } from './ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { customPanes } from './settings/panes';
 import { SettingsPane } from './settings/settings-pane';
+import { SettingsSearch } from './settings/settings-search';
+import { SettingsSearchResults } from './settings/settings-search-results';
 import {
   getSection,
   settingsSections,
@@ -43,7 +46,7 @@ function SectionTabs({
   onSelect: (id: SectionId) => void;
 }) {
   return (
-    <div className='flex gap-1 overflow-x-auto mx-2 md:pt-0 py-2 md:pb-3 md:hidden scrollbar-none [&::-webkit-scrollbar]:hidden'>
+    <div className='flex gap-1 overflow-x-auto md:pt-0 pt-2 md:py-2 md:pb-3 md:hidden scrollbar-none [&::-webkit-scrollbar]:hidden'>
       {settingsSections.map((section) => (
         <button
           key={section.id}
@@ -74,14 +77,24 @@ export function SettingsDialog() {
   const close = useSettingsDialog((s) => s.close);
   const activeSection = useSettingsDialog((s) => s.activeSection);
   const setActiveSection = useSettingsDialog((s) => s.setActiveSection);
+  const query = useSettingsDialog((s) => s.query.trim());
   const workspacePath = useWorkspace((s) => s.path);
 
   const section = getSection(activeSection);
   const CustomPane = customPanes[activeSection];
 
+  // Base UI's default is to focus the first tabbable element on open, which
+  // here is the search field -- so it opens pre-focused, cursor blinking,
+  // ready to type. Focusing the panel itself instead (same as its own
+  // fallback for touch opens) keeps the dialog correctly announced without
+  // stealing the first keystroke into search.
+  const panelRef = useRef<HTMLDivElement>(null);
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
       <DialogContent
+        ref={panelRef}
+        initialFocus={panelRef}
         showCloseButton={false}
         className='flex h-[min(90svh,680px)] w-[calc(100%-2rem)] flex-col overflow-hidden bg-background p-0 sm:max-w-4xl'
       >
@@ -98,6 +111,9 @@ export function SettingsDialog() {
             className='hidden w-52 min-w-52 bg-sidebar text-sidebar-foreground md:flex'
           >
             <SidebarContent>
+              <div className='px-2 pt-2'>
+                <SettingsSearch />
+              </div>
               <SidebarGroup>
                 <SidebarGroupContent>
                   <SidebarMenu>
@@ -118,24 +134,26 @@ export function SettingsDialog() {
             </SidebarContent>
           </Sidebar>
           <SidebarInset className='min-h-0 overflow-hidden bg-background'>
-            <div className='z-10 border-b items-center flex px-2 sm:py-2'>
-              <SectionTabs active={activeSection} onSelect={setActiveSection} />
-              <DialogClose
-                className='z-20 order-1 ml-auto'
-                render={
-                  <Button variant='ghost' size='icon-sm'>
-                    <X />
-                  </Button>
-                }
-              />
-              {/* The tab strip already names the active section below md. */}
-              <div className='hidden md:block md:px-4'>
-                <h2 className='hidden text-base font-medium md:block'>
-                  {section.label}
+            <div className='z-10 border-b px-2 py-2'>
+              <div className='flex items-center gap-2'>
+                {/* The tab strip already names the active section below md. */}
+                <h2 className='hidden px-2 text-base font-medium md:block'>
+                  {query ? 'Results' : section.label}
                 </h2>
+                {/* From md up the sidebar carries the search field instead. */}
+                <SettingsSearch className='min-w-0 flex-1 md:hidden' />
+                <DialogClose
+                  className='z-20 ml-auto shrink-0'
+                  render={
+                    <Button variant='ghost' size='icon-sm'>
+                      <X />
+                    </Button>
+                  }
+                />
               </div>
+              <SectionTabs active={activeSection} onSelect={setActiveSection} />
               {!workspacePath && (
-                <p className='pt-1 text-xs text-muted-foreground/80 italic'>
+                <p className='px-2 pb-2 text-xs text-muted-foreground/80 italic'>
                   No workspace is open, so per-workspace overrides are
                   unavailable.
                 </p>
@@ -144,7 +162,9 @@ export function SettingsDialog() {
             <ScrollArea className='h-full'>
               <div className='flex min-h-full flex-col'>
                 <div className='px-4 pb-8 md:px-6'>
-                  {CustomPane ? (
+                  {query ? (
+                    <SettingsSearchResults query={query} />
+                  ) : CustomPane ? (
                     <CustomPane />
                   ) : (
                     <SettingsPane section={activeSection} />

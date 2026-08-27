@@ -4,8 +4,11 @@ import type { SectionId } from '@/lib/settings/sections';
 type SettingsDialogState = {
   open: boolean;
   activeSection: SectionId;
+  /** Search spans every section, so it lives beside the active one, not in it. */
+  query: string;
   openSettings: (section?: SectionId) => void;
   setActiveSection: (section: SectionId) => void;
+  setQuery: (query: string) => void;
   close: () => void;
 };
 
@@ -18,8 +21,19 @@ type SettingsDialogState = {
 export const useSettingsDialog = create<SettingsDialogState>((set) => ({
   open: false,
   activeSection: 'appearance',
+  query: '',
+  // Opening always starts from a clean search; a stale query would otherwise
+  // hide the section the caller asked for.
   openSettings: (section) =>
-    set(section ? { open: true, activeSection: section } : { open: true }),
-  setActiveSection: (activeSection) => set({ activeSection }),
-  close: () => set({ open: false }),
+    set((state) =>
+      state.open
+        ? { open: false, query: '' }
+        : section
+          ? { open: true, activeSection: section, query: '' }
+          : { open: true, query: '' },
+    ),
+  // Picking a section is a request to see that section, so it drops the search.
+  setActiveSection: (activeSection) => set({ activeSection, query: '' }),
+  setQuery: (query) => set({ query }),
+  close: () => set({ open: false, query: '' }),
 }));
