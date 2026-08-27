@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { createRootRoute, Outlet } from '@tanstack/react-router';
-import { ThemeProvider } from '../components/theme-provider';
 import {
   SidebarInset,
   SidebarProvider,
@@ -19,6 +18,11 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useLayout } from '@/hooks/use-layout';
 import { getFileNameFromPath } from '@/lib/path-utils';
+import { SettingsDialog } from '@/components/settings-dialog';
+import { useSettingsDialog } from '@/lib/stores/settings-dialog';
+import { loadGlobalSettings, useSettingsStore } from '@/lib/settings/store';
+import { useSettingsDomBindings } from '@/lib/settings/apply';
+import { useThemeEffect } from '@/hooks/use-theme';
 
 export const Route = createRootRoute({
   component: () => {
@@ -29,9 +33,14 @@ export const Route = createRootRoute({
     const sidebarWidth = useWorkspaceUIStore((s) => s.sidebarWidth);
     const setSidebarWidth = useWorkspaceUIStore((s) => s.setSidebarWidth);
 
-    const [hydrated, setHydrated] = useState(
+    // Global settings join the same gate: without it, theme and editor
+    // typography would paint at their defaults for a frame before the stored
+    // values land.
+    const settingsLoaded = useSettingsStore((s) => s.globalLoaded);
+    const [uiHydrated, setUiHydrated] = useState(
       useWorkspaceUIStore.persist.hasHydrated(),
     );
+    const hydrated = uiHydrated && settingsLoaded;
 
     const [quickOpenOpen, setQuickOpenOpen] = useState(false);
     const openFile = useLayout((s) => s.openFile);
@@ -39,11 +48,15 @@ export const Route = createRootRoute({
     const openFolder = useWorkspace((s) => s.openFolder);
 
     useDevicePixelRatio();
+    useThemeEffect();
+    useSettingsDomBindings();
 
     useEffect(() => {
-      useWorkspace.getState().init();
+      // Global settings first: the workspace layer that `init` goes on to load
+      // only ever overrides it, never replaces it.
+      void loadGlobalSettings().then(() => useWorkspace.getState().init());
       return useWorkspaceUIStore.persist.onFinishHydration(() =>
-        setHydrated(true),
+        setUiHydrated(true),
       );
     }, []);
 
@@ -55,6 +68,9 @@ export const Route = createRootRoute({
       );
       registerCommand('file.open_folder', () => openFolder());
       registerCommand('file.open_file', () => setQuickOpenOpen(true));
+      registerCommand('app.settings', () =>
+        useSettingsDialog.getState().openSettings(),
+      );
 
       // Fetch the resolved registry + subscribe to keymap-changed.
       void useKeymapStore.getState().init();
@@ -85,41 +101,49 @@ export const Route = createRootRoute({
     useGlobalKeybinds();
     useNativeMenuCommands();
 
+    // Holding the first paint until the stored settings land is what actually
+    // prevents a flash of the defaults -- the `key` below only forces a
+    // remount, it does not delay rendering. This is a single store read, so
+    // the blank frame is a few milliseconds; the theme class is already on
+    // <html> by then, so the window paints in the right colour.
+    if (!settingsLoaded) return null;
+
     return (
       <DndProvider backend={HTML5Backend}>
-        <ThemeProvider defaultTheme='dark' storageKey='vite-ui-theme'>
-          <div className='h-screen bg-sidebar text-foreground flex flex-col overflow-hidden'>
-            <SidebarProvider
-              key={hydrated ? 'hydrated' : 'initial'}
-              open={!sidebarCollapsed}
-              onOpenChange={(open) => setSidebarCollapsed(!open)}
-              defaultWidth={`${sidebarWidth}px`}
-              onWidthChange={setSidebarWidth}
-              className='flex-col'
-            >
-              <div className='flex flex-1 min-h-0 relative w-full max-w-full'>
-                <div className='h-full flex flex-col'>
-                  <TitleBarShell />
+        <div className='h-screen bg-sidebar text-foreground flex flex-col overflow-hidden'>
+          <SidebarProvider
+            key={hydrated ? 'hydrated' : 'initial'}
+            open={!sidebarCollapsed}
+            onOpenChange={(open) => setSidebarCollapsed(!open)}
+            defaultWidth={`${sidebarWidth}px`}
+            onWidthChange={setSidebarWidth}
+            className='flex-col'
+          >
+            <div className='flex flex-1 min-h-0 relative w-full max-w-full'>
+              <div className='h-full flex flex-col'>
+                <TitleBarShell />
 
-                  <div className='relative flex-1 min-h-0'>
-                    <AppSidebar />
-                  </div>
+                <div className='relative flex-1 min-h-0'>
+                  <AppSidebar />
                 </div>
-                <SidebarInset>
-                  <Outlet />
-                </SidebarInset>
               </div>
-            </SidebarProvider>
-          </div>
+              <SidebarInset>
+                <Outlet />
+              </SidebarInset>
+            </div>
+          </SidebarProvider>
+        </div>
 
-          <QuickOpenDialog
-            open={quickOpenOpen}
-            onOpenChange={setQuickOpenOpen}
-            onOpenFile={(path) => {
-              openFile(path, getFileNameFromPath(path))
-            }}
-          />
-        </ThemeProvider>
+        <QuickOpenDialog
+          open={quickOpenOpen}
+          onOpenChange={setQuickOpenOpen}
+          onOpenFile={(path) => {
+            openFile(path, getFileNameFromPath(path));
+          }}
+        />
+
+        {/* One app-wide instance; opened through useSettingsDialog. */}
+        <SettingsDialog />
       </DndProvider>
     );
   },

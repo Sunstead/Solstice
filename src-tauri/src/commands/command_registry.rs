@@ -40,6 +40,8 @@ macro_rules! command_id {
 }
 
 command_id! {
+    AppSettings => "app.settings",
+
     FileNewNote => "file.new_note",
     FileOpenFile => "file.open_file",
     FileNewTab => "file.new_tab",
@@ -87,6 +89,13 @@ pub struct CommandMeta {
 
 pub fn default_commands() -> Vec<CommandMeta> {
     vec![
+        // -- App --
+        CommandMeta {
+            id: CommandId::AppSettings,
+            label: "Settings...".into(),
+            default_accelerator: Some("CmdOrCtrl+,".into()),
+        },
+        // -- File --
         CommandMeta {
             id: CommandId::FileNewNote,
             label: "New Note".into(),

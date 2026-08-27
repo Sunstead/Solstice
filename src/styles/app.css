@@ -98,7 +98,7 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.175 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
@@ -170,4 +170,32 @@
 
 [data-slot='scroll-area-thumb'] {
   z-index: 20;
+}
+
+/*
+ * appearance.reduceMotion sets [data-reduce-motion] on <html>; the media query
+ * covers the OS-level preference so the system setting is honoured even with
+ * the app setting off. Kept as one blanket rule rather than a duration token
+ * threaded through every component -- the animations live in a dozen files
+ * (sidebar, tabs, collapsible, title bar) and all of them should stop.
+ */
+html[data-reduce-motion='true'],
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -57,7 +57,7 @@ export function FileEditor({ path }: FileEditorProps) {
             <FileActionsDropdown />
           </div>
         </div>
-        <div className='typeset w-full text-sm flex-1 flex flex-col text-[16px] relative'>
+        <div className='typeset w-full flex-1 flex flex-col relative'>
           <MilkdownEditorWrapper
             path={path}
             initialContent={content}
