@@ -242,7 +242,7 @@ pub fn resolve_menu_layout(app: &AppHandle) -> Vec<ResolvedMenu> {
 fn collect_accelerated_commands(entries: &[ResolvedMenuEntry], out: &mut Vec<CommandId>) {
     for entry in entries {
         match entry {
-            ResolvedMenuEntry::Command(c) if c.default_accelerator.is_some() => out.push(c.id),
+            ResolvedMenuEntry::Command(c) if c.accelerator.is_some() => out.push(c.id),
             ResolvedMenuEntry::Submenu { entries, .. } =>
                 collect_accelerated_commands(entries, out),
             _ => {}

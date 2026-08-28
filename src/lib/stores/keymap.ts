@@ -4,8 +4,15 @@ import { CommandId, commands, events, type CommandMeta } from "@/bindings";
 interface KeymapState {
   commands: CommandMeta[];
   loaded: boolean;
+  /**
+   * A row is recording a keystroke. Global keybinds stand down while this is
+   * set, so the combo being recorded does not also run a command.
+   */
+  capturing: boolean;
   init: () => Promise<void>;
+  setCapturing: (capturing: boolean) => void;
   rebind: (commandId: CommandId, accelerator: string) => Promise<string | null>;
+  clearBinding: (commandId: CommandId) => Promise<string | null>;
 }
 
 let unlisten: (() => void) | null = null;
@@ -22,6 +29,7 @@ async function refresh(set: (partial: Partial<KeymapState>) => void) {
 export const useKeymapStore = create<KeymapState>((set) => ({
   commands: [],
   loaded: false,
+  capturing: false,
 
   init: async () => {
     await refresh(set);
@@ -30,8 +38,16 @@ export const useKeymapStore = create<KeymapState>((set) => ({
     }
   },
 
+  setCapturing: (capturing) => set({ capturing }),
+
   rebind: async (commandId, accelerator) => {
     const result = await commands.setKeybind(commandId, accelerator);
+    if (result.status === "error") return result.error;
+    return null;
+  },
+
+  clearBinding: async (commandId) => {
+    const result = await commands.clearKeybind(commandId);
     if (result.status === "error") return result.error;
     return null;
   },

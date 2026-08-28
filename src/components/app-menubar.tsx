@@ -99,9 +99,9 @@ function MenuEntryView({
     return (
       <MenubarItem disabled={!isEnabled} onClick={() => void runCommand(c.id)}>
         {c.label}
-        {c.default_accelerator && (
+        {c.accelerator && (
           <MenubarShortcut className='tracking-wide'>
-            {toDisplayFormat(c.default_accelerator)}
+            {toDisplayFormat(c.accelerator)}
           </MenubarShortcut>
         )}
       </MenubarItem>

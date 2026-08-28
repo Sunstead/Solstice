@@ -34,6 +34,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             workspace::get_workspace,
             commands::keymap::get_command_registry,
             commands::keymap::set_keybind,
+            commands::keymap::clear_keybind,
+            commands::keymap::set_menu_accelerators_enabled,
             commands::menu_layout::get_menu_layout,
             commands::menu_layout::get_native_menu_command_ids,
         ])
@@ -62,6 +64,7 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(workspace::WorkspaceState::new())
+        .manage(commands::keymap::MenuAccelerators::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             // Registers the event registry so `events.keymapChanged.listen(...)`
