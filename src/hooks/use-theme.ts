@@ -6,10 +6,8 @@ export type Theme = SettingValue<'appearance.theme'>;
 
 /**
  * Keeps the `light`/`dark` class on the document root in sync with
- * `appearance.theme`. Replaces the old ThemeProvider context: the value now
- * lives in the settings store like everything else, so there is nothing to
- * provide -- and unlike the old version, `system` keeps tracking the OS after
- * the first render.
+ * `appearance.theme`. Under `system` it keeps tracking the OS rather than
+ * sampling the preference once.
  */
 export function useThemeEffect() {
   const theme = useSetting('appearance.theme');

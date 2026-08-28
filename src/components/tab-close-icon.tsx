@@ -4,20 +4,16 @@ import type { TabNode } from 'flexlayout-react';
 import { useIsSaving } from '@/lib/stores/save-status';
 
 /**
- * The icon inside a tab's close button.
+ * The icon inside a tab's close button: a spinner while the file has an edit
+ * waiting to be written, the close cross otherwise. The hover swap back to the
+ * cross lives in `flexlayout.css`, because the element receiving the hover is
+ * flexlayout's own button wrapper rather than this one.
  *
- * While the tab's file has an edit waiting to be written, this shows a
- * spinner instead of the close cross -- but only until you point at the
- * button, at which point the cross comes back so the tab stays closeable.
- * That hover swap is CSS (see `flexlayout.css`), because the element that
- * receives the hover is flexlayout's own button wrapper, not this one.
- *
- * Only the debounced autosave mode ever reports a file as saving, so with
- * instant saving on this is always just the cross.
+ * Only debounced autosave reports a file as saving, so under instant saving
+ * this is always the cross.
  */
 export function TabCloseIcon({ node }: { node: TabNode }) {
-  // Read the path from config, not the tab id -- drag-opened tabs no longer
-  // use the path as their id.
+  // The path lives in config; tab ids are independent of it.
   const path = (node.getConfig() as { path?: string } | undefined)?.path;
   const saving = useIsSaving(path);
 

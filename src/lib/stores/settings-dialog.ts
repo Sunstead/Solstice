@@ -13,17 +13,17 @@ type SettingsDialogState = {
 };
 
 /**
- * Open state for the single app-wide settings dialog. Centralized -- rather
- * than local state inside the dialog -- so the sidebar button, the
- * `app.settings` command and the native menu can all reach it. Same reasoning
- * as `useFileActionDialog`.
+ * Open state for the single app-wide settings dialog, centralized so the
+ * sidebar button, the `app.settings` command and the native menu all reach the
+ * same instance. Same reasoning as `useFileActionDialog`.
+ *
+ * Every transition clears the search: a stale query would otherwise hide the
+ * section the caller asked for.
  */
 export const useSettingsDialog = create<SettingsDialogState>((set) => ({
   open: false,
   activeSection: 'appearance',
   query: '',
-  // Opening always starts from a clean search; a stale query would otherwise
-  // hide the section the caller asked for.
   openSettings: (section) =>
     set((state) =>
       state.open
@@ -32,7 +32,6 @@ export const useSettingsDialog = create<SettingsDialogState>((set) => ({
           ? { open: true, activeSection: section, query: '' }
           : { open: true, query: '' },
     ),
-  // Picking a section is a request to see that section, so it drops the search.
   setActiveSection: (activeSection) => set({ activeSection, query: '' }),
   setQuery: (query) => set({ query }),
   close: () => set({ open: false, query: '' }),
