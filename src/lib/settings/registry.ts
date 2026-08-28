@@ -107,6 +107,18 @@ export const settingsRegistry = {
     default: 'idle',
   }),
 
+  'editor.externalChanges': defineEnum({
+    section: 'editor',
+    group: 'Saving',
+    scope: 'workspace',
+    label: 'When a file changes on disk',
+    options: [
+      { value: 'reload', label: 'Reload if unedited' },
+      { value: 'prompt', label: 'Always ask' },
+    ],
+    default: 'reload',
+  }),
+
   'editor.autosaveDelay': defineNumber({
     section: 'editor',
     group: 'Saving',
@@ -132,6 +144,17 @@ export const settingsRegistry = {
   }),
 
   // -- Explorer -------------------------------------------------------
+  'explorer.watchFilesystem': defineBoolean({
+    section: 'explorer',
+    scope: 'workspace',
+    label: 'Watch for external changes',
+    default: true,
+    // Gates only the native watcher; the focus resync stays on regardless,
+    // since it is the fallback. Applied in `fs-watch`, which subscribes to
+    // this key -- keeping the wiring next to the watcher rather than making
+    // the registry import it.
+  }),
+
   'explorer.showHiddenFiles': defineBoolean({
     section: 'explorer',
     scope: 'workspace',
