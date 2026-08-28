@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 
 import { commands, FileEntry } from '@/bindings';
+import { useSetting } from '@/lib/settings/store';
 
 export type FileTreeNode = FileEntry & {
   childrenLoaded: boolean;
@@ -52,8 +54,13 @@ type FilesState = {
   collapseDirectory: (path: string) => void;
 };
 
-function compareEntries(a: FileTreeNode, b: FileTreeNode) {
-  if (a.is_dir !== b.is_dir) {
+export interface ChildrenOptions {
+  showHidden: boolean;
+  foldersFirst: boolean;
+}
+
+function compareEntries(a: FileTreeNode, b: FileTreeNode, foldersFirst: boolean) {
+  if (foldersFirst && a.is_dir !== b.is_dir) {
     return a.is_dir ? -1 : 1;
   }
 
@@ -66,12 +73,30 @@ function compareEntries(a: FileTreeNode, b: FileTreeNode) {
 export function selectChildren(
   entries: Record<string, FileTreeNode>,
   path: string,
+  { showHidden, foldersFirst }: ChildrenOptions,
 ) {
   const normalized = normalize(path);
 
   return Object.values(entries)
     .filter((entry) => getParentPath(entry.path) === normalized)
-    .sort(compareEntries);
+    .filter((entry) => showHidden || !entry.name.startsWith('.'))
+    .sort((a, b) => compareEntries(a, b, foldersFirst));
+}
+
+/**
+ * The tree's view of one directory. Hiding dotfiles and folder ordering are
+ * applied here rather than at fetch time, so flipping either setting is
+ * instant -- nothing has to be re-read from disk.
+ */
+export function useDirectoryChildren(path: string) {
+  const entries = useFiles((s) => s.entries);
+  const showHidden = useSetting('explorer.showHiddenFiles');
+  const foldersFirst = useSetting('explorer.foldersFirst');
+
+  return useMemo(
+    () => selectChildren(entries, path, { showHidden, foldersFirst }),
+    [entries, path, showHidden, foldersFirst],
+  );
 }
 
 const fetchVisibleEntries = async (path: string) => {
@@ -79,7 +104,9 @@ const fetchVisibleEntries = async (path: string) => {
 
   if (res.status === 'error') return [];
 
-  return res.data.filter((d) => !d.name.startsWith('.'));
+  // Everything on disk is kept in the store; `selectChildren` decides what the
+  // tree actually shows.
+  return res.data;
 };
 
 export const useFiles = create<FilesState>((set, get) => ({

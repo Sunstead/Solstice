@@ -26,9 +26,12 @@ export function useGlobalKeybinds() {
       const bindings: Record<string, (e: KeyboardEvent) => void> = {};
 
       for (const c of cmds) {
-        if (!c.default_accelerator || claimedByOs.has(c.id)) continue;
-        bindings[toTinykeysFormat(c.default_accelerator)] = (e) => {
+        if (!c.accelerator || claimedByOs.has(c.id)) continue;
+        bindings[toTinykeysFormat(c.accelerator)] = (e) => {
           if (e.defaultPrevented) return;
+          // Read at dispatch rather than as a dependency, so entering capture
+          // does not rebuild every binding.
+          if (useKeymapStore.getState().capturing) return;
           e.preventDefault();
 
           e.stopPropagation();

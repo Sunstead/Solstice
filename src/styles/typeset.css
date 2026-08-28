@@ -8,8 +8,12 @@
     --typeset-font-body: inherit;
     --typeset-font-heading: var(--font-heading);
     --typeset-font-mono: var(--font-mono);
-    --typeset-size: 1em;
-    --typeset-leading: 1.75;
+    /* Settings own these through --editor-*; the fallbacks are the upstream
+       shadcn defaults, so this stylesheet still stands alone. Note these have
+       to be indirected rather than set on :root -- .typeset defines them on
+       itself, which would shadow any root-level value. */
+    --typeset-size: var(--editor-font-size, 1em);
+    --typeset-leading: var(--editor-line-height, 1.75);
     --typeset-flow: 1.25em;
   }
 }

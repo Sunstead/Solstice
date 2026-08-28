@@ -21,7 +21,7 @@ import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useEffect } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { WorkspaceSwitcher } from './workspace-switcher';
-import { SettingsDialog } from './settings-dialog';
+import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { open, setOpen, toggleSidebar } = useSidebar();
@@ -31,6 +31,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     (s) => s.setActivePrimaryView,
   );
   const setSidebarCollapsed = useWorkspaceUIStore((s) => s.setSidebarCollapsed);
+  const openSettings = useSettingsDialog((s) => s.openSettings);
 
   const activeView =
     primaryViews.find((v) => v.id === activePrimaryView) ?? primaryViews[0];
@@ -91,7 +92,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <ThemeToggle />
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SettingsDialog />
+                  {/* The dialog itself lives at the root, so the command,
+                      the native menu and this button all drive one instance. */}
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className='size-10'
+                    onClick={() => openSettings()}
+                  >
+                    <Settings className='size-5' />
+                    <span className='sr-only'>Settings</span>
+                  </Button>
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>

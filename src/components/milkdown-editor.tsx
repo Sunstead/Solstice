@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { Ctx } from '@milkdown/kit/ctx';
 import {
   Editor,
@@ -45,7 +45,8 @@ import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { callCommand, $prose } from '@milkdown/kit/utils';
 import { Plugin, AllSelection } from '@milkdown/kit/prose/state';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
-import { commands, CommandId } from '@/bindings';
+import { CommandId } from '@/bindings';
+import { createAutosaver, type Autosaver } from '@/lib/autosave';
 import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useKeymapStore } from '@/lib/stores/keymap';
@@ -172,10 +173,29 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
 }) => {
   const instanceId = useId();
   const loaded = useKeymapStore((s) => s.loaded);
+  const autosaver = useRef<Autosaver | null>(null);
 
   const { get, loading } = useEditor(
     (root) => {
       if (!loaded) return undefined;
+
+      const saver = createAutosaver(path, onError);
+      autosaver.current = saver;
+
+      // Marks the file dirty synchronously with the transaction. Milkdown's
+      // listener debounces markdownUpdated by 200ms, so driving the tab's
+      // saving indicator off the write schedule would leave it trailing every
+      // edit by that much.
+      const dirtyTracker = $prose(
+        () =>
+          new Plugin({
+            view: () => ({
+              update: (view, prevState) => {
+                if (!view.state.doc.eq(prevState.doc)) saver.markDirty();
+              },
+            }),
+          }),
+      );
 
       const commandStateTracker = $prose(
         () =>
@@ -203,9 +223,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
           ctx.set(rootCtx, root);
           ctx.set(defaultValueCtx, initialContent);
           ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
-            commands
-              .writeFile(path, markdown)
-              .catch((err) => onError(String(err)));
+            saver.schedule(markdown);
           });
 
           for (const [keymapKey, bindings] of PRESET_BINDINGS_BY_KEYMAP) {
@@ -227,10 +245,23 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         .use(history)
         .use(clipboard)
         .use(wikilink)
+        .use(dirtyTracker)
         .use(commandStateTracker);
     },
     [path, loaded],
   );
+
+  // A debounced write must not outlive the editor that scheduled it: flush on
+  // a path change and when the window is going away, and dispose on unmount so
+  // a closed tab leaves no saving indicator behind.
+  useEffect(() => {
+    const flushPending = () => autosaver.current?.flush();
+    window.addEventListener('pagehide', flushPending);
+    return () => {
+      window.removeEventListener('pagehide', flushPending);
+      autosaver.current?.dispose();
+    };
+  }, [path]);
 
   useEffect(() => {
     if (loading) return;

@@ -64,3 +64,69 @@ export function toDisplayFormat(accelerator: string): string {
   }
   return [...parts.map((p) => WIN_LABELS[p] ?? p), displayKey].join('+');
 }
+
+/**
+ * Punctuation and digit `KeyboardEvent.code` names, mapped to the short form
+ * the command registry writes (`Comma` -> `,`). muda accepts either spelling,
+ * but the short form is what `Keybind` renders as a legible chip.
+ */
+const CODE_SYMBOLS: Record<string, string> = {
+  Comma: ',',
+  Period: '.',
+  Minus: '-',
+  Equal: '=',
+  Slash: '/',
+  Backslash: '\\',
+  Semicolon: ';',
+  Quote: "'",
+  BracketLeft: '[',
+  BracketRight: ']',
+  Backquote: '`',
+};
+
+function codeToKey(code: string): string {
+  if (CODE_SYMBOLS[code]) return CODE_SYMBOLS[code];
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  if (/^Numpad[0-9]$/.test(code)) return code.slice(6);
+  return code;
+}
+
+/** The parts of a keyboard event an accelerator is built from. */
+export interface KeyStroke {
+  code: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}
+
+/**
+ * The modifiers currently held, in the order accelerators are written.
+ *
+ * `CmdOrCtrl` is Cmd on macOS and Ctrl elsewhere, so a real Ctrl press is only
+ * its own token on macOS, where the two keys are distinct.
+ */
+export function modifiersOf(event: KeyStroke): string[] {
+  const modifiers: string[] = [];
+  if (isMac ? event.metaKey : event.ctrlKey) modifiers.push('CmdOrCtrl');
+  if (isMac && event.ctrlKey) modifiers.push('Ctrl');
+  if (event.altKey) modifiers.push('Alt');
+  if (event.shiftKey) modifiers.push('Shift');
+  return modifiers;
+}
+
+/**
+ * A keydown as a Tauri accelerator, or null while only modifiers are held.
+ *
+ * Reads `event.code` rather than `event.key`: with Alt held macOS reports the
+ * alternate character (⌥N is "˜"), and with Shift held the shifted symbol,
+ * neither of which round-trips back to a binding.
+ */
+export function eventToAccelerator(event: KeyStroke): string | null {
+  const { code } = event;
+  if (!code || /^(Control|Shift|Alt|Meta|OS)(Left|Right)?$/.test(code)) {
+    return null;
+  }
+  return [...modifiersOf(event), codeToKey(code)].join('+');
+}

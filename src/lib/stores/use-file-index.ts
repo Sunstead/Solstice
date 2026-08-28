@@ -44,7 +44,7 @@ function isWithinSubtree(entryPath: string, rootPath: string) {
   );
 }
 
-export const useFileIndex = create<FileIndexState>((set, get) => ({
+export const useFileIndex = create<FileIndexState>((set) => ({
   root: null,
   files: [],
   loading: false,

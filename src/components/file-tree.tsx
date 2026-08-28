@@ -1,5 +1,5 @@
 import { ChevronRight } from 'lucide-react';
-import { useFiles, FileTreeNode, selectChildren } from '@/hooks/use-files';
+import { useFiles, FileTreeNode, useDirectoryChildren } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
 import {
   useEntryInput,
@@ -23,19 +23,19 @@ import {
 } from './ui/resizable-sidebar';
 import { cn, getFileExtension } from '@/lib/utils';
 import { getFileIcon, getFolderIcon } from '@/assets/icons';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { useIsMac } from '@/hooks/use-platform';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
 import { useFileActionDialog } from '@/lib/stores/file-action-dialog';
+import { useSetting } from '@/lib/settings/store';
 
 type FileTreeProps = {
   path: string;
 };
 
 export function FileTree({ path }: FileTreeProps) {
-  const entries = useFiles((s) => s.entries);
-  const children = selectChildren(entries, path);
+  const children = useDirectoryChildren(path);
   const operation = useEntryInput((s) => s.operation);
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
   const cancel = useEntryInput((s) => s.cancel);
@@ -77,7 +77,6 @@ export function FileTree({ path }: FileTreeProps) {
 function FileTreeItem({ node }: { node: FileTreeNode }) {
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const collapseDirectory = useFiles((s) => s.collapseDirectory);
-  const entries = useFiles((s) => s.entries);
   const openFile = useLayout((s) => s.openFile);
   const activeTabId = useLayout((s) => s.activeTabId);
   const operation = useEntryInput((s) => s.operation);
@@ -85,7 +84,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const isMac = useIsMac();
   const requestDelete = useFileActionDialog((s) => s.requestDelete);
 
-  const children = selectChildren(entries, node.path);
+  const children = useDirectoryChildren(node.path);
 
   const FolderIcon = getFolderIcon(node.expanded);
   const FileIcon = getFileIcon(getFileExtension(node.name));
@@ -274,9 +273,11 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
 }
 
 export function FormattedFileName({ name }: { name: string }) {
+  const showExtensions = useSetting('explorer.showFileExtensions');
+
   return (
     <span className='text-nowrap w-full truncate'>
-      {stripPresetExtension(name).name}
+      {showExtensions ? name : stripPresetExtension(name).name}
     </span>
   );
 }

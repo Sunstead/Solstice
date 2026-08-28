@@ -4,6 +4,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { resetScopedStoreCache } from '@/lib/stores/scoped-storage';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
+import { loadWorkspaceSettings } from '@/lib/settings/store';
 import { useFiles } from '@/hooks/use-files';
 import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useLayout } from '@/hooks/use-layout';
@@ -21,6 +22,7 @@ type WorkspaceState = {
 async function syncScopedStores(path: string | null) {
   resetScopedStoreCache();
   await useWorkspaceUIStore.persist.rehydrate();
+  await loadWorkspaceSettings();
 
   if (path) {
     await useLayout.getState().loadForWorkspace(path);

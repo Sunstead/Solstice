@@ -6,12 +6,16 @@ import { useWorkspace } from '@/hooks/use-workspace';
 const WORKSPACE_DIR = '.solstice';
 const storeCache = new Map<string, Promise<Store>>();
 
+/** Where a store file lives: alongside the open workspace, or in app data. */
+export type StoreScope = 'workspace' | 'global';
+
 function normalize(path: string) {
   return path.replace(/\\/g, '/').replace(/\/$/, '');
 }
 
-function resolveTarget(fileName: string) {
-  const workspacePath = useWorkspace.getState().path;
+function resolveTarget(fileName: string, scope: StoreScope) {
+  const workspacePath =
+    scope === 'workspace' ? useWorkspace.getState().path : null;
 
   if (workspacePath) {
     const dir = `${normalize(workspacePath)}/${WORKSPACE_DIR}`;
@@ -22,12 +26,16 @@ function resolveTarget(fileName: string) {
     };
   }
 
-  // No workspace open yet, so bare filename resolves relative to the app data dir.
+  // A bare filename resolves relative to the app data dir. Workspace-scoped
+  // callers land here too when no workspace is open yet.
   return { cacheKey: `global:${fileName}`, dir: null, filePath: fileName };
 }
 
-export async function getScopedStore(fileName: string): Promise<Store> {
-  const { cacheKey, dir, filePath } = resolveTarget(fileName);
+export async function getScopedStore(
+  fileName: string,
+  scope: StoreScope = 'workspace',
+): Promise<Store> {
+  const { cacheKey, dir, filePath } = resolveTarget(fileName, scope);
 
   let storePromise = storeCache.get(cacheKey);
   if (!storePromise) {
@@ -41,9 +49,20 @@ export async function getScopedStore(fileName: string): Promise<Store> {
   return storePromise;
 }
 
-/** Drop cached handles and call whenever the active workspace changes. */
+/** True when a workspace-scoped store would currently resolve to a workspace. */
+export function hasOpenWorkspace() {
+  return useWorkspace.getState().path !== null;
+}
+
+/**
+ * Drop cached handles whenever the active workspace changes. Only the
+ * workspace-scoped ones: `global:` entries point at the app data dir, which
+ * does not move, and dropping them would race a write still in flight.
+ */
 export function resetScopedStoreCache() {
-  storeCache.clear();
+  for (const key of storeCache.keys()) {
+    if (key.startsWith('ws:')) storeCache.delete(key);
+  }
 }
 
 /**
