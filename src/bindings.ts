@@ -17,8 +17,22 @@ export const commands = {
 	movePath: (from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("move_path", { from, to })),
 	exists: (path: string) => __TAURI_INVOKE<boolean>("exists", { path }),
 	listWorkspaceFilesRecursive: (path: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_workspace_files_recursive", { path })),
-	setWorkspace: (path: string) => __TAURI_INVOKE<void>("set_workspace", { path }),
+	/**
+	 *  Opening a workspace is also what starts watching it, so the two can never
+	 *  drift apart. Returns an error if the watcher could not be started -- on
+	 *  Linux a large vault can exhaust the inotify watch limit, and the frontend
+	 *  needs to know it is running without live updates rather than assume it is.
+	 */
+	setWorkspace: (path: string) => typedError<null, string>(__TAURI_INVOKE("set_workspace", { path })),
 	getWorkspace: () => __TAURI_INVOKE<string | null>("get_workspace"),
+	/**
+	 *  Starts or stops watching the current workspace, backing the
+	 *  `explorer.watchFilesystem` setting. Turning it off has to reach the OS
+	 *  watcher itself -- muting the events on the frontend would leave the real
+	 *  cost (a recursive watch over a network share or a very large vault) exactly
+	 *  where it was.
+	 */
+	setWatchEnabled: (enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_watch_enabled", { enabled })),
 	getCommandRegistry: () => __TAURI_INVOKE<CommandMeta[]>("get_command_registry"),
 	setKeybind: (commandId: CommandId, accelerator: string) => typedError<null, string>(__TAURI_INVOKE("set_keybind", { commandId, accelerator })),
 	/**  Drop a command's override so it falls back to its compiled-in default. */
@@ -42,6 +56,7 @@ export const commands = {
 
 /** Events */
 export const events = {
+	fileSystemChanged: makeEvent<FileSystemChanged>("file-system-changed"),
 	keymapChanged: makeEvent<KeymapChanged>("keymap-changed"),
 	menuCommand: makeEvent<MenuCommand>("menu-command"),
 };
@@ -65,6 +80,27 @@ export type FileEntry = {
 	path: string,
 	is_dir: boolean,
 };
+
+/**  One debounced batch of changes under `root`. */
+export type FileSystemChanged = {
+	root: string,
+	changes: FsChange[],
+};
+
+export type FsChange = {
+	kind: FsChangeKind,
+	/**  The path as it stands now. For `Renamed`, the destination. */
+	path: string,
+	/**  Only set for `Renamed`. */
+	from: string | null,
+	/**
+	 *  Statted at emit time, so the frontend needs no follow-up call.
+	 *  `None` exactly when the path no longer exists.
+	 */
+	entry: FileEntry | null,
+};
+
+export type FsChangeKind = "Created" | "Modified" | "Removed" | "Renamed";
 
 /**
  *  Fired whenever the resolved keymap changes (an override was saved).

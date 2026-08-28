@@ -1,6 +1,12 @@
 use std::{ fs, io::{ Read, Write }, path::{ Path, PathBuf } };
 
 use crate::types::FileEntry;
+use crate::watcher::note_self_write;
+
+// Every mutating command below records what it touched via `note_self_write`,
+// so the watcher can tell the app's own writes apart from someone else's and
+// stay quiet about them. Tauri injects the `app` handle, so the generated
+// TypeScript signatures are unaffected.
 
 #[tauri::command]
 #[specta::specta]
@@ -38,69 +44,90 @@ pub fn read_file(path: String) -> Result<String, String> {
 
 #[tauri::command]
 #[specta::specta]
-pub fn write_file(path: String, contents: String) -> Result<(), String> {
+pub fn write_file(app: tauri::AppHandle, path: String, contents: String) -> Result<(), String> {
     if let Some(parent) = Path::new(&path).parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    let mut file = fs::File::create(path).map_err(|e| e.to_string())?;
-    file.write_all(contents.as_bytes()).map_err(|e| e.to_string())
+    let mut file = fs::File::create(&path).map_err(|e| e.to_string())?;
+    file.write_all(contents.as_bytes()).map_err(|e| e.to_string())?;
+    note_self_write(&app, Path::new(&path));
+
+    Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn create_file(path: String) -> Result<(), String> {
-    fs::File
-        ::create(path)
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+pub fn create_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    fs::File::create(&path).map_err(|e| e.to_string())?;
+    note_self_write(&app, Path::new(&path));
+
+    Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn create_directory(path: String) -> Result<(), String> {
-    fs::create_dir_all(path).map_err(|e| e.to_string())
+pub fn create_directory(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    note_self_write(&app, Path::new(&path));
+
+    Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
-    fs::rename(old_path, new_path).map_err(|e| e.to_string())
+pub fn rename_path(app: tauri::AppHandle, old_path: String, new_path: String) -> Result<(), String> {
+    fs::rename(&old_path, &new_path).map_err(|e| e.to_string())?;
+    note_self_write(&app, Path::new(&old_path));
+    note_self_write(&app, Path::new(&new_path));
+
+    Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_file(path: String) -> Result<(), String> {
-    fs::remove_file(path).map_err(|e| e.to_string())
+pub fn delete_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    fs::remove_file(&path).map_err(|e| e.to_string())?;
+    note_self_write(&app, Path::new(&path));
+
+    Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_directory(path: String, recursive: bool) -> Result<(), String> {
-    (if recursive { fs::remove_dir_all(path) } else { fs::remove_dir(path) }).map_err(|e|
+pub fn delete_directory(app: tauri::AppHandle, path: String, recursive: bool) -> Result<(), String> {
+    (if recursive { fs::remove_dir_all(&path) } else { fs::remove_dir(&path) }).map_err(|e|
         e.to_string()
-    )
+    )?;
+    note_self_write(&app, Path::new(&path));
+
+    Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn copy_path(from: String, to: String) -> Result<(), String> {
+pub fn copy_path(app: tauri::AppHandle, from: String, to: String) -> Result<(), String> {
     let from = PathBuf::from(from);
     let to = PathBuf::from(to);
 
-    if from.is_file() {
-        fs::copy(from, to)
-            .map(|_| ())
-            .map_err(|e| e.to_string())
-    } else {
-        Err("Directory copy is not implemented.".into())
+    if !from.is_file() {
+        return Err("Directory copy is not implemented.".into());
     }
+
+    fs::copy(&from, &to).map_err(|e| e.to_string())?;
+    note_self_write(&app, &to);
+
+    Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn move_path(from: String, to: String) -> Result<(), String> {
-    fs::rename(from, to).map_err(|e| e.to_string())
+pub fn move_path(app: tauri::AppHandle, from: String, to: String) -> Result<(), String> {
+    fs::rename(&from, &to).map_err(|e| e.to_string())?;
+    note_self_write(&app, Path::new(&from));
+    note_self_write(&app, Path::new(&to));
+
+    Ok(())
 }
 
 #[tauri::command]

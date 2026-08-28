@@ -1,5 +1,7 @@
 import { commands } from '@/bindings';
 import { getSetting, subscribeToSetting } from '@/lib/settings/store';
+import { setBufferDirty } from '@/lib/stores/buffer-status';
+import { clearAbandoned, isAbandoned } from '@/lib/stores/external-changes';
 import { setSaving } from '@/lib/stores/save-status';
 
 /**
@@ -18,12 +20,24 @@ import { setSaving } from '@/lib/stores/save-status';
  */
 export function createAutosaver(
   path: string,
+  initialContent: string,
   onError: (message: string) => void,
 ) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: { markdown: string; seq: number } | null = null;
   let disposed = false;
   let reported = false;
+  let reportedDirty = false;
+  let held = false;
+
+  // What disk holds as far as this editor knows. Lets the external-change
+  // handler recognise the events caused by our own writes.
+  let lastWritten = initialContent;
+
+  // A live editor on this path means writes are legitimate again. This is what
+  // ends an abandonment -- see `abandonPendingWrites` for why it can't be a
+  // timer.
+  clearAbandoned(path);
 
   // Edits are counted, not flagged, so a write landing while newer edits are
   // queued clears only the edit it actually carried.
@@ -41,6 +55,16 @@ export function createAutosaver(
     setSaving(path, active);
   };
 
+  // Mirrors publish(), but with no autosave-mode gate: dirtiness is just as
+  // real in 'change' mode, it is only too brief to be worth a spinner.
+  const publishDirty = () => {
+    if (disposed) return;
+    const dirty = dirtySeq !== savedSeq;
+    if (dirty === reportedDirty) return;
+    reportedDirty = dirty;
+    setBufferDirty(path, dirty);
+  };
+
   const unsubscribe = subscribeToSetting('editor.autosave', publish);
 
   const write = (markdown: string, seq: number) => {
@@ -51,10 +75,16 @@ export function createAutosaver(
         // bare .catch would take a failed write for a successful one and clear
         // the indicator on a file that is still unsaved.
         if (result.status === 'error') onError(result.error);
-        else if (seq > savedSeq) savedSeq = seq;
+        else {
+          lastWritten = markdown;
+          if (seq > savedSeq) savedSeq = seq;
+        }
       })
       .catch((err) => onError(String(err)))
-      .finally(publish);
+      .finally(() => {
+        publish();
+        publishDirty();
+      });
   };
 
   const flush = () => {
@@ -63,6 +93,18 @@ export function createAutosaver(
       timer = null;
     }
     if (pending === null) return;
+
+    // The file was deleted or renamed away. Writing now would recreate it --
+    // and `write_file` would recreate its parent directory too.
+    if (isAbandoned(path)) {
+      pending = null;
+      return;
+    }
+
+    // Held while a conflict is on screen. The pending edit is kept, not
+    // dropped, so "Keep mine" still has something to write.
+    if (held) return;
+
     const { markdown, seq } = pending;
     pending = null;
     write(markdown, seq);
@@ -72,6 +114,7 @@ export function createAutosaver(
   const markDirty = () => {
     dirtySeq += 1;
     publish();
+    publishDirty();
   };
 
   const schedule = (markdown: string) => {
@@ -98,9 +141,54 @@ export function createAutosaver(
       reported = false;
       setSaving(path, false);
     }
+    if (reportedDirty) {
+      reportedDirty = false;
+      setBufferDirty(path, false);
+    }
   };
 
-  return { schedule, markDirty, flush, dispose };
+  return {
+    schedule,
+    markDirty,
+    flush,
+    dispose,
+
+    /** Whether the buffer holds edits that aren't on disk. */
+    isDirty: () => dirtySeq !== savedSeq,
+
+    /** The content this editor last put on disk, or loaded from it. */
+    getLastWritten: () => lastWritten,
+
+    /**
+     * Accept `markdown` as the on-disk truth without writing it. Used after
+     * reloading a file that changed externally, so the reload doesn't count as
+     * an edit and immediately get written back.
+     */
+    adopt: (markdown: string) => {
+      savedSeq = dirtySeq;
+      lastWritten = markdown;
+      publish();
+      publishDirty();
+    },
+
+    /**
+     * Stop writing until released. Without this the conflict bar would be
+     * decorative: the buffer is dirty by definition while it is showing, so
+     * the running autosave timer would overwrite disk within `autosaveDelay`
+     * and silently choose "keep mine" on the user's behalf.
+     */
+    hold: () => {
+      held = true;
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    },
+
+    release: () => {
+      held = false;
+    },
+  };
 }
 
 export type Autosaver = ReturnType<typeof createAutosaver>;

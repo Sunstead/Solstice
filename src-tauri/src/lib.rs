@@ -7,10 +7,12 @@ mod workspace;
 mod files;
 mod types;
 mod commands;
+mod watcher;
 
 use commands::command_registry::CommandId;
 use commands::keymap::KeymapChanged;
 use commands::menu_layout::MenuCommand;
+use watcher::FileSystemChanged;
 
 /// Single source of truth for the typed command/event surface. Built once so
 /// the same collected set backs both the runtime invoke_handler and the
@@ -32,6 +34,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             files::list_workspace_files_recursive,
             workspace::set_workspace,
             workspace::get_workspace,
+            workspace::set_watch_enabled,
             commands::keymap::get_command_registry,
             commands::keymap::set_keybind,
             commands::keymap::clear_keybind,
@@ -39,7 +42,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::menu_layout::get_menu_layout,
             commands::menu_layout::get_native_menu_command_ids,
         ])
-        .events(tauri_specta::collect_events![KeymapChanged, MenuCommand])
+        .events(tauri_specta::collect_events![KeymapChanged, MenuCommand, FileSystemChanged])
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -64,6 +67,7 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(workspace::WorkspaceState::new())
+        .manage(watcher::FsWatcherState::new())
         .manage(commands::keymap::MenuAccelerators::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
@@ -105,6 +109,13 @@ pub fn run() {
             }
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // The watcher owns a thread and a live file-id cache; a closed
+            // window must not leave either behind.
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                watcher::unwatch(window.label(), &window.state::<watcher::FsWatcherState>());
+            }
         })
         .on_menu_event(|app, event| {
             #[cfg(debug_assertions)]

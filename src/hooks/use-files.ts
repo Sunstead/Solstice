@@ -3,34 +3,12 @@ import { create } from 'zustand';
 
 import { commands, FileEntry } from '@/bindings';
 import { useSetting } from '@/lib/settings/store';
+import { isWithin, normalizePath, parentPath } from '@/lib/path-utils';
 
 export type FileTreeNode = FileEntry & {
   childrenLoaded: boolean;
   expanded: boolean;
 };
-
-function normalize(path: string) {
-  return path.replace(/\\/g, '/');
-}
-
-function getParentPath(path: string) {
-  const normalized = normalize(path);
-  const index = normalized.lastIndexOf('/');
-
-  if (index === -1) return '';
-
-  return normalized.substring(0, index);
-}
-
-function isWithinSubtree(entryPath: string, rootPath: string) {
-  const normalizedEntry = normalize(entryPath);
-  const normalizedRoot = normalize(rootPath);
-
-  return (
-    normalizedEntry === normalizedRoot ||
-    normalizedEntry.startsWith(`${normalizedRoot}/`)
-  );
-}
 
 function pruneSubtree(
   entries: Record<string, FileTreeNode>,
@@ -38,7 +16,7 @@ function pruneSubtree(
 ): Record<string, FileTreeNode> {
   return Object.fromEntries(
     Object.entries(entries).filter(
-      ([entryPath]) => !isWithinSubtree(entryPath, path),
+      ([entryPath]) => !isWithin(entryPath, path),
     ),
   );
 }
@@ -75,10 +53,10 @@ export function selectChildren(
   path: string,
   { showHidden, foldersFirst }: ChildrenOptions,
 ) {
-  const normalized = normalize(path);
+  const normalized = normalizePath(path);
 
   return Object.values(entries)
-    .filter((entry) => getParentPath(entry.path) === normalized)
+    .filter((entry) => parentPath(entry.path) === normalized)
     .filter((entry) => showHidden || !entry.name.startsWith('.'))
     .sort((a, b) => compareEntries(a, b, foldersFirst));
 }
@@ -134,7 +112,7 @@ export const useFiles = create<FilesState>((set, get) => ({
   },
 
   refreshDirectory: async (path) => {
-    const normalizedPath = normalize(path);
+    const normalizedPath = normalizePath(path);
     const files = await fetchVisibleEntries(path);
     const freshPaths = new Set(files.map((file) => file.path));
 
@@ -143,7 +121,7 @@ export const useFiles = create<FilesState>((set, get) => ({
 
       for (const entry of Object.values(state.entries)) {
         const isStaleChild =
-          getParentPath(entry.path) === normalizedPath &&
+          parentPath(entry.path) === normalizedPath &&
           !freshPaths.has(entry.path);
 
         if (isStaleChild) {
