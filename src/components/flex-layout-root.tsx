@@ -7,6 +7,7 @@ import {
   TabNode,
   TabSetNode,
 } from 'flexlayout-react';
+import type { ILayoutApi } from 'flexlayout-react';
 import 'flexlayout-react/style/alpha_dark.css';
 import {
   ArrowLeft,
@@ -76,6 +77,17 @@ export default function FlexLayoutRoot() {
   // Subscribed here so flipping the setting re-renders <Layout>, which is what
   // makes onRenderTab below run again with the new value.
   const showExtensions = useSetting('explorer.showFileExtensions');
+
+  // Retargeting a tab after a rename mutates its config in place, which
+  // FlexLayout's content memo cannot see. Hand the store the imperative
+  // redraw so it can force those tabs to re-render.
+  const layoutRef = useRef<ILayoutApi>(null);
+  const setRedrawTabContent = useLayout((s) => s.setRedrawTabContent);
+
+  useEffect(() => {
+    setRedrawTabContent(() => layoutRef.current?.redraw());
+    return () => setRedrawTabContent(null);
+  }, [setRedrawTabContent]);
 
   // Registers containerRef as a react-dnd drop target so react-dnd's own
   // cursor/drop-permission logic doesn't fight with FlexLayout's — see
@@ -296,6 +308,7 @@ export default function FlexLayoutRoot() {
   return (
     <div ref={containerRef} className='flexlayout-custom h-full w-full'>
       <Layout
+        ref={layoutRef}
         model={model}
         realtimeResize
         factory={factory}

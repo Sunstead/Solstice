@@ -2,6 +2,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use crate::watcher::{self, FsWatcherState};
+
 pub struct WorkspaceState(pub Mutex<HashMap<String, String>>);
 
 impl WorkspaceState {
@@ -10,14 +12,56 @@ impl WorkspaceState {
     }
 }
 
+/// Opening a workspace is also what starts watching it, so the two can never
+/// drift apart. Returns an error if the watcher could not be started -- on
+/// Linux a large vault can exhaust the inotify watch limit, and the frontend
+/// needs to know it is running without live updates rather than assume it is.
 #[tauri::command]
 #[specta::specta]
-pub fn set_workspace(window: tauri::Window, state: tauri::State<WorkspaceState>, path: String) {
-    state.0.lock().unwrap().insert(window.label().to_string(), path);
+pub fn set_workspace(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    state: tauri::State<WorkspaceState>,
+    watchers: tauri::State<FsWatcherState>,
+    path: String,
+) -> Result<(), String> {
+    let label = window.label().to_string();
+    state.0.lock().unwrap().insert(label.clone(), path.clone());
+
+    watcher::watch_workspace(&app, &label, &path, &watchers)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn get_workspace(window: tauri::Window, state: tauri::State<WorkspaceState>) -> Option<String> {
     state.0.lock().unwrap().get(window.label()).cloned()
+}
+
+/// Starts or stops watching the current workspace, backing the
+/// `explorer.watchFilesystem` setting. Turning it off has to reach the OS
+/// watcher itself -- muting the events on the frontend would leave the real
+/// cost (a recursive watch over a network share or a very large vault) exactly
+/// where it was.
+#[tauri::command]
+#[specta::specta]
+pub fn set_watch_enabled(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    state: tauri::State<WorkspaceState>,
+    watchers: tauri::State<FsWatcherState>,
+    enabled: bool,
+) -> Result<(), String> {
+    let label = window.label().to_string();
+
+    if !enabled {
+        watcher::unwatch(&label, &watchers);
+        return Ok(());
+    }
+
+    let path = state.0.lock().unwrap().get(&label).cloned();
+
+    match path {
+        Some(path) => watcher::watch_workspace(&app, &label, &path, &watchers),
+        None => Ok(()),
+    }
 }

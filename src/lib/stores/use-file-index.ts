@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { commands, FileEntry } from '@/bindings';
+import { isWithin } from '@/lib/path-utils';
 
 /**
  * Flat, recursive index of every file/folder in the workspace.
@@ -30,20 +31,6 @@ type FileIndexState = {
   reset: () => void;
 };
 
-function normalize(path: string) {
-  return path.replace(/\\/g, '/');
-}
-
-function isWithinSubtree(entryPath: string, rootPath: string) {
-  const normalizedEntry = normalize(entryPath);
-  const normalizedRoot = normalize(rootPath);
-
-  return (
-    normalizedEntry === normalizedRoot ||
-    normalizedEntry.startsWith(`${normalizedRoot}/`)
-  );
-}
-
 export const useFileIndex = create<FileIndexState>((set) => ({
   root: null,
   files: [],
@@ -71,7 +58,7 @@ export const useFileIndex = create<FileIndexState>((set) => ({
 
   removeEntry: (path) => {
     set((state) => ({
-      files: state.files.filter((f) => !isWithinSubtree(f.path, path)),
+      files: state.files.filter((f) => !isWithin(f.path, path)),
     }));
   },
 
