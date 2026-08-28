@@ -21,6 +21,7 @@ import { getFileNameFromPath } from '@/lib/path-utils';
 import { SettingsDialog } from '@/components/settings-dialog';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { loadGlobalSettings, useSettingsStore } from '@/lib/settings/store';
+import { startFsWatch } from '@/lib/stores/fs-watch';
 import { useSettingsDomBindings } from '@/lib/settings/apply';
 import { useThemeEffect } from '@/hooks/use-theme';
 
@@ -74,6 +75,10 @@ export const Route = createRootRoute({
 
       // Fetch the resolved registry + subscribe to keymap-changed.
       void useKeymapStore.getState().init();
+
+      // Subscribe to filesystem changes + window focus. Safe to call before a
+      // workspace exists: the listener ignores batches for any other root.
+      void startFsWatch();
 
       const preventDefault = (event: MouseEvent) => {
         event.preventDefault();

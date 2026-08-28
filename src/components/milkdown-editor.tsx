@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useCallback, useEffect, useId, useRef } from 'react';
 import type { Ctx } from '@milkdown/kit/ctx';
 import {
   Editor,
@@ -6,6 +6,8 @@ import {
   defaultValueCtx,
   editorViewCtx,
   commandsCtx,
+  parserCtx,
+  serializerCtx,
 } from '@milkdown/kit/core';
 import {
   history,
@@ -43,7 +45,8 @@ import {
 } from '@milkdown/kit/preset/gfm';
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { callCommand, $prose } from '@milkdown/kit/utils';
-import { Plugin, AllSelection } from '@milkdown/kit/prose/state';
+import { Plugin, AllSelection, TextSelection } from '@milkdown/kit/prose/state';
+import { Slice } from '@milkdown/kit/prose/model';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
 import { CommandId } from '@/bindings';
 import { createAutosaver, type Autosaver } from '@/lib/autosave';
@@ -51,7 +54,45 @@ import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { wikilink, useWikilinkIndexSync } from '@/lib/wikilink';
+import { ExternalChangeBar } from '@/components/external-change-bar';
+import { useExternalFileChanges } from '@/hooks/use-external-file-changes';
+import { useLayout } from '@/hooks/use-layout';
+import {
+  abandonPendingWrites,
+  clearAbandoned,
+} from '@/lib/stores/external-changes';
 import '@/styles/wikilink.css';
+
+/**
+ * Marks a transaction as an external reload rather than a user edit, so the
+ * dirty tracker ignores it. Paired with `addToHistory: false`, which
+ * @milkdown/plugin-listener treats as a suppression signal -- a transaction
+ * carrying it never reaches `markdownUpdated`, and so never schedules a write.
+ * That is what makes replacing the document in place safe from a write-back
+ * loop, with no flags or timing windows involved.
+ */
+const EXTERNAL_RELOAD = 'solstice-external-reload';
+
+/**
+ * The editor scrolls inside FileEditor's ScrollArea viewport, not inside
+ * `view.dom`, so preserving scroll position means finding that ancestor.
+ */
+function findScrollParent(from: HTMLElement): HTMLElement | null {
+  let node: HTMLElement | null = from.parentElement;
+
+  while (node) {
+    const { overflowY } = getComputedStyle(node);
+    if (
+      (overflowY === 'auto' || overflowY === 'scroll') &&
+      node.scrollHeight > node.clientHeight
+    ) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+
+  return null;
+}
 
 type MilkdownEditorProps = {
   path: string;
@@ -179,21 +220,37 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     (root) => {
       if (!loaded) return undefined;
 
-      const saver = createAutosaver(path, onError);
+      const saver = createAutosaver(path, initialContent, onError);
       autosaver.current = saver;
 
       // Marks the file dirty synchronously with the transaction. Milkdown's
       // listener debounces markdownUpdated by 200ms, so driving the tab's
       // saving indicator off the write schedule would leave it trailing every
       // edit by that much.
+      //
+      // Written as appendTransaction rather than a view update because only
+      // this form can see transaction metadata -- an external reload replaces
+      // the whole document and must not count as an edit.
       const dirtyTracker = $prose(
         () =>
           new Plugin({
-            view: () => ({
-              update: (view, prevState) => {
-                if (!view.state.doc.eq(prevState.doc)) saver.markDirty();
-              },
-            }),
+            appendTransaction: (transactions) => {
+              const edited = transactions.some(
+                (tr) =>
+                  tr.docChanged &&
+                  // Mirrors the listener's own filter. A transaction it skips
+                  // never reaches markdownUpdated, so it can never schedule a
+                  // write -- counting one as an edit marks the file unsaved
+                  // with no way to ever clear it. Milkdown normalizes the
+                  // document at load with exactly such a transaction, which
+                  // is what used to pin the tab's saving spinner on from the
+                  // moment a file was opened.
+                  tr.getMeta('addToHistory') !== false &&
+                  !tr.getMeta(EXTERNAL_RELOAD),
+              );
+              if (edited) saver.markDirty();
+              return null;
+            },
           }),
       );
 
@@ -262,6 +319,121 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       autosaver.current?.dispose();
     };
   }, [path]);
+
+  /**
+   * Swaps in new content without remounting, preserving cursor and scroll.
+   *
+   * Milkdown's own `replaceAll` can't be used here: its flush path recreates
+   * the EditorState (losing undo history *and* selection), and its non-flush
+   * path dispatches a transaction of its own, so there is nowhere to attach
+   * the meta that keeps this from registering as an edit.
+   */
+  const applyDiskContent = useCallback(
+    (markdown: string) => {
+      const editor = get();
+      if (!editor) return;
+
+      editor.action((ctx: Ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const doc = ctx.get(parserCtx)(markdown);
+        if (!doc) return;
+
+        const { state } = view;
+        const anchor = Math.min(state.selection.anchor, doc.content.size);
+        const scroller = findScrollParent(view.dom as HTMLElement);
+        const scrollTop = scroller?.scrollTop ?? 0;
+        const hadFocus = view.hasFocus();
+
+        const tr = state.tr
+          .replace(0, state.doc.content.size, new Slice(doc.content, 0, 0))
+          .setMeta(EXTERNAL_RELOAD, true)
+          .setMeta('addToHistory', false);
+
+        // `replace` maps the selection to near the end of the document, so it
+        // has to be set back explicitly. Clamping the old offset is the
+        // honest best effort -- an exact logical position isn't recoverable
+        // across an arbitrary external edit.
+        try {
+          tr.setSelection(TextSelection.near(tr.doc.resolve(anchor), 1));
+        } catch {
+          // Document too short for the old offset; leave the default.
+        }
+
+        view.dispatch(tr);
+
+        // dispatch updates the DOM synchronously, so this lands after layout.
+        if (scroller) scroller.scrollTop = scrollTop;
+        if (hadFocus) view.focus();
+      });
+    },
+    [get],
+  );
+
+  /**
+   * Whether disk and buffer mean the same thing. Compared through the
+   * serializer rather than as raw text: Milkdown normalizes markdown, so a
+   * hand-edited file would otherwise look changed on every single check.
+   */
+  const matchesBuffer = useCallback(
+    (diskText: string) => {
+      const editor = get();
+      if (!editor) return false;
+
+      return (
+        editor.action((ctx: Ctx) => {
+          const doc = ctx.get(parserCtx)(diskText);
+          if (!doc) return false;
+
+          const serialize = ctx.get(serializerCtx);
+          return serialize(doc) === serialize(ctx.get(editorViewCtx).state.doc);
+        }) ?? false
+      );
+    },
+    [get],
+  );
+
+  const getMarkdown = useCallback(() => {
+    const editor = get();
+    if (!editor) return null;
+
+    return editor.action((ctx: Ctx) =>
+      ctx.get(serializerCtx)(ctx.get(editorViewCtx).state.doc),
+    );
+  }, [get]);
+
+  const { status, reload, keepMine, dismiss } = useExternalFileChanges({
+    path,
+    ready: !loading,
+    isDirty: () => autosaver.current?.isDirty() ?? false,
+    getLastWritten: () => autosaver.current?.getLastWritten() ?? initialContent,
+    matchesBuffer,
+    applyDiskContent,
+    adopt: (text) => autosaver.current?.adopt(text),
+    hold: () => autosaver.current?.hold(),
+    release: () => autosaver.current?.release(),
+  });
+
+  // Writing the buffer back immediately is what actually resolves the
+  // divergence. Just dismissing would leave a user who then stops typing
+  // permanently out of sync, with the bar returning on the next focus resync.
+  const handleKeepMine = useCallback(() => {
+    const markdown = getMarkdown();
+    keepMine();
+
+    if (markdown === null) return;
+    // The file was abandoned when it vanished, to stop stale flushes from
+    // resurrecting it. Saving it back is the user explicitly asking for
+    // exactly that, so lift the mark first.
+    clearAbandoned(path);
+    autosaver.current?.schedule(markdown);
+    autosaver.current?.flush();
+  }, [getMarkdown, keepMine, path]);
+
+  const handleCloseTab = useCallback(() => {
+    abandonPendingWrites(path);
+    dismiss();
+    useLayout.getState().closeFileTab(path);
+  }, [dismiss, path]);
 
   useEffect(() => {
     if (loading) return;
@@ -414,7 +586,19 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     return <div className='p-4 text-muted-foreground'>Loading editor…</div>;
   }
 
-  return <Milkdown />;
+  return (
+    <>
+      {status.kind !== 'none' && (
+        <ExternalChangeBar
+          variant={status.kind}
+          onReload={reload}
+          onKeepMine={handleKeepMine}
+          onClose={handleCloseTab}
+        />
+      )}
+      <Milkdown />
+    </>
+  );
 };
 
 export const MilkdownEditorWrapper: React.FC<MilkdownEditorProps> = (props) => {

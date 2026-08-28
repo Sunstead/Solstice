@@ -48,3 +48,53 @@ export function getFileNameFromPath(path: string) {
   const normalized = normalizePath(path);
   return normalized.substring(normalized.lastIndexOf('/') + 1);
 }
+
+/**
+ * Path comparison helpers. Store keys keep whatever separators the OS gave
+ * them -- they are handed straight back to `list_directory`/`read_file` -- so
+ * normalization belongs here, at the point of comparison, rather than at the
+ * point of storage.
+ */
+export function isSamePath(a: string, b: string) {
+  return normalizePath(a) === normalizePath(b);
+}
+
+/** Whether `child` is `ancestor` itself or lives somewhere beneath it. */
+export function isWithin(child: string, ancestor: string) {
+  const normalizedChild = normalizePath(child);
+  const normalizedAncestor = normalizePath(ancestor);
+
+  return (
+    normalizedChild === normalizedAncestor ||
+    normalizedChild.startsWith(`${normalizedAncestor}/`)
+  );
+}
+
+/** The normalized parent directory of `path`, or `''` at the root. */
+export function parentPath(path: string) {
+  const normalized = normalizePath(path);
+  const index = normalized.lastIndexOf('/');
+
+  return index === -1 ? '' : normalized.substring(0, index);
+}
+
+/**
+ * Separator-native counterparts to `parentPath`/`normalizePath`. Store keys
+ * and Tauri command arguments keep whatever separators the OS handed us, so
+ * anything that produces a path to feed *back* to the backend has to preserve
+ * them rather than normalize.
+ */
+export function joinPath(parentPath: string, name: string): string {
+  const separator = parentPath.includes('\\') ? '\\' : '/';
+
+  return parentPath.endsWith(separator)
+    ? `${parentPath}${name}`
+    : `${parentPath}${separator}${name}`;
+}
+
+export function parentOf(path: string): string {
+  const separator = path.includes('\\') ? '\\' : '/';
+  const index = path.lastIndexOf(separator);
+
+  return index === -1 ? '' : path.slice(0, index);
+}

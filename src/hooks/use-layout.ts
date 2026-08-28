@@ -11,6 +11,7 @@ import {
   getStoredLayout,
   setStoredLayout,
 } from '@/lib/stores/workspace-layout';
+import { getFileNameFromPath, normalizePath } from '@/lib/path-utils';
 
 const defaultLayoutJson: IJsonModel = {
   global: {
@@ -42,6 +43,17 @@ type LayoutState = {
   normalizeTabsetDeletion: () => void;
   closeFileTab: (path: string) => void;
   closeFolderTabs: (path: string) => void;
+  retargetTabs: (from: string, to: string) => void;
+  listTabPaths: () => string[];
+  /**
+   * FlexLayout's imperative `redraw()`, registered by <FlexLayoutRoot>.
+   * Tab content is memoized on tabNode *identity* plus FlexLayout's own redraw
+   * revisions -- never on config -- and `updateNodeAttributes` mutates a node
+   * in place. So changing a tab's `config.path` is invisible to the renderer
+   * until something bumps a revision, and this is the only thing that does.
+   */
+  redrawTabContent: (() => void) | null;
+  setRedrawTabContent: (redraw: (() => void) | null) => void;
 };
 
 function findFirstTabset(model: Model): TabSetNode | undefined {
@@ -72,10 +84,6 @@ function findBlankTab(model: Model): TabNode | undefined {
     }
   });
   return found;
-}
-
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '');
 }
 
 function findTabForPath(model: Model, path: string): TabNode | undefined {
@@ -136,7 +144,7 @@ function nextBlankTabName(model: Model): string {
   return count === 0 ? 'New Tab' : `New Tab ${count + 1}`;
 }
 
-function makeBlankTabId(): string {
+function makeUniqueTabId(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `blank-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -153,8 +161,11 @@ export const useLayout = create<LayoutState>((set, get) => ({
   model: null,
   workspacePath: null,
   activeTabId: null,
+  redrawTabContent: null,
 
   setActiveTabId: (id) => set({ activeTabId: id }),
+
+  setRedrawTabContent: (redraw) => set({ redrawTabContent: redraw }),
 
   loadForWorkspace: async (path) => {
     const stored = await getStoredLayout();
@@ -193,6 +204,13 @@ export const useLayout = create<LayoutState>((set, get) => ({
       return;
     }
 
+    // The id is normally the path, which keeps layout JSON readable. But a
+    // retargeted tab keeps its original id, so a path can still be taken by a
+    // tab that no longer points at it -- `addNode` would throw on the
+    // duplicate. Fall back to a synthetic id in that case; `config.path`
+    // is the real identity either way.
+    const id = model.getNodeById(path) ? makeUniqueTabId() : path;
+
     const blankTab = findBlankTab(model);
     const blankTabParent = blankTab?.getParent();
 
@@ -205,7 +223,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
         Actions.addNode(
           {
             type: 'tab',
-            id: path,
+            id,
             name,
             component: 'editor',
             config: { path },
@@ -224,7 +242,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
     model.doAction(
       Actions.addNode(
-        { type: 'tab', id: path, name, component: 'editor', config: { path } },
+        { type: 'tab', id, name, component: 'editor', config: { path } },
         activeTabset.getId(),
         DockLocation.CENTER,
         -1,
@@ -245,7 +263,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
       Actions.addNode(
         {
           type: 'tab',
-          id: makeBlankTabId(),
+          id: makeUniqueTabId(),
           name: nextBlankTabName(model),
           component: 'blank',
         },
@@ -305,5 +323,73 @@ export const useLayout = create<LayoutState>((set, get) => ({
     for (const id of idsToClose) {
       model.doAction(Actions.deleteTab(id));
     }
+  },
+
+  /**
+   * Points every tab at `from` -- or at anything beneath it, so a renamed
+   * folder carries its open descendants along -- at the corresponding path
+   * under `to`. Tab ids are deliberately left alone: `useNavigationHistory`
+   * keys on them, and `config.path` is what actually identifies the file.
+   */
+  retargetTabs: (from, to) => {
+    const { model } = get();
+    if (!model) return;
+
+    const oldPath = normalizePath(from);
+    const newPath = normalizePath(to);
+    const updates: Array<{ id: string; path: string; name: string }> = [];
+
+    // Collected first and applied after: doAction() mutates the tree that
+    // visitNodes() is walking.
+    model.visitNodes((node) => {
+      if (node.getType() !== 'tab') return;
+      const tab = node as TabNode;
+      const config = tab.getConfig() as { path?: string } | undefined;
+      if (!config?.path) return;
+
+      const tabPath = normalizePath(config.path);
+      if (tabPath !== oldPath && !tabPath.startsWith(`${oldPath}/`)) return;
+
+      const nextPath = newPath + tabPath.slice(oldPath.length);
+      updates.push({
+        id: tab.getId(),
+        path: nextPath,
+        name: getFileNameFromPath(nextPath),
+      });
+    });
+
+    for (const update of updates) {
+      const tab = model.getNodeById(update.id) as TabNode | undefined;
+      if (!tab) continue;
+
+      model.doAction(
+        Actions.updateNodeAttributes(update.id, {
+          name: update.name,
+          config: { ...(tab.getConfig() ?? {}), path: update.path },
+        }),
+      );
+    }
+
+    if (updates.length > 0) {
+      get().redrawTabContent?.();
+      get().persistCurrent();
+    }
+  },
+
+  listTabPaths: () => {
+    const { model } = get();
+    if (!model) return [];
+
+    const paths = new Set<string>();
+
+    model.visitNodes((node) => {
+      if (node.getType() !== 'tab') return;
+      const config = (node as TabNode).getConfig() as
+        | { path?: string }
+        | undefined;
+      if (config?.path) paths.add(config.path);
+    });
+
+    return [...paths];
   },
 }));

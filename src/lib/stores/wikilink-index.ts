@@ -42,6 +42,13 @@ type WikilinkIndexState = WikilinkIndexSnapshot & {
    * previous index, so workspace switches need no explicit reset.
    */
   ensureBuilt: (root: string) => Promise<void>;
+  /**
+   * Forces a re-walk of `root`, keeping the current snapshot live while it
+   * runs. This is the hook for file creates/renames/deletes -- in-app and
+   * external alike. `invalidate` is deliberately not that hook: dropping the
+   * snapshot flashes every link through "unresolved" for the length of a walk.
+   */
+  rebuild: (root: string) => Promise<void>;
   invalidate: () => void;
 };
 
@@ -141,6 +148,11 @@ async function walk(root: string, directory: string, into: string[]) {
 // editor) await the same walk instead of each starting their own.
 let inFlight: { root: string; promise: Promise<void> } | null = null;
 
+// `rebuild` drops the in-flight handle to force a fresh walk, which means two
+// walks of the same root can overlap. Only the newest may publish its result,
+// or a slow earlier walk could land last and reinstate a stale snapshot.
+let walkSeq = 0;
+
 export const useWikilinkIndex = create<WikilinkIndexState>((set, get) => ({
   ...emptySnapshot(),
   root: null,
@@ -150,17 +162,19 @@ export const useWikilinkIndex = create<WikilinkIndexState>((set, get) => ({
     if (inFlight?.root === root) return inFlight.promise;
     if (get().root === root && !get().building) return Promise.resolve();
 
-    const rebuild = get().root === root;
+    const isRebuild = get().root === root;
+    const seq = ++walkSeq;
     const promise = (async () => {
       // A rebuild of the same workspace keeps serving the previous snapshot
       // so links don't flicker through "unresolved" while the walk runs.
-      set({ root, building: true, ...(rebuild ? {} : emptySnapshot()) });
+      set({ root, building: true, ...(isRebuild ? {} : emptySnapshot()) });
 
       const paths: string[] = [];
       await walk(root, root, paths);
 
-      // Discard the result if the workspace changed mid-walk.
-      if (get().root !== root) return;
+      // Discard the result if the workspace changed, or a newer walk started,
+      // mid-walk.
+      if (get().root !== root || seq !== walkSeq) return;
       set({ ...buildSnapshot(paths), building: false });
     })();
 
@@ -170,6 +184,15 @@ export const useWikilinkIndex = create<WikilinkIndexState>((set, get) => ({
     });
 
     return promise;
+  },
+
+  rebuild: (root) => {
+    // Dropping the in-flight handle forces a fresh walk, and `building: true`
+    // clears ensureBuilt's "already current" guard while steering it down its
+    // rebuild branch -- so the existing snapshot keeps serving throughout.
+    inFlight = null;
+    set({ building: true });
+    return get().ensureBuilt(root);
   },
 
   invalidate: () => {

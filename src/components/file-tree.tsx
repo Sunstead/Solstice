@@ -6,7 +6,8 @@ import {
   FILE_TYPE_PRESETS,
   stripPresetExtension,
 } from '@/lib/stores/entry-input';
-import { fileOperations, parentOf } from '@/lib/file-operations';
+import { fileOperations } from '@/lib/file-operations';
+import { parentOf } from '@/lib/path-utils';
 import { useFileTreeDrag, useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { useDragHoverStore } from '@/hooks/use-drag-hover';
 import { EntryInput } from './entry-input';

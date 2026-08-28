@@ -7,6 +7,7 @@ import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { loadWorkspaceSettings } from '@/lib/settings/store';
 import { useFiles } from '@/hooks/use-files';
 import { useFileIndex } from '@/lib/stores/use-file-index';
+import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { useLayout } from '@/hooks/use-layout';
 import { commands } from '@/bindings';
 
@@ -30,6 +31,9 @@ async function syncScopedStores(path: string | null) {
   } else {
     useLayout.setState({ model: null, workspacePath: null });
     useFileIndex.getState().reset();
+    // Closing the workspace is the one case where dropping the snapshot
+    // outright is right -- there is nothing left for links to resolve against.
+    useWikilinkIndex.getState().invalidate();
   }
 }
 
@@ -50,12 +54,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       const lastOpened =
         useKnownWorkspaces.getState().workspaces[0]?.path ?? null;
       if (lastOpened) {
-        try {
-          await commands.setWorkspace(lastOpened);
-          path = lastOpened;
-        } catch (error) {
-          console.error('Failed to restore last workspace:', error);
+        // A failed watcher is not a failed open: the workspace is still
+        // usable, it just won't see external changes until the next focus
+        // resync. Restoring must not be blocked on it.
+        const result = await commands.setWorkspace(lastOpened);
+        if (result.status === 'error') {
+          console.error('Failed to watch workspace:', result.error);
         }
+        path = lastOpened;
       }
     }
 
@@ -71,7 +77,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   setWorkspace: async (path) => {
-    await commands.setWorkspace(path);
+    const result = await commands.setWorkspace(path);
+    if (result.status === 'error') {
+      console.error('Failed to watch workspace:', result.error);
+    }
     await useKnownWorkspaces.getState().touch(path);
     useFiles.getState().reset();
     set({ path });

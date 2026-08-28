@@ -1,36 +1,16 @@
 import { commands } from '@/bindings';
-import { useFiles } from '@/hooks/use-files';
+import { applyFsChanges, selfChange } from '@/lib/fs-sync';
 import type { FileTreeNode } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
-import { useWorkspace } from '@/hooks/use-workspace';
-import { useFileIndex } from '@/lib/stores/use-file-index';
-
-function joinPath(parentPath: string, name: string): string {
-  const separator = parentPath.includes('\\') ? '\\' : '/';
-  return parentPath.endsWith(separator)
-    ? `${parentPath}${name}`
-    : `${parentPath}${separator}${name}`;
-}
-
-export function parentOf(path: string): string {
-  const separator = path.includes('\\') ? '\\' : '/';
-  const index = path.lastIndexOf(separator);
-  return index === -1 ? '' : path.slice(0, index);
-}
+import { joinPath, parentOf } from '@/lib/path-utils';
 
 /**
- * The flat search index (`useFileIndex`) has no per-directory expand/collapse
- * state to reconcile — unlike `useFiles`, a surgical patch after a folder
- * rename/move would need to rewrite every descendant path by hand. A full
- * re-walk is simpler, still cheap (these operations are user-triggered, not
- * hot-path), and can't drift the way a partial patch could.
+ * In-app operations apply optimistically through the same reconciler the
+ * watcher uses, rather than waiting for the watcher to report them back. The
+ * debounce would make creating a file feel broken, and a workspace whose
+ * watcher failed to start has to stay fully usable. `applyFsChanges` is
+ * idempotent, so the watcher re-reporting the same change is harmless.
  */
-async function refreshFileIndex() {
-  const root = useWorkspace.getState().path;
-  if (root) {
-    await useFileIndex.getState().loadIndex(root);
-  }
-}
 
 /** The subset of a FileTreeNode needed to move it. Matches what a react-dnd drag item carries. */
 export type MovableEntry = Pick<FileTreeNode, 'path' | 'name' | 'is_dir'>;
@@ -76,8 +56,7 @@ async function createFile(parentPath: string, name: string) {
     return result;
   }
 
-  await useFiles.getState().refreshDirectory(parentPath);
-  await refreshFileIndex();
+  await applyFsChanges([selfChange('Created', path)]);
   useLayout.getState().openFile(path, name);
   return result;
 }
@@ -91,8 +70,7 @@ async function createFolder(parentPath: string, name: string) {
     return result;
   }
 
-  await useFiles.getState().refreshDirectory(parentPath);
-  await refreshFileIndex();
+  await applyFsChanges([selfChange('Created', path, { isDir: true })]);
   return result;
 }
 
@@ -106,9 +84,7 @@ async function rename(path: string, newName: string) {
     return result;
   }
 
-  useFiles.getState().removeSubtree(path);
-  await useFiles.getState().refreshDirectory(parentPath);
-  await refreshFileIndex();
+  await applyFsChanges([selfChange('Renamed', newPath, { from: path })]);
   return result;
 }
 
@@ -134,12 +110,9 @@ async function move(entry: MovableEntry, targetParentPath: string) {
     return result;
   }
 
-  useFiles.getState().removeSubtree(entry.path);
-  await Promise.all([
-    useFiles.getState().refreshDirectory(currentParent),
-    useFiles.getState().refreshDirectory(targetParentPath),
+  await applyFsChanges([
+    selfChange('Renamed', newPath, { from: entry.path, isDir: entry.is_dir }),
   ]);
-  await refreshFileIndex();
 
   return result;
 }
@@ -154,14 +127,7 @@ async function remove(node: FileTreeNode) {
     return result;
   }
 
-  useFiles.getState().removeSubtree(node.path);
-  await refreshFileIndex();
-
-  if (node.is_dir) {
-    useLayout.getState().closeFolderTabs(node.path);
-  } else {
-    useLayout.getState().closeFileTab(node.path);
-  }
+  await applyFsChanges([selfChange('Removed', node.path)]);
 
   return result;
 }
