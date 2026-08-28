@@ -55,7 +55,7 @@ export function BlankTab({}: { tabId: string }) {
                   <Keybind
                     accelerator={
                       commands.find((c) => c.id === action.commandId)
-                        ?.default_accelerator ?? ''
+                        ?.accelerator ?? ''
                     }
                   />
                 </div>

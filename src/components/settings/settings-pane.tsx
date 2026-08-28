@@ -39,11 +39,11 @@ export function SettingsPane({ section }: { section: SectionId }) {
   }
 
   return (
-    <div className='flex flex-col'>
+    <div className='flex flex-col gap-6'>
       {groupByHeading(entries).map((group, index) => (
         <section key={group.name ?? `ungrouped-${index}`}>
           {group.name && (
-            <h3 className='pt-6 pb-1 text-xs font-medium text-muted-foreground'>
+            <h3 className='pt-0 pb-1 text-xs font-medium text-muted-foreground'>
               {group.name}
             </h3>
           )}

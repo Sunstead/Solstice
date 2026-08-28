@@ -34,7 +34,7 @@ export const settingsRegistry = {
   }),
 
   'appearance.reduceMotion': defineBoolean({
-    section: 'appearance',
+    section: 'accessibility',
     scope: 'global',
     label: 'Reduce motion',
     default: false,

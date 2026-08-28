@@ -157,19 +157,21 @@ export function SettingsDialog() {
                 </p>
               )}
             </div>
-            <ScrollArea className='h-full'>
-              <div className='flex min-h-full flex-col'>
-                <div className='px-4 pb-8 md:px-6'>
-                  {query ? (
-                    <SettingsSearchResults query={query} />
-                  ) : CustomPane ? (
-                    <CustomPane />
-                  ) : (
-                    <SettingsPane section={activeSection} />
-                  )}
+            <div className='flex-1 flex-col min-h-0 flex'>
+              <ScrollArea className='h-full'>
+                <div className='flex min-h-full flex-col'>
+                  <div className='px-4 py-6 md:px-6 '>
+                    {query ? (
+                      <SettingsSearchResults query={query} />
+                    ) : CustomPane ? (
+                      <CustomPane />
+                    ) : (
+                      <SettingsPane section={activeSection} />
+                    )}
+                  </div>
                 </div>
-              </div>
-            </ScrollArea>
+              </ScrollArea>
+            </div>
           </SidebarInset>
         </SidebarProvider>
       </DialogContent>

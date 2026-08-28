@@ -1,4 +1,4 @@
-import { Files, Keyboard, PenLine, Paintbrush, type LucideIcon } from 'lucide-react';
+import { Files, Keyboard, PenLine, Paintbrush, type LucideIcon, PersonStanding } from 'lucide-react';
 
 /**
  * The nav down the left of the settings dialog, shaped like `primaryViews` in
@@ -33,6 +33,11 @@ export const settingsSections = [
     label: 'Keyboard',
     icon: Keyboard,
   },
+  {
+    id: 'accessibility',
+    label: 'Accessibility',
+    icon: PersonStanding
+  }
 ] as const satisfies readonly SettingsSection[];
 
 export type SectionId = (typeof settingsSections)[number]['id'];

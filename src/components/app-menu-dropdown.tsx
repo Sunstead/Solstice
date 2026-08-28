@@ -115,9 +115,9 @@ function MenuEntryView({
         onClick={() => void runCommand(c.id)}
       >
         {c.label}
-        {c.default_accelerator && (
+        {c.accelerator && (
           <DropdownMenuShortcut className='tracking-wide'>
-            {toDisplayFormat(c.default_accelerator)}
+            {toDisplayFormat(c.accelerator)}
           </DropdownMenuShortcut>
         )}
       </DropdownMenuItem>

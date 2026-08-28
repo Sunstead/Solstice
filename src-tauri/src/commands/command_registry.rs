@@ -84,7 +84,10 @@ impl std::fmt::Display for CommandId {
 pub struct CommandMeta {
     pub id: CommandId,
     pub label: String,
-    pub default_accelerator: Option<String>,
+    /// The accelerator in effect: the compiled-in default, or the user's
+    /// override when `is_overridden`.
+    pub accelerator: Option<String>,
+    pub is_overridden: bool,
 }
 
 pub fn default_commands() -> Vec<CommandMeta> {
@@ -93,138 +96,164 @@ pub fn default_commands() -> Vec<CommandMeta> {
         CommandMeta {
             id: CommandId::AppSettings,
             label: "Settings...".into(),
-            default_accelerator: Some("CmdOrCtrl+,".into()),
+            accelerator: Some("CmdOrCtrl+,".into()),
+            is_overridden: false,
         },
         // -- File --
         CommandMeta {
             id: CommandId::FileNewNote,
             label: "New Note".into(),
-            default_accelerator: Some("CmdOrCtrl+N".into()),
+            accelerator: Some("CmdOrCtrl+N".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::FileNewFolder,
             label: "New Folder".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+N".into()),
+            accelerator: Some("CmdOrCtrl+Alt+N".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::FileOpenFile,
             label: "Open File".into(),
-            default_accelerator: Some("CmdOrCtrl+O".into()),
+            accelerator: Some("CmdOrCtrl+O".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::FileNewTab,
             label: "New Tab".into(),
-            default_accelerator: Some("CmdOrCtrl+T".into()),
+            accelerator: Some("CmdOrCtrl+T".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::FileCloseTab,
             label: "Close Tab".into(),
-            default_accelerator: Some("CmdOrCtrl+W".into()),
+            accelerator: Some("CmdOrCtrl+W".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::FileOpenFolder,
             label: "Open Folder".into(),
-            default_accelerator: Some("CmdOrCtrl+Shift+O".into()),
+            accelerator: Some("CmdOrCtrl+Shift+O".into()),
+            is_overridden: false,
         },
         // -- Text formatting (commonmark) --
         CommandMeta {
             id: CommandId::EditBold,
             label: "Bold".into(),
-            default_accelerator: Some("CmdOrCtrl+B".into()),
+            accelerator: Some("CmdOrCtrl+B".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditItalic,
             label: "Italic".into(),
-            default_accelerator: Some("CmdOrCtrl+I".into()),
+            accelerator: Some("CmdOrCtrl+I".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditInlineCode,
             label: "Inline code".into(),
-            default_accelerator: Some("CmdOrCtrl+E".into()),
+            accelerator: Some("CmdOrCtrl+E".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditStrikethrough,
             label: "Strikethrough".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+X".into()),
+            accelerator: Some("CmdOrCtrl+Alt+X".into()),
+            is_overridden: false,
         },
         // -- Headings (commonmark) --
         CommandMeta {
             id: CommandId::EditHeading1,
             label: "Heading 1".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+1".into()),
+            accelerator: Some("CmdOrCtrl+Alt+1".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditHeading2,
             label: "Heading 2".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+2".into()),
+            accelerator: Some("CmdOrCtrl+Alt+2".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditHeading3,
             label: "Heading 3".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+3".into()),
+            accelerator: Some("CmdOrCtrl+Alt+3".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditHeading4,
             label: "Heading 4".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+4".into()),
+            accelerator: Some("CmdOrCtrl+Alt+4".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditHeading5,
             label: "Heading 5".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+5".into()),
+            accelerator: Some("CmdOrCtrl+Alt+5".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditHeading6,
             label: "Heading 6".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+6".into()),
+            accelerator: Some("CmdOrCtrl+Alt+6".into()),
+            is_overridden: false,
         },
         // -- Block elements (commonmark) --
         CommandMeta {
             id: CommandId::EditBlockquote,
             label: "Blockquote".into(),
-            default_accelerator: Some("CmdOrCtrl+Shift+B".into()),
+            accelerator: Some("CmdOrCtrl+Shift+B".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditBulletList,
             label: "Bullet list".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+8".into()),
+            accelerator: Some("CmdOrCtrl+Alt+8".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditOrderedList,
             label: "Ordered list".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+7".into()),
+            accelerator: Some("CmdOrCtrl+Alt+7".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditCodeBlock,
             label: "Code block".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+C".into()),
+            accelerator: Some("CmdOrCtrl+Alt+C".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditHardBreak,
             label: "Insert hard break".into(),
-            default_accelerator: Some("Shift+Enter".into()),
+            accelerator: Some("Shift+Enter".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::EditParagraph,
             label: "Paragraph".into(),
-            default_accelerator: Some("CmdOrCtrl+Alt+0".into()),
+            accelerator: Some("CmdOrCtrl+Alt+0".into()),
+            is_overridden: false,
         },
         // -- View --
         CommandMeta {
             id: CommandId::ViewToggleSidebar,
             label: "Toggle sidebar".into(),
-            default_accelerator: Some("CmdOrCtrl+Shift+E".into()),
+            accelerator: Some("CmdOrCtrl+Shift+E".into()),
+            is_overridden: false,
         },
         // -- Navigation --
         CommandMeta {
             id: CommandId::NavigationBack,
             label: "Go Back".into(),
-            default_accelerator: Some("Alt+ArrowLeft".into()),
+            accelerator: Some("Alt+ArrowLeft".into()),
+            is_overridden: false,
         },
         CommandMeta {
             id: CommandId::NavigationForward,
             label: "Go Forward".into(),
-            default_accelerator: Some("Alt+ArrowRight".into()),
+            accelerator: Some("Alt+ArrowRight".into()),
+            is_overridden: false,
         }
     ]
 }
