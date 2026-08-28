@@ -1,13 +1,13 @@
-import { getSection, type SectionId } from '@/lib/settings/sections';
 import { searchSettings } from '@/lib/settings/search';
+import { getSection, type SectionId } from '@/lib/settings/sections';
 import { useSettingReader } from '@/lib/settings/store';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
-import { SettingRow } from './setting-row';
+import { SettingList } from './setting-list';
 
 /**
- * Results across every section, so a setting can be found without knowing
- * which pane holds it. Each group keeps its section heading, which is what
- * tells you where the setting lives once you have found it.
+ * Results across every section, so a setting can be found without knowing which
+ * pane holds it. Each group keeps its section heading, which is what tells you
+ * where the setting lives once you have found it.
  */
 export function SettingsSearchResults({ query }: { query: string }) {
   const read = useSettingReader();
@@ -16,11 +16,9 @@ export function SettingsSearchResults({ query }: { query: string }) {
 
   if (total === 0 && sections.length === 0) {
     return (
-      <div className='py-10 text-center'>
-        <p className='text-sm text-muted-foreground'>
-          No settings match “{query}”.
-        </p>
-      </div>
+      <p className='py-10 text-center text-sm text-muted-foreground'>
+        No settings match “{query}”.
+      </p>
     );
   }
 
@@ -55,11 +53,7 @@ export function SettingsSearchResults({ query }: { query: string }) {
           <h3 className='pt-4 pb-1 text-xs font-medium text-muted-foreground'>
             {getSection(group.section).label}
           </h3>
-          <div className='divide-y divide-border/60'>
-            {group.keys.map((key) => (
-              <SettingRow key={key} settingKey={key} />
-            ))}
-          </div>
+          <SettingList keys={group.keys} />
         </section>
       ))}
     </div>

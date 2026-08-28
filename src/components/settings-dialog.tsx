@@ -83,11 +83,9 @@ export function SettingsDialog() {
   const section = getSection(activeSection);
   const CustomPane = customPanes[activeSection];
 
-  // Base UI's default is to focus the first tabbable element on open, which
-  // here is the search field -- so it opens pre-focused, cursor blinking,
-  // ready to type. Focusing the panel itself instead (same as its own
-  // fallback for touch opens) keeps the dialog correctly announced without
-  // stealing the first keystroke into search.
+  // Base UI otherwise focuses the first tabbable element, which is the search
+  // field. Focusing the panel keeps the dialog announced without capturing the
+  // first keystroke into search.
   const panelRef = useRef<HTMLDivElement>(null);
 
   return (

@@ -13,14 +13,11 @@ import {
 import { SettingControl, isWideControl } from './setting-control';
 
 /**
- * One row: label, description, and the generated control. Narrow controls sit
- * to the right of the label; wide ones (a radio list, where every option
- * carries its own description) stack underneath so they get the full width.
+ * One row: label and the generated control. Narrow controls sit beside the
+ * label, wide ones stack underneath for the full width.
  *
- * The row geometry is fixed: nothing appears or disappears as a value changes,
- * so a control never moves out from under the pointer. The only signal that a
- * setting has been changed is the reset button fading in, and which layer it
- * would clear is spelled out in its tooltip rather than a badge.
+ * The geometry is fixed — nothing appears or disappears as a value changes, so
+ * a control never moves out from under the pointer.
  */
 export function SettingRow({ settingKey }: { settingKey: SettingKey }) {
   const { value, def, isOverridden, isCustomized, effectiveScope } =
@@ -39,8 +36,8 @@ export function SettingRow({ settingKey }: { settingKey: SettingKey }) {
     />
   );
 
-  // Always rendered, only sometimes visible: showing it conditionally would
-  // reflow the control next to it every time a value changed.
+  // Always rendered, only sometimes visible: rendering it conditionally would
+  // reflow the control beside it every time a value changed.
   const resetButton = (
     <Button
       variant='ghost'
@@ -48,8 +45,7 @@ export function SettingRow({ settingKey }: { settingKey: SettingKey }) {
       aria-hidden={!isCustomized}
       tabIndex={isCustomized ? undefined : -1}
       className={cn(
-        // transition-none overrides Button's base transition-all: fading the
-        // button out reads as lag when a value returns to its default.
+        // No transition: fading out reads as lag when a value returns to default.
         'text-muted-foreground transition-none',
         !isCustomized && 'pointer-events-none opacity-0',
       )}
@@ -70,16 +66,6 @@ export function SettingRow({ settingKey }: { settingKey: SettingKey }) {
       >
         {def.label}
       </Label>
-      {def.description && (
-        <p className='text-xs leading-relaxed text-muted-foreground'>
-          {def.description}
-        </p>
-      )}
-      {def.requiresReload && (
-        <p className='text-xs text-muted-foreground/80 italic'>
-          Takes effect the next time the note is opened.
-        </p>
-      )}
       {disabled && (
         <p className='text-xs text-muted-foreground/80 italic'>
           Open a workspace to change this.

@@ -3,18 +3,20 @@ import { useShallow } from 'zustand/shallow';
 import { settingKeys, settingsRegistry } from './registry';
 import { resolveSetting, useSettingsStore } from './store';
 
+type Binding = { name: string; format?: (value: never) => string };
+
+function render(binding: Binding, value: unknown) {
+  const format = binding.format as ((v: unknown) => string) | undefined;
+  return format ? format(value) : String(value);
+}
+
 /**
- * Pushes every setting that declares a `cssVar` or `domAttr` binding onto the
- * document root. This is the whole implementation for most appearance
- * settings -- the stylesheets consume `--editor-font-size`,
- * `--editor-measure` and friends, so nothing downstream has to know a
- * setting exists.
- *
- * Mirrors how `useDevicePixelRatio` already maintains `--dpr`.
+ * Pushes every setting declaring a `cssVar` or `domAttr` binding onto the
+ * document root. This is the whole implementation for most appearance settings:
+ * the stylesheets consume `--editor-font-size`, `--editor-measure` and friends,
+ * so nothing downstream has to know a setting exists.
  */
 export function useSettingsDomBindings() {
-  // One subscription for both layers; `useShallow` keeps the effect from
-  // re-running on unrelated store writes.
   const [global, workspace] = useSettingsStore(
     useShallow((s) => [s.global, s.workspace] as const),
   );
@@ -23,26 +25,12 @@ export function useSettingsDomBindings() {
     const root = document.documentElement;
 
     for (const key of settingKeys) {
-      const def = settingsRegistry[key];
-      if (!def.cssVar && !def.domAttr) continue;
+      const { cssVar, domAttr } = settingsRegistry[key];
+      if (!cssVar && !domAttr) continue;
 
       const value = resolveSetting(key, global, workspace);
-
-      if (def.cssVar) {
-        const { name, format } = def.cssVar as {
-          name: string;
-          format?: (v: unknown) => string;
-        };
-        root.style.setProperty(name, format ? format(value) : String(value));
-      }
-
-      if (def.domAttr) {
-        const { name, format } = def.domAttr as {
-          name: string;
-          format?: (v: unknown) => string;
-        };
-        root.setAttribute(name, format ? format(value) : String(value));
-      }
+      if (cssVar) root.style.setProperty(cssVar.name, render(cssVar, value));
+      if (domAttr) root.setAttribute(domAttr.name, render(domAttr, value));
     }
   }, [global, workspace]);
 }

@@ -1,8 +1,10 @@
+import type { SectionId } from './sections';
 import {
   defineBoolean,
   defineEnum,
   defineNumber,
   type AnySettingDef,
+  type SettingReader,
 } from './types';
 
 /**
@@ -155,22 +157,29 @@ export const settingsRegistry = {
 export type SettingKey = keyof typeof settingsRegistry;
 
 /**
- * The value type of a setting, taken straight off its declared default -- so
- * `SettingValue<'appearance.theme'>` is `'system' | 'light' | 'dark'`, not
- * `string`.
+ * A setting's value type, taken off its declared default, so
+ * `SettingValue<'appearance.theme'>` is `'system' | 'light' | 'dark'`.
  */
 export type SettingValue<K extends SettingKey> =
   (typeof settingsRegistry)[K]['default'];
 
 export const settingKeys = Object.keys(settingsRegistry) as SettingKey[];
 
-export function getSettingDef(key: SettingKey): AnySettingDef {
-  return settingsRegistry[key];
+export interface SettingEntry {
+  key: SettingKey;
+  def: AnySettingDef;
 }
 
-/** Registry entries belonging to one section, in declaration order. */
-export function settingsForSection(section: string) {
+export function isSettingVisible(def: AnySettingDef, read: SettingReader) {
+  return def.visibleWhen ? def.visibleWhen(read) : true;
+}
+
+/** Currently-visible settings for one section, in declaration order. */
+export function visibleSettingsForSection(
+  section: SectionId,
+  read: SettingReader,
+): SettingEntry[] {
   return settingKeys
-    .map((key) => [key, settingsRegistry[key]] as const)
-    .filter(([, def]) => def.section === section);
+    .map((key): SettingEntry => ({ key, def: settingsRegistry[key] }))
+    .filter(({ def }) => def.section === section && isSettingVisible(def, read));
 }

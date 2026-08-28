@@ -1,11 +1,10 @@
 import { Files, Keyboard, PenLine, Paintbrush, type LucideIcon } from 'lucide-react';
 
 /**
- * The nav down the left of the settings dialog. Deliberately shaped like
- * `primaryViews` in `@/lib/views/registry` -- plain data, no React, so the
- * settings registry can type-reference `SectionId` without pulling components
- * into the data layer. Custom (non-generated) panes are wired separately in
- * `@/components/settings/panes`.
+ * The nav down the left of the settings dialog, shaped like `primaryViews` in
+ * `@/lib/views/registry`. Plain data with no React, so the settings registry
+ * can reference `SectionId` without pulling components into the data layer;
+ * custom (non-generated) panes are wired in `@/components/settings/panes`.
  */
 export interface SettingsSection {
   id: string;

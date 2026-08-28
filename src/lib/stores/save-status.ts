@@ -3,11 +3,9 @@ import { create } from 'zustand';
 /**
  * Which files currently have an unwritten edit.
  *
- * Counted rather than flagged because more than one editor can be open on the
- * same file -- drag-opened tabs no longer use the path as their id, so two
- * tabs can point at one path (see `handleExternalDrag`). Each autosaver
- * reports its own transitions and the count keeps them from cancelling each
- * other out.
+ * Counted rather than flagged because two tabs can point at one path — tab ids
+ * are independent of the file path (see `handleExternalDrag`). Each autosaver
+ * reports its own transitions and the count keeps them from cancelling out.
  */
 interface SaveStatusState {
   saving: Record<string, number>;
