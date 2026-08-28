@@ -3,22 +3,43 @@ use tauri::{
     AppHandle,
 };
 
-use crate::commands::menu_layout::{ resolve_menu_layout, NativeItem, ResolvedMenuEntry };
+use crate::commands::keymap::menu_accelerators_enabled;
+use crate::commands::menu_layout::{
+    resolve_app_menu,
+    resolve_menu_layout,
+    NativeItem,
+    ResolvedMenuEntry,
+};
+
+fn command_item(
+    app: &AppHandle,
+    entry: &ResolvedMenuEntry,
+    accelerators: bool
+) -> tauri::Result<Option<tauri::menu::MenuItem<tauri::Wry>>> {
+    let ResolvedMenuEntry::Command(c) = entry else {
+        return Ok(None);
+    };
+    let mut item = MenuItemBuilder::new(&c.label).id(&c.id);
+    if let (true, Some(a)) = (accelerators, &c.accelerator) {
+        item = item.accelerator(a);
+    }
+    Ok(Some(item.build(app)?))
+}
 
 fn build_submenu(
     app: &AppHandle,
     title: &str,
-    entries: &[ResolvedMenuEntry]
+    entries: &[ResolvedMenuEntry],
+    accelerators: bool
 ) -> tauri::Result<Submenu<tauri::Wry>> {
     let mut b = SubmenuBuilder::new(app, title);
     for entry in entries {
         b = match entry {
-            ResolvedMenuEntry::Command(c) => {
-                let mut item = MenuItemBuilder::new(&c.label).id(&c.id);
-                if let Some(a) = &c.default_accelerator {
-                    item = item.accelerator(a);
+            ResolvedMenuEntry::Command(_) => {
+                match command_item(app, entry, accelerators)? {
+                    Some(item) => b.item(&item),
+                    None => b,
                 }
-                b.item(&item.build(app)?)
             }
             // Native items map straight to Tauri's OS-linked predefined
             // items -- same free, zero-JS behavior as before.
@@ -35,7 +56,7 @@ fn build_submenu(
             }
             ResolvedMenuEntry::Separator => b.separator(),
             ResolvedMenuEntry::Submenu { title, entries } => {
-                b.item(&build_submenu(app, title, entries)?)
+                b.item(&build_submenu(app, title, entries, accelerators)?)
             }
         };
     }
@@ -43,6 +64,9 @@ fn build_submenu(
 }
 
 pub fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, String> {
+    // Cleared while the settings pane is recording a keystroke, so the OS does
+    // not consume the combo before the webview sees it.
+    let accelerators = menu_accelerators_enabled(app);
     let layout = resolve_menu_layout(app);
     let mut b = MenuBuilder::new(app);
 
@@ -51,8 +75,20 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, String> {
     // (our actual first item) would silently take that slot instead of
     // appearing as its own menu. `None` on each predefined item lets Tauri
     // fill in the app's real name (matching "Quit Solstice" etc.).
-    let app_menu = SubmenuBuilder::new(app, "Solstice")
+    let mut app_menu_builder = SubmenuBuilder::new(app, "Solstice")
         .item(&PredefinedMenuItem::about(app, None, None).map_err(|e| e.to_string())?)
+        .separator();
+
+    // Registry commands that belong in the app menu rather than a top-level
+    // one -- Settings, on macOS. They resolve through the keymap like any
+    // other command, so an override changes this accelerator too.
+    for entry in resolve_app_menu(app) {
+        if let Some(item) = command_item(app, &entry, accelerators).map_err(|e| e.to_string())? {
+            app_menu_builder = app_menu_builder.item(&item);
+        }
+    }
+
+    let app_menu = app_menu_builder
         .separator()
         .item(&PredefinedMenuItem::services(app, None).map_err(|e| e.to_string())?)
         .separator()
@@ -66,7 +102,9 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, String> {
     b = b.item(&app_menu);
 
     for menu in &layout {
-        let submenu = build_submenu(app, &menu.title, &menu.entries).map_err(|e| e.to_string())?;
+        let submenu = build_submenu(app, &menu.title, &menu.entries, accelerators).map_err(|e|
+            e.to_string()
+        )?;
         b = b.item(&submenu);
     }
 
@@ -79,16 +117,16 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, String> {
     // and only exist in debug builds.
     #[cfg(debug_assertions)]
     {
-        let reload = MenuItemBuilder::new("Reload")
-            .id("debug.reload")
-            .accelerator("CmdOrCtrl+R")
-            .build(app)
-            .map_err(|e| e.to_string())?;
-        let toggle_devtools = MenuItemBuilder::new("Toggle Developer Tools")
-            .id("debug.toggle_devtools")
-            .accelerator("CmdOrCtrl+Alt+I")
-            .build(app)
-            .map_err(|e| e.to_string())?;
+        let mut reload = MenuItemBuilder::new("Reload").id("debug.reload");
+        let mut toggle_devtools = MenuItemBuilder::new("Toggle Developer Tools").id(
+            "debug.toggle_devtools"
+        );
+        if accelerators {
+            reload = reload.accelerator("CmdOrCtrl+R");
+            toggle_devtools = toggle_devtools.accelerator("CmdOrCtrl+Alt+I");
+        }
+        let reload = reload.build(app).map_err(|e| e.to_string())?;
+        let toggle_devtools = toggle_devtools.build(app).map_err(|e| e.to_string())?;
         let debug_menu = SubmenuBuilder::new(app, "Debug")
             .item(&reload)
             .item(&toggle_devtools)

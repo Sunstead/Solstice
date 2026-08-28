@@ -1,5 +1,6 @@
 import { platform } from '@tauri-apps/plugin-os';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { cn } from '@/lib/utils';
 
 /**
  * Tauri accelerators write single-character keys in uppercase
@@ -28,6 +29,28 @@ const MAC_SYMBOLS: Record<string, string> = {
   Ctrl: '⌃',
 };
 
+/**
+ * Named keys as macOS writes them. Without this an accelerator like
+ * `Alt+ArrowLeft` renders a chip reading "ArrowLeft", which is both wrong for
+ * the platform and wide enough to unbalance a list of shortcuts.
+ */
+const MAC_KEY_SYMBOLS: Record<string, string> = {
+  ArrowLeft: '←',
+  ArrowRight: '→',
+  ArrowUp: '↑',
+  ArrowDown: '↓',
+  Enter: '↩',
+  Backspace: '⌫',
+  Delete: '⌦',
+  Escape: '⎋',
+  Tab: '⇥',
+  Space: '␣',
+  PageUp: '⇞',
+  PageDown: '⇟',
+  Home: '↖',
+  End: '↘',
+};
+
 const WIN_LABELS: Record<string, string> = {
   CmdOrCtrl: 'Ctrl',
   Cmd: 'Ctrl',
@@ -43,17 +66,23 @@ const WIN_LABELS: Record<string, string> = {
  * (Windows/Linux).
  */
 function acceleratorToTokens(accelerator: string): string[] {
+  if (!accelerator) return [];
+  const map = isMac ? MAC_SYMBOLS : WIN_LABELS;
   const parts = accelerator.split('+');
   const key = parts.pop()!;
-  const displayKey = normalizeBaseKey(key);
-  const map = isMac ? MAC_SYMBOLS : WIN_LABELS;
-  const modifiers = parts.map((p) => map[p] ?? p);
-  return [...modifiers, displayKey];
+  // The trailing part goes through the map too, so a partial accelerator of
+  // only held modifiers still renders as symbols while a keybind is recorded.
+  const displayKey = isMac
+    ? MAC_KEY_SYMBOLS[key] ?? normalizeBaseKey(key)
+    : normalizeBaseKey(key);
+  return [...parts.map((p) => map[p] ?? p), map[key] ?? displayKey];
 }
 
 interface KeybindProps {
   /** e.g. "CmdOrCtrl+Shift+B" */
   accelerator: string;
+  /** `warning` marks an accelerator that more than one command answers to. */
+  tone?: 'default' | 'warning';
   className?: string;
 }
 
@@ -62,16 +91,22 @@ interface KeybindProps {
  * Mac renders modifier symbols back-to-back (⌘⇧B); other platforms
  * render each key as its own Kbd joined by a literal "+" (Ctrl+Shift+B).
  */
-export function Keybind({ accelerator, className }: KeybindProps) {
+export function Keybind({
+  accelerator,
+  tone = 'default',
+  className,
+}: KeybindProps) {
   const tokens = acceleratorToTokens(accelerator);
 
   return (
     <KbdGroup className={className}>
       {tokens.map((token, i) => (
-        <span key={`${token}-${i}`} className="inline-flex items-center gap-1">
-          {/* {!isMac && i > 0 && <span className="text-muted-foreground">+</span>} */}
-          <Kbd>{token}</Kbd>
-        </span>
+        <Kbd
+          key={`${token}-${i}`}
+          className={cn(tone === 'warning' && 'bg-warning/15 text-warning')}
+        >
+          {token}
+        </Kbd>
       ))}
     </KbdGroup>
   );

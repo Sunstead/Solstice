@@ -21,6 +21,14 @@ export const commands = {
 	getWorkspace: () => __TAURI_INVOKE<string | null>("get_workspace"),
 	getCommandRegistry: () => __TAURI_INVOKE<CommandMeta[]>("get_command_registry"),
 	setKeybind: (commandId: CommandId, accelerator: string) => typedError<null, string>(__TAURI_INVOKE("set_keybind", { commandId, accelerator })),
+	/**  Drop a command's override so it falls back to its compiled-in default. */
+	clearKeybind: (commandId: CommandId) => typedError<null, string>(__TAURI_INVOKE("clear_keybind", { commandId })),
+	/**
+	 *  Release the native menu's key equivalents so the frontend can record a
+	 *  keystroke that the OS would otherwise consume before the webview sees it.
+	 *  Menu items stay visible and clickable throughout.
+	 */
+	setMenuAcceleratorsEnabled: (enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_menu_accelerators_enabled", { enabled })),
 	getMenuLayout: () => __TAURI_INVOKE<ResolvedMenu[]>("get_menu_layout"),
 	/**
 	 *  Commands whose accelerator is dispatched by the OS before the webview
@@ -39,12 +47,17 @@ export const events = {
 };
 
 /* Types */
-export type CommandId = "file.new_note" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.open_folder" | "file.close_tab" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward";
+export type CommandId = "app.settings" | "file.new_note" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.open_folder" | "file.close_tab" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward";
 
 export type CommandMeta = {
 	id: CommandId,
 	label: string,
-	default_accelerator: string | null,
+	/**
+	 *  The accelerator in effect: the compiled-in default, or the user's
+	 *  override when `is_overridden`.
+	 */
+	accelerator: string | null,
+	is_overridden: boolean,
 };
 
 export type FileEntry = {

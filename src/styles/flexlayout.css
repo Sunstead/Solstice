@@ -346,3 +346,44 @@
 .flexlayout-custom .flexlayout__tab_toolbar_sticky_buttons_container {
   padding-left: 2px;
 }
+
+/*
+ * Tab close button, while the file has an unwritten edit.
+ *
+ * TabCloseIcon renders both the spinner and the cross; which one shows is
+ * decided here because the element that receives the hover is flexlayout's
+ * own button wrapper (.flexlayout__tab_button_trailing), which React does not
+ * own. Pointing at the button always brings the cross back, so a tab stays
+ * closeable while it is saving.
+ */
+.flexlayout-custom .tab-close-saving__close {
+  display: none;
+}
+
+.flexlayout-custom
+  .flexlayout__tab_button_trailing:hover
+  .tab-close-saving__close {
+  display: block;
+}
+
+.flexlayout-custom
+  .flexlayout__tab_button_trailing:hover
+  .tab-close-saving__spinner {
+  display: none;
+}
+
+/* The spinner is status, not a control: it should not read as hoverable. */
+.flexlayout-custom
+  .flexlayout__tab_button_trailing:not(:hover)
+  .tab-close-saving {
+  opacity: 0.7;
+}
+
+/* A saving tab keeps its close button visible even when unselected and
+   unhovered -- otherwise the spinner would be hidden exactly when it is
+   trying to tell you something. */
+.flexlayout-custom
+  .flexlayout__tab_button_trailing:has(.tab-close-saving) {
+  display: flex;
+  visibility: visible;
+}
