@@ -137,6 +137,7 @@ export function ExplorerSidebar() {
             }
           />
           <FileTreeItemContextMenuContent
+            surface='root'
             renameEnabled={false}
             deleteEnabled={false}
             moveEnabled={false}

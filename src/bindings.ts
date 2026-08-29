@@ -15,6 +15,19 @@ export const commands = {
 	deleteDirectory: (path: string, recursive: boolean) => typedError<null, string>(__TAURI_INVOKE("delete_directory", { path, recursive })),
 	copyPath: (from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("copy_path", { from, to })),
 	movePath: (from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("move_path", { from, to })),
+	/**
+	 *  Moves an entry to the OS trash rather than unlinking it, so a mistaken
+	 *  delete stays recoverable from Finder/Explorer. `delete_file` and
+	 *  `delete_directory` remain the permanent-delete primitives.
+	 */
+	trashPath: (path: string) => typedError<null, string>(__TAURI_INVOKE("trash_path", { path })),
+	/**
+	 *  Copies an entry alongside itself under a free name, returning the path it
+	 *  landed at. Picking that name here rather than in the frontend keeps the
+	 *  check and the create in one step -- a caller that probed for a free name
+	 *  first could still lose the race to the watcher, another window, or Finder.
+	 */
+	duplicatePath: (path: string) => typedError<string, string>(__TAURI_INVOKE("duplicate_path", { path })),
 	exists: (path: string) => __TAURI_INVOKE<boolean>("exists", { path }),
 	listWorkspaceFilesRecursive: (path: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_workspace_files_recursive", { path })),
 	/**
@@ -62,7 +75,7 @@ export const events = {
 };
 
 /* Types */
-export type CommandId = "app.settings" | "file.new_note" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.open_folder" | "file.close_tab" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward";
+export type CommandId = "app.settings" | "file.new_note" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward";
 
 export type CommandMeta = {
 	id: CommandId,

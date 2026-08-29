@@ -74,12 +74,32 @@ pub fn create_directory(app: tauri::AppHandle, path: String) -> Result<(), Strin
     Ok(())
 }
 
+/// Whether `a` and `b` name the same entry on disk. Used to let a case-only
+/// rename through on case-insensitive filesystems (macOS, Windows), where the
+/// destination "already exists" purely because it *is* the source.
+fn is_same_entry(a: &Path, b: &Path) -> bool {
+    match (fs::canonicalize(a), fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn rename_path(app: tauri::AppHandle, old_path: String, new_path: String) -> Result<(), String> {
-    fs::rename(&old_path, &new_path).map_err(|e| e.to_string())?;
-    note_self_write(&app, Path::new(&old_path));
-    note_self_write(&app, Path::new(&new_path));
+    let old = Path::new(&old_path);
+    let new = Path::new(&new_path);
+
+    // `fs::rename` silently clobbers an existing destination on Unix, so a
+    // rename onto a sibling's name would destroy that sibling with no warning.
+    if new.exists() && !is_same_entry(old, new) {
+        let name = new.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or(new_path.clone());
+        return Err(format!("\"{name}\" already exists."));
+    }
+
+    fs::rename(old, new).map_err(|e| e.to_string())?;
+    note_self_write(&app, old);
+    note_self_write(&app, new);
 
     Ok(())
 }
@@ -134,6 +154,90 @@ pub fn move_path(app: tauri::AppHandle, from: String, to: String) -> Result<(), 
 #[specta::specta]
 pub fn exists(path: String) -> bool {
     Path::new(&path).exists()
+}
+
+/// Moves an entry to the OS trash rather than unlinking it, so a mistaken
+/// delete stays recoverable from Finder/Explorer. `delete_file` and
+/// `delete_directory` remain the permanent-delete primitives.
+#[tauri::command]
+#[specta::specta]
+pub fn trash_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    trash::delete(&path).map_err(|e| e.to_string())?;
+    note_self_write(&app, Path::new(&path));
+
+    Ok(())
+}
+
+/// Copies an entry alongside itself under a free name, returning the path it
+/// landed at. Picking that name here rather than in the frontend keeps the
+/// check and the create in one step -- a caller that probed for a free name
+/// first could still lose the race to the watcher, another window, or Finder.
+#[tauri::command]
+#[specta::specta]
+pub fn duplicate_path(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let source = Path::new(&path);
+
+    if !source.exists() {
+        return Err(format!("\"{path}\" no longer exists."));
+    }
+
+    let parent = source.parent().ok_or("Cannot duplicate the filesystem root.")?;
+    let name = source
+        .file_name()
+        .ok_or("Cannot duplicate an entry with no name.")?
+        .to_string_lossy()
+        .into_owned();
+
+    let destination = free_copy_path(parent, &name)?;
+
+    if source.is_dir() {
+        copy_dir_recursive(source, &destination)?;
+    } else {
+        fs::copy(source, &destination).map_err(|e| e.to_string())?;
+    }
+
+    note_self_write(&app, &destination);
+
+    Ok(destination.to_string_lossy().into_owned())
+}
+
+/// `note.md` -> `note copy.md`, then `note copy 2.md`, `note copy 3.md`...
+/// Only the final extension is preserved, matching how the rest of the app
+/// treats names (`stripPresetExtension` on the frontend does the same).
+fn free_copy_path(parent: &Path, name: &str) -> Result<PathBuf, String> {
+    let (stem, extension) = match name.rsplit_once('.') {
+        // A leading dot is part of the name, not an extension separator.
+        Some((stem, extension)) if !stem.is_empty() => (stem, format!(".{extension}")),
+        _ => (name, String::new()),
+    };
+
+    for attempt in 1..1000 {
+        let suffix = if attempt == 1 { " copy".to_string() } else { format!(" copy {attempt}") };
+        let candidate = parent.join(format!("{stem}{suffix}{extension}"));
+
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!("Could not find a free name to duplicate \"{name}\" under."))
+}
+
+fn copy_dir_recursive(from: &Path, to: &Path) -> Result<(), String> {
+    fs::create_dir_all(to).map_err(|e| e.to_string())?;
+
+    for entry in fs::read_dir(from).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let destination = to.join(entry.file_name());
+
+        if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+            copy_dir_recursive(&entry.path(), &destination)?;
+        } else {
+            fs::copy(entry.path(), &destination).map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

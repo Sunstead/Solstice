@@ -117,10 +117,14 @@ async function move(entry: MovableEntry, targetParentPath: string) {
   return result;
 }
 
-async function remove(node: FileTreeNode) {
-  const result = node.is_dir
-    ? await commands.deleteDirectory(node.path, true)
-    : await commands.deleteFile(node.path);
+/**
+ * Deletion goes to the OS trash rather than unlinking, so a misclick is
+ * recoverable from Finder/Explorer -- there is no in-app undo for it. The
+ * tree sees a plain `Removed` either way; where the bytes went is the OS's
+ * business, not the reconciler's.
+ */
+async function remove(node: Pick<FileTreeNode, 'path'>) {
+  const result = await commands.trashPath(node.path);
 
   if (result.status === 'error') {
     logFailure(`delete "${node.path}"`, result.error);
@@ -132,10 +136,27 @@ async function remove(node: FileTreeNode) {
   return result;
 }
 
+async function duplicate(entry: Pick<FileTreeNode, 'path' | 'is_dir'>) {
+  const result = await commands.duplicatePath(entry.path);
+
+  if (result.status === 'error') {
+    logFailure(`duplicate "${entry.path}"`, result.error);
+    return result;
+  }
+
+  // The backend picks the free name, so the path only exists once it answers.
+  await applyFsChanges([
+    selfChange('Created', result.data, { isDir: entry.is_dir }),
+  ]);
+
+  return result;
+}
+
 export const fileOperations = {
   createFile,
   createFolder,
   rename,
   remove,
   move,
+  duplicate,
 };

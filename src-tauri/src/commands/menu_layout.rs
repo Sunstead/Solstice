@@ -82,6 +82,28 @@ fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                     Command(FileOpenFile),
                     Command(FileOpenFolder),
                     Separator,
+                    // A submenu rather than a flat block: these all act on
+                    // whatever the focused tab has open, and inlining ten of
+                    // them would bury New/Open under a wall of file actions.
+                    Submenu(
+                        "Current File",
+                        vec![
+                            Command(FileRevealInExplorer),
+                            Command(FileRevealInSystem),
+                            Command(FileOpenInDefaultApp),
+                            Separator,
+                            Command(FileCopyPath),
+                            Command(FileCopyRelativePath),
+                            Command(FileCopyWikilink),
+                            Separator,
+                            Command(FileRename),
+                            Command(FileDuplicate),
+                            Command(FileMoveTo),
+                            Separator,
+                            Command(FileDelete)
+                        ]
+                    ),
+                    Separator,
                     Command(FileCloseTab)
                 ];
                 // Only macOS has an application menu to put Settings in;
@@ -96,6 +118,8 @@ fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
         (
             "Edit",
             vec![
+                Command(EditFind),
+                Separator,
                 Native(Undo),
                 Native(Redo),
                 Separator,
