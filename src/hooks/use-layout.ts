@@ -39,12 +39,20 @@ type LayoutState = {
   loadForWorkspace: (path: string) => Promise<void>;
   persistCurrent: () => void;
   openFile: (path: string, name: string) => void;
+  openFileInNewTab: (path: string, name: string, location?: 'center' | 'right') => void;
   newBlankTab: (tabsetId?: string) => void;
   normalizeTabsetDeletion: () => void;
   closeFileTab: (path: string) => void;
   closeFolderTabs: (path: string) => void;
   retargetTabs: (from: string, to: string) => void;
   listTabPaths: () => string[];
+  /**
+   * The path the focused tab has open, or `null` on a blank tab or no tab.
+   * Not the same thing as `activeTabId`: a tab's id is fixed at creation and
+   * deliberately survives a rename (see `retargetTabs`), so `config.path` is
+   * the only thing that still points at the file after one.
+   */
+  getActiveFilePath: () => string | null;
   /**
    * FlexLayout's imperative `redraw()`, registered by <FlexLayoutRoot>.
    * Tab content is memoized on tabNode *identity* plus FlexLayout's own redraw
@@ -250,6 +258,30 @@ export const useLayout = create<LayoutState>((set, get) => ({
     );
   },
 
+  /**
+   * Unlike `openFile`, this always creates a tab: no selecting an existing
+   * one, no reusing a blank tab. That is the whole point of the action -- a
+   * second view of a file you already have open, or one parked beside it.
+   */
+  openFileInNewTab: (path, name, location = 'center') => {
+    const { model } = get();
+    if (!model) return;
+
+    const activeTabset = model.getActiveTabset() ?? findFirstTabset(model);
+    if (!activeTabset) return;
+
+    model.doAction(
+      Actions.addNode(
+        // Never the path: `openFile` already uses that as the id, so a second
+        // tab on the same file would collide and `addNode` would throw.
+        { type: 'tab', id: makeUniqueTabId(), name, component: 'editor', config: { path } },
+        activeTabset.getId(),
+        location === 'right' ? DockLocation.RIGHT : DockLocation.CENTER,
+        -1,
+      ),
+    );
+  },
+
   newBlankTab: (tabsetId) => {
     const { model } = get();
     if (!model) return;
@@ -391,5 +423,17 @@ export const useLayout = create<LayoutState>((set, get) => ({
     });
 
     return [...paths];
+  },
+
+  getActiveFilePath: () => {
+    const { model, activeTabId } = get();
+    if (!model || !activeTabId) return null;
+
+    const tab = model.getNodeById(activeTabId);
+    if (!(tab instanceof TabNode)) return null;
+
+    const config = tab.getConfig() as { path?: string } | undefined;
+
+    return config?.path ?? null;
   },
 }));

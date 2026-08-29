@@ -1,15 +1,9 @@
-import {
-  ArrowUpRight,
-  Clipboard,
-  FileSearch,
-  FolderTree,
-  HardDrive,
-  Monitor,
-  MoreVertical,
-  PencilLine,
-  Trash,
-} from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
+
+import { targetFromPath } from '@/lib/entry-actions';
 import { Button } from './ui/button';
+import { useEntryMenuItems } from '@/lib/entry-menu-items';
+import { EntryMenuItems } from './entry-menu-items';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +15,22 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 
-export function FileActionsDropdown() {
+const components = {
+  Item: DropdownMenuItem,
+  Separator: DropdownMenuSeparator,
+  Sub: DropdownMenuSub,
+  SubTrigger: DropdownMenuSubTrigger,
+  SubContent: DropdownMenuSubContent,
+};
+
+/**
+ * Actions for the file the editor has open. The items themselves come from
+ * `useEntryMenuItems`, the same source the explorer's context menu renders,
+ * so the two can never offer different things for the same file.
+ */
+export function FileActionsDropdown({ path }: { path: string }) {
+  const items = useEntryMenuItems(targetFromPath(path), { surface: 'editor' });
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -32,44 +41,7 @@ export function FileActionsDropdown() {
         }
       />
       <DropdownMenuContent className='w-max min-w-52'>
-        <DropdownMenuItem>
-          <FileSearch /> Find...
-        </DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Clipboard /> Copy path
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuItem>
-              <Monitor /> from workspace folder
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <HardDrive /> from system root
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem>
-          <ArrowUpRight /> Open in default app
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <ArrowUpRight /> Open in system explorer
-        </DropdownMenuItem>
-        
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem>
-          <FolderTree /> Move file to...
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <PencilLine /> Rename
-        </DropdownMenuItem>
-        <DropdownMenuItem variant='destructive'>
-          <Trash /> Delete file
-        </DropdownMenuItem>
+        <EntryMenuItems items={items} components={components} />
       </DropdownMenuContent>
     </DropdownMenu>
   );

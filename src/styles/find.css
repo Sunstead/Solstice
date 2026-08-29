@@ -1,0 +1,20 @@
+/*
+ * Find-in-file highlights. Both use colour-mix against the theme's own tokens
+ * rather than fixed yellows, so they stay legible over the editor background
+ * in either theme without a second set of dark-mode rules.
+ */
+.find-match {
+  border-radius: 2px;
+  background-color: color-mix(in oklch, var(--primary) 25%, transparent);
+}
+
+/*
+ * The current match has to be findable at a glance among the others, so it
+ * differs in weight as well as in shade -- a slightly stronger fill alone
+ * reads as noise once a page has a dozen matches on it.
+ */
+.find-match-active {
+  background-color: color-mix(in oklch, var(--primary) 55%, transparent);
+  outline: 1px solid var(--primary);
+  outline-offset: -1px;
+}

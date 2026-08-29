@@ -1,12 +1,22 @@
-import { FileTreeNode, useFiles } from '@/hooks/use-files';
-import { useEntryInput, FILE_TYPE_PRESETS } from '@/lib/stores/entry-input';
-import { useFileActionDialog } from '@/lib/stores/file-action-dialog';
+import { FileTreeNode } from '@/hooks/use-files';
+import { useEntryMenuItems } from '@/lib/entry-menu-items';
+import { EntryMenuItems } from './entry-menu-items';
 import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
 } from './ui/context-menu';
-import { FolderInput, PencilLine, Trash } from 'lucide-react';
+
+const components = {
+  Item: ContextMenuItem,
+  Separator: ContextMenuSeparator,
+  Sub: ContextMenuSub,
+  SubTrigger: ContextMenuSubTrigger,
+  SubContent: ContextMenuSubContent,
+};
 
 /**
  * Just the menu items — the delete/move dialogs themselves live in the
@@ -17,91 +27,28 @@ import { FolderInput, PencilLine, Trash } from 'lucide-react';
  */
 export function FileTreeItemContextMenuContent({
   node,
+  surface = 'tree',
   renameEnabled = true,
   deleteEnabled = true,
   moveEnabled = true,
 }: {
   node: FileTreeNode;
+  /** `'root'` is the sidebar's background: the workspace folder itself. */
+  surface?: 'tree' | 'root';
   renameEnabled?: boolean;
   deleteEnabled?: boolean;
   moveEnabled?: boolean;
 }) {
-  const expandDirectory = useFiles((s) => s.expandDirectory);
-  const startCreateFile = useEntryInput((s) => s.startCreateFile);
-  const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
-  const startRename = useEntryInput((s) => s.startRename);
-  const requestDelete = useFileActionDialog((s) => s.requestDelete);
-  const requestMove = useFileActionDialog((s) => s.requestMove);
-
-  const ensureExpanded = () => {
-    if (!node.expanded) {
-      expandDirectory(node.path);
-    }
-  };
+  const items = useEntryMenuItems(node, {
+    surface,
+    renameEnabled,
+    deleteEnabled,
+    moveEnabled,
+  });
 
   return (
-    <ContextMenuContent>
-      {node.is_dir && (
-        <>
-          {Object.values(FILE_TYPE_PRESETS).map((preset) => (
-            <ContextMenuItem
-              key={preset.id}
-              onClick={() => {
-                ensureExpanded();
-                startCreateFile(node.path, preset);
-              }}
-            >
-              New {preset.label}
-            </ContextMenuItem>
-          ))}
-          <ContextMenuItem
-            onClick={() => {
-              ensureExpanded();
-              startCreateFolder(node.path);
-            }}
-          >
-            New Folder
-          </ContextMenuItem>
-          <ContextMenuItem
-            onClick={() => {
-              ensureExpanded();
-              startCreateFile(node.path);
-            }}
-          >
-            New File
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-        </>
-      )}
-      <ContextMenuItem
-        onClick={() => {
-          setTimeout(() => startRename(node), 0);
-        }}
-        disabled={!renameEnabled}
-      >
-        <PencilLine />
-        Rename
-      </ContextMenuItem>
-      <ContextMenuItem
-        onClick={() => {
-          setTimeout(() => requestMove(node), 0);
-        }}
-        disabled={!moveEnabled}
-      >
-        <FolderInput />
-        Move to...
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem
-        variant='destructive'
-        onClick={() => {
-          setTimeout(() => requestDelete(node), 0);
-        }}
-        disabled={!deleteEnabled}
-      >
-        <Trash />
-        Delete
-      </ContextMenuItem>
+    <ContextMenuContent className='min-w-52'>
+      <EntryMenuItems items={items} components={components} />
     </ContextMenuContent>
   );
 }

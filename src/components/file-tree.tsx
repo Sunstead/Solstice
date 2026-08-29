@@ -7,7 +7,7 @@ import {
   stripPresetExtension,
 } from '@/lib/stores/entry-input';
 import { fileOperations } from '@/lib/file-operations';
-import { parentOf } from '@/lib/path-utils';
+import { isSamePath, parentOf } from '@/lib/path-utils';
 import { useFileTreeDrag, useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { useDragHoverStore } from '@/hooks/use-drag-hover';
 import { EntryInput } from './entry-input';
@@ -30,6 +30,7 @@ import { useIsMac } from '@/hooks/use-platform';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
 import { useFileActionDialog } from '@/lib/stores/file-action-dialog';
 import { useSetting } from '@/lib/settings/store';
+import { useRevealTarget } from '@/lib/stores/reveal-target';
 
 type FileTreeProps = {
   path: string;
@@ -39,6 +40,7 @@ export function FileTree({ path }: FileTreeProps) {
   const children = useDirectoryChildren(path);
   const operation = useEntryInput((s) => s.operation);
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
+  const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
   const cancel = useEntryInput((s) => s.cancel);
 
   useEffect(() => {
@@ -46,8 +48,12 @@ export function FileTree({ path }: FileTreeProps) {
     registerCommand('file.new_note', () =>
       startCreateFile(path, FILE_TYPE_PRESETS.markdown),
     );
-    return () => unregisterCommand('file.new_note');
-  }, [path, startCreateFile]);
+    registerCommand('file.new_folder', () => startCreateFolder(path));
+    return () => {
+      unregisterCommand('file.new_note');
+      unregisterCommand('file.new_folder');
+    };
+  }, [path, startCreateFile, startCreateFolder]);
 
   const showCreateInput =
     operation?.mode === 'create' && operation.parentPath === path;
@@ -79,7 +85,10 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const collapseDirectory = useFiles((s) => s.collapseDirectory);
   const openFile = useLayout((s) => s.openFile);
-  const activeTabId = useLayout((s) => s.activeTabId);
+  // The active tab's *path*, not its id: a tab keeps its original id across a
+  // rename (see `retargetTabs`), so an id comparison stops matching the moment
+  // a file is renamed -- and starts matching a new file created at the old path.
+  const activeFilePath = useLayout((s) => s.getActiveFilePath());
   const operation = useEntryInput((s) => s.operation);
   const cancel = useEntryInput((s) => s.cancel);
   const isMac = useIsMac();
@@ -156,6 +165,23 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
     isDropDestination && 'bg-accent/20 rounded-sm',
   );
 
+  // A reveal has to survive being asked for twice in a row, so the effect
+  // keys on the store's nonce rather than on the path -- re-revealing the file
+  // already showing is otherwise invisible to React and would not re-scroll.
+  const revealPath = useRevealTarget((s) => s.path);
+  const revealNonce = useRevealTarget((s) => s.nonce);
+  const isRevealed = !!revealPath && isSamePath(revealPath, node.path);
+
+  useEffect(() => {
+    if (!isRevealed) return;
+    nodeRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [isRevealed, revealNonce]);
+
+  const revealClassName = cn(
+    isRevealed &&
+      'bg-accent/60 outline outline-1 -outline-offset-1 outline-accent-foreground/50',
+  );
+
   if (!node.is_dir) {
     if (isRenaming) {
       return (
@@ -177,10 +203,11 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
           render={
             <SidebarMenuButton
               ref={nodeRef}
-              isActive={activeTabId === node.path}
+              isActive={!!activeFilePath && isSamePath(activeFilePath, node.path)}
               className={cn(
                 'data-active:font-normal w-full max-w-full truncate pl-8',
                 dropHighlightClassName,
+                revealClassName,
               )}
               onClick={() => openFile(node.path, node.name)}
               onKeyDown={handleDeleteKeyDown}
@@ -227,7 +254,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
                   render={
                     <SidebarMenuButton
                       ref={nodeRef}
-                      className={dropHighlightClassName}
+                      className={cn(dropHighlightClassName, revealClassName)}
                       onKeyDown={handleDeleteKeyDown}
                     >
                       <ChevronRight

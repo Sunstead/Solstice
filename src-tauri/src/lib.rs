@@ -30,6 +30,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             files::delete_directory,
             files::copy_path,
             files::move_path,
+            files::trash_path,
+            files::duplicate_path,
             files::exists,
             files::list_workspace_files_recursive,
             workspace::set_workspace,

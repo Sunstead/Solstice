@@ -1,4 +1,5 @@
 import { Trash2Icon } from 'lucide-react';
+import { useIsMac } from '@/hooks/use-platform';
 import { useFileActionDialog } from '@/lib/stores/file-action-dialog';
 import { fileOperations } from '@/lib/file-operations';
 import { MoveToFolderDialog } from './move-to-folder-dialog';
@@ -28,12 +29,15 @@ import {
  * and avoids mounting a Dialog + full Command/file-index instance per row.
  */
 export function FileActionDialogs() {
+  const isMac = useIsMac();
   const deleteTarget = useFileActionDialog((s) => s.deleteTarget);
   const moveTarget = useFileActionDialog((s) => s.moveTarget);
   const closeDelete = useFileActionDialog((s) => s.closeDelete);
   const closeMove = useFileActionDialog((s) => s.closeMove);
 
   const itemName = deleteTarget?.is_dir ? 'folder' : 'file';
+  // Named for what the user will go looking in if they change their mind.
+  const trashName = isMac ? 'system trash' : 'Recycle Bin';
 
   return (
     <>
@@ -48,7 +52,7 @@ export function FileActionDialogs() {
             </AlertDialogMedia>
             <AlertDialogTitle>Delete {itemName}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This {itemName} will be permanently deleted.
+              This {itemName} will be moved to the {trashName}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

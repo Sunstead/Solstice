@@ -49,10 +49,22 @@ command_id! {
     FileOpenFolder => "file.open_folder",
     FileCloseTab => "file.close_tab",
 
+    FileRevealInExplorer => "file.reveal_in_explorer",
+    FileRevealInSystem => "file.reveal_in_system",
+    FileOpenInDefaultApp => "file.open_in_default_app",
+    FileCopyPath => "file.copy_path",
+    FileCopyRelativePath => "file.copy_relative_path",
+    FileCopyWikilink => "file.copy_wikilink",
+    FileRename => "file.rename",
+    FileDuplicate => "file.duplicate",
+    FileMoveTo => "file.move_to",
+    FileDelete => "file.delete",
+
     EditBold => "edit.bold",
     EditItalic => "edit.italic",
     EditInlineCode => "edit.inline_code",
     EditStrikethrough => "edit.strikethrough",
+    EditFind => "edit.find",
 
     EditHeading1 => "edit.heading1",
     EditHeading2 => "edit.heading2",
@@ -88,6 +100,19 @@ pub struct CommandMeta {
     /// override when `is_overridden`.
     pub accelerator: Option<String>,
     pub is_overridden: bool,
+}
+
+/// The system file manager goes by a different name on every platform, and
+/// the label has to be picked here rather than in the UI so the native menu,
+/// the frontend menus and the keybindings pane all agree on one string.
+fn reveal_in_system_label() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "Reveal in Finder"
+    } else if cfg!(target_os = "windows") {
+        "Show in File Explorer"
+    } else {
+        "Show in File Manager"
+    }
 }
 
 pub fn default_commands() -> Vec<CommandMeta> {
@@ -136,6 +161,71 @@ pub fn default_commands() -> Vec<CommandMeta> {
             accelerator: Some("CmdOrCtrl+Shift+O".into()),
             is_overridden: false,
         },
+        // -- Current file --
+        // These act on whatever file the focused tab has open, so they carry
+        // no default accelerator: the useful ones are per-user, and an empty
+        // default keeps them bindable from the keybindings pane without
+        // spending a keystroke everyone has to live with.
+        CommandMeta {
+            id: CommandId::FileRevealInExplorer,
+            label: "Reveal in Explorer".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileRevealInSystem,
+            label: reveal_in_system_label().into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileOpenInDefaultApp,
+            label: "Open in Default App".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileCopyPath,
+            label: "Copy Absolute Path".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileCopyRelativePath,
+            label: "Copy Relative Path".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileCopyWikilink,
+            label: "Copy Wikilink".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileRename,
+            label: "Rename...".into(),
+            accelerator: Some("F2".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileDuplicate,
+            label: "Duplicate".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileMoveTo,
+            label: "Move to...".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileDelete,
+            label: "Delete".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
         // -- Text formatting (commonmark) --
         CommandMeta {
             id: CommandId::EditBold,
@@ -159,6 +249,13 @@ pub fn default_commands() -> Vec<CommandMeta> {
             id: CommandId::EditStrikethrough,
             label: "Strikethrough".into(),
             accelerator: Some("CmdOrCtrl+Alt+X".into()),
+            is_overridden: false,
+        },
+        // -- Editor --
+        CommandMeta {
+            id: CommandId::EditFind,
+            label: "Find...".into(),
+            accelerator: Some("CmdOrCtrl+F".into()),
             is_overridden: false,
         },
         // -- Headings (commonmark) --

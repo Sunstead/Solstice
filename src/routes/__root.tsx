@@ -24,6 +24,7 @@ import { loadGlobalSettings, useSettingsStore } from '@/lib/settings/store';
 import { startFsWatch } from '@/lib/stores/fs-watch';
 import { useSettingsDomBindings } from '@/lib/settings/apply';
 import { useThemeEffect } from '@/hooks/use-theme';
+import { useFileCommands } from '@/hooks/use-file-commands';
 
 export const Route = createRootRoute({
   component: () => {
@@ -49,6 +50,7 @@ export const Route = createRootRoute({
     const openFolder = useWorkspace((s) => s.openFolder);
 
     useDevicePixelRatio();
+    useFileCommands();
     useThemeEffect();
     useSettingsDomBindings();
 

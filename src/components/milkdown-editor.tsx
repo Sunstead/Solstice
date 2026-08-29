@@ -46,6 +46,7 @@ import {
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
 import { callCommand, $prose } from '@milkdown/kit/utils';
 import { Plugin, AllSelection, TextSelection } from '@milkdown/kit/prose/state';
+import type { EditorView } from '@milkdown/kit/prose/view';
 import { Slice } from '@milkdown/kit/prose/model';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
 import { CommandId } from '@/bindings';
@@ -55,6 +56,8 @@ import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { wikilink, useWikilinkIndexSync } from '@/lib/wikilink';
 import { ExternalChangeBar } from '@/components/external-change-bar';
+import { findPlugin, getFindState, setFindQuery, stepFindMatch } from '@/lib/find/plugin';
+import { useFindStore } from '@/lib/stores/find';
 import { useExternalFileChanges } from '@/hooks/use-external-file-changes';
 import { useLayout } from '@/hooks/use-layout';
 import {
@@ -62,6 +65,7 @@ import {
   clearAbandoned,
 } from '@/lib/stores/external-changes';
 import '@/styles/wikilink.css';
+import '@/styles/find.css';
 
 /**
  * Marks a transaction as an external reload rather than a user edit, so the
@@ -275,6 +279,33 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
           }),
       );
 
+      // Keeps the find bar's "3/12" honest. Reporting from the view rather
+      // than from the effect that pushes the query down means an edit that
+      // creates or destroys a match updates the count too, not just a
+      // retyped query.
+      const findReporter = $prose(
+        () =>
+          new Plugin({
+            view: () => ({
+              update: (view) => {
+                const store = useFindStore.getState();
+                if (store.openPath !== path) return;
+
+                const found = getFindState(view.state);
+                const matchCount = found?.matches.length ?? 0;
+                const activeIndex = found?.activeIndex ?? -1;
+
+                if (
+                  matchCount !== store.matchCount ||
+                  activeIndex !== store.activeIndex
+                ) {
+                  store.reportMatches(matchCount, activeIndex);
+                }
+              },
+            }),
+          }),
+      );
+
       return Editor.make()
         .config((ctx) => {
           ctx.set(rootCtx, root);
@@ -303,7 +334,9 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         .use(clipboard)
         .use(wikilink)
         .use(dirtyTracker)
-        .use(commandStateTracker);
+        .use(commandStateTracker)
+        .use(findPlugin)
+        .use(findReporter);
     },
     [path, loaded],
   );
@@ -536,6 +569,10 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       void pasteFromClipboard();
     });
 
+    registerScopedCommand(instanceId, 'edit.find', () => {
+      useFindStore.getState().openFor(path);
+    });
+
     registerScopedCommand(instanceId, 'native.select_all', () => {
       editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
@@ -567,6 +604,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         unregisterScopedCommand(instanceId, id);
       }
 
+      unregisterScopedCommand(instanceId, 'edit.find');
       unregisterScopedCommand(instanceId, 'native.undo');
       unregisterScopedCommand(instanceId, 'native.redo');
       unregisterScopedCommand(instanceId, 'native.cut');
@@ -580,7 +618,80 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         useActiveEditorStore.getState().setActiveEditor(null);
       }
     };
-  }, [loading, get, instanceId]);
+  }, [loading, get, instanceId, path]);
+
+  // --- find in file -------------------------------------------------------
+  // The store holds the query; the plugin holds the matches. These effects are
+  // the only traffic between them, in one direction each.
+
+  const findOpen = useFindStore((s) => s.openPath === path);
+  const findQuery = useFindStore((s) => s.query);
+  const findCaseSensitive = useFindStore((s) => s.caseSensitive);
+  const findWholeWord = useFindStore((s) => s.wholeWord);
+  const findStepRequest = useFindStore((s) => s.stepRequest);
+  const findFocusNonce = useFindStore((s) => s.focusNonce);
+
+  const withView = useCallback(
+    (fn: (view: EditorView) => void) => {
+      const editor = get();
+      if (!editor) return;
+      editor.action((ctx: Ctx) => fn(ctx.get(editorViewCtx)));
+    },
+    [get],
+  );
+
+  useEffect(() => {
+    if (loading) return;
+
+    withView((view) => {
+      // A closed bar on a document that was never searched has nothing to
+      // clear, and every editor mounts in that state -- so say nothing.
+      if (!findOpen && !getFindState(view.state)?.query) return;
+
+      setFindQuery(
+        view,
+        findOpen
+          ? {
+              query: findQuery,
+              caseSensitive: findCaseSensitive,
+              wholeWord: findWholeWord,
+            }
+          : // Closing has to clear the search, not just hide the bar --
+            // otherwise the highlights outlive it.
+            null,
+      );
+    });
+  }, [loading, withView, findOpen, findQuery, findCaseSensitive, findWholeWord]);
+
+  useEffect(() => {
+    if (loading || !findOpen || !findStepRequest) return;
+    withView((view) => stepFindMatch(view, findStepRequest.direction));
+  }, [loading, withView, findOpen, findStepRequest]);
+
+  // Opening over a selection searches for it, the way every editor does.
+  // Owned here rather than by the bar because only the editor can read the
+  // selection, and keyed on the open counter so asking for find again while
+  // the bar is already up re-seeds it.
+  useEffect(() => {
+    if (loading || !findOpen) return;
+
+    withView((view) => {
+      const { from, to, empty } = view.state.selection;
+      if (empty) return;
+
+      const text = view.state.doc.textBetween(from, to, ' ');
+      // A multi-line selection is a region, not a search term.
+      if (text && !text.includes('\n')) useFindStore.getState().setQuery(text);
+    });
+  }, [loading, withView, findOpen, findFocusNonce]);
+
+  // Closing hands focus back to the document, so typing resumes at the caret
+  // -- which stepping through matches has already left on the last one.
+  const wasFindOpen = useRef(false);
+  useEffect(() => {
+    if (wasFindOpen.current && !findOpen) withView((view) => view.focus());
+    wasFindOpen.current = findOpen;
+  }, [findOpen, withView]);
 
   if (!loaded) {
     return <div className='p-4 text-muted-foreground'>Loading editor…</div>;

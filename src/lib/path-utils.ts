@@ -98,3 +98,23 @@ export function parentOf(path: string): string {
 
   return index === -1 ? '' : path.slice(0, index);
 }
+
+/**
+ * Every directory between `root` and `path`, outermost first, excluding the
+ * root itself and `path`. Built with `joinPath` off `root` so the results keep
+ * the OS's own separators -- `useFiles.entries` is keyed by the paths the
+ * backend handed back, so a chain built from normalized segments would miss
+ * every lookup on Windows.
+ */
+export function ancestorChain(root: string, path: string): string[] {
+  if (!isWithin(path, root)) return [];
+
+  const relative = getRelativePath(path, root);
+  const segments = relative.split('/').filter(Boolean);
+
+  // The last segment is the entry itself, not one of its ancestors.
+  return segments.slice(0, -1).reduce<string[]>((chain, segment) => {
+    chain.push(joinPath(chain[chain.length - 1] ?? root, segment));
+    return chain;
+  }, []);
+}
