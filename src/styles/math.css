@@ -1,0 +1,99 @@
+/*
+ * KaTeX output is styled by katex.min.css (imported from lib/math/render.ts).
+ * Everything here is the surrounding chrome: the reveal-on-caret behaviour for
+ * inline math and the block editor.
+ */
+
+/*
+ * Same zero-box trick as `.wikilink-hidden`: the source text has to stay in
+ * the document for positions to line up, so it is collapsed rather than
+ * removed, and `inline-block` keeps it off the baseline.
+ */
+.math-hidden {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  vertical-align: baseline;
+}
+
+.math-inline-source {
+  color: var(--primary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.9375em;
+}
+
+.math-inline-rendered .katex,
+.math-block-rendered .katex {
+  color: inherit;
+}
+
+/*
+ * Rendered inline math is clickable: the click handler resolves it back to a
+ * caret position in the collapsed source behind it, so a text cursor is the
+ * honest affordance -- this behaves like text, not like a button.
+ */
+.math-inline-rendered {
+  cursor: text;
+  border-radius: 0.2em;
+}
+
+.math-inline-rendered:hover {
+  background-color: color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
+/*
+ * A genuine block, because the node is a block node -- see `mathBlockSchema`.
+ * Nothing here shares a line box with the caret, so the caret in the paragraph
+ * above or below keeps its ordinary height and position.
+ */
+.solstice-math-block {
+  display: block;
+  margin-block: 1em;
+}
+
+.solstice-math-block-render {
+  display: block;
+  padding: 0.5rem 0;
+  cursor: pointer;
+  border-radius: calc(var(--radius) * 0.75);
+}
+
+.solstice-math-block-render:hover {
+  background-color: color-mix(in oklch, var(--muted) 60%, transparent);
+}
+
+.solstice-math-block.is-selected .solstice-math-block-render {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* While editing, the rendered result stays above as a live preview. */
+.solstice-math-block.is-editing .solstice-math-block-render {
+  background-color: color-mix(in oklch, var(--muted) 50%, transparent);
+}
+
+.solstice-math-block-source {
+  display: block;
+  width: 100%;
+  margin-block-start: 0.375rem;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.75);
+  background-color: var(--muted);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.875em;
+  line-height: 1.6;
+  color: var(--foreground);
+  outline: none;
+}
+
+.solstice-math-block-source:focus-visible {
+  border-color: var(--ring);
+}
+
+/* KaTeX renders its own error colouring; make sure it reads as an error. */
+.katex .katex-error {
+  color: var(--destructive) !important;
+}

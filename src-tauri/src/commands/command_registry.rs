@@ -79,6 +79,7 @@ command_id! {
     EditCodeBlock => "edit.code_block",
     EditHardBreak => "edit.hard_break",
     EditParagraph => "edit.paragraph",
+    EditInsertImage => "edit.insert_image",
 
     ViewToggleSidebar => "view.toggle_sidebar",
 
@@ -330,6 +331,14 @@ pub fn default_commands() -> Vec<CommandMeta> {
             id: CommandId::EditParagraph,
             label: "Paragraph".into(),
             accelerator: Some("CmdOrCtrl+Alt+0".into()),
+            is_overridden: false,
+        },
+        // No default accelerator: inserting an image is a deliberate, rare
+        // action, and it stays bindable from the keybindings pane.
+        CommandMeta {
+            id: CommandId::EditInsertImage,
+            label: "Insert image...".into(),
+            accelerator: None,
             is_overridden: false,
         },
         // -- View --

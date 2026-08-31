@@ -31,6 +31,12 @@ function flatten(doc: ProseNode) {
   const positions: number[] = [];
 
   doc.descendants((node, position) => {
+    // Code blocks render as a CodeMirror instance, which owns its own DOM and
+    // has no ProseMirror positions to hang a highlight on. Matching inside one
+    // would step the selection to a match that is never drawn, so they are
+    // skipped here and searched with CodeMirror's own panel instead.
+    if (node.type.spec.code) return false;
+
     if (node.isText) {
       const value = node.text ?? '';
       for (let index = 0; index < value.length; index += 1) {

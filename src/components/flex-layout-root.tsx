@@ -26,7 +26,7 @@ import {
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useFileTreeDragState } from '@/hooks/use-file-tree-drag-state';
 import { useFileTreeExternalDropZone } from '@/hooks/use-file-tree-dnd';
-import { FileEditor } from '@/components/file-editor';
+import { FileView } from '@/components/file-view';
 import { BlankTab } from '@/components/blank-tab';
 import { WindowControls } from './window-controls';
 import { useIsMac } from '@/hooks/use-platform';
@@ -56,7 +56,9 @@ const factory = (node: TabNode) => {
   const component = node.getComponent();
   if (component === 'editor') {
     const config = node.getConfig() as { path?: string } | undefined;
-    return <FileEditor path={config?.path ?? ''} />;
+    // Not necessarily an editor: FileView picks a viewer for non-markdown
+    // files, which the tab component name predates.
+    return <FileView path={config?.path ?? ''} />;
   }
   if (component === 'blank') {
     return <BlankTab tabId={node.getId()} />;

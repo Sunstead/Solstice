@@ -7,6 +7,8 @@ import FileBreadcrumb from './file-breadcrumb';
 import { FileActionsDropdown } from './file-actions-dropdown';
 import { revealInExplorer } from '@/lib/entry-actions';
 import { FindBar } from './find-bar';
+import { LinkEditor } from './link-editor';
+import { TableTools } from './table-tools';
 import { useFindStore } from '@/lib/stores/find';
 
 type FileEditorProps = {
@@ -84,6 +86,9 @@ export function FileEditor({ path }: FileEditorProps) {
             initialContent={content}
             onError={setError}
           />
+          {/* Positions itself against the viewport, so it can live anywhere. */}
+          <LinkEditor />
+          <TableTools />
         </div>
       </div>
     </ScrollArea>

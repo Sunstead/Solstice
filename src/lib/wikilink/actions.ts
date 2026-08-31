@@ -1,7 +1,7 @@
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useLayout } from '@/hooks/use-layout';
 import { resolveWikilink, useWikilinkIndex } from '@/lib/stores/wikilink-index';
-import { joinWorkspacePath, wikilinkLabel } from './target';
+import { joinWorkspacePath, parseWikilinkTarget, wikilinkLabel } from './target';
 
 /**
  * Opens the file a target points at. Returns false when there is nothing to
@@ -12,7 +12,11 @@ export function openWikilink(target: string): boolean {
   const root = useWorkspace.getState().path;
   if (!root) return false;
 
-  const resolution = resolveWikilink(target, useWikilinkIndex.getState());
+  // A target may carry `#heading` and `|alias`; only the path part resolves.
+  const { path } = parseWikilinkTarget(target);
+  if (!path) return false;
+
+  const resolution = resolveWikilink(path, useWikilinkIndex.getState());
   if (resolution.status !== 'resolved') return false;
 
   useLayout

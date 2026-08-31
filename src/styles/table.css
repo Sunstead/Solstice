@@ -1,0 +1,95 @@
+/*
+ * Tables.
+ *
+ * typeset.css styles tables in an editorial hairline style: horizontal rules
+ * only, flush to the text column, and its header rules target `thead th`.
+ * prosemirror-tables emits no `thead` at all -- header cells are `th` in the
+ * first `tr` of `tbody` -- so those header rules never matched, and the result
+ * had no vertical borders and no outer frame. These rules replace that with a
+ * fully bordered grid, which is what a table being *edited* needs: you have to
+ * see where the cells are to click into them.
+ *
+ * All of typeset's table rules are `:where()`-wrapped and therefore
+ * zero-specificity, so plain selectors here win without `!important`.
+ */
+
+.typeset table {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.75);
+  border-collapse: separate;
+  border-spacing: 0;
+  /* No `overflow: hidden` here: the corner radii below are applied to the
+     corner cells directly, and clipping a table with no scroll wrapper would
+     cut off a wide one rather than let it scroll. */
+}
+
+.typeset table :is(th, td) {
+  border-inline-start: 1px solid var(--border);
+  border-block-start: 1px solid var(--border);
+  /* typeset flushes the first cell to the text column; a framed table wants
+     even padding instead. */
+  padding: 0.5em 0.75em;
+  vertical-align: top;
+}
+
+/* The outer frame already draws these edges. */
+.typeset table tr:first-child :is(th, td) {
+  border-block-start: 0;
+}
+
+.typeset table :is(th, td):first-child {
+  border-inline-start: 0;
+}
+
+.typeset table tr:first-child :is(th, td) {
+  background-color: color-mix(in oklch, var(--muted) 70%, transparent);
+  font-weight: 600;
+}
+
+/*
+ * Corner radii are applied to the corner cells rather than relying on
+ * `overflow` clipping a table, which browsers handle inconsistently.
+ */
+.typeset table tr:first-child :is(th, td):first-child {
+  border-start-start-radius: inherit;
+}
+
+.typeset table tr:first-child :is(th, td):last-child {
+  border-start-end-radius: inherit;
+}
+
+.typeset table tr:last-child :is(th, td):first-child {
+  border-end-start-radius: inherit;
+}
+
+.typeset table tr:last-child :is(th, td):last-child {
+  border-end-end-radius: inherit;
+}
+
+.typeset table :is(th, td) > :first-child {
+  margin-block-start: 0;
+}
+
+.typeset table :is(th, td) > :last-child {
+  margin-block-end: 0;
+}
+
+/*
+ * Cell selection. `tableEditing` is registered with node selection enabled, so
+ * dragging across cells produces a real selection -- which is invisible unless
+ * it is drawn. prosemirror-tables marks those cells with `.selectedCell` and
+ * expects the overlay to come from a pseudo-element, since a background would
+ * be painted under the cell's own.
+ */
+.typeset table .selectedCell {
+  position: relative;
+}
+
+.typeset table .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: color-mix(in oklch, var(--primary) 18%, transparent);
+  pointer-events: none;
+}

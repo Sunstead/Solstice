@@ -81,6 +81,8 @@ function coerce(def: AnySettingDef, raw: unknown): unknown {
       return typeof raw === 'number' && Number.isFinite(raw)
         ? snapNumber(def, raw)
         : undefined;
+    case 'text':
+      return typeof raw === 'string' ? raw : undefined;
     case 'enum':
       return def.options.some((o) => o.value === raw) ? raw : undefined;
   }
