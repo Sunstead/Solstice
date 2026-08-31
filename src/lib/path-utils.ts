@@ -118,3 +118,25 @@ export function ancestorChain(root: string, path: string): string[] {
     return chain;
   }, []);
 }
+
+/**
+ * Path of `target` as written from inside `fromDir`, e.g. `/w/notes` +
+ * `/w/attachments/a.png` -> `../attachments/a.png`. Both arguments must be
+ * absolute.
+ *
+ * Links are written note-relative because that is what `![](...)` means in
+ * every other markdown tool; the resolver additionally accepts the
+ * workspace-relative form that Obsidian writes.
+ */
+export function relativeFromDirectory(fromDir: string, target: string): string {
+  const from = normalizePath(fromDir).split('/').filter(Boolean);
+  const to = normalizePath(target).split('/').filter(Boolean);
+
+  let shared = 0;
+  while (shared < from.length && shared < to.length && from[shared] === to[shared]) {
+    shared += 1;
+  }
+
+  const up = Array<string>(from.length - shared).fill('..');
+  return [...up, ...to.slice(shared)].join('/');
+}

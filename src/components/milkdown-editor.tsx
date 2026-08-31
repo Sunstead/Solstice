@@ -49,12 +49,19 @@ import { Plugin, AllSelection, TextSelection } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { Slice } from '@milkdown/kit/prose/model';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
+import {
+  ProsemirrorAdapterProvider,
+  useNodeViewFactory,
+} from '@prosemirror-adapter/react';
 import { CommandId } from '@/bindings';
 import { createAutosaver, type Autosaver } from '@/lib/autosave';
 import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { wikilink, useWikilinkIndexSync } from '@/lib/wikilink';
+import { createEditorFeatures } from '@/lib/editor/plugins';
+import { insertImagesFromDialog } from '@/lib/editor/insert-image';
+import { EditorNotePathContext } from '@/components/editor/editor-file-context';
 import { ExternalChangeBar } from '@/components/external-change-bar';
 import { findPlugin, getFindState, setFindQuery, stepFindMatch } from '@/lib/find/plugin';
 import { useFindStore } from '@/lib/stores/find';
@@ -66,6 +73,13 @@ import {
 } from '@/lib/stores/external-changes';
 import '@/styles/wikilink.css';
 import '@/styles/find.css';
+import '@/styles/image.css';
+import '@/styles/embed.css';
+import '@/styles/code-block.css';
+import '@/styles/math.css';
+import '@/styles/callout.css';
+import '@/styles/task-list.css';
+import '@/styles/table.css';
 
 /**
  * Marks a transaction as an external reload rather than a user edit, so the
@@ -218,6 +232,9 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
 }) => {
   const instanceId = useId();
   const loaded = useKeymapStore((s) => s.loaded);
+  // Memoized by the adapter, so listing it as a dependency below does not
+  // rebuild the editor on every render.
+  const nodeViewFactory = useNodeViewFactory();
   const autosaver = useRef<Autosaver | null>(null);
 
   const { get, loading } = useEditor(
@@ -333,12 +350,13 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         .use(history)
         .use(clipboard)
         .use(wikilink)
+        .use(createEditorFeatures({ notePath: path, nodeViewFactory }))
         .use(dirtyTracker)
         .use(commandStateTracker)
         .use(findPlugin)
         .use(findReporter);
     },
-    [path, loaded],
+    [path, loaded, nodeViewFactory],
   );
 
   // A debounced write must not outlive the editor that scheduled it: flush on
@@ -486,6 +504,13 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
         const items = await navigator.clipboard.read();
         for (const item of items) {
           for (const type of item.types) {
+            // An image has to arrive as a file rather than as data: the paste
+            // handler that turns one into an attachment reads `files`.
+            if (type.startsWith('image/')) {
+              const blob = await item.getType(type);
+              dataTransfer.items.add(new File([blob], '', { type }));
+              continue;
+            }
             if (type !== 'text/plain' && type !== 'text/html') continue;
             const blob = await item.getType(type);
             dataTransfer.setData(type, await blob.text());
@@ -573,6 +598,10 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       useFindStore.getState().openFor(path);
     });
 
+    registerScopedCommand(instanceId, 'edit.insert_image', () => {
+      void insertImagesFromDialog((fn) => editor.action(fn), path);
+    });
+
     registerScopedCommand(instanceId, 'native.select_all', () => {
       editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
@@ -605,6 +634,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       }
 
       unregisterScopedCommand(instanceId, 'edit.find');
+      unregisterScopedCommand(instanceId, 'edit.insert_image');
       unregisterScopedCommand(instanceId, 'native.undo');
       unregisterScopedCommand(instanceId, 'native.redo');
       unregisterScopedCommand(instanceId, 'native.cut');
@@ -715,9 +745,16 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
 export const MilkdownEditorWrapper: React.FC<MilkdownEditorProps> = (props) => {
   useWikilinkIndexSync();
 
+  // The note path sits outside the adapter on purpose: node views render as
+  // portals into the adapter's own tree, so context provided above it reaches
+  // them, and they need the path to resolve relative links.
   return (
-    <MilkdownProvider>
-      <MilkdownEditor {...props} />
-    </MilkdownProvider>
+    <EditorNotePathContext.Provider value={props.path}>
+      <ProsemirrorAdapterProvider>
+        <MilkdownProvider>
+          <MilkdownEditor {...props} />
+        </MilkdownProvider>
+      </ProsemirrorAdapterProvider>
+    </EditorNotePathContext.Provider>
   );
 };

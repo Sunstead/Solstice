@@ -29,6 +29,24 @@ export const commands = {
 	 */
 	duplicatePath: (path: string) => typedError<string, string>(__TAURI_INVOKE("duplicate_path", { path })),
 	exists: (path: string) => __TAURI_INVOKE<boolean>("exists", { path }),
+	/**
+	 *  Writes an attachment's bytes into `dir` under a free name derived from
+	 *  `file_name`, creating the directory if it does not exist yet, and returns
+	 *  the path it landed at.
+	 * 
+	 *  The name is resolved here rather than on the frontend for the same reason
+	 *  `duplicate_path` does it: a caller that probed for a free name first could
+	 *  still lose the race to another window or to Finder.
+	 */
+	saveAttachment: (dir: string, fileName: string, contents: number[]) => typedError<string, string>(__TAURI_INVOKE("save_attachment", { dir, fileName, contents })),
+	/**
+	 *  Copies a file that is already on disk into `into_dir`, under a free name,
+	 *  and returns where it landed.
+	 * 
+	 *  The counterpart to `save_attachment` for the file-picker path: the bytes
+	 *  stay in the backend rather than making a round trip through the webview.
+	 */
+	importAttachment: (from: string, intoDir: string) => typedError<string, string>(__TAURI_INVOKE("import_attachment", { from, intoDir })),
 	listWorkspaceFilesRecursive: (path: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_workspace_files_recursive", { path })),
 	/**
 	 *  Opening a workspace is also what starts watching it, so the two can never
@@ -75,7 +93,7 @@ export const events = {
 };
 
 /* Types */
-export type CommandId = "app.settings" | "file.new_note" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward";
+export type CommandId = "app.settings" | "file.new_note" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward";
 
 export type CommandMeta = {
 	id: CommandId,

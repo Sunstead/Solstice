@@ -1,0 +1,99 @@
+/*
+ * `![[target]]` embeds. The root is an inline atom node, promoted to block
+ * layout for the kinds that need it -- media and transclusions are never
+ * meaningfully inline.
+ *
+ * Unlike the image node view this subtree is NOT opted out of typeset:
+ * transcluded markdown should be styled exactly like the note around it.
+ */
+
+.solstice-embed {
+  display: inline-block;
+  max-width: 100%;
+}
+
+/*
+ * Inline-block for the same reason as block math: an embed is an inline atom
+ * node, and a `display: block` box inside inline content leaves the caret in
+ * an anonymous line box that shifts as soon as text is typed around it.
+ */
+.solstice-embed[data-embed-kind='video'],
+.solstice-embed[data-embed-kind='pdf'],
+.solstice-embed[data-embed-kind='markdown'] {
+  display: inline-block;
+  width: 100%;
+  vertical-align: top;
+}
+
+.solstice-embed img,
+.solstice-embed video {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius, 0.5rem);
+}
+
+.solstice-embed audio {
+  width: 100%;
+}
+
+.solstice-embed iframe {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 0.5rem);
+  background-color: var(--muted);
+}
+
+.solstice-embed.is-selected > * {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius, 0.5rem);
+}
+
+/*
+ * A transcluded note is marked off by a rule rather than a box: it is someone
+ * else's prose, and a heavy container would compete with the note's own
+ * headings for attention.
+ */
+.solstice-embed-note {
+  border-left: 2px solid var(--border);
+  padding-left: 1rem;
+  margin-block: 0.5em;
+}
+
+.solstice-embed-note > :first-child {
+  margin-block-start: 0;
+}
+
+.solstice-embed-note > :last-child {
+  margin-block-end: 0;
+}
+
+.solstice-embed-missing,
+.solstice-embed-file {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px dashed var(--border);
+  border-radius: calc(var(--radius) * 0.75);
+  background-color: color-mix(in oklch, var(--muted) 50%, transparent);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+
+.solstice-embed-file {
+  border-style: solid;
+  cursor: pointer;
+}
+
+.solstice-embed-file:hover {
+  color: var(--foreground);
+  background-color: var(--muted);
+}
+
+.solstice-embed-missing.is-selected {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

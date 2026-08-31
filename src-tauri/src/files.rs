@@ -201,15 +201,21 @@ pub fn duplicate_path(app: tauri::AppHandle, path: String) -> Result<String, Str
     Ok(destination.to_string_lossy().into_owned())
 }
 
+/// Splits a trailing extension off a file name, keeping the dot with the
+/// extension. A leading dot is part of the name, not a separator, so
+/// `.gitignore` has no extension.
+fn split_extension(name: &str) -> (&str, String) {
+    match name.rsplit_once('.') {
+        Some((stem, extension)) if !stem.is_empty() => (stem, format!(".{extension}")),
+        _ => (name, String::new()),
+    }
+}
+
 /// `note.md` -> `note copy.md`, then `note copy 2.md`, `note copy 3.md`...
 /// Only the final extension is preserved, matching how the rest of the app
 /// treats names (`stripPresetExtension` on the frontend does the same).
 fn free_copy_path(parent: &Path, name: &str) -> Result<PathBuf, String> {
-    let (stem, extension) = match name.rsplit_once('.') {
-        // A leading dot is part of the name, not an extension separator.
-        Some((stem, extension)) if !stem.is_empty() => (stem, format!(".{extension}")),
-        _ => (name, String::new()),
-    };
+    let (stem, extension) = split_extension(name);
 
     for attempt in 1..1000 {
         let suffix = if attempt == 1 { " copy".to_string() } else { format!(" copy {attempt}") };
@@ -275,4 +281,86 @@ fn collect_entries_recursive(dir: &Path, entries: &mut Vec<FileEntry>) -> Result
     }
  
     Ok(())
+}
+
+/// Writes an attachment's bytes into `dir` under a free name derived from
+/// `file_name`, creating the directory if it does not exist yet, and returns
+/// the path it landed at.
+///
+/// The name is resolved here rather than on the frontend for the same reason
+/// `duplicate_path` does it: a caller that probed for a free name first could
+/// still lose the race to another window or to Finder.
+#[tauri::command]
+#[specta::specta]
+pub fn save_attachment(
+    app: tauri::AppHandle,
+    dir: String,
+    file_name: String,
+    contents: Vec<u8>
+) -> Result<String, String> {
+    let dir = Path::new(&dir);
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+
+    let destination = free_attachment_path(dir, &file_name)?;
+
+    fs::write(&destination, &contents).map_err(|e| e.to_string())?;
+    note_self_write(&app, &destination);
+
+    Ok(destination.to_string_lossy().into_owned())
+}
+
+/// `image.png` -> `image.png`, then `image 1.png`, `image 2.png`...
+/// Unlike `free_copy_path` the requested name is tried first: an attachment is
+/// a new file rather than a copy of an existing one, so there is nothing for a
+/// suffix to distinguish it from until a collision actually happens.
+fn free_attachment_path(parent: &Path, name: &str) -> Result<PathBuf, String> {
+    let (stem, extension) = split_extension(name);
+
+    for attempt in 0..1000 {
+        let candidate = match attempt {
+            0 => parent.join(name),
+            n => parent.join(format!("{stem} {n}{extension}")),
+        };
+
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!("Could not find a free name to save \"{name}\" under."))
+}
+
+/// Copies a file that is already on disk into `into_dir`, under a free name,
+/// and returns where it landed.
+///
+/// The counterpart to `save_attachment` for the file-picker path: the bytes
+/// stay in the backend rather than making a round trip through the webview.
+#[tauri::command]
+#[specta::specta]
+pub fn import_attachment(
+    app: tauri::AppHandle,
+    from: String,
+    into_dir: String
+) -> Result<String, String> {
+    let source = Path::new(&from);
+
+    if !source.is_file() {
+        return Err(format!("\"{from}\" is not a file."));
+    }
+
+    let name = source
+        .file_name()
+        .ok_or("Cannot import an entry with no name.")?
+        .to_string_lossy()
+        .into_owned();
+
+    let dir = Path::new(&into_dir);
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+
+    let destination = free_attachment_path(dir, &name)?;
+
+    fs::copy(source, &destination).map_err(|e| e.to_string())?;
+    note_self_write(&app, &destination);
+
+    Ok(destination.to_string_lossy().into_owned())
 }

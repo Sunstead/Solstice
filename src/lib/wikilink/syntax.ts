@@ -1,8 +1,10 @@
-/** mdast node type produced and consumed by this extension. */
+/** mdast node types produced and consumed by this extension. */
 export const WIKILINK_MDAST_TYPE = 'wikiLink';
+export const WIKI_EMBED_MDAST_TYPE = 'wikiEmbed';
 
 const LEFT_BRACKET = 91;
 const RIGHT_BRACKET = 93;
+const EXCLAMATION = 33;
 
 /*
  * Structural types for the micromark and mdast-util interfaces used below.
@@ -37,52 +39,74 @@ type RemarkData = {
 // end of file as null.
 const endsLine = (code: Code) => code === null || code < -2;
 
-function tokenizeWikilink(effects: Effects, ok: State, nok: State): State {
-  let hasTarget = false;
+/**
+ * Both `[[target]]` and `![[target]]` share one state machine; only the opening
+ * differs. The target body is deliberately permissive -- `|` and `#` are
+ * ordinary characters here, and are split apart downstream by
+ * `parseWikilinkTarget`, so the tokenizer stays the single definition of where
+ * a construct starts and ends.
+ */
+function createTokenizer(type: string, embed: boolean) {
+  return function tokenize(effects: Effects, ok: State, nok: State): State {
+    let hasTarget = false;
 
-  return start;
+    return start;
 
-  function start(code: Code) {
-    effects.enter(WIKILINK_MDAST_TYPE);
-    effects.enter('wikiLinkMarker');
-    effects.consume(code);
-    return openingMarker;
-  }
-
-  function openingMarker(code: Code) {
-    if (code !== LEFT_BRACKET) return nok(code);
-    effects.consume(code);
-    effects.exit('wikiLinkMarker');
-    effects.enter('wikiLinkTarget');
-    return target;
-  }
-
-  function target(code: Code) {
-    if (code === RIGHT_BRACKET) {
-      if (!hasTarget) return nok(code);
-      effects.exit('wikiLinkTarget');
+    function start(code: Code) {
+      effects.enter(type);
       effects.enter('wikiLinkMarker');
       effects.consume(code);
-      return closingMarker;
+      return embed ? afterBang : openingMarker;
     }
-    if (code === LEFT_BRACKET || endsLine(code)) return nok(code);
-    hasTarget = true;
-    effects.consume(code);
-    return target;
-  }
 
-  function closingMarker(code: Code) {
-    if (code !== RIGHT_BRACKET) return nok(code);
-    effects.consume(code);
-    effects.exit('wikiLinkMarker');
-    effects.exit(WIKILINK_MDAST_TYPE);
-    return ok;
-  }
+    function afterBang(code: Code) {
+      if (code !== LEFT_BRACKET) return nok(code);
+      effects.consume(code);
+      return openingMarker;
+    }
+
+    function openingMarker(code: Code) {
+      if (code !== LEFT_BRACKET) return nok(code);
+      effects.consume(code);
+      effects.exit('wikiLinkMarker');
+      effects.enter('wikiLinkTarget');
+      return target;
+    }
+
+    function target(code: Code) {
+      if (code === RIGHT_BRACKET) {
+        if (!hasTarget) return nok(code);
+        effects.exit('wikiLinkTarget');
+        effects.enter('wikiLinkMarker');
+        effects.consume(code);
+        return closingMarker;
+      }
+      if (code === LEFT_BRACKET || endsLine(code)) return nok(code);
+      hasTarget = true;
+      effects.consume(code);
+      return target;
+    }
+
+    function closingMarker(code: Code) {
+      if (code !== RIGHT_BRACKET) return nok(code);
+      effects.consume(code);
+      effects.exit('wikiLinkMarker');
+      effects.exit(type);
+      return ok;
+    }
+  };
 }
 
 const syntaxExtension = {
   text: {
-    [LEFT_BRACKET]: { name: WIKILINK_MDAST_TYPE, tokenize: tokenizeWikilink },
+    [LEFT_BRACKET]: {
+      name: WIKILINK_MDAST_TYPE,
+      tokenize: createTokenizer(WIKILINK_MDAST_TYPE, false),
+    },
+    [EXCLAMATION]: {
+      name: WIKI_EMBED_MDAST_TYPE,
+      tokenize: createTokenizer(WIKI_EMBED_MDAST_TYPE, true),
+    },
   },
 };
 
@@ -90,6 +114,9 @@ const fromMarkdownExtension = {
   enter: {
     [WIKILINK_MDAST_TYPE](this: CompileContext, token: Token) {
       this.enter({ type: WIKILINK_MDAST_TYPE, value: '' }, token);
+    },
+    [WIKI_EMBED_MDAST_TYPE](this: CompileContext, token: Token) {
+      this.enter({ type: WIKI_EMBED_MDAST_TYPE, value: '' }, token);
     },
   },
   exit: {
@@ -99,19 +126,23 @@ const fromMarkdownExtension = {
     [WIKILINK_MDAST_TYPE](this: CompileContext, token: Token) {
       this.exit(token);
     },
+    [WIKI_EMBED_MDAST_TYPE](this: CompileContext, token: Token) {
+      this.exit(token);
+    },
   },
 };
 
 const toMarkdownExtension = {
   handlers: {
     [WIKILINK_MDAST_TYPE]: (node: { value: string }) => `[[${node.value}]]`,
+    [WIKI_EMBED_MDAST_TYPE]: (node: { value: string }) => `![[${node.value}]]`,
   },
 };
 
 /**
- * Teaches the shared remark processor to parse and stringify wikilinks. Owning
- * the stringify side is what keeps `[[` out of remark's escaping rules, which
- * would otherwise write `\[\[note]]` to disk.
+ * Teaches the shared remark processor to parse and stringify wikilinks and
+ * embeds. Owning the stringify side is what keeps `[[` out of remark's escaping
+ * rules, which would otherwise write `\[\[note]]` to disk.
  */
 export function remarkWikilink(this: { data(): unknown }) {
   const data = this.data() as RemarkData;
