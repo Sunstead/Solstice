@@ -66,6 +66,12 @@ export interface NumberDef extends CommonDef<number> {
   control?: 'slider';
 }
 
+export interface TextDef extends CommonDef<string> {
+  kind: 'text';
+  /** Shown when the field is empty, i.e. what the default would be. */
+  placeholder?: string;
+}
+
 export interface EnumOption<V extends string> {
   value: V;
   label: string;
@@ -77,7 +83,7 @@ export interface EnumDef<V extends string = string> extends CommonDef<V> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnySettingDef = BooleanDef | NumberDef | EnumDef<any>;
+export type AnySettingDef = BooleanDef | NumberDef | TextDef | EnumDef<any>;
 
 // Each builder pins `kind` and widens `default` to the value type rather than
 // the literal written, so `SettingValue<K>` resolves to `boolean` / `number` /
@@ -89,6 +95,10 @@ export function defineBoolean(def: Omit<BooleanDef, 'kind'>): BooleanDef {
 
 export function defineNumber(def: Omit<NumberDef, 'kind'>): NumberDef {
   return { ...def, kind: 'number' };
+}
+
+export function defineText(def: Omit<TextDef, 'kind'>): TextDef {
+  return { ...def, kind: 'text' };
 }
 
 /** `const V` infers the option values as literals, so the setting's type is their union. */

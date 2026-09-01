@@ -1,0 +1,148 @@
+/*
+ * Callouts. A callout is a blockquote with a marker, so these rules layer on
+ * top of typeset's blockquote styling rather than replacing it -- and the
+ * moment the marker is deleted, the styling falls away with it.
+ */
+
+.typeset .callout,
+.callout {
+  --callout-accent: var(--chart-1);
+
+  position: relative;
+  border-inline-start: 3px solid var(--callout-accent);
+  border-radius: calc(var(--radius) * 0.75);
+  background-color: color-mix(in oklch, var(--callout-accent) 8%, transparent);
+  padding: 0.75em 1em;
+  margin-block: 1.25em;
+  font-style: normal;
+}
+
+/*
+ * The title is the first *line*, which is very often only part of the first
+ * paragraph -- `> [!tip] Title` with `> Body` under it and no blank line
+ * between is a single paragraph with a soft break in it. So the title is
+ * styled by an inline decoration over that range, and this rule only handles
+ * the paragraph's own spacing.
+ */
+.callout > :first-child {
+  margin-block-start: 0;
+}
+
+.callout-title {
+  font-weight: 600;
+  color: var(--callout-accent);
+}
+
+/*
+ * Puts the body on its own line
+ */
+.callout-title::after {
+  content: '';
+  display: block;
+}
+
+/* The tail of the first paragraph, when a fold has to hide part of a block. */
+.callout-hidden {
+  display: none;
+}
+
+.callout > :last-child {
+  margin-block-end: 0;
+}
+
+.callout-affordances {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  margin-inline-end: 0.4em;
+  vertical-align: -0.18em;
+  color: var(--callout-accent);
+  user-select: none;
+}
+
+.callout-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+}
+
+.callout-fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.callout-fold:hover {
+  opacity: 1;
+}
+
+.callout-chevron {
+  width: 1em;
+  height: 1em;
+  transition: rotate 120ms ease;
+}
+
+.callout.is-folded .callout-chevron {
+  rotate: -90deg;
+}
+
+.callout.is-folded > :not(:first-child) {
+  display: none;
+}
+
+/* Same zero-box collapse the wikilink and math sources use. */
+.callout-marker-hidden {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  vertical-align: baseline;
+}
+
+.callout[data-callout='note'] {
+  --callout-accent: var(--chart-1);
+}
+.callout[data-callout='abstract'] {
+  --callout-accent: var(--chart-2);
+}
+.callout[data-callout='info'] {
+  --callout-accent: var(--chart-1);
+}
+.callout[data-callout='todo'] {
+  --callout-accent: var(--chart-1);
+}
+.callout[data-callout='tip'] {
+  --callout-accent: var(--chart-2);
+}
+.callout[data-callout='success'] {
+  --callout-accent: var(--chart-2);
+}
+.callout[data-callout='question'] {
+  --callout-accent: var(--chart-3);
+}
+.callout[data-callout='warning'] {
+  --callout-accent: var(--warning);
+}
+.callout[data-callout='failure'] {
+  --callout-accent: var(--destructive);
+}
+.callout[data-callout='danger'] {
+  --callout-accent: var(--destructive);
+}
+.callout[data-callout='bug'] {
+  --callout-accent: var(--destructive);
+}
+.callout[data-callout='example'] {
+  --callout-accent: var(--chart-4);
+}
+.callout[data-callout='quote'] {
+  --callout-accent: var(--muted-foreground);
+}

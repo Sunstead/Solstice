@@ -12,6 +12,10 @@
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Geist Variable', sans-serif;
+  /* Referenced by typeset.css and the code block theme, both of which fell
+     back silently while this was undefined. */
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -25,6 +29,14 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-syntax-tag: var(--syntax-tag);
+  --color-syntax-constant: var(--syntax-constant);
+  --color-syntax-property: var(--syntax-property);
+  --color-syntax-type: var(--syntax-type);
+  --color-syntax-function: var(--syntax-function);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-keyword: var(--syntax-keyword);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -97,6 +109,26 @@
     var(--border-color) var(--border-opacity),
     var(--sidebar)
   );
+
+  /*
+   * Code syntax highlighting. Deliberately its own palette rather than
+   * `--chart-1..5`: those are a flat greyscale ramp in this theme (`c 0` in
+   * both modes), so reusing them for syntax colour would still render as five
+   * shades of grey. Named `--syntax-*` rather than folded into the semantic
+   * `--color-*` set, since these carry no UI meaning beyond "this token kind" --
+   * consumed directly by `src/lib/codeblock/theme.ts`. Hues are spread around
+   * the wheel with a gap left at each of `--destructive` (~27°) and `--warning`
+   * (~70°), so an error squiggle or a warning banner never reads as though it
+   * belongs to a token class.
+   */
+  --syntax-keyword: oklch(0.53 0.23 275);
+  --syntax-string: oklch(0.55 0.15 150);
+  --syntax-number: oklch(0.6 0.16 95);
+  --syntax-function: oklch(0.5 0.19 225);
+  --syntax-type: oklch(0.55 0.14 190);
+  --syntax-property: oklch(0.52 0.19 305);
+  --syntax-constant: oklch(0.58 0.17 48);
+  --syntax-tag: oklch(0.55 0.22 340);
 }
 
 .dark {
@@ -136,6 +168,15 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --syntax-keyword: oklch(0.78 0.15 275);
+  --syntax-string: oklch(0.78 0.13 150);
+  --syntax-number: oklch(0.8 0.13 95);
+  --syntax-function: oklch(0.75 0.14 225);
+  --syntax-type: oklch(0.78 0.11 190);
+  --syntax-property: oklch(0.78 0.15 305);
+  --syntax-constant: oklch(0.8 0.14 48);
+  --syntax-tag: oklch(0.76 0.17 340);
 }
 
 @layer base {

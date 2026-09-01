@@ -3,6 +3,7 @@ import {
   defineBoolean,
   defineEnum,
   defineNumber,
+  defineText,
   type AnySettingDef,
   type SettingReader,
 } from './types';
@@ -141,6 +142,57 @@ export const settingsRegistry = {
     // `spellcheck` is an inherited HTML attribute, so setting it on <html>
     // reaches the contenteditable without reconfiguring the editor.
     domAttr: { name: 'spellcheck', format: (v) => String(v) },
+  }),
+
+  'editor.autoPairBrackets': defineBoolean({
+    section: 'editor',
+    group: 'Writing',
+    scope: 'global',
+    label: 'Auto-close brackets and quotes',
+    default: true,
+  }),
+
+  'editor.codeLineNumbers': defineBoolean({
+    section: 'editor',
+    group: 'Writing',
+    scope: 'global',
+    label: 'Line numbers in code blocks',
+    default: true,
+  }),
+
+  'links.openExternalInBrowser': defineBoolean({
+    section: 'editor',
+    group: 'Writing',
+    scope: 'global',
+    label: 'Open external links in the browser',
+    default: true,
+  }),
+
+  // -- Attachments ----------------------------------------------------
+  'attachments.location': defineEnum({
+    section: 'editor',
+    group: 'Attachments',
+    scope: 'workspace',
+    label: 'New attachment location',
+    options: [
+      { value: 'workspace-folder', label: 'In the folder below' },
+      { value: 'next-to-note', label: 'Alongside the note' },
+      { value: 'note-subfolder', label: 'In a subfolder of the note' },
+    ],
+    default: 'workspace-folder',
+  }),
+
+  'attachments.folder': defineText({
+    section: 'editor',
+    group: 'Attachments',
+    scope: 'workspace',
+    label: 'Attachment folder',
+    default: 'attachments',
+    placeholder: 'attachments',
+    // Read as a workspace-relative path when the location is the workspace
+    // folder, and as a subfolder name when it is relative to the note -- so it
+    // stays relevant either way, and only `next-to-note` has nowhere to put it.
+    visibleWhen: (get) => get('attachments.location') !== 'next-to-note',
   }),
 
   // -- Explorer -------------------------------------------------------

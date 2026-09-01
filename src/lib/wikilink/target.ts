@@ -9,8 +9,15 @@ export const WIKILINK_CLOSE = ']]';
  * A wikilink is `[[target]]` on a single line. Brackets are disallowed inside
  * the target, so the construct can never overlap ordinary link syntax and a
  * match is always unambiguous in both directions.
+ *
+ * The leading `(?<!!)` is what keeps a link from being found inside an embed:
+ * `![[note]]` is an embed, and without the guard the `[[note]]` within it would
+ * be marked as a plain link while it is still being typed.
  */
-export const WIKILINK_SOURCE = String.raw`\[\[([^[\]\n]+)\]\]`;
+export const WIKILINK_SOURCE = String.raw`(?<!!)\[\[([^[\]\n]+)\]\]`;
+
+/** The embed form of the same construct, used by its input rule. */
+export const EMBED_SOURCE = String.raw`!\[\[([^[\]\n]+)\]\]`;
 
 /**
  * Canonical form of a target: forward slashes, no leading `./` or `/`, no
@@ -59,4 +66,33 @@ export function wikilinkLabel(target: string): string {
 
 export function joinWorkspacePath(root: string, relativePath: string): string {
   return `${root.replace(/[\\/]+$/, '')}${SEPARATOR}${relativePath}`;
+}
+
+export interface WikilinkParts {
+  /** The file part, with no heading or suffix. May be empty for `[[#here]]`. */
+  path: string;
+  heading: string | null;
+  /** Text after `|`: a display alias on a link, a size on an embed. */
+  suffix: string | null;
+}
+
+/**
+ * Splits `notes/spec#Design|400` into its parts.
+ *
+ * The tokenizer treats `#` and `|` as ordinary target characters, so this is
+ * the one place their meaning is decided -- and the reason resolution must be
+ * given `parts.path` rather than the raw target.
+ */
+export function parseWikilinkTarget(raw: string): WikilinkParts {
+  const pipe = raw.indexOf('|');
+  const head = pipe === -1 ? raw : raw.slice(0, pipe);
+  const suffix = pipe === -1 ? null : raw.slice(pipe + 1);
+
+  const hash = head.indexOf('#');
+
+  return {
+    path: (hash === -1 ? head : head.slice(0, hash)).trim(),
+    heading: hash === -1 ? null : head.slice(hash + 1).trim() || null,
+    suffix,
+  };
 }

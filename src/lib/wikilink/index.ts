@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import type { MilkdownPlugin } from '@milkdown/kit/ctx';
-import { InputRule } from '@milkdown/kit/prose/inputrules';
 import { keymap } from '@milkdown/kit/prose/keymap';
 import type { MarkType, Node as PMNode } from '@milkdown/kit/prose/model';
 import {
@@ -12,22 +11,24 @@ import {
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import {
   $command,
-  $inputRule,
   $mark,
   $prose,
   $remark,
 } from '@milkdown/kit/utils';
 
+import { attributeFromEvent } from '@/lib/editor/event-target';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { resolveWikilink, useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { openWikilink } from './actions';
-import { activeWikilinkQuery, findWikilinks, wikilinkAt } from './scan';
+import { findWikilinks, wikilinkAt } from './scan';
 import { WIKILINK_MDAST_TYPE, remarkWikilink } from './syntax';
 import {
   WIKILINK_CLOSE,
   WIKILINK_OPEN,
   WIKILINK_SOURCE,
+  basename,
   basenameOffset,
+  parseWikilinkTarget,
   stripExtension,
 } from './target';
 
@@ -156,16 +157,28 @@ function buildDecorations(state: EditorState, markType: MarkType) {
   const { selection } = state;
 
   const decorations = findWikilinks(state.doc, markType).flatMap((link) => {
-    const { status } = resolveWikilink(link.target, index);
+    const parts = parseWikilinkTarget(link.target);
+    const { status } = parts.path
+      ? resolveWikilink(parts.path, index)
+      : ({ status: 'unresolved' } as const);
     const linkClass = `wikilink wikilink-${status}`;
 
     const targetFrom = link.from + WIKILINK_OPEN.length;
     const targetTo = link.to - WIKILINK_CLOSE.length;
 
-    const labelFrom = targetFrom + basenameOffset(link.target);
-    const label = stripExtension(
-      link.target.slice(basenameOffset(link.target)),
-    );
+    // What the collapsed link reads as. It has to be a contiguous slice of the
+    // source, because the surrounding text is hidden by position rather than
+    // replaced: an explicit `|alias` runs to the end of the target, and
+    // otherwise the file name sits at a known offset into the path.
+    const aliasAt = link.target.indexOf('|');
+    const labelFrom =
+      parts.suffix === null
+        ? targetFrom + basenameOffset(parts.path)
+        : targetFrom + aliasAt + 1;
+    const label =
+      parts.suffix === null
+        ? stripExtension(basename(parts.path))
+        : parts.suffix;
     const labelTo = labelFrom + label.length;
 
     const revealed = selection.from <= link.to && selection.to >= link.from;
@@ -194,12 +207,7 @@ function buildDecorations(state: EditorState, markType: MarkType) {
 }
 
 function clickedTarget(event: MouseEvent): string | null {
-  const node = event.target as Node | null;
-  const element = node instanceof HTMLElement ? node : node?.parentElement;
-  return (
-    element?.closest(`[${TARGET_ATTRIBUTE}]`)?.getAttribute(TARGET_ATTRIBUTE) ??
-    null
-  );
+  return attributeFromEvent(event, `[${TARGET_ATTRIBUTE}]`, TARGET_ATTRIBUTE);
 }
 
 const wikilinkDecorations = $prose((ctx) => {
@@ -258,38 +266,13 @@ const wikilinkDecorations = $prose((ctx) => {
  * Authoring
  * ---------------------------------------------------------------------- */
 
-/** Typing `[[` closes itself, leaving the cursor ready for the file name. */
-const wikilinkAutoPair = $inputRule(
-  () =>
-    new InputRule(/\[\[$/, (state, _match, start, end) => {
-      const tr = state.tr.insertText(
-        `${WIKILINK_OPEN}${WIKILINK_CLOSE}`,
-        start,
-        end,
-      );
-      return tr.setSelection(
-        TextSelection.create(tr.doc, start + WIKILINK_OPEN.length),
-      );
-    }),
-);
-
-/** Typing the closing brackets steps over the auto-inserted pair instead. */
-const wikilinkSkipClosing = $inputRule(
-  () =>
-    new InputRule(/\]$/, (state, _match, _start, end) => {
-      if (!activeWikilinkQuery(state)) return null;
-
-      const ahead = state.doc.textBetween(
-        end,
-        Math.min(end + WIKILINK_CLOSE.length, state.doc.content.size),
-      );
-      if (ahead !== WIKILINK_CLOSE) return null;
-
-      return state.tr.setSelection(
-        TextSelection.create(state.doc, end + WIKILINK_CLOSE.length),
-      );
-    }),
-);
+/*
+ * Bracket pairing for `[[` used to live here. It now comes from the generic
+ * auto-pair rules in `lib/autopair`, which subsume it: typing `[` twice
+ * produces `[[]]` on its own, and typing `]` steps over one closer at a time.
+ * Keeping a wikilink-specific rule alongside the generic one produced `[[]]]`,
+ * because both fired on the same keystroke.
+ */
 
 /**
  * Inserts a link around the selection, or an empty one with the cursor between
@@ -332,8 +315,6 @@ export const wikilink: MilkdownPlugin[] = [
   wikilinkMark,
   wikilinkSync,
   wikilinkDecorations,
-  wikilinkAutoPair,
-  wikilinkSkipClosing,
   wikilinkKeymap,
   insertWikilinkCommand,
 ].flat();
