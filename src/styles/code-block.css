@@ -19,15 +19,50 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.25rem 0.375rem 0.25rem 0.5rem;
+  /*
+   * A fixed weight, not tied to hover -- `--border` is already this subtle
+   * on purpose (see `app.css`), and giving the divider its own transition
+   * would just reintroduce the fade artefact described below for one more
+   * property.
+   */
   border-bottom: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
-  /* Chrome stays quiet until the block is worth attending to. */
-  opacity: 0.55;
-  transition: opacity 120ms ease;
+  /*
+   * Chrome stays quiet until the block is worth attending to.
+   *
+   * Dimmed with `color` rather than `opacity`: an element at opacity < 1 is
+   * composited on its own layer, and everything painted on that layer --
+   * text, icons, this border -- is re-rasterised at each step of the fade.
+   * That produced two visible artefacts: glyphs and the border briefly
+   * flashed brighter than either endpoint as the layer was torn down on
+   * exit, and the language label's measured width wobbled by a pixel as its
+   * antialiasing mode changed mid-fade, nudging the copy button sideways
+   * with it under `justify-content: space-between`. Colour alone changes
+   * what gets painted, never how the box is composited, so none of that
+   * happens. The buttons inherit this for free -- the ghost variant sets no
+   * colour of its own, and the icons stroke with `currentColor`.
+   */
+  color: var(--muted-foreground);
+  transition: color 120ms ease;
 }
 
 .solstice-code-block:hover .solstice-code-block-bar,
 .solstice-code-block:focus-within .solstice-code-block-bar {
-  opacity: 1;
+  color: var(--foreground);
+}
+
+/*
+ * The shared `Button` component dips 1px on press (`active:translate-y-px`)
+ * as tactile feedback, which is fine and stays. What isn't fine is how it
+ * returns: `transition-all` smoothly interpolates that `transform` back to
+ * 0 over ~150ms, and a multi-frame subpixel settle on a 1px move reads as a
+ * jiggle rather than a release. Only the copy button shows this -- the
+ * language picker is a popover trigger, which the same rule excludes via
+ * `not-aria-[haspopup]`. Dropping `transform` from what's transitioned here
+ * makes the dip and its release both instant; everything else the button
+ * animates (colour, background, the focus ring) is unaffected.
+ */
+.solstice-code-block-bar button {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
 }
 
 .solstice-code-block-editor {
