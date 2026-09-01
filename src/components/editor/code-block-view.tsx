@@ -54,6 +54,10 @@ function computeChange(before: string, after: string) {
   return { from: start, to: endBefore, insert: after.slice(start, endAfter) };
 }
 
+function syncScrollerHeight(cm: EditorView) {
+  cm.scrollDOM.style.height = `${cm.contentHeight}px`;
+}
+
 /**
  * Code blocks as a real CodeMirror editor.
  *
@@ -230,12 +234,16 @@ export const CodeBlockView: React.FC = () => {
             ),
           ]),
           EditorView.updateListener.of(forwardUpdate),
+          EditorView.updateListener.of((update) => {
+            if (update.heightChanged) syncScrollerHeight(update.view);
+          }),
         ],
       }),
       parent: host,
     });
 
     cmRef.current = cm;
+    syncScrollerHeight(cm);
 
     // Focus tracking: `view.dom`'s own `focus` listener does not fire for a
     // nested editable (focus does not bubble), so this block claims the active
