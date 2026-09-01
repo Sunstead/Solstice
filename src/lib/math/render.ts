@@ -32,6 +32,15 @@ export function renderMath(source: string, displayMode: boolean): string {
   return html;
 }
 
+/**
+ * Carries the formula on the rendered output, so a click on it can be matched
+ * back to its source. Deliberately not the mark's own `data-math-inline`: that
+ * one marks *source* text, and `mathInlineMark.parseDOM` claims any span
+ * carrying it -- rendered output sharing the name would be pasted back in as
+ * if the KaTeX markup were the formula.
+ */
+export const MATH_SOURCE_ATTRIBUTE = 'data-math-source';
+
 /** Builds the element a decoration or node view shows. */
 export function renderMathElement(
   source: string,
@@ -42,7 +51,7 @@ export function renderMathElement(
   host.setAttribute('data-not-typeset', '');
   // The hook the click handler uses to turn a click on rendered output back
   // into a caret position in the source behind it.
-  if (!displayMode) host.setAttribute('data-math-inline', source);
+  if (!displayMode) host.setAttribute(MATH_SOURCE_ATTRIBUTE, source);
   host.innerHTML = renderMath(source, displayMode);
 
   return host;

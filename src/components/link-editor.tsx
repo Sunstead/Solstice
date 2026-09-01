@@ -37,6 +37,13 @@ function LinkEditorPanel({
   // Re-seed when the caret moves to a different link without closing first.
   useEffect(() => setDraft(target.href), [target.href, target.from]);
 
+  // The confirmation tick, cancelled if the popover closes while it shows.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1200);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
   const apply = (href: string) => {
     const { view, from, to } = target;
     const markType = view.state.schema.marks.link;
@@ -104,10 +111,10 @@ function LinkEditorPanel({
             variant='ghost'
             title='Copy address'
             onClick={() => {
-              void navigator.clipboard.writeText(target.href).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1200);
-              });
+              navigator.clipboard.writeText(target.href).then(
+                () => setCopied(true),
+                (error: unknown) => console.error('[link] copy failed', error),
+              );
             }}
           >
             {copied ? <Check /> : <Copy />}

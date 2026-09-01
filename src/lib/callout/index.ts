@@ -9,6 +9,7 @@ import {
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { $mark, $prose, $remark } from '@milkdown/kit/utils';
 
+import { attributeFromEvent } from '@/lib/editor/event-target';
 import { calloutIcon, chevronIcon } from './icons';
 import { CALLOUT_MDAST_TYPE, remarkCallout } from './syntax';
 import { parseCallout, type CalloutMarker } from './types';
@@ -275,11 +276,8 @@ const calloutPlugin = $prose(() => {
 });
 
 function foldTargetOf(event: MouseEvent): number | null {
-  const node = event.target as Node | null;
-  const element = node instanceof HTMLElement ? node : node?.parentElement;
-  const raw = element?.closest(`[${FOLD_ATTRIBUTE}]`)?.getAttribute(FOLD_ATTRIBUTE);
-
-  return raw === null || raw === undefined ? null : Number(raw);
+  const raw = attributeFromEvent(event, `[${FOLD_ATTRIBUTE}]`, FOLD_ATTRIBUTE);
+  return raw === null ? null : Number(raw);
 }
 
 /**

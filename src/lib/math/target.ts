@@ -10,4 +10,3 @@
 export const MATH_INLINE_SOURCE = String.raw`(?<!\$)\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\$)`;
 
 export const MATH_DELIMITER = '$';
-export const MATH_BLOCK_DELIMITER = '$$';

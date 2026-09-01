@@ -16,6 +16,7 @@ import {
   $remark,
 } from '@milkdown/kit/utils';
 
+import { attributeFromEvent } from '@/lib/editor/event-target';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { resolveWikilink, useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { openWikilink } from './actions';
@@ -206,12 +207,7 @@ function buildDecorations(state: EditorState, markType: MarkType) {
 }
 
 function clickedTarget(event: MouseEvent): string | null {
-  const node = event.target as Node | null;
-  const element = node instanceof HTMLElement ? node : node?.parentElement;
-  return (
-    element?.closest(`[${TARGET_ATTRIBUTE}]`)?.getAttribute(TARGET_ATTRIBUTE) ??
-    null
-  );
+  return attributeFromEvent(event, `[${TARGET_ATTRIBUTE}]`, TARGET_ATTRIBUTE);
 }
 
 const wikilinkDecorations = $prose((ctx) => {

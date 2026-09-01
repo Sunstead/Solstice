@@ -36,7 +36,11 @@ import {
   languageNames,
   loadLanguage,
 } from '@/lib/codeblock/languages';
-import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
+import {
+  registerScopedCommand,
+  unregisterScopedCommand,
+  type ScopedCommandId,
+} from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useSetting } from '@/lib/settings/store';
 import { cn } from '@/lib/utils';
@@ -67,6 +71,19 @@ function computeChange(before: string, after: string) {
   return { from: start, to: endBefore, insert: after.slice(start, endAfter) };
 }
 
+/** Shown for a fence with no info string, and the entry that clears one. */
+const PLAIN_TEXT = 'plain text';
+
+/**
+ * Pins the scroller to CodeMirror's own measured height.
+ *
+ * Its stylesheet sizes the scroller from `.cm-content`'s `min-height: 100%`,
+ * which is in turn a percentage of the scroller -- a cycle WebKit resolves
+ * wrong on first layout and never revisits, leaving the block a few pixels
+ * too tall until something forces a reflow. `contentHeight` comes from
+ * CodeMirror's own line bookkeeping rather than from reading the box back,
+ * so it is right whatever the browser would have made of the percentage.
+ */
 function syncScrollerHeight(cm: EditorView) {
   cm.scrollDOM.style.height = `${cm.contentHeight}px`;
 }
@@ -246,9 +263,7 @@ export const CodeBlockView: React.FC = () => {
             // Ahead of the default keymap so its Backspace binding, which
             // removes both halves of an auto-inserted pair, wins.
             ...closeBracketsKeymap,
-            ...defaultKeymap.filter(
-              (binding) => !['Mod-Enter'].includes(String(binding.key)),
-            ),
+            ...defaultKeymap.filter((binding) => binding.key !== 'Mod-Enter'),
           ]),
           EditorView.updateListener.of(forwardUpdate),
           EditorView.updateListener.of((update) => {
@@ -273,48 +288,37 @@ export const CodeBlockView: React.FC = () => {
     // absent -- edit.bold, the headings, edit.code_block -- resolves to this
     // scope, finds no handler, and correctly does nothing, instead of yanking
     // focus back to the prose editor and formatting the wrong thing.
-    registerScopedCommand(scopeId, 'native.undo', () => {
-      undo(view.state, view.dispatch);
-    });
-    registerScopedCommand(scopeId, 'native.redo', () => {
-      redo(view.state, view.dispatch);
-    });
-    registerScopedCommand(scopeId, 'native.copy', () => {
-      document.execCommand('copy');
-    });
-    registerScopedCommand(scopeId, 'native.cut', () => {
-      document.execCommand('cut');
-    });
-    registerScopedCommand(scopeId, 'native.paste', () => {
-      void navigator.clipboard.readText().then((text) => {
-        cm.dispatch(cm.state.replaceSelection(text));
-      });
-    });
-    registerScopedCommand(scopeId, 'native.select_all', () => {
-      // Focus first: the update listener only forwards a selection to the
-      // document while this instance holds focus.
-      cm.focus();
-      cm.dispatch({ selection: { anchor: 0, head: cm.state.doc.length } });
-    });
-    // The document-wide find bar cannot reach inside CodeMirror, so this block
-    // gets CodeMirror's own search panel instead of nothing.
-    registerScopedCommand(scopeId, 'edit.find', () => {
-      openSearchPanel(cm);
-    });
+    const scopedCommands: Partial<Record<ScopedCommandId, () => void>> = {
+      'native.undo': () => undo(view.state, view.dispatch),
+      'native.redo': () => redo(view.state, view.dispatch),
+      'native.copy': () => document.execCommand('copy'),
+      'native.cut': () => document.execCommand('cut'),
+      'native.paste': () => {
+        navigator.clipboard.readText().then(
+          (text) => cm.dispatch(cm.state.replaceSelection(text)),
+          (error: unknown) => console.error('[code-block] paste failed', error),
+        );
+      },
+      'native.select_all': () => {
+        // Focus first: the update listener only forwards a selection to the
+        // document while this instance holds focus.
+        cm.focus();
+        cm.dispatch({ selection: { anchor: 0, head: cm.state.doc.length } });
+      },
+      // The document-wide find bar cannot reach inside CodeMirror, so this
+      // block gets CodeMirror's own search panel instead of nothing.
+      'edit.find': () => openSearchPanel(cm),
+    };
+
+    for (const [id, handler] of Object.entries(scopedCommands)) {
+      registerScopedCommand(scopeId, id as ScopedCommandId, handler);
+    }
 
     return () => {
       cm.contentDOM.removeEventListener('focus', claimScope);
 
-      for (const id of [
-        'native.undo',
-        'native.redo',
-        'native.copy',
-        'native.cut',
-        'native.paste',
-        'native.select_all',
-        'edit.find',
-      ] as const) {
-        unregisterScopedCommand(scopeId, id);
+      for (const id of Object.keys(scopedCommands)) {
+        unregisterScopedCommand(scopeId, id as ScopedCommandId);
       }
 
       cm.destroy();
@@ -364,6 +368,12 @@ export const CodeBlockView: React.FC = () => {
     });
   }, [showLineNumbers, gutterCompartment]);
 
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1200);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
   const setLanguage = (next: string) => {
     const pos = getPos();
     if (pos === undefined) return;
@@ -378,10 +388,10 @@ export const CodeBlockView: React.FC = () => {
   };
 
   const copy = () => {
-    void navigator.clipboard.writeText(node.textContent).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    });
+    navigator.clipboard.writeText(node.textContent).then(
+      () => setCopied(true),
+      (error: unknown) => console.error('[code-block] copy failed', error),
+    );
   };
 
   // `contentEditable={false}` is load-bearing: the adapter gives every
@@ -402,7 +412,7 @@ export const CodeBlockView: React.FC = () => {
           <PopoverTrigger
             render={
               <Button variant='ghost' size='xs' className='font-mono'>
-                {language ? languageLabel(language) : 'plain text'}
+                {language ? languageLabel(language) : PLAIN_TEXT}
                 <ChevronsUpDown />
               </Button>
             }
@@ -412,23 +422,23 @@ export const CodeBlockView: React.FC = () => {
               <CommandInput placeholder='Language…' />
               <CommandList>
                 <CommandEmpty>No language found.</CommandEmpty>
-                {['plain text', ...languageNames].map((name) => (
+                {[PLAIN_TEXT, ...languageNames].map((name) => (
                   <CommandItem
                     key={name}
                     value={name}
                     onSelect={() =>
-                      setLanguage(name === 'plain text' ? '' : name)
+                      setLanguage(name === PLAIN_TEXT ? '' : name)
                     }
                   >
                     <Check
                       className={cn(
                         'size-3.5',
-                        (language || 'plain text') === name
+                        (language || PLAIN_TEXT) === name
                           ? 'opacity-100'
                           : 'opacity-0',
                       )}
                     />
-                    {name === 'plain text' ? name : languageLabel(name)}
+                    {languageLabel(name)}
                   </CommandItem>
                 ))}
               </CommandList>
