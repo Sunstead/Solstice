@@ -1,0 +1,143 @@
+/*
+ * Task lists and footnotes.
+ *
+ * typeset.css styles the GFM classes a static renderer emits
+ * (`ul.contains-task-list`, `.footnotes`), but the editor's schema renders
+ * `li[data-item-type="task"]` and `dl[data-type="footnote_definition"]`
+ * instead, which those selectors never match. These rules target what is
+ * actually in the document.
+ */
+
+.typeset li[data-item-type='task'] {
+  list-style: none;
+  position: relative;
+  /* The gutter the checkbox is drawn in, and the click target for toggling. */
+  padding-inline-start: 1.75em;
+}
+
+.typeset li[data-item-type='task']::marker {
+  content: '';
+}
+
+/*
+ * The checkbox is a pseudo-element, not a node.
+ *
+ * Anything real placed here -- an `<input>`, a styled `<span>` -- is a
+ * `contenteditable="false"` island inside editable text, and WebKit handles
+ * carets around those badly enough to make the line unusable: the caret
+ * changes height, lands on the following line, or refuses to sit after it.
+ * A pseudo-element is unreachable by the selection, so none of that applies.
+ *
+ * Both boxes are positioned against the list item and centred on its first
+ * line, so a label that wraps keeps its checkbox beside line one.
+ */
+.typeset li[data-item-type='task']::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0.05em;
+  top: calc((1em * var(--typeset-leading, 1.75) - 1.15em) / 2);
+  box-sizing: border-box;
+  width: 1.15em;
+  height: 1.15em;
+  border: 1.5px solid color-mix(in oklch, var(--muted-foreground) 65%, transparent);
+  border-radius: 0.3em;
+  cursor: pointer;
+  transition:
+    background-color 100ms ease,
+    border-color 100ms ease;
+}
+
+.typeset li[data-item-type='task']:hover::before {
+  border-color: var(--primary);
+}
+
+.typeset li[data-item-type='task'][data-checked='true']::before {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+/*
+ * The tick, masked rather than drawn as a glyph or a hard-coded SVG fill: the
+ * colour has to follow `--primary-foreground`, which flips between light and
+ * dark, and a mask takes its colour from `background-color`.
+ */
+.typeset li[data-item-type='task'][data-checked='true']::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0.05em;
+  top: calc((1em * var(--typeset-leading, 1.75) - 1.15em) / 2);
+  width: 1.15em;
+  height: 1.15em;
+  background-color: var(--primary-foreground);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  -webkit-mask-size: 68% 68%;
+  mask-size: 68% 68%;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/*
+ * A completed item recedes, the way a crossed-off line would -- but only its
+ * own label. Striking the whole item would strike any nested list under it,
+ * whose children are not themselves done.
+ */
+.typeset li[data-item-type='task'][data-checked='true'] > :first-child {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklch, currentColor 40%, transparent);
+}
+
+.typeset sup[data-type='footnote_reference'] {
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 500;
+  padding-inline: 0.1em;
+}
+
+.typeset sup[data-type='footnote_reference']::before {
+  content: '[';
+}
+
+.typeset sup[data-type='footnote_reference']::after {
+  content: ']';
+}
+
+.typeset dl[data-type='footnote_definition'] {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 0.75em;
+  margin-block: 0.5em;
+  border-inline-start: 2px solid var(--border);
+  padding-inline-start: 1em;
+  font-size: 0.9375em;
+  color: var(--muted-foreground);
+}
+
+.typeset dl[data-type='footnote_definition'] > dt {
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+}
+
+.typeset dl[data-type='footnote_definition'] > dt::before {
+  content: '[';
+}
+
+.typeset dl[data-type='footnote_definition'] > dt::after {
+  content: ']';
+}
+
+.typeset dl[data-type='footnote_definition'] > dd {
+  margin: 0;
+}
+
+.typeset dl[data-type='footnote_definition'] > dd > :first-child {
+  margin-block-start: 0;
+}
+
+.typeset dl[data-type='footnote_definition'] > dd > :last-child {
+  margin-block-end: 0;
+}

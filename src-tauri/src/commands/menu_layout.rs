@@ -156,6 +156,7 @@ fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                     ]
                 ),
                 Separator,
+                Command(EditInsertImage),
                 Command(EditHardBreak)
             ],
         )

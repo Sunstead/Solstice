@@ -60,6 +60,20 @@ export function SettingControl({ def, value, onChange, id }: SettingControlProps
         </RadioGroup>
       );
 
+    case 'text':
+      // Committed on every keystroke rather than on blur: unlike a number, a
+      // half-typed string is still a valid value, and the store debounces the
+      // write anyway.
+      return (
+        <Input
+          id={id}
+          className='h-8 w-52 text-sm'
+          value={value as string}
+          placeholder={def.placeholder}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      );
+
     case 'number':
       if (def.control === 'slider') {
         return (

@@ -2,6 +2,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use tauri::Manager;
+
 use crate::watcher::{self, FsWatcherState};
 
 pub struct WorkspaceState(pub Mutex<HashMap<String, String>>);
@@ -27,6 +29,13 @@ pub fn set_workspace(
 ) -> Result<(), String> {
     let label = window.label().to_string();
     state.0.lock().unwrap().insert(label.clone(), path.clone());
+
+    // Lets the webview load images and PDFs from this folder over `asset:`.
+    // Granted per workspace rather than globally, so the page can only reach
+    // what the user actually opened. Grants accumulate across switches within a
+    // session, which is deliberate -- revoking would break `asset:` URLs in
+    // tabs still open from the previous workspace.
+    app.asset_protocol_scope().allow_directory(&path, true).map_err(|e| e.to_string())?;
 
     watcher::watch_workspace(&app, &label, &path, &watchers)
 }

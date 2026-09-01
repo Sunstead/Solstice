@@ -1,0 +1,65 @@
+/*
+ * Code block node view. `data-not-typeset` keeps typeset's `pre`/`code` rules
+ * off the CodeMirror DOM -- CodeMirror sets its own metrics, and a competing
+ * font-size makes its cursor positioning wrong rather than merely ugly.
+ */
+
+.solstice-code-block {
+  position: relative;
+  margin-block: 1.25em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 0.5rem);
+  background-color: var(--muted);
+  overflow: hidden;
+}
+
+.solstice-code-block-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.375rem 0.25rem 0.5rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+  /*
+   * Chrome stays quiet until the block is worth attending to. Dimmed with
+   * `color`, never `opacity`: opacity < 1 composites the bar onto its own
+   * layer and re-rasterises its text each frame of the fade, which visibly
+   * flickers the label and border. Buttons and icons follow via
+   * `currentColor`.
+   */
+  color: var(--muted-foreground);
+  transition: color 120ms ease;
+}
+
+.solstice-code-block:hover .solstice-code-block-bar,
+.solstice-code-block:focus-within .solstice-code-block-bar {
+  color: var(--foreground);
+}
+
+/*
+ * Everything the button animates except its 1px press dip. Interpolating that
+ * `transform` back over `transition-all`'s ~150ms turns the release into a
+ * visible subpixel jiggle; snapping it is imperceptible.
+ */
+.solstice-code-block-bar button {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+}
+
+.solstice-code-block-editor {
+  /* CodeMirror measures against this box, so it must not be a flex child. */
+  display: block;
+}
+
+.solstice-code-block .cm-editor {
+  background-color: transparent;
+}
+
+/*
+ * CodeMirror's chrome must not inherit the note's font: `inherit` set the line
+ * numbers in the proportional UI webfont, and since the gutter is a flex
+ * sibling of the content, the block then resized when that font swapped in.
+ */
+.solstice-code-block .cm-scroller {
+  font-family: var(--font-mono);
+  line-height: 1.6;
+}

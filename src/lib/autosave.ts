@@ -3,6 +3,7 @@ import { getSetting, subscribeToSetting } from '@/lib/settings/store';
 import { setBufferDirty } from '@/lib/stores/buffer-status';
 import { clearAbandoned, isAbandoned } from '@/lib/stores/external-changes';
 import { setSaving } from '@/lib/stores/save-status';
+import { noteEmbedSourceWritten } from '@/lib/embed/source';
 
 /**
  * Writes editor content back to disk according to `editor.autosave`, and
@@ -78,6 +79,10 @@ export function createAutosaver(
         else {
           lastWritten = markdown;
           if (seq > savedSeq) savedSeq = seq;
+          // The watcher suppresses our own writes, so anything transcluding
+          // this note has to be told about them here or it would go stale
+          // exactly while the note is being edited.
+          noteEmbedSourceWritten(path, markdown);
         }
       })
       .catch((err) => onError(String(err)))
