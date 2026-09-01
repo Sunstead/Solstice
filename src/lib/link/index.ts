@@ -6,6 +6,7 @@ import type { EditorView } from '@milkdown/kit/prose/view';
 import { $inputRule, $prose } from '@milkdown/kit/utils';
 import { openUrl } from '@tauri-apps/plugin-opener';
 
+import { attributeFromEvent } from '@/lib/editor/event-target';
 import { getSetting } from '@/lib/settings/store';
 import { useLinkEditor } from '@/lib/stores/link-editor';
 import { isSafeExternalHref, isUrl, trimUrl } from './url';
@@ -138,9 +139,7 @@ function isModifiedClick(event: MouseEvent): boolean {
 }
 
 function anchorHref(event: MouseEvent): string | null {
-  const node = event.target as Node | null;
-  const element = node instanceof HTMLElement ? node : node?.parentElement;
-  return element?.closest('a[href]')?.getAttribute('href') ?? null;
+  return attributeFromEvent(event, 'a[href]', 'href');
 }
 
 /**

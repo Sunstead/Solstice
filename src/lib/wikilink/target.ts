@@ -96,11 +96,3 @@ export function parseWikilinkTarget(raw: string): WikilinkParts {
     suffix,
   };
 }
-
-/** Exact inverse of `parseWikilinkTarget`, for rewriting a target in place. */
-export function buildWikilinkTarget(parts: WikilinkParts): string {
-  const heading = parts.heading === null ? '' : `#${parts.heading}`;
-  const suffix = parts.suffix === null ? '' : `|${parts.suffix}`;
-
-  return `${parts.path}${heading}${suffix}`;
-}

@@ -54,10 +54,11 @@ function inVerbatim(state: EditorState, pos: number): boolean {
  */
 const skipClosing = $inputRule(
   () =>
-    new InputRule(/[)\]}"']$/, (state, match, _start, end) => {
+    new InputRule(/[)\]}"']$/, (state, match, start, end) => {
       if (!enabled()) return null;
       if (!state.selection.empty) return null;
       if (!CLOSERS.has(match[0])) return null;
+      if (inVerbatim(state, start)) return null;
       if (characterAt(state, end) !== match[0]) return null;
 
       // A selection-only transaction: nothing is inserted, so this never marks

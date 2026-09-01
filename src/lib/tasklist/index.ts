@@ -3,26 +3,25 @@ import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { $prose } from '@milkdown/kit/utils';
 
-const TASK_SELECTOR = 'li[data-item-type="task"]';
+import { closestFromEvent } from '@/lib/editor/event-target';
 
 /**
  * Clickable checkboxes for GFM task list items.
  *
  * The checkbox is drawn entirely in CSS, as a pseudo-element on the list item
- * (which the gfm preset already renders with `data-checked`). Nothing is added
- * to the document.
+ * (which the gfm preset already renders with `data-checked`) -- nothing is
+ * added to the document. A widget-decoration `<input>` is the obvious approach
+ * and the wrong one: a `contenteditable="false"` element sitting in editable
+ * text makes the caret jump lines, change height, and refuse to land after it.
+ * A pseudo-element cannot be selected or hold a caret at all.
  *
- * An earlier version injected an `<input>` as a widget decoration, which is
- * the obvious approach and the wrong one: a `contenteditable="false"` replaced
- * element sitting in editable text makes the caret jump lines, change height,
- * and refuse to land after it -- prosemirror-view carries its own kludge for
- * one corner of the same problem. A pseudo-element cannot be selected, cannot
- * hold a caret, and does not exist as far as the DOM is concerned, so none of
- * that is possible.
- *
- * The trade-off is that the click has to be located by geometry rather than by
- * hit-testing an element, which is what `isInCheckbox` below does.
+ * The trade-off is that a click has to be located by geometry rather than by
+ * hit-testing an element, which is what `isInCheckbox` does.
  */
+
+const TASK_SELECTOR = 'li[data-item-type="task"]';
+
+/** The document position of the `list_item` a task's DOM node belongs to. */
 function taskItemAt(view: EditorView, item: HTMLElement): number | null {
   let inner: number;
   try {
@@ -69,9 +68,7 @@ const taskListPlugin = $prose(
       props: {
         handleDOMEvents: {
           mousedown: (view, event) => {
-            const node = event.target as Node | null;
-            const element = node instanceof HTMLElement ? node : node?.parentElement;
-            const item = element?.closest(TASK_SELECTOR) as HTMLElement | null;
+            const item = closestFromEvent(event, TASK_SELECTOR);
             if (!item || !isInCheckbox(item, event)) return false;
 
             const pos = taskItemAt(view, item);

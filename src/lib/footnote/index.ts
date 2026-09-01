@@ -3,6 +3,8 @@ import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { $prose } from '@milkdown/kit/utils';
 
+import { attributeFromEvent } from '@/lib/editor/event-target';
+
 const REFERENCE = 'footnote_reference';
 const DEFINITION = 'footnote_definition';
 
@@ -51,13 +53,7 @@ const footnotePlugin = $prose(
 );
 
 function labelOf(event: MouseEvent): string | null {
-  const node = event.target as Node | null;
-  const element = node instanceof HTMLElement ? node : node?.parentElement;
-
-  return (
-    element?.closest(`sup[data-type="${REFERENCE}"]`)?.getAttribute('data-label') ??
-    null
-  );
+  return attributeFromEvent(event, `sup[data-type="${REFERENCE}"]`, 'data-label');
 }
 
 export const footnote: MilkdownPlugin[] = [footnotePlugin].flat();

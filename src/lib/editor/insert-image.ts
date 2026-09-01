@@ -6,7 +6,7 @@ import { imageWithSize } from '@/lib/image/schema';
 import { importAttachment } from './attachments';
 
 /** Kept in step with the types `resolveAsset` can actually display. */
-export const IMAGE_EXTENSIONS = [
+const IMAGE_EXTENSIONS = [
   'png',
   'jpg',
   'jpeg',

@@ -6,7 +6,7 @@
  * respectively -- exactly Obsidian's grammar, so vaults move between the two
  * without editing.
  */
-export const CALLOUT_MARKER = /^\[!([A-Za-z][\w-]*)\]([-+])?([ \t]?)/;
+const CALLOUT_MARKER = /^\[!([A-Za-z][\w-]*)\]([-+])?([ \t]?)/;
 
 export interface CalloutMarker {
   /** Canonical type, after alias resolution. */

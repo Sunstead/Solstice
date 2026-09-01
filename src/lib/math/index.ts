@@ -16,8 +16,9 @@ import {
   $remark,
 } from '@milkdown/kit/utils';
 
+import { closestFromEvent } from '@/lib/editor/event-target';
 import { findInlineMath } from './scan';
-import { renderMathElement } from './render';
+import { MATH_SOURCE_ATTRIBUTE, renderMathElement } from './render';
 import {
   MATH_BLOCK_MDAST_TYPE,
   MATH_INLINE_MDAST_TYPE,
@@ -163,16 +164,14 @@ const mathInlineDecorations = $prose((ctx) => {
          * inside the match is what makes rendered math directly editable.
          */
         mousedown: (view, event) => {
-          const node = event.target as Node | null;
-          const element = node instanceof HTMLElement ? node : node?.parentElement;
-          const rendered = element?.closest('[data-math-inline]');
-          if (!(rendered instanceof HTMLElement)) return false;
+          const rendered = closestFromEvent(event, `[${MATH_SOURCE_ATTRIBUTE}]`);
+          if (!rendered) return false;
 
           // Matched on the formula itself rather than on a resolved DOM
           // position: a widget holds no position of its own, so asking for one
           // is unreliable. The value is exact, and position is only needed to
           // disambiguate a document that repeats the same formula.
-          const source = rendered.getAttribute('data-math-inline') ?? '';
+          const source = rendered.getAttribute(MATH_SOURCE_ATTRIBUTE) ?? '';
           const candidates = findInlineMath(view.state.doc, markType).filter(
             (match) => match.value === source,
           );

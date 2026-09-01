@@ -42,7 +42,7 @@ export function setColumnAlignment(
 }
 
 /** The alignment currently applied to the selected column, if any. */
-export function currentColumnAlignment(view: EditorView): string | null {
+function currentColumnAlignment(view: EditorView): string | null {
   if (!isInTable(view.state)) return null;
 
   const rect = selectedRect(view.state);
