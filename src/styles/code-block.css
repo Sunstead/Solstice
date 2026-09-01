@@ -39,7 +39,14 @@
   background-color: transparent;
 }
 
+/*
+ * CodeMirror's chrome must not inherit the note's font. `inherit` pulled in
+ * the proportional UI webfont, which set the line numbers in it and -- since
+ * the gutter is a flex sibling of the content inside `.cm-scroller` -- made
+ * the scroller's height depend on a `font-display: swap` webfont, so it
+ * resized once that font loaded.
+ */
 .solstice-code-block .cm-scroller {
-  font-family: inherit;
+  font-family: var(--font-mono);
   line-height: 1.6;
 }

@@ -13,6 +13,21 @@ export const languageNames: string[] = languages
   .map((description) => description.name)
   .sort((a, b) => a.localeCompare(b));
 
+/**
+ * A couple of esolang names in `@codemirror/language-data` read as profanity
+ * out of context (the picker shows plain language names in a UI, not code).
+ * Parsing, highlighting and what gets written to the fence are all keyed on
+ * the real name via `findLanguage` -- this only touches the label shown in
+ * the picker.
+ */
+const CENSORED_LABELS: Record<string, string> = {
+  Brainfuck: 'Brainf***',
+};
+
+export function languageLabel(name: string): string {
+  return CENSORED_LABELS[name] ?? name;
+}
+
 /** Resolves a fence info string the way every markdown renderer does. */
 export function findLanguage(name: string): LanguageDescription | null {
   const trimmed = name.trim();
