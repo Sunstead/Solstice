@@ -33,6 +33,14 @@
   color: var(--callout-accent);
 }
 
+/*
+ * Puts the body on its own line
+ */
+.callout-title::after {
+  content: '';
+  display: block;
+}
+
 /* The tail of the first paragraph, when a fold has to hide part of a block. */
 .callout-hidden {
   display: none;
@@ -99,16 +107,42 @@
   vertical-align: baseline;
 }
 
-.callout[data-callout='note'] { --callout-accent: var(--chart-1); }
-.callout[data-callout='abstract'] { --callout-accent: var(--chart-2); }
-.callout[data-callout='info'] { --callout-accent: var(--chart-1); }
-.callout[data-callout='todo'] { --callout-accent: var(--chart-1); }
-.callout[data-callout='tip'] { --callout-accent: var(--chart-2); }
-.callout[data-callout='success'] { --callout-accent: var(--chart-2); }
-.callout[data-callout='question'] { --callout-accent: var(--chart-3); }
-.callout[data-callout='warning'] { --callout-accent: var(--warning); }
-.callout[data-callout='failure'] { --callout-accent: var(--destructive); }
-.callout[data-callout='danger'] { --callout-accent: var(--destructive); }
-.callout[data-callout='bug'] { --callout-accent: var(--destructive); }
-.callout[data-callout='example'] { --callout-accent: var(--chart-4); }
-.callout[data-callout='quote'] { --callout-accent: var(--muted-foreground); }
+.callout[data-callout='note'] {
+  --callout-accent: var(--chart-1);
+}
+.callout[data-callout='abstract'] {
+  --callout-accent: var(--chart-2);
+}
+.callout[data-callout='info'] {
+  --callout-accent: var(--chart-1);
+}
+.callout[data-callout='todo'] {
+  --callout-accent: var(--chart-1);
+}
+.callout[data-callout='tip'] {
+  --callout-accent: var(--chart-2);
+}
+.callout[data-callout='success'] {
+  --callout-accent: var(--chart-2);
+}
+.callout[data-callout='question'] {
+  --callout-accent: var(--chart-3);
+}
+.callout[data-callout='warning'] {
+  --callout-accent: var(--warning);
+}
+.callout[data-callout='failure'] {
+  --callout-accent: var(--destructive);
+}
+.callout[data-callout='danger'] {
+  --callout-accent: var(--destructive);
+}
+.callout[data-callout='bug'] {
+  --callout-accent: var(--destructive);
+}
+.callout[data-callout='example'] {
+  --callout-accent: var(--chart-4);
+}
+.callout[data-callout='quote'] {
+  --callout-accent: var(--muted-foreground);
+}
