@@ -4,7 +4,11 @@ import type { useNodeViewFactory } from '@prosemirror-adapter/react';
 
 import { codeBlockSchema } from '@milkdown/kit/preset/commonmark';
 
+import { EditorView as CodeMirrorView } from '@codemirror/view';
+
 import { CodeBlockView } from '@/components/editor/code-block-view';
+import { syncFromDoc } from '@/lib/codeblock/bridge';
+import { codeBlockKeymap } from '@/lib/codeblock/keymap';
 import { createEmbedView } from '@/components/editor/embed-view';
 import { ImageView } from '@/components/editor/image-view';
 import {
@@ -58,14 +62,39 @@ export function createEditorFeatures({
       nodeViewFactory({ component: createEmbedView(ctx) }),
     ),
 
+    codeBlockKeymap,
     // CodeMirror owns everything inside a code block: `stopEvent` keeps
     // ProseMirror's keymap and input rules out, and `ignoreMutation` stops it
-    // trying to reconcile DOM it did not write.
+    // trying to reconcile DOM it did not write -- including selection changes,
+    // which it consults `ignoreMutation` for as well.
     $view(codeBlockSchema.node, () =>
       nodeViewFactory({
         component: CodeBlockView,
         stopEvent: () => true,
         ignoreMutation: () => true,
+        /**
+         * Hands a selection landing inside the block over to CodeMirror.
+         *
+         * Without this ProseMirror places the caret itself, and since the node
+         * view exposes no `contentDOM` it has nowhere sensible to put it --
+         * the browser selection ends up on the node view's root and
+         * CodeMirror's caret is lost. `this` is the node view, because
+         * ProseMirror calls the hook as `spec.setSelection(...)`; the instance
+         * is found from its DOM rather than captured, since this hook is
+         * registered once for every code block rather than per block.
+         */
+        setSelection(this: { dom: HTMLElement }, anchor: number, head: number) {
+          const cm = CodeMirrorView.findFromDOM(this.dom);
+          if (!cm) return;
+
+          const limit = cm.state.doc.length;
+          if (anchor > limit || head > limit) return;
+
+          syncFromDoc(cm, () => {
+            cm.focus();
+            cm.dispatch({ selection: { anchor, head } });
+          });
+        },
       }),
     ),
 

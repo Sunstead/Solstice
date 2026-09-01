@@ -62,22 +62,97 @@ export const codeBlockTheme = EditorView.theme({
 });
 
 /**
- * Syntax colours mapped onto the chart ramp rather than invented ones, so a
- * code block sits in the same palette as everything else in the app.
+ * Syntax colours, mapped onto their own palette (`--syntax-*` in `app.css`)
+ * rather than the chart ramp: `--chart-1..5` is a flat greyscale in this
+ * theme, so code using it never actually looked colourful, just shaded.
+ *
+ * Structural tokens -- punctuation, brackets, operators -- stay on
+ * `--muted-foreground` on purpose: colouring everything makes nothing stand
+ * out, and the point of syntax colour is to separate the few token kinds that
+ * carry meaning from the scaffolding around them.
  */
 const highlightStyle = HighlightStyle.define([
-  { tag: [tags.comment, tags.lineComment, tags.blockComment], color: 'var(--muted-foreground)', fontStyle: 'italic' },
-  { tag: [tags.keyword, tags.moduleKeyword, tags.controlKeyword, tags.operatorKeyword], color: 'var(--chart-1)' },
-  { tag: [tags.string, tags.special(tags.string), tags.regexp], color: 'var(--chart-2)' },
-  { tag: [tags.number, tags.bool, tags.null, tags.atom], color: 'var(--chart-3)' },
-  { tag: [tags.function(tags.variableName), tags.function(tags.propertyName), tags.macroName], color: 'var(--chart-4)' },
-  { tag: [tags.typeName, tags.className, tags.namespace, tags.definition(tags.typeName)], color: 'var(--chart-5)' },
-  { tag: [tags.propertyName, tags.attributeName], color: 'var(--chart-4)' },
+  {
+    tag: [
+      tags.comment,
+      tags.lineComment,
+      tags.blockComment,
+      tags.docComment,
+      tags.docString,
+    ],
+    color: 'var(--muted-foreground)',
+    fontStyle: 'italic',
+  },
+  { tag: [tags.meta, tags.documentMeta, tags.processingInstruction], color: 'var(--muted-foreground)' },
+
+  {
+    tag: [
+      tags.keyword,
+      tags.moduleKeyword,
+      tags.controlKeyword,
+      tags.operatorKeyword,
+      tags.definitionKeyword,
+      tags.modifier,
+    ],
+    color: 'var(--syntax-keyword)',
+  },
+
+  {
+    tag: [tags.string, tags.special(tags.string), tags.regexp, tags.character, tags.attributeValue],
+    color: 'var(--syntax-string)',
+  },
+  { tag: tags.inserted, color: 'var(--syntax-string)' },
+
+  { tag: [tags.number, tags.integer, tags.float, tags.bool, tags.null, tags.atom, tags.color], color: 'var(--syntax-number)' },
+
+  {
+    tag: [tags.constant(tags.variableName), tags.standard(tags.variableName), tags.self, tags.escape],
+    color: 'var(--syntax-constant)',
+  },
+  { tag: tags.changed, color: 'var(--syntax-constant)' },
+
+  {
+    tag: [tags.function(tags.variableName), tags.function(tags.propertyName), tags.macroName, tags.labelName],
+    color: 'var(--syntax-function)',
+  },
+
+  {
+    tag: [tags.typeName, tags.className, tags.namespace, tags.definition(tags.typeName), tags.typeOperator],
+    color: 'var(--syntax-type)',
+  },
+
+  { tag: [tags.propertyName, tags.attributeName], color: 'var(--syntax-property)' },
+
+  // Plain identifiers are deliberately left uncoloured -- only the special
+  // roles above (functions, types, constants...) earn a colour, which is what
+  // makes those readable as landmarks rather than noise.
   { tag: [tags.variableName, tags.definition(tags.variableName)], color: 'var(--foreground)' },
-  { tag: [tags.operator, tags.punctuation, tags.separator, tags.bracket], color: 'var(--muted-foreground)' },
-  { tag: [tags.tagName, tags.angleBracket], color: 'var(--chart-1)' },
+
+  {
+    tag: [
+      tags.operator,
+      tags.punctuation,
+      tags.separator,
+      tags.bracket,
+      tags.paren,
+      tags.brace,
+      tags.squareBracket,
+      tags.derefOperator,
+      tags.arithmeticOperator,
+      tags.bitwiseOperator,
+      tags.compareOperator,
+      tags.logicOperator,
+      tags.controlOperator,
+    ],
+    color: 'var(--muted-foreground)',
+  },
+
+  { tag: [tags.tagName, tags.angleBracket, tags.contentSeparator], color: 'var(--syntax-tag)' },
+  { tag: tags.heading, color: 'var(--syntax-tag)', fontWeight: 'bold' },
+
   { tag: tags.invalid, color: 'var(--destructive)' },
-  { tag: tags.heading, color: 'var(--chart-1)', fontWeight: 'bold' },
+  { tag: tags.deleted, color: 'var(--destructive)' },
+
   { tag: tags.link, color: 'var(--primary)', textDecoration: 'underline' },
   { tag: tags.strong, fontWeight: 'bold' },
   { tag: tags.emphasis, fontStyle: 'italic' },

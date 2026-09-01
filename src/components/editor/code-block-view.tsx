@@ -1,12 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNodeViewContext } from '@prosemirror-adapter/react';
 import { Compartment, EditorState } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+import { EditorView, keymap, lineNumbers, type ViewUpdate } from '@codemirror/view';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { openSearchPanel, search } from '@codemirror/search';
 import { bracketMatching, indentOnInput } from '@codemirror/language';
 import { redo, undo } from '@milkdown/kit/prose/history';
-import { Selection } from '@milkdown/kit/prose/state';
+import { Selection, TextSelection } from '@milkdown/kit/prose/state';
 import { exitCode } from '@milkdown/kit/prose/commands';
 import { Check, ChevronsUpDown, Copy } from 'lucide-react';
 
@@ -19,8 +20,9 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { isSyncingFromDoc, syncFromDoc } from '@/lib/codeblock/bridge';
 import { codeBlockHighlighting, codeBlockTheme } from '@/lib/codeblock/theme';
-import { languageNames, loadLanguage } from '@/lib/codeblock/languages';
+import { languageLabel, languageNames, loadLanguage } from '@/lib/codeblock/languages';
 import {
   registerScopedCommand,
   unregisterScopedCommand,
@@ -71,7 +73,6 @@ export const CodeBlockView: React.FC = () => {
   // current node and position through refs rather than closing over them.
   const nodeRef = useRef(node);
   const getPosRef = useRef(getPos);
-  const applyingFromDoc = useRef(false);
 
   nodeRef.current = node;
   getPosRef.current = getPos;
@@ -89,33 +90,60 @@ export const CodeBlockView: React.FC = () => {
     const host = hostRef.current;
     if (!host) return;
 
-    /** CodeMirror change -> ProseMirror transaction. */
-    const forwardUpdate = (update: { docChanged: boolean; changes: any }) => {
-      if (!update.docChanged || applyingFromDoc.current) return;
+    /**
+     * CodeMirror change -> ProseMirror transaction.
+     *
+     * The selection is forwarded alongside the text so ProseMirror's own
+     * selection stays inside this block. ProseMirror writes its selection back
+     * to the DOM after every transaction, and a selection pointing outside
+     * would drag the browser caret out of CodeMirror on each keystroke.
+     */
+    const forwardUpdate = (update: ViewUpdate) => {
+      const cmView = update.view;
+      // Only mirror what the user did here. Changes pushed in from the
+      // document arrive already applied, and echoing them back would loop.
+      if (isSyncingFromDoc(cmView) || !cmView.hasFocus) return;
 
       const base = getPosRef.current();
       if (base === undefined) return;
 
-      let offset = base + 1;
+      const start = base + 1;
+      const { main } = update.state.selection;
+      const selectionFrom = start + main.from;
+      const selectionTo = start + main.to;
+      const pmSelection = view.state.selection;
+
+      if (
+        !update.docChanged &&
+        pmSelection.from === selectionFrom &&
+        pmSelection.to === selectionTo
+      ) {
+        return;
+      }
+
+      let offset = start;
       const tr = view.state.tr;
 
-      update.changes.iterChanges(
-        (fromA: number, toA: number, fromB: number, toB: number, text: any) => {
-          const inserted = text.toString();
+      update.changes.iterChanges((fromA, toA, fromB, toB, text) => {
+        const inserted = text.toString();
 
-          if (inserted.length) {
-            tr.replaceWith(
-              offset + fromA,
-              offset + toA,
-              view.state.schema.text(inserted),
-            );
-          } else {
-            tr.delete(offset + fromA, offset + toA);
-          }
+        if (inserted.length) {
+          tr.replaceWith(
+            offset + fromA,
+            offset + toA,
+            view.state.schema.text(inserted),
+          );
+        } else {
+          tr.delete(offset + fromA, offset + toA);
+        }
 
-          offset += toB - fromB - (toA - fromA);
-        },
-      );
+        offset += toB - fromB - (toA - fromA);
+      });
+
+      const limit = tr.doc.content.size;
+      if (selectionFrom <= limit && selectionTo <= limit) {
+        tr.setSelection(TextSelection.create(tr.doc, selectionFrom, selectionTo));
+      }
 
       view.dispatch(tr);
     };
@@ -153,6 +181,7 @@ export const CodeBlockView: React.FC = () => {
           codeBlockTheme,
           codeBlockHighlighting,
           bracketMatching(),
+          closeBrackets(),
           indentOnInput(),
           search(),
           EditorView.lineWrapping,
@@ -173,7 +202,29 @@ export const CodeBlockView: React.FC = () => {
             { key: 'Mod-z', run: () => undo(view.state, view.dispatch) },
             { key: 'Mod-Shift-z', run: () => redo(view.state, view.dispatch) },
             { key: 'Mod-y', run: () => redo(view.state, view.dispatch) },
+            {
+              key: 'Backspace',
+              run: (cm) => {
+                if (cm.state.doc.length > 0) return false;
+
+                const base = getPosRef.current();
+                if (base === undefined) return false;
+
+                const tr = view.state.tr.delete(
+                  base,
+                  base + nodeRef.current.nodeSize,
+                );
+                tr.setSelection(Selection.near(tr.doc.resolve(base), -1));
+
+                view.dispatch(tr);
+                view.focus();
+                return true;
+              },
+            },
             indentWithTab,
+            // Ahead of the default keymap so its Backspace binding, which
+            // removes both halves of an auto-inserted pair, wins.
+            ...closeBracketsKeymap,
             ...defaultKeymap.filter(
               (binding) => !['Mod-Enter'].includes(String(binding.key)),
             ),
@@ -215,8 +266,10 @@ export const CodeBlockView: React.FC = () => {
       });
     });
     registerScopedCommand(scopeId, 'native.select_all', () => {
-      cm.dispatch({ selection: { anchor: 0, head: cm.state.doc.length } });
+      // Focus first: the update listener only forwards a selection to the
+      // document while this instance holds focus.
       cm.focus();
+      cm.dispatch({ selection: { anchor: 0, head: cm.state.doc.length } });
     });
     // The document-wide find bar cannot reach inside CodeMirror, so this block
     // gets CodeMirror's own search panel instead of nothing.
@@ -226,6 +279,7 @@ export const CodeBlockView: React.FC = () => {
 
     return () => {
       cm.contentDOM.removeEventListener('focus', claimScope);
+
       for (const id of [
         'native.undo',
         'native.redo',
@@ -254,9 +308,7 @@ export const CodeBlockView: React.FC = () => {
     const change = computeChange(cm.state.doc.toString(), node.textContent);
     if (!change) return;
 
-    applyingFromDoc.current = true;
-    cm.dispatch({ changes: change });
-    applyingFromDoc.current = false;
+    syncFromDoc(cm, () => cm.dispatch({ changes: change }));
   }, [node]);
 
   useEffect(() => {
@@ -305,14 +357,21 @@ export const CodeBlockView: React.FC = () => {
     });
   };
 
+  // `contentEditable={false}` is load-bearing: the adapter gives every
+  // non-leaf node a `contentDOM`, so ProseMirror never marks this node view
+  // uneditable and the subtree inherits `contenteditable` from the document.
+  // CodeMirror's `.cm-content` cannot become its own editing host inside
+  // another one, so the browser routes editing to ProseMirror, the caret never
+  // advances, and typed text comes out reversed. This also keeps the gutters
+  // from being editable.
   return (
-    <div className='solstice-code-block' data-not-typeset>
-      <div className='solstice-code-block-bar' contentEditable={false}>
+    <div className='solstice-code-block' data-not-typeset contentEditable={false}>
+      <div className='solstice-code-block-bar'>
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger
             render={
               <Button variant='ghost' size='xs' className='font-mono'>
-                {language || 'plain text'}
+                {language ? languageLabel(language) : 'plain text'}
                 <ChevronsUpDown />
               </Button>
             }
@@ -336,7 +395,7 @@ export const CodeBlockView: React.FC = () => {
                           : 'opacity-0',
                       )}
                     />
-                    {name}
+                    {name === 'plain text' ? name : languageLabel(name)}
                   </CommandItem>
                 ))}
               </CommandList>
