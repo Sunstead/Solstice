@@ -30,6 +30,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { isSyncingFromDoc, syncFromDoc } from '@/lib/codeblock/bridge';
+import { createSearchPanel } from '@/lib/codeblock/search-panel';
 import { codeBlockHighlighting, codeBlockTheme } from '@/lib/codeblock/theme';
 import {
   languageLabel,
@@ -221,7 +222,7 @@ export const CodeBlockView: React.FC = () => {
           bracketMatching(),
           closeBrackets(),
           indentOnInput(),
-          search(),
+          search({ createPanel: createSearchPanel }),
           EditorView.lineWrapping,
           keymap.of([
             { key: 'ArrowUp', run: maybeEscape('line', -1) },
