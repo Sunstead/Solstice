@@ -42,18 +42,13 @@ export const codeBlockTheme = EditorView.theme({
   '.cm-searchMatch.cm-searchMatch-selected': {
     backgroundColor: 'color-mix(in oklch, var(--primary) 55%, transparent)',
   },
+  // The panel's own contents (the search UI) are real shadcn components with
+  // their own complete styling; only the bar they sit in is themed here.
   '.cm-panels': {
     backgroundColor: 'var(--popover)',
     color: 'var(--popover-foreground)',
     border: '1px solid var(--border)',
     borderRadius: 'calc(var(--radius) * 0.6)',
-  },
-  '.cm-panels input, .cm-panels button': {
-    backgroundColor: 'var(--background)',
-    color: 'var(--foreground)',
-    border: '1px solid var(--border)',
-    borderRadius: 'calc(var(--radius) * 0.5)',
-    padding: '0.125rem 0.375rem',
   },
   '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
     backgroundColor: 'color-mix(in oklch, var(--primary) 20%, transparent)',
