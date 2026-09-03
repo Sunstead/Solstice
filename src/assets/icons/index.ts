@@ -2,6 +2,7 @@ import { SvgComponent } from '@/lib/views/types';
 
 import Markdown from './file-types/markdown.svg?react';
 import Json from './file-types/json.svg?react';
+import Pdf from './file-types/pdf.svg?react';
 import Folder from './file-types/folder.svg?react';
 import FolderOpen from './file-types/folder_open.svg?react';
 import Default from './file-types/file.svg?react';
@@ -9,6 +10,7 @@ import Default from './file-types/file.svg?react';
 export const fileIconRegistry: Record<string, SvgComponent> = {
   md: Markdown,
   json: Json,
+  pdf: Pdf,
 };
 
 export function getFolderIcon(open: boolean = false) {
