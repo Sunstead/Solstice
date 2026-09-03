@@ -89,3 +89,30 @@
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+/*
+ * Route from an inline image to the full viewer. Hidden until hover for the
+ * same reason the resize handles are: an image in a note should read as the
+ * image, not as a control panel.
+ */
+.solstice-image-open {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--radius) * 0.6);
+  background-color: color-mix(in oklch, var(--popover) 85%, transparent);
+  padding: 0.25rem;
+  line-height: 0;
+  color: var(--popover-foreground);
+  opacity: 0;
+  backdrop-filter: blur(8px);
+  transition: opacity 120ms ease;
+}
+
+.solstice-image:hover .solstice-image-open,
+.solstice-image-open:focus-visible {
+  opacity: 1;
+}

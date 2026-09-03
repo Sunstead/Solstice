@@ -56,7 +56,12 @@ export type EntryMenuItem =
     };
 
 /** Which menu is being built, and what it is allowed to offer. */
-export type EntryMenuSurface = 'editor' | 'tree' | 'root';
+/**
+ * Where the menu is being shown. `viewer` is the editor header of a file the
+ * app renders but cannot search or edit -- an image, a PDF, a media file -- so
+ * it offers everything the editor surface does except find.
+ */
+export type EntryMenuSurface = 'editor' | 'tree' | 'root' | 'viewer';
 
 export type EntryMenuOptions = {
   surface: EntryMenuSurface;

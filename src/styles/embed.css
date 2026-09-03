@@ -18,6 +18,7 @@
  * an anonymous line box that shifts as soon as text is typed around it.
  */
 .solstice-embed[data-embed-kind='video'],
+.solstice-embed[data-embed-kind='audio'],
 .solstice-embed[data-embed-kind='pdf'],
 .solstice-embed[data-embed-kind='markdown'] {
   display: inline-block;
@@ -32,16 +33,6 @@
   border-radius: var(--radius, 0.5rem);
 }
 
-.solstice-embed audio {
-  width: 100%;
-}
-
-.solstice-embed iframe {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius, 0.5rem);
-  background-color: var(--muted);
-}
 
 .solstice-embed.is-selected > * {
   outline: 2px solid var(--primary);

@@ -1,9 +1,14 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useNodeViewContext } from '@prosemirror-adapter/react';
-import { ImageOff } from 'lucide-react';
+import { ExternalLink, ImageOff } from 'lucide-react';
 
+import { MediaPlayer } from '@/components/viewer/media-player';
+import { PdfPreviewCard } from '@/components/viewer/pdf-preview-card';
+import { useLayout } from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { embedKind } from '@/lib/embed/kind';
 import { resolveAsset } from '@/lib/image/resolve';
+import { getFileNameFromPath } from '@/lib/path-utils';
 import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { cn } from '@/lib/utils';
 import { useEditorNotePath } from './editor-file-context';
@@ -98,6 +103,37 @@ export const ImageView: React.FC = () => {
   }
 
   const shownWidth = dragWidth ?? width;
+  const localPath = asset.status === 'resolved' ? asset.absolutePath : null;
+
+  /*
+   * `![](clip.mp4)` used to render as a broken image: the CommonMark image
+   * node had no notion of kind, while `![[clip.mp4]]` did. Both syntaxes name
+   * a file, so both should show whatever that file is. Only the kinds that are
+   * unambiguously not an image divert -- an external URL with no extension
+   * still falls through to the image path, which is where it belongs.
+   */
+  const kind = embedKind(localPath ?? src);
+
+  if (kind === 'video' || kind === 'audio') {
+    return (
+      <span data-not-typeset contentEditable={false} className='solstice-image-media'>
+        <MediaPlayer
+          src={asset.url}
+          kind={kind}
+          density='compact'
+          className='solstice-embed-player'
+          style={{
+            width: shownWidth === null ? undefined : `${shownWidth}px`,
+            height: height === null ? undefined : `${height}px`,
+          }}
+        />
+      </span>
+    );
+  }
+
+  if (kind === 'pdf' && localPath) {
+    return <PdfPreviewCard path={localPath} height={height ?? undefined} />;
+  }
 
   return (
     <span
@@ -116,6 +152,21 @@ export const ImageView: React.FC = () => {
           height: dragWidth !== null || height === null ? undefined : `${height}px`,
         }}
       />
+
+      {/* The only route from a note to the zoom/pan viewer. */}
+      {localPath && (
+        <button
+          type='button'
+          className='solstice-image-open'
+          title='Open in a tab'
+          aria-label='Open in a tab'
+          onClick={() =>
+            useLayout.getState().openFile(localPath, getFileNameFromPath(localPath))
+          }
+        >
+          <ExternalLink className='size-3.5' />
+        </button>
+      )}
 
       {/* Double-click clears the size, which is also how it leaves the markdown. */}
       {([-1, 1] as const).map((direction) => (
