@@ -20,13 +20,21 @@ function isWordBoundary(text: string, index: number) {
 }
 
 /**
- * Flattens the document into one string with a document position per
- * character, so a match found by plain string search maps straight back to a
- * ProseMirror range. Block boundaries become a single separator character:
- * without one, the end of a paragraph and the start of the next would form a
- * word that exists nowhere on screen.
+ * One string with a source position per character.
+ *
+ * `positions[i]` is wherever character `i` came from, so a match found by
+ * plain string search maps straight back into whatever produced the text --
+ * a ProseMirror document here, a PDF page's text items elsewhere.
  */
-function flatten(doc: ProseNode) {
+export type FlatText<P> = { text: string; positions: P[] };
+
+/**
+ * Flattens the document into one string with a document position per
+ * character. Block boundaries become a single separator character: without
+ * one, the end of a paragraph and the start of the next would form a word that
+ * exists nowhere on screen.
+ */
+function flatten(doc: ProseNode): FlatText<number> {
   let text = '';
   const positions: number[] = [];
 
@@ -57,18 +65,28 @@ function flatten(doc: ProseNode) {
   return { text, positions };
 }
 
-export function findMatches(
-  doc: ProseNode,
+/**
+ * The search itself, over flattened text.
+ *
+ * Split out from `findMatches` so the PDF viewer can search a page's text
+ * layer with exactly the same semantics the editor has -- the unicode word
+ * boundaries and the separator rule below are the behaviour users would
+ * otherwise have to learn twice.
+ *
+ * Returns index pairs into `positions`; mapping those back to whatever the
+ * positions mean is the caller's job.
+ */
+export function searchFlat<P>(
+  { text, positions }: FlatText<P>,
   query: string,
   { caseSensitive, wholeWord }: FindOptions,
-): FindMatch[] {
+): { start: number; end: number }[] {
   if (!query) return [];
 
-  const { text, positions } = flatten(doc);
   const haystack = caseSensitive ? text : text.toLowerCase();
   const needle = caseSensitive ? query : query.toLowerCase();
 
-  const matches: FindMatch[] = [];
+  const found: { start: number; end: number }[] = [];
   let index = haystack.indexOf(needle);
 
   while (index !== -1) {
@@ -82,15 +100,25 @@ export function findMatches(
     // contiguous text anywhere, so it can never be highlighted honestly.
     const withinOneBlock = !haystack.slice(index, end).includes('\n');
 
-    if (boundedByWords && withinOneBlock) {
-      matches.push({
-        from: positions[index],
-        to: positions[end - 1] + 1,
-      });
+    if (boundedByWords && withinOneBlock && index < positions.length) {
+      found.push({ start: index, end });
     }
 
     index = haystack.indexOf(needle, index + 1);
   }
 
-  return matches;
+  return found;
+}
+
+export function findMatches(
+  doc: ProseNode,
+  query: string,
+  options: FindOptions,
+): FindMatch[] {
+  const flat = flatten(doc);
+
+  return searchFlat(flat, query, options).map(({ start, end }) => ({
+    from: flat.positions[start],
+    to: flat.positions[end - 1] + 1,
+  }));
 }

@@ -2,7 +2,7 @@ import { MoreVertical } from 'lucide-react';
 
 import { targetFromPath } from '@/lib/entry-actions';
 import { Button } from './ui/button';
-import { useEntryMenuItems } from '@/lib/entry-menu-items';
+import { useEntryMenuItems, type EntryMenuSurface } from '@/lib/entry-menu-items';
 import { EntryMenuItems } from './entry-menu-items';
 import {
   DropdownMenu,
@@ -28,8 +28,14 @@ const components = {
  * `useEntryMenuItems`, the same source the explorer's context menu renders,
  * so the two can never offer different things for the same file.
  */
-export function FileActionsDropdown({ path }: { path: string }) {
-  const items = useEntryMenuItems(targetFromPath(path), { surface: 'editor' });
+export function FileActionsDropdown({
+  path,
+  surface = 'editor',
+}: {
+  path: string;
+  surface?: EntryMenuSurface;
+}) {
+  const items = useEntryMenuItems(targetFromPath(path), { surface });
 
   return (
     <DropdownMenu>
