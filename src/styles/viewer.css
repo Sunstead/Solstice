@@ -42,14 +42,24 @@
 }
 
 /*
- * The dot grid. Everything that varies is set inline by `CanvasGrid`; the
- * opacity lives here so the `viewer.imageGrid` setting can switch it off
- * through a variable.
+ * The dot grid, drawn on a canvas by `CanvasGrid`.
+ *
+ * `width`/`height` are load-bearing, not belt-and-braces: an absolutely
+ * positioned *replaced* element with `width: auto` takes its intrinsic size and
+ * ignores the inset constraint (CSS 2.1 10.3.8), so `inset: 0` alone would
+ * leave the canvas at its default 300x150 and everything drawn would be
+ * stretched to fit the pane.
+ *
+ * `color` is here so the component can resolve the theme variable to a value
+ * the canvas will accept as a fill; nothing paints with it directly.
  */
 .solstice-canvas-grid {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+  color: var(--ring);
   opacity: var(--canvas-grid-opacity, 0.3);
 }
 
