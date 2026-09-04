@@ -9,6 +9,7 @@ export type FileTypePreset = {
 
 export const FILE_TYPE_PRESETS: Record<string, FileTypePreset> = {
   markdown: { id: 'markdown', label: 'Note', extension: 'md' },
+  pdf: { id: 'pdf', label: 'PDF', extension: 'pdf' },
 };
 
 export function getPresetByExtension(extension: string): FileTypePreset | null {
