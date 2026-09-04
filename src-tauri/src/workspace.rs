@@ -46,6 +46,20 @@ pub fn get_workspace(window: tauri::Window, state: tauri::State<WorkspaceState>)
     state.0.lock().unwrap().get(window.label()).cloned()
 }
 
+/// Grants `asset:` access to one file outside the open workspace.
+///
+/// `set_workspace` only allows the workspace directory, so a file opened
+/// through the file dialog from anywhere else resolves to a perfectly
+/// well-formed `asset:` URL that the scope then denies -- a blank image or a
+/// PDF that never loads, with nothing in the console to explain it. Viewers
+/// call this before building the URL. Allowing a single file the user has
+/// explicitly opened is the narrowest grant that fixes it.
+#[tauri::command]
+#[specta::specta]
+pub fn allow_asset_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    app.asset_protocol_scope().allow_file(&path).map_err(|e| e.to_string())
+}
+
 /// Starts or stops watching the current workspace, backing the
 /// `explorer.watchFilesystem` setting. Turning it off has to reach the OS
 /// watcher itself -- muting the events on the frontend would leave the real

@@ -95,6 +95,48 @@ export const settingsRegistry = {
     },
   }),
 
+  // -- File viewers ---------------------------------------------------
+
+  'viewer.imageBackground': defineEnum({
+    section: 'appearance',
+    group: 'File viewers',
+    scope: 'global',
+    label: 'Image background',
+    options: [
+      { value: 'app', label: 'Match the app' },
+      { value: 'checkerboard', label: 'Checkerboard' },
+      { value: 'dark', label: 'Neutral dark' },
+    ],
+    // Neutral dark suits photographs and checkerboard suits transparency, but
+    // most images in a vault are diagrams and screenshots that read best on
+    // the same ground as the notes around them.
+    default: 'app',
+    domAttr: { name: 'data-image-bg' },
+  }),
+
+  'viewer.imageGrid': defineBoolean({
+    section: 'appearance',
+    group: 'File viewers',
+    scope: 'global',
+    label: 'Image canvas grid',
+    default: true,
+    // Fading the layer rather than hiding it, so the setting is one value the
+    // stylesheet already reads.
+    cssVar: {
+      name: '--canvas-grid-opacity',
+      format: (v) => (v ? '0.3' : '0'),
+    },
+    visibleWhen: (get) => get('viewer.imageBackground') !== 'checkerboard',
+  }),
+
+  'viewer.mediaAutoplay': defineBoolean({
+    section: 'appearance',
+    group: 'File viewers',
+    scope: 'global',
+    label: 'Play media on open',
+    default: false,
+  }),
+
   // -- Editor ---------------------------------------------------------
   'editor.autosave': defineEnum({
     section: 'editor',
