@@ -1,0 +1,169 @@
+/*
+ * Chrome for the standalone file viewers -- image, PDF and media tabs.
+ *
+ * Kept out of the editor stylesheets (which `milkdown-editor.tsx` imports)
+ * because none of this is editor-scoped: a viewer is a whole tab, and the
+ * compact media players also render inside notes.
+ */
+
+/* ---------------------------------------------------------------- canvas -- */
+
+/*
+ * The pan/zoom surface behind an image.
+ *
+ * The ground colour only. The dot grid is a layer of its own below, so the
+ * checkerboard mode can replace it without disturbing the ground.
+ */
+.solstice-canvas {
+  background-color: var(--background);
+}
+
+/* A neutral dark ground for photographs, where the app background tints them. */
+:root[data-image-bg='dark'] .solstice-canvas {
+  background-color: oklch(0.17 0 0);
+}
+
+/*
+ * Transparency check. Screen-fixed rather than locked to the image: it is a
+ * readout of the alpha channel, not part of the surface the image sits on.
+ * It replaces the dots outright -- a grid showing through the squares defeats
+ * the point of the mode.
+ */
+:root[data-image-bg='checkerboard'] .solstice-canvas {
+  background-image: repeating-conic-gradient(
+    color-mix(in oklch, var(--muted-foreground) 18%, transparent) 0% 25%,
+    transparent 0% 50%
+  );
+  background-size: 24px 24px;
+}
+
+:root[data-image-bg='checkerboard'] .solstice-canvas-grid {
+  display: none;
+}
+
+/*
+ * The dot grid, drawn on a canvas by `CanvasGrid`.
+ *
+ * `width`/`height` are load-bearing, not belt-and-braces: an absolutely
+ * positioned *replaced* element with `width: auto` takes its intrinsic size and
+ * ignores the inset constraint (CSS 2.1 10.3.8), so `inset: 0` alone would
+ * leave the canvas at its default 300x150 and everything drawn would be
+ * stretched to fit the pane.
+ *
+ * `color` is here so the component can resolve the theme variable to a value
+ * the canvas will accept as a fill; nothing paints with it directly.
+ */
+.solstice-canvas-grid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  color: var(--ring);
+  opacity: var(--canvas-grid-opacity, 0.3);
+}
+
+.solstice-canvas img {
+  /* Blocks the browser's own drag-to-save, which otherwise fires mid-pan. */
+  -webkit-user-drag: none;
+  user-select: none;
+  display: block;
+  max-width: none;
+}
+
+/* ------------------------------------------------------------------- pdf -- */
+
+.solstice-pdf-page {
+  position: relative;
+  margin-inline: auto;
+  background-color: white;
+  /* The page now sits on the app background rather than a grey tray, so it
+     needs an edge of its own -- white on near-white otherwise has none. */
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius, 0.5rem) * 0.5);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.2), 0 8px 24px oklch(0 0 0 / 0.12);
+  overflow: hidden;
+}
+
+/*
+ * A page that has not been mounted yet still has to occupy its height, or the
+ * scrollbar would jump every time one entered the window.
+ */
+.solstice-pdf-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--muted-foreground);
+}
+
+.solstice-pdf-page canvas {
+  display: block;
+}
+
+/*
+ * pdf.js paints the text layer transparently over the canvas so text can be
+ * selected. Find highlights ride on that same layer: the `<mark>` inherits the
+ * transparent colour and contributes only its background, which is why they
+ * can reuse `find.css` untouched.
+ */
+.solstice-pdf-page .textLayer mark {
+  color: inherit;
+  background-color: color-mix(in oklch, var(--primary) 25%, transparent);
+  border-radius: 2px;
+}
+
+.solstice-pdf-page .textLayer mark.find-match-active {
+  background-color: color-mix(in oklch, var(--primary) 55%, transparent);
+  outline: 1px solid var(--primary);
+  outline-offset: -1px;
+}
+
+/* ----------------------------------------------------------------- media -- */
+
+/*
+ * Buffered ranges sit behind the seek slider's own track. Painted as a plain
+ * absolutely-positioned bar rather than a second slider: it is never
+ * interactive, and a real control here would compete for the drag.
+ */
+.solstice-media-buffered {
+  position: absolute;
+  left: 0;
+  background-color: color-mix(in oklch, var(--muted-foreground) 30%, transparent);
+  pointer-events: none;
+}
+
+/*
+ * Video controls fade rather than unmount, so a pointer already over the
+ * toolbar does not lose its target the instant playback starts.
+ */
+.solstice-media-chrome {
+  transition: opacity 150ms ease;
+}
+
+.solstice-media-chrome[data-hidden='true'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+html[data-reduce-motion='true'] .solstice-media-chrome {
+  transition: none;
+}
+
+/* ---------------------------------------------------------------- embeds -- */
+
+/*
+ * Inline-block rather than block for the same reason `embed.css` gives: these
+ * are inline atom node views, and a `display: block` box inside inline content
+ * leaves the caret in an anonymous line box that shifts as text is typed
+ * around it.
+ */
+.solstice-embed-pdf,
+.solstice-image-media {
+  display: inline-block;
+  width: 100%;
+  vertical-align: top;
+}
+
+/* Width only: the player itself decides whether it is a row or a column. */
+.solstice-embed-player {
+  width: 100%;
+}

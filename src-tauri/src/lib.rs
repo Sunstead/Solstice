@@ -38,6 +38,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             files::list_workspace_files_recursive,
             workspace::set_workspace,
             workspace::get_workspace,
+            workspace::allow_asset_path,
             workspace::set_watch_enabled,
             commands::keymap::get_command_registry,
             commands::keymap::set_keybind,

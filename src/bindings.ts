@@ -57,6 +57,17 @@ export const commands = {
 	setWorkspace: (path: string) => typedError<null, string>(__TAURI_INVOKE("set_workspace", { path })),
 	getWorkspace: () => __TAURI_INVOKE<string | null>("get_workspace"),
 	/**
+	 *  Grants `asset:` access to one file outside the open workspace.
+	 * 
+	 *  `set_workspace` only allows the workspace directory, so a file opened
+	 *  through the file dialog from anywhere else resolves to a perfectly
+	 *  well-formed `asset:` URL that the scope then denies -- a blank image or a
+	 *  PDF that never loads, with nothing in the console to explain it. Viewers
+	 *  call this before building the URL. Allowing a single file the user has
+	 *  explicitly opened is the narrowest grant that fixes it.
+	 */
+	allowAssetPath: (path: string) => typedError<null, string>(__TAURI_INVOKE("allow_asset_path", { path })),
+	/**
 	 *  Starts or stops watching the current workspace, backing the
 	 *  `explorer.watchFilesystem` setting. Turning it off has to reach the OS
 	 *  watcher itself -- muting the events on the frontend would leave the real

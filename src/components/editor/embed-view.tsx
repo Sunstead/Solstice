@@ -13,6 +13,9 @@ import { DOMSerializer } from '@milkdown/kit/prose/model';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { FileWarning, Link2Off, RefreshCcw } from 'lucide-react';
 
+import { MediaPlayer } from '@/components/viewer/media-player';
+import { PdfPreviewCard } from '@/components/viewer/pdf-preview-card';
+
 import { useWorkspace } from '@/hooks/use-workspace';
 import { embedKind } from '@/lib/embed/kind';
 import {
@@ -129,16 +132,23 @@ export function createEmbedView(ctx: Ctx): React.FC {
       >
         {kind === 'image' && <img src={url} alt={value} style={sizeStyle} />}
 
-        {kind === 'video' && <video src={url} controls style={sizeStyle} />}
-
-        {kind === 'audio' && <audio src={url} controls />}
-
-        {kind === 'pdf' && (
-          <iframe
+        {/*
+          The app's own player rather than `controls`, which renders as
+          whatever the platform webview ships -- three different-looking
+          players across macOS, Windows and Linux, none of them themed.
+        */}
+        {(kind === 'video' || kind === 'audio') && (
+          <MediaPlayer
             src={url}
-            title={value}
-            style={{ ...sizeStyle, height: height === null ? '32rem' : `${height}px` }}
+            kind={kind}
+            density='compact'
+            className='solstice-embed-player'
+            style={sizeStyle}
           />
+        )}
+
+        {kind === 'pdf' && absolutePath && (
+          <PdfPreviewCard path={absolutePath} height={height ?? undefined} />
         )}
 
         {kind === 'markdown' && absolutePath && (
