@@ -36,10 +36,11 @@ export function PdfPreviewCard({ path, height }: { path: string; height?: number
     return () => observer.disconnect();
   }, []);
 
-  const file = useMemo(
-    () => (asset.status === 'ready' ? { url: asset.url } : null),
-    [asset],
-  );
+  // Keyed on the URL string, not the asset object: react-pdf reloads the whole
+  // document whenever this changes identity, so it must not churn just because
+  // the hook re-created an otherwise identical result.
+  const url = asset.status === 'ready' ? asset.url : null;
+  const file = useMemo(() => (url ? { url } : null), [url]);
 
   const open = () => useLayout.getState().openFile(path, name);
 

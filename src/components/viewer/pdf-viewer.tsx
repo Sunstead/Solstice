@@ -38,6 +38,14 @@ const ZOOM_STEP = 0.2;
 const RENDER_MARGIN = '200% 0px';
 
 /**
+ * Pages either side of the current one that render regardless of the observer.
+ *
+ * A backstop, not the mechanism: if intersection reporting is ever wrong or
+ * late, the reader still sees the page they are on rather than a placeholder.
+ */
+const NEARBY_PAGES = 2;
+
+/**
  * Only the page crossing the vertical middle of the viewport intersects, which
  * is a truer answer to "which page am I on" than the topmost visible one.
  */
@@ -75,7 +83,7 @@ export function PdfViewer({ path }: { path: string }) {
   });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const pageNodes = useRef(new Map<number, HTMLDivElement>());
 
@@ -84,10 +92,11 @@ export function PdfViewer({ path }: { path: string }) {
 
   // react-pdf reloads the document whenever this changes identity, so it has
   // to survive every unrelated re-render of this component.
-  const file = useMemo(
-    () => (asset.status === 'ready' ? { url: asset.url } : null),
-    [asset],
-  );
+  // Keyed on the URL string, not the asset object: react-pdf reloads the whole
+  // document whenever this changes identity, so it must not churn just because
+  // the hook re-created an otherwise identical result.
+  const url = asset.status === 'ready' ? asset.url : null;
+  const file = useMemo(() => (url ? { url } : null), [url]);
 
   const baseSize = intrinsic.get(1) ?? FALLBACK_SIZE;
 
@@ -154,70 +163,107 @@ export function PdfViewer({ path }: { path: string }) {
 
   // -- measurement and windowing --------------------------------------
 
-  useEffect(() => {
-    const node = scrollRef.current;
-    if (!node) return;
+  /*
+   * Observers are held here and bound to each page as it registers, rather
+   * than gathered up once in an effect.
+   *
+   * That effect used to snapshot the page nodes and key itself on `numPages`.
+   * Renaming a file changes the path, which reloads `<Document>`, which swaps
+   * in its loading state and remounts every page as a *new* DOM node -- but
+   * the page count is identical, so the effect never re-ran and the observers
+   * were left watching detached nodes. Nothing intersected again, so no page
+   * ever re-entered the render window and the whole document sat there as
+   * numbered placeholders.
+   */
+  const viewportObserver = useRef<ResizeObserver | null>(null);
+  const windowObserver = useRef<IntersectionObserver | null>(null);
+  const currentPageObserver = useRef<IntersectionObserver | null>(null);
 
-    const observer = new ResizeObserver(([entry]) => {
-      setViewport({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      });
-    });
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [file]);
-
-  useEffect(() => {
-    const root = scrollRef.current;
-    if (!root || numPages === 0) return;
-
-    const window_ = new IntersectionObserver(
-      (entries) => {
-        setMountedPages((previous) => {
-          const next = new Set(previous);
-          let changed = false;
-
-          for (const entry of entries) {
-            const page = Number((entry.target as HTMLElement).dataset.page);
-            if (entry.isIntersecting === next.has(page)) continue;
-            if (entry.isIntersecting) next.add(page);
-            else next.delete(page);
-            changed = true;
-          }
-
-          return changed ? next : previous;
-        });
-      },
-      { root, rootMargin: RENDER_MARGIN },
-    );
-
-    const middle = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          setCurrentPage(Number((entry.target as HTMLElement).dataset.page));
-        }
-      },
-      { root, rootMargin: CURRENT_PAGE_MARGIN },
-    );
-
-    for (const node of pageNodes.current.values()) {
-      window_.observe(node);
-      middle.observe(node);
-    }
-
-    return () => {
-      window_.disconnect();
-      middle.disconnect();
-    };
-  }, [numPages]);
-
-  const registerNode = useCallback((pageNumber: number, node: HTMLDivElement | null) => {
-    if (node) pageNodes.current.set(pageNumber, node);
-    else pageNodes.current.delete(pageNumber);
+  const observePage = useCallback((node: HTMLDivElement) => {
+    windowObserver.current?.observe(node);
+    currentPageObserver.current?.observe(node);
   }, []);
+
+  /**
+   * Attaches the scrolling element and everything that watches it.
+   *
+   * A callback ref rather than an effect, so the observers are rebuilt exactly
+   * when the element they need as their root appears or is replaced -- there is
+   * no dependency list here that can go stale.
+   */
+  const attachScroller = useCallback(
+    (root: HTMLDivElement | null) => {
+      viewportObserver.current?.disconnect();
+      windowObserver.current?.disconnect();
+      currentPageObserver.current?.disconnect();
+      viewportObserver.current = null;
+      windowObserver.current = null;
+      currentPageObserver.current = null;
+
+      scrollRef.current = root;
+      if (!root) return;
+
+      viewportObserver.current = new ResizeObserver(([entry]) => {
+        setViewport({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      });
+      viewportObserver.current.observe(root);
+
+      windowObserver.current = new IntersectionObserver(
+        (entries) => {
+          setMountedPages((previous) => {
+            const next = new Set(previous);
+            let changed = false;
+
+            for (const entry of entries) {
+              const page = Number((entry.target as HTMLElement).dataset.page);
+              if (entry.isIntersecting === next.has(page)) continue;
+              if (entry.isIntersecting) next.add(page);
+              else next.delete(page);
+              changed = true;
+            }
+
+            return changed ? next : previous;
+          });
+        },
+        { root, rootMargin: RENDER_MARGIN },
+      );
+
+      currentPageObserver.current = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            setCurrentPage(Number((entry.target as HTMLElement).dataset.page));
+          }
+        },
+        { root, rootMargin: CURRENT_PAGE_MARGIN },
+      );
+
+      // Pages that registered before the scroller did, on the first mount.
+      for (const node of pageNodes.current.values()) observePage(node);
+    },
+    [observePage],
+  );
+
+  const registerNode = useCallback(
+    (pageNumber: number, node: HTMLDivElement | null) => {
+      const previous = pageNodes.current.get(pageNumber);
+      if (previous && previous !== node) {
+        windowObserver.current?.unobserve(previous);
+        currentPageObserver.current?.unobserve(previous);
+      }
+
+      if (node) {
+        pageNodes.current.set(pageNumber, node);
+        observePage(node);
+      } else {
+        pageNodes.current.delete(pageNumber);
+      }
+    },
+    [observePage],
+  );
 
   const onIntrinsicSize = useCallback(
     (pageNumber: number, size: { width: number; height: number }) => {
@@ -233,6 +279,20 @@ export function PdfViewer({ path }: { path: string }) {
     },
     [],
   );
+
+  /*
+   * A different file -- or the same file under a new name -- is a different
+   * document. Page sizes, which pages are mounted and where we were all belong
+   * to the old one, and carrying them over is what leaves stale pages on screen
+   * while the new document loads.
+   */
+  useEffect(() => {
+    setPdf(null);
+    setError(null);
+    setIntrinsic(new Map());
+    setMountedPages(new Set([1]));
+    setCurrentPage(1);
+  }, [file]);
 
   const goToPage = useCallback((pageNumber: number) => {
     pageNodes.current.get(pageNumber)?.scrollIntoView({ block: 'start' });
@@ -407,7 +467,7 @@ export function PdfViewer({ path }: { path: string }) {
         onPointerDown={() => useActiveEditorStore.getState().setActiveEditor(scopeId)}
         className='absolute inset-0 outline-none'
       >
-        <div ref={scrollRef} className='h-full w-full overflow-auto bg-background'>
+        <div ref={attachScroller} className='h-full w-full overflow-auto bg-background'>
           {file && (
             <Document
               file={file}
@@ -438,7 +498,10 @@ export function PdfViewer({ path }: { path: string }) {
                       scale={scale}
                       width={size.width * scale}
                       height={size.height * scale}
-                      mounted={mountedPages.has(pageNumber)}
+                      mounted={
+                        mountedPages.has(pageNumber) ||
+                        Math.abs(pageNumber - currentPage) <= NEARBY_PAGES
+                      }
                       matches={matchesByPage[index]?.count ? matchesByPage[index] : undefined}
                       activeMatch={activeMatch}
                       onIntrinsicSize={onIntrinsicSize}
