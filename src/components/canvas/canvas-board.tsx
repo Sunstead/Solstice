@@ -464,7 +464,7 @@ export function CanvasBoard({ path }: { path: string }) {
           <Button
             size='icon-sm'
             variant='ghost'
-            title='Zoom to fit (0)'
+            title='Zoom to fit'
             aria-label='Zoom to fit'
             onClick={fit}
           >

@@ -9,6 +9,21 @@ import {
 } from '@/components/ui/context-menu';
 import type { CanvasColor, EdgeEnd } from '@/lib/canvas/types';
 import { CanvasColorPicker } from './canvas-color-picker';
+import {
+  File,
+  Group,
+  LayersArrowDown,
+  LayersArrowUp,
+  LineDotRightHorizontal,
+  Link2,
+  Maximize2,
+  MoveLeft,
+  MoveRight,
+  PencilLine,
+  Square,
+  SquareChartGantt,
+  Trash,
+} from 'lucide-react';
 
 /**
  * The board's right-click menu.
@@ -78,6 +93,7 @@ export function CanvasContextMenuContent({
                     onSetEdgeEnd('from', checked ? 'arrow' : 'none')
                   }
                 >
+                  <MoveLeft />
                   Start
                 </ContextMenuCheckboxItem>
                 <ContextMenuCheckboxItem
@@ -86,6 +102,7 @@ export function CanvasContextMenuContent({
                     onSetEdgeEnd('to', checked ? 'arrow' : 'none')
                   }
                 >
+                  <MoveRight />
                   End
                 </ContextMenuCheckboxItem>
               </ContextMenuGroup>
@@ -95,34 +112,51 @@ export function CanvasContextMenuContent({
             <>
               <ContextMenuSeparator />
               <ContextMenuItem onClick={onRename}>
+                <PencilLine />
                 {renameKind === 'group' ? 'Rename group...' : 'Edit label...'}
               </ContextMenuItem>
             </>
           )}
           <ContextMenuSeparator />
           <ContextMenuItem onClick={onBringToFront}>
+            <LayersArrowUp />
             Bring to front
           </ContextMenuItem>
-          <ContextMenuItem onClick={onSendToBack}>Send to back</ContextMenuItem>
+          <ContextMenuItem onClick={onSendToBack}>
+            <LayersArrowDown />
+            Send to back
+          </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onClick={onZoomToSelection}>
+            <Maximize2 />
             Zoom to selection
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem variant='destructive' onClick={onDelete}>
+            <Trash />
             Delete
           </ContextMenuItem>
         </>
       ) : (
         <>
-          <ContextMenuItem onClick={onNewText}>New card</ContextMenuItem>
-          <ContextMenuItem onClick={onNewFile}>New file card...</ContextMenuItem>
-          <ContextMenuItem onClick={onNewLink}>New link card...</ContextMenuItem>
-          <ContextMenuItem onClick={onNewGroup}>New group</ContextMenuItem>
+          <ContextMenuItem onClick={onNewText}>
+            <Square />
+            New card</ContextMenuItem>
+          <ContextMenuItem onClick={onNewFile}>
+            <SquareChartGantt />
+            New file card...
+          </ContextMenuItem>
+          <ContextMenuItem onClick={onNewLink}>
+            <Link2 />
+            New link card...
+          </ContextMenuItem>
+          <ContextMenuItem onClick={onNewGroup}>
+            <Group />
+            New group</ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onClick={onZoomToFit}>
+            <Maximize2 />
             Zoom to fit
-            <ContextMenuShortcut>0</ContextMenuShortcut>
           </ContextMenuItem>
         </>
       )}
