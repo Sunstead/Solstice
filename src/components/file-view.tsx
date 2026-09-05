@@ -1,3 +1,4 @@
+import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import { FileEditor } from '@/components/file-editor';
 import { ImageViewer } from '@/components/viewer/image-viewer';
 import { MediaViewer } from '@/components/viewer/media-viewer';
@@ -29,6 +30,8 @@ export const FileView: React.FC<{ path: string }> = ({ path }) => {
       return <MediaViewer path={path} kind='audio' />;
     case 'pdf':
       return <PdfViewer path={path} />;
+    case 'canvas':
+      return <CanvasEditor path={path} />;
     default:
       return <UnsupportedViewer path={path} />;
   }

@@ -1,7 +1,7 @@
 // components/blank-tab.tsx
 import { runCommand } from '@/lib/commands';
 import { Button } from './ui/button';
-import { FilePlusCorner, LucideIcon, Search, X } from 'lucide-react';
+import { FilePlusCorner, Frame, LucideIcon, Search, X } from 'lucide-react';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { CommandId } from '@/bindings';
 import { Keybind } from './keybind';
@@ -18,6 +18,11 @@ const blankTabActions: {
     label: 'Create new note...',
     icon: FilePlusCorner,
     commandId: 'file.new_note',
+  },
+  {
+    label: 'Create new canvas...',
+    icon: Frame,
+    commandId: 'file.new_canvas',
   },
   {
     label: 'Open note...',

@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-/** Screen spacing the dots aim for; the cell is snapped to a power of two. */
-const TARGET_SPACING = 30;
+import { gridCellForScale } from '@/lib/canvas/grid';
+import { useResolvedColors } from '@/lib/canvas/use-resolved-color';
 
 const DOT_RADIUS = 1;
 
 /**
- * The dot surface an image sits on.
+ * The dot surface an image or a canvas board sits on.
  *
  * Drawn on a canvas rather than as a tiled CSS background. The background
  * version is smooth in Chromium and jitters in WKWebView, which is why it
@@ -16,14 +16,15 @@ const DOT_RADIUS = 1;
  * snaps them back. A canvas has no tile -- every dot centre is a float the
  * rasteriser antialiases directly -- so there is nothing to round.
  *
- * The lattice itself is unchanged from the canvas editor this was ported from.
  * `offset` is the screen position of the content's origin, which with a `0 0`
  * transform origin is exactly the translation applied to the content, so dots
  * land on content coordinates that are whole multiples of the cell and stay
- * welded to the image through any pan or zoom. Snapping the cell to a power of
- * two makes zooming *subdivide*: each cell is half the last, so existing dots
- * survive and new ones appear between them. `Math.min(scale, 1)` stops that
- * above 1:1, where a subdivision would reveal half the dots at once.
+ * welded to the image through any pan or zoom.
+ *
+ * The cell comes from `gridCellForScale` rather than being computed here, so
+ * the canvas editor snaps to the same lattice it can see. Both surfaces render
+ * their content and this layer from one `scale`/`offset` pair in one commit,
+ * so nothing can disagree about where anything is.
  */
 export function CanvasGrid({
   scale,
@@ -35,13 +36,12 @@ export function CanvasGrid({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
-  /**
-   * The resolved dot colour.
-   *
-   * Cached because reading it means `getComputedStyle`, which forces a style
-   * recalculation -- doing that inside the draw would cost one every frame.
+  /*
+   * `color: var(--ring)` on the element resolves the theme variable to a value
+   * the canvas will accept as a fill. Shared with the minimap, which is also a
+   * canvas and has the same problem.
    */
-  const colorRef = useRef('');
+  const colors = useResolvedColors(canvasRef, ['color']);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -58,29 +58,6 @@ export function CanvasGrid({
     return () => observer.disconnect();
   }, []);
 
-  /*
-   * `color: var(--ring)` on the element resolves the theme variable to a
-   * concrete value the canvas will accept as a fill. Re-read when the theme
-   * changes, which shows up as an attribute change on `<html>`.
-   */
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const read = () => {
-      colorRef.current = getComputedStyle(canvas).color;
-    };
-
-    read();
-    const observer = new MutationObserver(read);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'style', 'data-theme'],
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
@@ -94,8 +71,7 @@ export function CanvasGrid({
     if (canvas.width !== backingWidth) canvas.width = backingWidth;
     if (canvas.height !== backingHeight) canvas.height = backingHeight;
 
-    const cell = 2 ** Math.round(Math.log2(TARGET_SPACING / Math.min(scale, 1)));
-    const spacing = cell * scale;
+    const spacing = gridCellForScale(scale) * scale;
     if (!Number.isFinite(spacing) || spacing <= 0) return;
 
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -118,9 +94,9 @@ export function CanvasGrid({
       }
     }
 
-    context.fillStyle = colorRef.current || 'currentColor';
+    context.fillStyle = colors.current.color || 'currentColor';
     context.fill(path);
-  }, [scale, offset, size]);
+  }, [scale, offset, size, colors]);
 
   return <canvas ref={canvasRef} aria-hidden className='solstice-canvas-grid' />;
 }

@@ -13,6 +13,7 @@ import { DOMSerializer } from '@milkdown/kit/prose/model';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { FileWarning, Link2Off, RefreshCcw } from 'lucide-react';
 
+import { CanvasPreviewCard } from '@/components/canvas/canvas-preview-card';
 import { MediaPlayer } from '@/components/viewer/media-player';
 import { PdfPreviewCard } from '@/components/viewer/pdf-preview-card';
 
@@ -25,9 +26,10 @@ import {
 } from '@/lib/embed/source';
 import { resolveAsset } from '@/lib/image/resolve';
 import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
-import { basename, parseWikilinkTarget, wikilinkLabel } from '@/lib/wikilink/target';
+import { basename, parseWikilinkTarget } from '@/lib/wikilink/target';
 import { parseSize } from '@/lib/image/size';
 import { cn } from '@/lib/utils';
+import { rewriteStaticFragment } from '@/lib/editor/static-markdown';
 import { useEditorNotePath } from './editor-file-context';
 
 /**
@@ -41,42 +43,6 @@ import { useEditorNotePath } from './editor-file-context';
 const EmbedChainContext = createContext<readonly string[]>([]);
 
 const MAX_EMBED_DEPTH = 3;
-
-/**
- * Rewrites links inside transcluded content, which was written relative to the
- * *embedded* note rather than to the one displaying it.
- *
- * Static serialization is used rather than a nested editor: a second Milkdown
- * instance per embed would bring its own autosaver, command surface and undo
- * history, none of which a read-only preview should own.
- */
-function rewriteTransclusion(
-  fragment: ParentNode,
-  sourcePath: string,
-  workspaceRoot: string | null,
-) {
-  const index = useWikilinkIndex.getState();
-
-  for (const image of Array.from(fragment.querySelectorAll('img[src]'))) {
-    const asset = resolveAsset(
-      image.getAttribute('src') ?? '',
-      { notePath: sourcePath, workspaceRoot },
-      index,
-    );
-
-    if (asset.status === 'unresolved') image.removeAttribute('src');
-    else image.setAttribute('src', asset.url);
-  }
-
-  // Wikilinks serialize as their literal `[[target]]` source. In a preview
-  // there is nothing to edit, so show what a collapsed link would show.
-  for (const link of Array.from(fragment.querySelectorAll('[data-wikilink]'))) {
-    const raw = link.textContent ?? '';
-    const target = raw.slice(2, -2);
-    link.textContent = wikilinkLabel(parseWikilinkTarget(target).path);
-    link.classList.add('wikilink', 'wikilink-resolved');
-  }
-}
 
 export function createEmbedView(ctx: Ctx): React.FC {
   return function EmbedView() {
@@ -149,6 +115,10 @@ export function createEmbedView(ctx: Ctx): React.FC {
 
         {kind === 'pdf' && absolutePath && (
           <PdfPreviewCard path={absolutePath} height={height ?? undefined} />
+        )}
+
+        {kind === 'canvas' && absolutePath && (
+          <CanvasPreviewCard path={absolutePath} height={height ?? undefined} />
         )}
 
         {kind === 'markdown' && absolutePath && (
@@ -252,7 +222,10 @@ function Transclusion({
 
     const schema = ctx.get(editorViewCtx).state.schema;
     const fragment = DOMSerializer.fromSchema(schema).serializeFragment(doc.content);
-    rewriteTransclusion(fragment, absolutePath, workspaceRoot);
+    // Static serialization rather than a nested editor: a second Milkdown
+    // instance per embed would bring its own autosaver, command surface and
+    // undo history, none of which a read-only preview should own.
+    rewriteStaticFragment(fragment, absolutePath, workspaceRoot);
 
     host.replaceChildren(fragment);
   }, [ctx, markdown, heading, absolutePath, workspaceRoot]);

@@ -1,6 +1,13 @@
 import { getFileExtension } from '@/lib/utils';
 
-export type EmbedKind = 'image' | 'video' | 'audio' | 'pdf' | 'markdown' | 'unknown';
+export type EmbedKind =
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'pdf'
+  | 'markdown'
+  | 'canvas'
+  | 'unknown';
 
 /**
  * One table, so adding a future embed type is a line here plus a branch in the
@@ -29,6 +36,7 @@ const BY_EXTENSION: Record<string, EmbedKind> = {
 
   pdf: 'pdf',
   md: 'markdown',
+  canvas: 'canvas',
 };
 
 /** An extensionless target is a note, matching how wikilinks resolve. */
