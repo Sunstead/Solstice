@@ -64,7 +64,7 @@
   overflow: hidden;
   border: 1px solid
     color-mix(in oklch, var(--canvas-node-color) 55%, transparent);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   /*
    * Mixed against `--card` rather than used as the fill. A hex someone picked
    * in another app, or in the other theme, can be unreadable behind text;
@@ -387,7 +387,7 @@ html[data-reduce-motion='true'] .solstice-canvas-port {
   bottom: 0.75rem;
   z-index: 20;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background-color: color-mix(in oklab, var(--popover) 85%, transparent);
   box-shadow: 0 2px 8px oklch(0 0 0 / 0.15);
   backdrop-filter: blur(8px);
