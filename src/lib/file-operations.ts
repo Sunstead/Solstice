@@ -3,6 +3,8 @@ import { applyFsChanges, selfChange } from '@/lib/fs-sync';
 import type { FileTreeNode } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
 import { joinPath, parentOf } from '@/lib/path-utils';
+import { getPresetByExtension } from '@/lib/stores/entry-input';
+import { getFileExtension } from '@/lib/utils';
 
 /**
  * In-app operations apply optimistically through the same reconciler the
@@ -54,6 +56,20 @@ async function createFile(parentPath: string, name: string) {
   if (result.status === 'error') {
     logFailure(`create file "${path}"`, result.error);
     return result;
+  }
+
+  // `create_file` leaves a zero-byte file, which not every format can read back
+  // as an empty document -- `""` is not JSON. The preset is looked up from the
+  // extension rather than passed in, so typing `board.canvas` into the plain
+  // new-file input seeds it exactly as the New Canvas menu item does.
+  //
+  // Before `openFile`, so the tab never opens on the empty version.
+  const preset = getPresetByExtension(getFileExtension(name));
+  if (preset?.initialContents) {
+    const seeded = await commands.writeFile(path, preset.initialContents);
+    if (seeded.status === 'error') {
+      logFailure(`seed file "${path}"`, seeded.error);
+    }
   }
 
   await applyFsChanges([selfChange('Created', path)]);

@@ -2,6 +2,7 @@ import { SvgComponent } from '@/lib/views/types';
 
 import Markdown from './file-types/markdown.svg?react';
 import Json from './file-types/json.svg?react';
+import Canvas from './file-types/canvas.svg?react';
 import Pdf from './file-types/pdf.svg?react';
 import Image from './file-types/image.svg?react';
 import Video from './file-types/video.svg?react';
@@ -13,6 +14,7 @@ import Default from './file-types/file.svg?react';
 export const fileIconRegistry: Record<string, SvgComponent> = {
   md: Markdown,
   json: Json,
+  canvas: Canvas,
   pdf: Pdf,
   png: Image,
   jpg: Image,

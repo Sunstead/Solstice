@@ -35,6 +35,35 @@ export interface EditorFeatureOptions {
 }
 
 /**
+ * What the document *is*: every node and mark this app adds to commonmark,
+ * with the rules that parse and serialize them. No React, no node views, no
+ * path.
+ *
+ * Split out from `createEditorFeatures` so a headless editor can be built from
+ * the same list -- see `static-markdown.ts`, which renders a canvas card's
+ * markdown with no editor attached to anything. Sharing the list is what keeps
+ * a card and a note definitionally in step: a feature added here appears in
+ * both, and there is no second manifest to forget.
+ */
+export function editorSchemaPlugins(): MilkdownPlugin[] {
+  return [
+    imageWithSize,
+    insertImageWithSizeInputRule,
+
+    wikiEmbedSchema,
+    insertWikiEmbedInputRule,
+
+    math,
+
+    link,
+    callout,
+    taskList,
+    table,
+    footnote,
+  ].flat();
+}
+
+/**
  * Every Solstice-specific editor feature, collected in one list.
  *
  * Kept out of `milkdown-editor.tsx` deliberately: adding a feature is an edit
@@ -50,12 +79,10 @@ export function createEditorFeatures({
   nodeViewFactory,
 }: EditorFeatureOptions): MilkdownPlugin[] {
   return [
-    imageWithSize,
-    insertImageWithSizeInputRule,
+    ...editorSchemaPlugins(),
+
     $view(imageWithSize.node, () => nodeViewFactory({ component: ImageView })),
 
-    wikiEmbedSchema,
-    insertWikiEmbedInputRule,
     // The view is built inside the factory so it closes over the editor's own
     // ctx, which transclusion needs for the parser and the schema.
     $view(wikiEmbedSchema.node, (ctx) =>
@@ -98,7 +125,6 @@ export function createEditorFeatures({
       }),
     ),
 
-    math,
     // Events inside the formula's own controls belong to the node view, not
     // to the document: without this ProseMirror also handles what is typed
     // into the source box, and a keystroke landing on the selected node
@@ -117,11 +143,6 @@ export function createEditorFeatures({
       }),
     ),
 
-    link,
-    callout,
-    taskList,
-    table,
-    footnote,
     // Last, so every preset input rule -- emphasis, headings, lists -- is
     // tried before the generic pairs. Input rules inside a `code` textblock
     // never run at all, so code blocks need no special case here.

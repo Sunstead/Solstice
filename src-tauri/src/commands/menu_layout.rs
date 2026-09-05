@@ -76,6 +76,7 @@ fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
             {
                 let mut items = vec![
                     Command(FileNewNote),
+        Command(FileNewCanvas),
                     Command(FileNewFolder),
                     Command(FileNewTab),
                     Separator,
@@ -129,7 +130,31 @@ fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                 Native(SelectAll)
             ],
         ),
-        ("View", vec![Command(ViewToggleSidebar)]),
+        (
+            "View",
+            vec![
+                Command(ViewToggleSidebar),
+                Separator,
+                // A submenu rather than a top-level "Canvas" menu. The `Format`
+                // precedent would allow one, but two top-level menus that are
+                // each greyed out most of the time reads worse than one
+                // submenu -- and View had a single item to keep it company.
+                Submenu(
+                    "Canvas",
+                    vec![
+                        Command(CanvasNewText),
+                        Command(CanvasNewFile),
+                        Command(CanvasNewGroup),
+                        Separator,
+                        Command(CanvasZoomToFit),
+                        Command(CanvasZoomToSelection),
+                        Separator,
+                        Command(CanvasToggleSnap),
+                        Command(CanvasToggleMinimap),
+                    ],
+                ),
+            ],
+        ),
         (
             "Format",
             vec![

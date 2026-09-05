@@ -43,6 +43,7 @@ command_id! {
     AppSettings => "app.settings",
 
     FileNewNote => "file.new_note",
+    FileNewCanvas => "file.new_canvas",
     FileOpenFile => "file.open_file",
     FileNewTab => "file.new_tab",
     FileNewFolder => "file.new_folder",
@@ -85,6 +86,14 @@ command_id! {
 
     NavigationBack => "navigation.back",
     NavigationForward => "navigation.forward",
+
+    CanvasNewText => "canvas.new_text",
+    CanvasNewFile => "canvas.new_file",
+    CanvasNewGroup => "canvas.new_group",
+    CanvasZoomToFit => "canvas.zoom_to_fit",
+    CanvasZoomToSelection => "canvas.zoom_to_selection",
+    CanvasToggleSnap => "canvas.toggle_snap",
+    CanvasToggleMinimap => "canvas.toggle_minimap",
 }
 
 impl std::fmt::Display for CommandId {
@@ -130,6 +139,14 @@ pub fn default_commands() -> Vec<CommandMeta> {
             id: CommandId::FileNewNote,
             label: "New Note".into(),
             accelerator: Some("CmdOrCtrl+N".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileNewCanvas,
+            label: "New Canvas".into(),
+            // No default: creating a board is a deliberate, occasional action,
+            // and it stays bindable from the keybindings pane.
+            accelerator: None,
             is_overridden: false,
         },
         CommandMeta {
@@ -359,6 +376,55 @@ pub fn default_commands() -> Vec<CommandMeta> {
             id: CommandId::NavigationForward,
             label: "Go Forward".into(),
             accelerator: Some("Alt+ArrowRight".into()),
+            is_overridden: false,
+        },
+        // -- Canvas --
+        // No default accelerators. These act on whatever the focused tab has
+        // open, so the useful ones are per-user; an empty default keeps them
+        // bindable from the keybindings pane without spending a keystroke
+        // everyone has to live with. The reflexive keys on a board -- Delete,
+        // the arrows, 0 and 1 -- are handled by the surface's own keydown,
+        // exactly as the image viewer handles 0 and 1.
+        CommandMeta {
+            id: CommandId::CanvasNewText,
+            label: "New Card".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::CanvasNewFile,
+            label: "New File Card...".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::CanvasNewGroup,
+            label: "New Group".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::CanvasZoomToFit,
+            label: "Zoom to Fit".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::CanvasZoomToSelection,
+            label: "Zoom to Selection".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::CanvasToggleSnap,
+            label: "Snap to Grid".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::CanvasToggleMinimap,
+            label: "Show Minimap".into(),
+            accelerator: None,
             is_overridden: false,
         }
     ]
