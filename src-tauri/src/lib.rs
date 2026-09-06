@@ -46,6 +46,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::keymap::set_menu_accelerators_enabled,
             commands::menu_layout::get_menu_layout,
             commands::menu_layout::get_native_menu_command_ids,
+            commands::themes::list_user_themes,
+            commands::themes::ensure_theme_dir,
+            commands::fonts::list_system_fonts,
         ])
         .events(tauri_specta::collect_events![KeymapChanged, MenuCommand, FileSystemChanged])
 }

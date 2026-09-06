@@ -94,6 +94,24 @@ export const commands = {
 	 *  accelerator to one dispatcher and rules out double-firing.
 	 */
 	getNativeMenuCommandIds: () => __TAURI_INVOKE<CommandId[]>("get_native_menu_command_ids"),
+	/**
+	 *  Every user-authored theme visible right now: the ones in the open workspace
+	 *  and the ones in the app data dir, which follow the user between workspaces.
+	 */
+	listUserThemes: () => typedError<UserThemeFile[], string>(__TAURI_INVOKE("list_user_themes")),
+	/**
+	 *  The directory a user theme should be dropped into, created on demand so the
+	 *  settings pane can offer to reveal it.
+	 */
+	ensureThemeDir: (scope: string) => typedError<string, string>(__TAURI_INVOKE("ensure_theme_dir", { scope })),
+	/**
+	 *  Every font family installed on this machine, sorted and deduplicated.
+	 * 
+	 *  Enumerating families walks the system font directories, which is slow
+	 *  enough to be worth keeping off the startup path -- the frontend calls this
+	 *  lazily the first time a font control is opened and caches the result.
+	 */
+	listSystemFonts: () => typedError<string[], string>(__TAURI_INVOKE("list_system_fonts")),
 };
 
 /** Events */
@@ -184,6 +202,19 @@ export type ResolvedMenuEntry = ({ Command: CommandMeta }) & { Native?: never; S
 	title: string,
 	entries: ResolvedMenuEntry[],
 } }) & { Command?: never; Native?: never };
+
+/**
+ *  One theme file as found on disk. The contents are handed over unparsed:
+ *  validating here would split the rules across two languages, and the
+ *  frontend already owns the token allowlist that decides what a theme may
+ *  declare.
+ */
+export type UserThemeFile = {
+	path: string,
+	/**  `"workspace"` or `"global"`, for the badge on the theme card. */
+	source: string,
+	contents: string,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

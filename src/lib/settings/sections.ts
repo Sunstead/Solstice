@@ -1,4 +1,12 @@
-import { Files, Keyboard, PenLine, Paintbrush, type LucideIcon, PersonStanding } from 'lucide-react';
+import {
+  Files,
+  Keyboard,
+  PenLine,
+  Palette,
+  Type,
+  type LucideIcon,
+  PersonStanding,
+} from 'lucide-react';
 
 /**
  * The nav down the left of the settings dialog, shaped like `primaryViews` in
@@ -13,10 +21,18 @@ export interface SettingsSection {
 }
 
 export const settingsSections = [
+  // Themes and the leftover visual toggles (viewers, canvas) live under one
+  // "Appearance" section; typography stays separate since it is comprehensive
+  // enough to deserve its own nav item.
   {
     id: 'appearance',
     label: 'Appearance',
-    icon: Paintbrush,
+    icon: Palette,
+  },
+  {
+    id: 'typography',
+    label: 'Typography',
+    icon: Type,
   },
   {
     id: 'editor',

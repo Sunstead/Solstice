@@ -94,7 +94,7 @@ export function SettingsDialog() {
         ref={panelRef}
         initialFocus={panelRef}
         showCloseButton={false}
-        className='flex h-[min(90svh,680px)] w-[calc(100%-2rem)] flex-col overflow-hidden bg-background p-0 sm:max-w-4xl'
+        className='flex h-[min(92svh,860px)] w-[calc(100%-2rem)] flex-col overflow-hidden bg-background p-0 sm:max-w-6xl'
       >
         <DialogTitle className='sr-only'>Settings</DialogTitle>
         <DialogDescription className='sr-only'>
@@ -106,7 +106,7 @@ export function SettingsDialog() {
         <SidebarProvider className='min-h-0 flex-1'>
           <Sidebar
             collapsible='none'
-            className='hidden w-52 min-w-52 bg-sidebar text-sidebar-foreground md:flex'
+            className='hidden w-56 min-w-56 bg-sidebar text-sidebar-foreground md:flex'
           >
             <SidebarContent>
               <div className='px-2 pt-2'>
