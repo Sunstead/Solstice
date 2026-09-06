@@ -121,6 +121,21 @@ function LoadedCanvas({
   });
 
   useEffect(() => {
+    // Leaving a card's edit mode already lands its text in `doc` -- see
+    // `registerCardFlush` -- but the board's own autosaver would otherwise
+    // still wait out `editor.autosaveDelay` before writing it. A card that was
+    // just being typed into is exactly the moment someone is watching for the
+    // save to land, so force it through immediately rather than leaving the
+    // usual debounce to catch up.
+    let wasEditing = store.getState().editingNodeId !== null;
+    return store.subscribe((state) => {
+      const isEditing = state.editingNodeId !== null;
+      if (wasEditing && !isEditing) autosaver.current?.flush();
+      wasEditing = isEditing;
+    });
+  }, [store]);
+
+  useEffect(() => {
     const saver = autosaver.current;
     // A tab closed mid-edit still has to land its last write.
     const flush = () => saver?.flush();

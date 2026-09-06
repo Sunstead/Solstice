@@ -1,3 +1,5 @@
+import { Fragment } from 'react';
+
 import {
   ContextMenuCheckboxItem,
   ContextMenuContent,
@@ -5,23 +7,20 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
-  ContextMenuShortcut,
 } from '@/components/ui/context-menu';
 import type { CanvasColor, EdgeEnd } from '@/lib/canvas/types';
 import { CanvasColorPicker } from './canvas-color-picker';
 import {
-  File,
   Group,
   LayersArrowDown,
   LayersArrowUp,
-  LineDotRightHorizontal,
   Link2,
   Maximize2,
   MoveLeft,
   MoveRight,
   PencilLine,
-  Square,
   SquareChartGantt,
+  SquarePlus,
   Trash,
 } from 'lucide-react';
 
@@ -77,89 +76,114 @@ export function CanvasContextMenuContent({
   onZoomToFit,
   onZoomToSelection,
 }: CanvasContextMenuProps) {
+  /*
+   * What this menu *is*, so React rebuilds it when it becomes a different one.
+   *
+   * Both branches below are lists of `ContextMenuItem`s in a fragment, so
+   * without a key React reconciles them slot by slot and reuses the DOM node
+   * at each position -- the sixth item is `ContextMenuItem` either way, so
+   * "Zoom to fit" became "Send to back" by having its text and icon swapped in
+   * place rather than by being replaced.
+   *
+   * That is wrong on its own terms (these are different items, and reusing a
+   * node carries Base UI's per-item state across with it), and in WebKit it
+   * showed: the popup paints over a `backdrop-filter` layer, and while
+   * swapping the icon inserts an element and dirties the region, rewriting a
+   * text node in place did not always invalidate it. The old label stayed on
+   * screen until hovering the item repainted it. Fresh nodes have nothing to
+   * leave behind.
+   */
+  const shape = [
+    hasSelection ? 'selection' : 'board',
+    edgeEnds ? 'edges' : '',
+    renameKind ?? '',
+  ].join('/');
+
   return (
     <ContextMenuContent className='min-w-52'>
-      {hasSelection ? (
-        <>
-          <CanvasColorPicker value={selectionColor} onPick={onSetColor} />
-          {edgeEnds && (
-            <>
-              <ContextMenuSeparator />
-              <ContextMenuGroup>
-                <ContextMenuLabel>Arrowheads</ContextMenuLabel>
-                <ContextMenuCheckboxItem
-                  checked={edgeEnds.from === 'on'}
-                  onCheckedChange={(checked) =>
-                    onSetEdgeEnd('from', checked ? 'arrow' : 'none')
-                  }
-                >
-                  <MoveLeft />
-                  Start
-                </ContextMenuCheckboxItem>
-                <ContextMenuCheckboxItem
-                  checked={edgeEnds.to === 'on'}
-                  onCheckedChange={(checked) =>
-                    onSetEdgeEnd('to', checked ? 'arrow' : 'none')
-                  }
-                >
-                  <MoveRight />
-                  End
-                </ContextMenuCheckboxItem>
-              </ContextMenuGroup>
-            </>
-          )}
-          {renameKind && (
-            <>
-              <ContextMenuSeparator />
-              <ContextMenuItem onClick={onRename}>
-                <PencilLine />
-                {renameKind === 'group' ? 'Rename group...' : 'Edit label...'}
-              </ContextMenuItem>
-            </>
-          )}
-          <ContextMenuSeparator />
-          <ContextMenuItem onClick={onBringToFront}>
-            <LayersArrowUp />
-            Bring to front
-          </ContextMenuItem>
-          <ContextMenuItem onClick={onSendToBack}>
-            <LayersArrowDown />
-            Send to back
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem onClick={onZoomToSelection}>
-            <Maximize2 />
-            Zoom to selection
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem variant='destructive' onClick={onDelete}>
-            <Trash />
-            Delete
-          </ContextMenuItem>
-        </>
-      ) : (
-        <>
-          <ContextMenuItem onClick={onNewText}>
-            <Square />
-            New card</ContextMenuItem>
-          <ContextMenuItem onClick={onNewFile}>
-            <SquareChartGantt />
-            New file card...
-          </ContextMenuItem>
-          <ContextMenuItem onClick={onNewLink}>
-            <Link2 />
-            New link card...
-          </ContextMenuItem>
-          <ContextMenuItem onClick={onNewGroup}>
-            <Group />
-            New group</ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem onClick={onZoomToFit}>
-            <Maximize2 />
-            Zoom to fit
-          </ContextMenuItem>
-        </>
-      )}
+      <Fragment key={shape}>
+        {hasSelection ? (
+          <>
+            <CanvasColorPicker value={selectionColor} onPick={onSetColor} />
+            {edgeEnds && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuGroup>
+                  <ContextMenuLabel>Arrowheads</ContextMenuLabel>
+                  <ContextMenuCheckboxItem
+                    checked={edgeEnds.from === 'on'}
+                    onCheckedChange={(checked) =>
+                      onSetEdgeEnd('from', checked ? 'arrow' : 'none')
+                    }
+                  >
+                    <MoveLeft />
+                    Start
+                  </ContextMenuCheckboxItem>
+                  <ContextMenuCheckboxItem
+                    checked={edgeEnds.to === 'on'}
+                    onCheckedChange={(checked) =>
+                      onSetEdgeEnd('to', checked ? 'arrow' : 'none')
+                    }
+                  >
+                    <MoveRight />
+                    End
+                  </ContextMenuCheckboxItem>
+                </ContextMenuGroup>
+              </>
+            )}
+            {renameKind && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem onClick={onRename}>
+                  <PencilLine />
+                  {renameKind === 'group' ? 'Rename group...' : 'Edit label...'}
+                </ContextMenuItem>
+              </>
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={onBringToFront}>
+              <LayersArrowUp />
+              Bring to front
+            </ContextMenuItem>
+            <ContextMenuItem onClick={onSendToBack}>
+              <LayersArrowDown />
+              Send to back
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={onZoomToSelection}>
+              <Maximize2 />
+              Zoom to selection
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem variant='destructive' onClick={onDelete}>
+              <Trash />
+              Delete
+            </ContextMenuItem>
+          </>
+        ) : (
+          <>
+            <ContextMenuItem onClick={onNewText}>
+              <SquarePlus />
+              New card</ContextMenuItem>
+            <ContextMenuItem onClick={onNewFile}>
+              <SquareChartGantt />
+              New file card...
+            </ContextMenuItem>
+            <ContextMenuItem onClick={onNewLink}>
+              <Link2 />
+              New link card...
+            </ContextMenuItem>
+            <ContextMenuItem onClick={onNewGroup}>
+              <Group />
+              New group</ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={onZoomToFit}>
+              <Maximize2 />
+              Zoom to fit
+            </ContextMenuItem>
+          </>
+        )}
+      </Fragment>
     </ContextMenuContent>
   );
 }

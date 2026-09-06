@@ -4,6 +4,7 @@ import {
   Editor,
   editorViewCtx,
   rootCtx,
+  serializerCtx,
 } from '@milkdown/kit/core';
 import { clipboard } from '@milkdown/kit/plugin/clipboard';
 import { history } from '@milkdown/kit/plugin/history';
@@ -85,6 +86,30 @@ function TextEditorCore({ node }: { node: TextNode }) {
       view.focus();
     });
   }, [loading, getEditor]);
+
+  // Registers this card's "commit right now" callback -- see
+  // `registerCardFlush`. Reads the *live* ProseMirror document directly,
+  // rather than waiting on `markdownUpdated`'s debounce, which is exactly the
+  // thing that would otherwise still be pending when the card unmounts. Same
+  // coalesce key as the listener above: this is not a separate edit, only a
+  // guarantee that the last one lands before the editor goes away.
+  useEffect(() => {
+    if (loading) return;
+    const editor = getEditor();
+    if (!editor) return;
+
+    const flush = () => {
+      const markdown = editor.action((ctx) =>
+        ctx.get(serializerCtx)(ctx.get(editorViewCtx).state.doc),
+      );
+      const state = store.getState();
+      state.commit(setNodeText(state.doc, node.id, markdown), {
+        coalesceKey: `text:${node.id}`,
+      });
+    };
+
+    return store.getState().registerCardFlush(node.id, flush);
+  }, [loading, getEditor, store, node.id]);
 
   return <Milkdown />;
 }

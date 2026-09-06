@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Map as MapIcon, Maximize2, Minus, Plus } from 'lucide-react';
+import {
+  Group,
+  Link2,
+  Map as MapIcon,
+  Maximize2,
+  Minus,
+  Plus,
+  SquareChartGantt,
+  SquarePlus,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -436,6 +445,47 @@ export function CanvasBoard({ path }: { path: string }) {
 
       <div className='pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4'>
         <ViewerToolbar>
+          {/* Same icons as the context menu's "New ..." items, so a card's
+              type reads the same way whichever surface added it. */}
+          <Button
+            size='icon-sm'
+            variant='ghost'
+            title='New card'
+            aria-label='New card'
+            onClick={newTextCard}
+          >
+            <SquarePlus />
+          </Button>
+          <Button
+            size='icon-sm'
+            variant='ghost'
+            title='New file card'
+            aria-label='New file card'
+            onClick={newFileCard}
+          >
+            <SquareChartGantt />
+          </Button>
+          <Button
+            size='icon-sm'
+            variant='ghost'
+            title='New link card'
+            aria-label='New link card'
+            onClick={newLinkCard}
+          >
+            <Link2 />
+          </Button>
+          <Button
+            size='icon-sm'
+            variant='ghost'
+            title='New group'
+            aria-label='New group'
+            onClick={newGroup}
+          >
+            <Group />
+          </Button>
+
+          <ViewerToolbarSeparator />
+
           <Button
             size='icon-sm'
             variant='ghost'

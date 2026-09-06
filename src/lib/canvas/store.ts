@@ -80,6 +80,17 @@ export interface CanvasState {
   setInteraction(interaction: Interaction): void;
   setEditing(id: string | null): void;
 
+  /**
+   * Registers the currently-mounted card editor's "commit whatever you have,
+   * right now" callback. `setEditing` calls whatever is registered for the
+   * node it is leaving *before* changing `editingNodeId` -- which is what
+   * unmounts that editor -- because Milkdown's `markdownUpdated` listener is
+   * debounced by ~200ms, and a card left within that window would otherwise
+   * unmount before the debounce ever fires, silently dropping the keystrokes
+   * it was about to report. Returns an unregister function.
+   */
+  registerCardFlush(id: string, flush: () => void): () => void;
+
   select(ids: Iterable<string>, mode?: SelectionMode): void;
   clearSelection(): void;
 }
@@ -93,6 +104,11 @@ export function createCanvasStore(
   /** Called for every committed change; the tab turns it into a write. */
   onDocChanged: (doc: CanvasDoc) => void,
 ): CanvasStore {
+  // Not store state: nothing should re-render off who currently holds a flush
+  // callback, and the callback itself closes over a live Milkdown instance
+  // that has no business being kept in a serializable snapshot.
+  const cardFlush = new Map<string, () => void>();
+
   return createStore<CanvasState>((set, get) => ({
     doc: initial,
     selection: EMPTY_SELECTION,
@@ -166,8 +182,21 @@ export function createCanvasStore(
     setInteraction: (interaction) => set({ interaction }),
 
     setEditing(id) {
-      if (get().editingNodeId === id) return;
+      const current = get().editingNodeId;
+      if (current === id) return;
+      // Give the card being left one last chance to land its freshest text --
+      // see `registerCardFlush`. Runs first: the card is still mounted at this
+      // point, and only the `set` below triggers the re-render that tears it
+      // down.
+      if (current !== null) cardFlush.get(current)?.();
       set({ editingNodeId: id });
+    },
+
+    registerCardFlush(id, flush) {
+      cardFlush.set(id, flush);
+      return () => {
+        if (cardFlush.get(id) === flush) cardFlush.delete(id);
+      };
     },
 
     select(ids, mode = 'replace') {
