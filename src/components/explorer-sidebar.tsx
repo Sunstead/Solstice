@@ -1,6 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { useFiles } from '@/hooks/use-files';
 import {
   SidebarContent,
   SidebarGroup,
@@ -34,12 +33,6 @@ import { useDragHoverStore } from '@/hooks/use-drag-hover';
 export function ExplorerSidebar() {
   const path = useWorkspace((s) => s.path);
   const loading = useWorkspace((s) => s.loading);
-  const loadDirectory = useFiles((s) => s.loadDirectory);
-
-  useEffect(() => {
-    if (!path) return;
-    loadDirectory(path);
-  }, [path, loadDirectory]);
 
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
   const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
