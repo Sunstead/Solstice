@@ -42,9 +42,10 @@ function headingSizes(ratio: number) {
  * stable, greppable, hand-editable strings rather than generated reprs.
  */
 export const settingsRegistry = {
-  // -- Theme ---------------------------------------------------------
+  // -- Appearance / Theme ---------------------------------------------
   'theme.mode': defineEnum({
-    section: 'theme',
+    section: 'appearance',
+    group: 'Theme',
     scope: 'global',
     label: 'Theme mode',
     options: [
@@ -58,7 +59,8 @@ export const settingsRegistry = {
   // list includes whatever theme files the workspace happens to hold, which is
   // not knowable when this module is evaluated.
   'theme.preset': defineSelect({
-    section: 'theme',
+    section: 'appearance',
+    group: 'Theme',
     scope: 'global',
     label: 'Theme',
     options: () => themeOptions(),
@@ -67,7 +69,8 @@ export const settingsRegistry = {
   }),
 
   'theme.lightPreset': defineSelect({
-    section: 'theme',
+    section: 'appearance',
+    group: 'Theme',
     scope: 'global',
     label: 'Light theme',
     options: () => themeOptions('light'),
@@ -76,7 +79,8 @@ export const settingsRegistry = {
   }),
 
   'theme.darkPreset': defineSelect({
-    section: 'theme',
+    section: 'appearance',
+    group: 'Theme',
     scope: 'global',
     label: 'Dark theme',
     options: () => themeOptions('dark'),

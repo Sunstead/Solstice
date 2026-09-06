@@ -10,7 +10,7 @@ import { TypographyPane } from './typography-pane';
  * layer stays free of React imports.
  */
 export const customPanes: Partial<Record<SectionId, React.ComponentType>> = {
-  theme: ThemePane,
+  appearance: ThemePane,
   typography: TypographyPane,
   keybindings: KeybindingsPane,
 };

@@ -25,10 +25,23 @@ function groupByHeading(entries: { key: SettingKey; def: { group?: string } }[])
 /**
  * The default pane: every visible setting declared for this section, in
  * registry order. A new setting appears here with no UI work at all.
+ *
+ * `excludeKeys` lets a custom pane borrow the rest of its own section's
+ * generated rows without duplicating the ones it renders its own control for
+ * -- the theme pane's preset picker is a grid, not a row, but "File viewers"
+ * and "Canvas" still belong to it as ordinary settings.
  */
-export function SettingsPane({ section }: { section: SectionId }) {
+export function SettingsPane({
+  section,
+  excludeKeys,
+}: {
+  section: SectionId;
+  excludeKeys?: readonly SettingKey[];
+}) {
   const read = useSettingReader();
-  const entries = visibleSettingsForSection(section, read);
+  const entries = visibleSettingsForSection(section, read).filter(
+    ({ key }) => !excludeKeys?.includes(key),
+  );
 
   if (entries.length === 0) {
     return (

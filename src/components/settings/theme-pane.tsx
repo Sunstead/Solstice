@@ -11,6 +11,7 @@ import { SWATCH_TOKENS } from '@/lib/theme/tokens';
 import { useThemeCatalogue } from '@/lib/theme/store';
 import type { CatalogueTheme } from '@/lib/theme/types';
 import { SettingList } from './setting-list';
+import { SettingsPane } from './settings-pane';
 
 /**
  * A theme's own colors, read straight off its declaration rather than off the
@@ -72,10 +73,14 @@ function ThemeCard({
   );
 }
 
+/** The theme keys this pane renders its own controls for, not `SettingsPane`'s. */
+const THEME_KEYS = ['theme.mode', 'theme.preset', 'theme.lightPreset', 'theme.darkPreset'] as const;
+
 /**
- * The theme grid, above the generic rows for the section. Themes are picked by
- * looking at them, which a list of radio labels cannot support — everything
- * else about the section is ordinary generated UI.
+ * The custom pane for the merged "Appearance" section: a theme grid above the
+ * generic rows. Themes are picked by looking at them, which a list of radio
+ * labels cannot support — everything else in the section (the mode toggle,
+ * and the leftover viewer/canvas toggles below) is ordinary generated UI.
  */
 export function ThemePane() {
   const themes = useThemeCatalogue((s) => s.themes);
@@ -212,6 +217,13 @@ export function ThemePane() {
           </Button>
         </div>
       </section>
+
+      {/*
+        * Everything else this section owns -- the "File viewers" and "Canvas"
+        * groups -- rendered as ordinary settings below the theme controls.
+        * `excludeKeys` keeps the theme keys above from appearing twice.
+        */}
+      <SettingsPane section='appearance' excludeKeys={THEME_KEYS} />
     </div>
   );
 }
