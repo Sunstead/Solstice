@@ -39,7 +39,7 @@ On the frontend, [src/lib/commands.ts](src/lib/commands.ts) is the dispatch laye
 
 ### Workspace state
 
-A workspace is a directory path, nothing more. [src-tauri/src/workspace.rs](src-tauri/src/workspace.rs) keeps it in an in-memory `HashMap<window_label, path>` (`set_workspace`/`get_workspace` commands). The frontend mirrors this in [src/hooks/use-workspace.ts](src/hooks/use-workspace.ts) (`useWorkspace`), which also tracks recently-opened workspaces (`useKnownWorkspaces`) and restores the last one on startup. Switching workspaces (`setWorkspace`) resets and reloads every workspace-scoped store: layout, settings, and the file index.
+A workspace is a directory path, nothing more. [src-tauri/src/workspace.rs](src-tauri/src/workspace.rs) keeps it in an in-memory `HashMap<window_label, path>` (`set_workspace`/`get_workspace` commands). The frontend mirrors this in [src/hooks/use-workspace.ts](src/hooks/use-workspace.ts) (`useWorkspace`), which also tracks recently-opened workspaces (`useKnownWorkspaces`) and restores the last one on startup. Switching workspaces (`setWorkspace`) resets and reloads every workspace-scoped store: layout, settings, the file tree, and the file index.
 
 ### Scoped persistence
 
@@ -64,7 +64,7 @@ The Markdown editor is [Milkdown](https://milkdown.dev) (a ProseMirror wrapper) 
 
 ### Layout
 
-Tab/pane layout is [flexlayout-react](https://github.com/caplin/FlexLayout), wrapped by [src/hooks/use-layout.ts](src/hooks/use-layout.ts) (`useLayout`). Tabs are one of two kinds by `component`: `'editor'` (carries `{ path }` in its config) or `'blank'` (a fresh untitled tab). The model is persisted per-workspace (debounced) via the workspace-layout store. Opening a file that's already open selects its existing tab rather than duplicating it; opening a file while a blank tab is focused replaces that blank tab in place.
+Tab/pane layout is [flexlayout-react](https://github.com/caplin/FlexLayout), wrapped by [src/hooks/use-layout.ts](src/hooks/use-layout.ts) (`useLayout`). Tabs are one of two kinds by `component`: `'editor'` (carries `{ path }` in its config) or `'blank'` (a fresh untitled tab). The model is persisted per-workspace (debounced) via the workspace-layout store. Explorer state that sits outside the FlexLayout model — sidebar width/collapse and which folders are expanded — persists alongside it in `workspace-ui.json`; `useFiles.loadRoot` replays the saved expansions after the store rehydrates. Opening a file that's already open selects its existing tab rather than duplicating it; opening a file while a blank tab is focused replaces that blank tab in place.
 
 ### UI components
 

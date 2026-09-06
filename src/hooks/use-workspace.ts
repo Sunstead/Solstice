@@ -27,9 +27,13 @@ async function syncScopedStores(path: string | null) {
 
   if (path) {
     await useLayout.getState().loadForWorkspace(path);
+    // After the rehydrate above, so the tree can reopen the folders the
+    // workspace-ui store remembers.
+    await useFiles.getState().loadRoot(path);
     await useFileIndex.getState().loadIndex(path);
   } else {
     useLayout.setState({ model: null, workspacePath: null });
+    useFiles.getState().reset();
     useFileIndex.getState().reset();
     // Closing the workspace is the one case where dropping the snapshot
     // outright is right -- there is nothing left for links to resolve against.

@@ -3,7 +3,14 @@ import { create } from 'zustand';
 
 import { commands, FileEntry } from '@/bindings';
 import { useSetting } from '@/lib/settings/store';
-import { isWithin, normalizePath, parentPath } from '@/lib/path-utils';
+import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
+import {
+  isSamePath,
+  isWithin,
+  normalizePath,
+  parentOf,
+  parentPath,
+} from '@/lib/path-utils';
 
 export type FileTreeNode = FileEntry & {
   childrenLoaded: boolean;
@@ -25,9 +32,11 @@ type FilesState = {
   entries: Record<string, FileTreeNode>;
 
   reset: () => void;
+  loadRoot: (root: string) => Promise<void>;
   loadDirectory: (path: string) => Promise<FileTreeNode[]>;
   refreshDirectory: (path: string) => Promise<void>;
   removeSubtree: (path: string) => void;
+  restoreExpandedFolders: (root: string) => Promise<void>;
   expandDirectory: (path: string) => Promise<void>;
   collapseDirectory: (path: string) => void;
 };
@@ -92,6 +101,11 @@ export const useFiles = create<FilesState>((set, get) => ({
 
   reset: () => set({ entries: {} }),
 
+  loadRoot: async (root) => {
+    await get().loadDirectory(root);
+    await get().restoreExpandedFolders(root);
+  },
+
   loadDirectory: async (path) => {
     const files = await fetchVisibleEntries(path);
 
@@ -146,9 +160,47 @@ export const useFiles = create<FilesState>((set, get) => ({
   },
 
   removeSubtree: (path) => {
+    useWorkspaceUIStore.getState().forgetExpandedSubtree(path);
+
     set((state) => ({
       entries: pruneSubtree(state.entries, path),
     }));
+  },
+
+  /**
+   * Reopens the folders `workspace-ui.json` remembers, so the tree comes back
+   * shaped the way it was left. Level by level rather than all at once: a
+   * folder's children only enter the store once its parent has been read, and
+   * `expandDirectory` ignores a path it has never seen.
+   */
+  restoreExpandedFolders: async (root) => {
+    const saved = useWorkspaceUIStore.getState().expandedFolders;
+    if (saved.length === 0) return;
+
+    const depth = (path: string) => normalizePath(path).split('/').length;
+    const levels = [...new Set(saved.map(depth))].sort((a, b) => a - b);
+
+    for (const level of levels) {
+      await Promise.all(
+        saved
+          .filter((path) => depth(path) === level)
+          .map((path) => get().expandDirectory(path)),
+      );
+    }
+
+    // A folder whose parent was read but which is not in it was deleted while
+    // the workspace was closed; anything still unreachable (its parent is
+    // collapsed, so it was never read) is kept -- it is cached state, not dead.
+    const { entries } = get();
+    const wasRead = (path: string) => {
+      const parent = parentOf(path);
+      return isSamePath(parent, root) || entries[parent]?.childrenLoaded === true;
+    };
+
+    const alive = saved.filter((path) => entries[path] !== undefined || !wasRead(path));
+    if (alive.length !== saved.length) {
+      useWorkspaceUIStore.getState().setExpandedFolders(alive);
+    }
   },
 
   expandDirectory: async (path) => {
@@ -159,6 +211,8 @@ export const useFiles = create<FilesState>((set, get) => ({
     if (!node.childrenLoaded) {
       await get().loadDirectory(path);
     }
+
+    useWorkspaceUIStore.getState().setFolderExpanded(path, true);
 
     set((state) => ({
       entries: {
@@ -176,6 +230,8 @@ export const useFiles = create<FilesState>((set, get) => ({
     const node = get().entries[path];
 
     if (!node) return;
+
+    useWorkspaceUIStore.getState().setFolderExpanded(path, false);
 
     set((state) => ({
       entries: {
