@@ -1,21 +1,22 @@
 import { Moon, Sun } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { resolvedTheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * The quick flip in the sidebar rail. Deliberately binary -- it toggles away
- * from whatever is currently on screen, so it works from `system` too. The
- * three-way choice lives in Settings > Appearance.
+ * from whatever is currently on screen, so it works from `system` mode too,
+ * landing on the last theme used in the other appearance. Choosing among the
+ * presets themselves lives in Settings > Theme.
  */
 export function ThemeToggle() {
-  const { setTheme } = useTheme();
+  const { toggleAppearance } = useTheme();
 
   return (
     <Button
       variant='ghost'
       size='icon'
-      onClick={() => setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark')}
+      onClick={toggleAppearance}
       className='size-10'
     >
       <Sun className='size-5 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90' />
