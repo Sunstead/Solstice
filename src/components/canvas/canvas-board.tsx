@@ -522,7 +522,7 @@ export function CanvasBoard({ path }: { path: string }) {
 
           <Button
             size='icon-sm'
-            variant='ghost'
+            variant={showMinimap ? 'default' : 'ghost'}
             title={showMinimap ? 'Hide minimap' : 'Show minimap'}
             aria-label={showMinimap ? 'Hide minimap' : 'Show minimap'}
             aria-pressed={showMinimap}
