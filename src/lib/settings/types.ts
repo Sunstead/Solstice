@@ -27,6 +27,14 @@ export interface CssVarBinding<V> {
 }
 
 /**
+ * Applies a setting to several CSS custom properties at once, for one value
+ * that drives a derived set — a heading scale ratio expanding into per-level
+ * sizes. Computed in JS rather than with CSS `pow()`, which is not dependable
+ * on the WebKitGTK build the Linux webview uses.
+ */
+export type CssVarsBinding<V> = (value: V) => Record<`--${string}`, string>;
+
+/**
  * Applies a setting to an attribute on `<html>`, for values CSS selects on
  * (`[data-reduce-motion]`) or that HTML inherits down the tree (`spellcheck`,
  * which reaches the contenteditable without touching the editor).
@@ -48,6 +56,7 @@ interface CommonDef<V> {
   /** Side effect beyond re-rendering; runs after the value is committed. */
   onChange?: (value: V) => void;
   cssVar?: CssVarBinding<V>;
+  cssVars?: CssVarsBinding<V>;
   domAttr?: DomAttrBinding<V>;
 }
 
@@ -82,8 +91,51 @@ export interface EnumDef<V extends string = string> extends CommonDef<V> {
   options: readonly EnumOption<V>[];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnySettingDef = BooleanDef | NumberDef | TextDef | EnumDef<any>;
+/**
+ * Options that may not exist yet at module load — the theme catalogue is read
+ * off disk. Called on every render and every coercion, so it must be cheap and
+ * synchronous; anything expensive belongs behind a cache in its own module.
+ */
+export type OptionSource<V extends string> =
+  | readonly EnumOption<V>[]
+  | (() => readonly EnumOption<V>[]);
+
+export function resolveOptions<V extends string>(
+  source: OptionSource<V>,
+): readonly EnumOption<V>[] {
+  return typeof source === 'function' ? source() : source;
+}
+
+/**
+ * An `enum` rendered as a compact dropdown rather than a stack of radio cards.
+ * Same value semantics; the difference is that the option list may be long,
+ * dynamic, or both, which the card list cannot carry.
+ */
+export interface SelectDef<V extends string = string> extends CommonDef<V> {
+  kind: 'select';
+  options: OptionSource<V>;
+}
+
+/**
+ * A font family. The value is a bare family name, or `''` meaning "leave the
+ * default in place" — which the binding renders as the existing fallback chain
+ * rather than as an empty declaration.
+ */
+export interface FontDef extends CommonDef<string> {
+  kind: 'font';
+  /** Filters the bundled suggestions; installed families are never filtered. */
+  suggest?: 'sans' | 'serif' | 'mono';
+}
+
+export type AnySettingDef =
+  | BooleanDef
+  | NumberDef
+  | TextDef
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | EnumDef<any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | SelectDef<any>
+  | FontDef;
 
 // Each builder pins `kind` and widens `default` to the value type rather than
 // the literal written, so `SettingValue<K>` resolves to `boolean` / `number` /
@@ -106,4 +158,16 @@ export function defineEnum<const V extends string>(
   def: Omit<EnumDef<V>, 'kind'>,
 ): EnumDef<V> {
   return { ...def, kind: 'enum' };
+}
+
+/**
+ * Widened to `string` rather than the option literals: a select's options can
+ * be dynamic, so the value union is not knowable from the declaration.
+ */
+export function defineSelect(def: Omit<SelectDef, 'kind'>): SelectDef {
+  return { ...def, kind: 'select' };
+}
+
+export function defineFont(def: Omit<FontDef, 'kind'>): FontDef {
+  return { ...def, kind: 'font' };
 }

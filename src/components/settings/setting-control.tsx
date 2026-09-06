@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { clampToRange } from '@/lib/settings/store';
 import type { AnySettingDef, NumberDef } from '@/lib/settings/types';
+import { FontControl, SelectControl } from './combobox-control';
 
 /**
  * Controls needing the full row width, which `SettingRow` stacks under the
@@ -58,6 +59,21 @@ export function SettingControl({ def, value, onChange, id }: SettingControlProps
             </label>
           ))}
         </RadioGroup>
+      );
+
+    case 'select':
+      return (
+        <SelectControl
+          id={id}
+          def={def}
+          value={value as string}
+          onChange={onChange}
+        />
+      );
+
+    case 'font':
+      return (
+        <FontControl id={id} def={def} value={value as string} onChange={onChange} />
       );
 
     case 'text':

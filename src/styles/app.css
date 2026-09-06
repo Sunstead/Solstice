@@ -2,6 +2,11 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/geist';
+/* Bundled faces the font pickers offer, so a chosen font survives moving the
+   vault to a machine that does not have it installed. */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/literata';
+@import '@fontsource-variable/jetbrains-mono';
 @import './typeset.css';
 @import './flexlayout.css';
 @import './prosemirror.css';
@@ -225,7 +230,9 @@
     cursor: pointer;
   }
   html {
-    @apply font-sans;
+    /* `ui.font` overrides the app chrome only; notes read --editor-font-body
+       through .typeset, so the two can be set independently. */
+    font-family: var(--editor-font-ui, var(--font-sans));
   }
   @layer base {
     [data-slot='layout'] {

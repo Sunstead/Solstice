@@ -5,6 +5,7 @@ import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { resetScopedStoreCache } from '@/lib/stores/scoped-storage';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { loadWorkspaceSettings } from '@/lib/settings/store';
+import { useThemeCatalogue } from '@/lib/theme/store';
 import { useFiles } from '@/hooks/use-files';
 import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
@@ -24,6 +25,9 @@ async function syncScopedStores(path: string | null) {
   resetScopedStoreCache();
   await useWorkspaceUIStore.persist.rehydrate();
   await loadWorkspaceSettings();
+  // Themes live in the workspace too, so the catalogue is workspace state like
+  // the settings above it.
+  await useThemeCatalogue.getState().reload();
 
   if (path) {
     await useLayout.getState().loadForWorkspace(path);

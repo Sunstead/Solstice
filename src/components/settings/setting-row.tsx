@@ -59,10 +59,14 @@ export function SettingRow({ settingKey }: { settingKey: SettingKey }) {
 
   const heading = (
     <div className='min-w-0 flex-1 space-y-1'>
+      {/* Never wraps: a two-line label changes the row's height and takes its
+          control out of line with the rows around it. The ellipsis is a safety
+          valve for a very narrow window, not the expected rendering. */}
       <Label
         id={id}
         htmlFor={wide ? undefined : id}
-        className='text-sm font-medium'
+        title={def.label}
+        className='block truncate text-sm font-medium'
       >
         {def.label}
       </Label>
@@ -76,7 +80,7 @@ export function SettingRow({ settingKey }: { settingKey: SettingKey }) {
 
   return (
     <div className={cn('py-2', disabled && 'pointer-events-none opacity-50')}>
-      <div className='flex items-center justify-between gap-8'>
+      <div className='flex items-center justify-between gap-4'>
         {heading}
         <div className='flex shrink-0 items-center gap-1.5 pt-0.5'>
           {resetButton}

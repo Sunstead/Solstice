@@ -18,6 +18,12 @@ function haystack(key: SettingKey): string {
   ];
 
   if (def.kind === 'enum') parts.push(...def.options.map((o) => o.label));
+  // A dynamic option list is skipped: it is read off disk, so it is empty when
+  // this table is built and would go stale the moment a theme file changed.
+  if (def.kind === 'select' && Array.isArray(def.options)) {
+    parts.push(...def.options.map((o) => o.label));
+  }
+  if (def.kind === 'font') parts.push('font family typeface');
   if (def.kind === 'number' && def.unit) parts.push(def.unit);
 
   return parts.join(' ').toLowerCase();

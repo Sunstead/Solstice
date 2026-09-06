@@ -1,12 +1,33 @@
 import type { SectionId } from './sections';
+import { themeOptions } from '@/lib/theme/store';
+import { fontStack } from '@/lib/theme/fonts';
 import {
   defineBoolean,
   defineEnum,
+  defineFont,
   defineNumber,
+  defineSelect,
   defineText,
   type AnySettingDef,
   type SettingReader,
 } from './types';
+
+/**
+ * Heading sizes as exponents of one scale ratio, chosen so the default ratio
+ * of 1.25 reproduces the sizes the typeset stylesheet shipped with (1.75em /
+ * 1.25em / 1.125em / 1em) to three decimal places. Turning the ratio up or
+ * down then stretches the whole ladder while keeping their relationship.
+ */
+const HEADING_EXPONENTS = { 1: 2.51, 2: 1, 3: 0.53, 4: 0 } as const;
+
+function headingSizes(ratio: number) {
+  return Object.fromEntries(
+    Object.entries(HEADING_EXPONENTS).map(([level, exponent]) => [
+      `--editor-h${level}-size`,
+      `${(ratio ** exponent).toFixed(3)}em`,
+    ]),
+  );
+}
 
 /**
  * Every setting in the app, declared once.
@@ -21,17 +42,50 @@ import {
  * stable, greppable, hand-editable strings rather than generated reprs.
  */
 export const settingsRegistry = {
-  // -- Appearance ----------------------------------------------------
-  'appearance.theme': defineEnum({
+  // -- Appearance / Theme ---------------------------------------------
+  'theme.mode': defineEnum({
     section: 'appearance',
+    group: 'Theme',
+    scope: 'global',
+    label: 'Theme mode',
+    options: [
+      { value: 'fixed', label: 'A single theme' },
+      { value: 'system', label: 'Follow the system, light and dark' },
+    ],
+    default: 'fixed',
+  }),
+
+  // The three preset keys are dynamic selects rather than enums: the option
+  // list includes whatever theme files the workspace happens to hold, which is
+  // not knowable when this module is evaluated.
+  'theme.preset': defineSelect({
+    section: 'appearance',
+    group: 'Theme',
     scope: 'global',
     label: 'Theme',
-    options: [
-      { value: 'system', label: 'Match system' },
-      { value: 'light', label: 'Light' },
-      { value: 'dark', label: 'Dark' },
-    ],
-    default: 'dark',
+    options: () => themeOptions(),
+    default: 'solstice-dark',
+    visibleWhen: (get) => get('theme.mode') === 'fixed',
+  }),
+
+  'theme.lightPreset': defineSelect({
+    section: 'appearance',
+    group: 'Theme',
+    scope: 'global',
+    label: 'Light theme',
+    options: () => themeOptions('light'),
+    default: 'solstice-light',
+    visibleWhen: (get) => get('theme.mode') === 'system',
+  }),
+
+  'theme.darkPreset': defineSelect({
+    section: 'appearance',
+    group: 'Theme',
+    scope: 'global',
+    label: 'Dark theme',
+    options: () => themeOptions('dark'),
+    default: 'solstice-dark',
+    visibleWhen: (get) => get('theme.mode') === 'system',
   }),
 
   'appearance.reduceMotion': defineBoolean({
@@ -42,11 +96,69 @@ export const settingsRegistry = {
     domAttr: { name: 'data-reduce-motion', format: (v) => String(v) },
   }),
 
-  // -- Appearance / Editor typography ---------------------------------
+  // -- Typography / Fonts ---------------------------------------------
+  // Every font setting stores a bare family name, with `''` meaning "leave the
+  // default in place" -- which `apply.ts` turns into removing the variable, so
+  // the stylesheet's own `var(--x, fallback)` can reach its fallback.
+  'editor.fontBody': defineFont({
+    section: 'typography',
+    group: 'Fonts',
+    scope: 'global',
+    label: 'Note font',
+    default: '',
+    suggest: 'serif',
+    cssVar: { name: '--editor-font-body', format: (v) => fontStack(v, 'sans') },
+  }),
+
+  'editor.fontHeading': defineFont({
+    section: 'typography',
+    group: 'Fonts',
+    scope: 'global',
+    label: 'Heading font',
+    default: '',
+    suggest: 'sans',
+    cssVar: { name: '--editor-font-heading', format: (v) => fontStack(v, 'sans') },
+  }),
+
+  'editor.fontMono': defineFont({
+    section: 'typography',
+    group: 'Fonts',
+    scope: 'global',
+    label: 'Code font',
+    default: '',
+    suggest: 'mono',
+    cssVar: { name: '--editor-font-mono', format: (v) => fontStack(v, 'mono') },
+  }),
+
+  'editor.monoLigatures': defineBoolean({
+    section: 'typography',
+    group: 'Fonts',
+    scope: 'global',
+    label: 'Code ligatures',
+    // Most programming faces ship them on; the ones that do are the reason
+    // someone picks the face, so the default follows the font's own intent.
+    default: true,
+    cssVar: {
+      name: '--editor-mono-ligatures',
+      format: (v) => (v ? 'normal' : 'none'),
+    },
+  }),
+
+  'ui.font': defineFont({
+    section: 'typography',
+    group: 'Fonts',
+    scope: 'global',
+    label: 'Interface font',
+    default: '',
+    suggest: 'sans',
+    cssVar: { name: '--editor-font-ui', format: (v) => fontStack(v, 'sans') },
+  }),
+
+  // -- Typography / Metrics -------------------------------------------
   'editor.fontSize': defineNumber({
-    section: 'appearance',
-    group: 'Editor typography',
-    scope: 'workspace',
+    section: 'typography',
+    group: 'Metrics',
+    scope: 'global',
     label: 'Font size',
     default: 16,
     min: 10,
@@ -57,9 +169,9 @@ export const settingsRegistry = {
   }),
 
   'editor.lineHeight': defineNumber({
-    section: 'appearance',
-    group: 'Editor typography',
-    scope: 'workspace',
+    section: 'typography',
+    group: 'Metrics',
+    scope: 'global',
     label: 'Line height',
     default: 1.75,
     min: 1.2,
@@ -70,9 +182,9 @@ export const settingsRegistry = {
   }),
 
   'editor.lineWidth': defineNumber({
-    section: 'appearance',
-    group: 'Editor typography',
-    scope: 'workspace',
+    section: 'typography',
+    group: 'Metrics',
+    scope: 'global',
     label: 'Line length',
     default: 80,
     min: 40,
@@ -83,10 +195,114 @@ export const settingsRegistry = {
     cssVar: { name: '--editor-measure', format: (v) => `${v}ch` },
   }),
 
+  'editor.letterSpacing': defineNumber({
+    section: 'typography',
+    group: 'Metrics',
+    scope: 'global',
+    label: 'Letter spacing',
+    default: 0,
+    min: -0.02,
+    max: 0.06,
+    step: 0.005,
+    unit: 'em',
+    control: 'slider',
+    cssVar: { name: '--editor-letter-spacing', format: (v) => `${v}em` },
+  }),
+
+  'editor.paragraphSpacing': defineNumber({
+    section: 'typography',
+    group: 'Metrics',
+    scope: 'global',
+    label: 'Paragraph spacing',
+    default: 1.25,
+    min: 0.75,
+    max: 2.5,
+    step: 0.05,
+    unit: 'em',
+    control: 'slider',
+    // Drives every block's leading margin, not just paragraphs -- it is the
+    // one rhythm value the whole typeset is measured against.
+    cssVar: { name: '--editor-flow', format: (v) => `${v}em` },
+  }),
+
+  'editor.codeFontScale': defineNumber({
+    section: 'typography',
+    group: 'Metrics',
+    scope: 'global',
+    label: 'Code size',
+    default: 0.875,
+    min: 0.75,
+    max: 1.1,
+    step: 0.005,
+    control: 'slider',
+    cssVar: { name: '--editor-code-scale' },
+  }),
+
+  // -- Typography / Headings ------------------------------------------
+  'editor.headingScale': defineNumber({
+    section: 'typography',
+    group: 'Headings',
+    scope: 'global',
+    label: 'Heading scale',
+    default: 1.25,
+    min: 1,
+    max: 1.5,
+    step: 0.01,
+    control: 'slider',
+    // One value, four variables: see `headingSizes` above for why the ladder
+    // is computed here rather than with CSS `pow()`.
+    cssVars: headingSizes,
+  }),
+
+  'editor.headingWeight': defineSelect({
+    section: 'typography',
+    group: 'Headings',
+    scope: 'global',
+    label: 'Heading weight',
+    options: [
+      { value: '400', label: 'Regular' },
+      { value: '500', label: 'Medium' },
+      { value: '600', label: 'Semibold' },
+      { value: '700', label: 'Bold' },
+      { value: '800', label: 'Extrabold' },
+    ],
+    default: '600',
+    cssVar: { name: '--editor-heading-weight' },
+  }),
+
+  // -- Typography / Layout --------------------------------------------
+  'editor.textAlign': defineEnum({
+    section: 'typography',
+    group: 'Layout',
+    scope: 'global',
+    label: 'Text alignment',
+    options: [
+      { value: 'left', label: 'Ragged right' },
+      { value: 'justify', label: 'Justified' },
+    ],
+    default: 'left',
+    cssVar: { name: '--editor-text-align' },
+  }),
+
+  'editor.hyphenate': defineBoolean({
+    section: 'typography',
+    group: 'Layout',
+    scope: 'global',
+    label: 'Hyphenate',
+    default: false,
+    cssVar: {
+      name: '--editor-hyphens',
+      format: (v) => (v ? 'auto' : 'manual'),
+    },
+    // Justified text without hyphenation opens rivers at a narrow measure,
+    // which is the only place the option earns its row.
+    visibleWhen: (get) => get('editor.textAlign') === 'justify',
+  }),
+
   'editor.scrollPastEnd': defineBoolean({
-    section: 'appearance',
-    group: 'Editor typography',
-    scope: 'workspace',
+    section: 'typography',
+    group: 'Layout',
+    scope: 'global',
     label: 'Scroll past end',
     default: true,
     cssVar: {

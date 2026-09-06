@@ -11,6 +11,17 @@ function render(binding: Binding, value: unknown) {
 }
 
 /**
+ * An empty string removes the property rather than declaring it empty, which
+ * is how a setting says "leave the default alone": the stylesheet's own
+ * `var(--x, fallback)` can only reach its fallback if `--x` is genuinely
+ * absent. Font settings use this for their "Default" option.
+ */
+function setVar(root: HTMLElement, name: string, value: string) {
+  if (value === '') root.style.removeProperty(name);
+  else root.style.setProperty(name, value);
+}
+
+/**
  * Pushes every setting declaring a `cssVar` or `domAttr` binding onto the
  * document root. This is the whole implementation for most appearance settings:
  * the stylesheets consume `--editor-font-size`, `--editor-measure` and friends,
@@ -25,11 +36,17 @@ export function useSettingsDomBindings() {
     const root = document.documentElement;
 
     for (const key of settingKeys) {
-      const { cssVar, domAttr } = settingsRegistry[key];
-      if (!cssVar && !domAttr) continue;
+      const { cssVar, cssVars, domAttr } = settingsRegistry[key];
+      if (!cssVar && !cssVars && !domAttr) continue;
 
       const value = resolveSetting(key, global, workspace);
-      if (cssVar) root.style.setProperty(cssVar.name, render(cssVar, value));
+      if (cssVar) setVar(root, cssVar.name, render(cssVar, value));
+      if (cssVars) {
+        const expand = cssVars as (v: unknown) => Record<string, string>;
+        for (const [name, css] of Object.entries(expand(value))) {
+          setVar(root, name, css);
+        }
+      }
       if (domAttr) root.setAttribute(domAttr.name, render(domAttr, value));
     }
   }, [global, workspace]);
