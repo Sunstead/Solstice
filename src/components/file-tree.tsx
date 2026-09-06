@@ -48,9 +48,13 @@ export function FileTree({ path }: FileTreeProps) {
     registerCommand('file.new_note', () =>
       startCreateFile(path, FILE_TYPE_PRESETS.markdown),
     );
+    registerCommand('file.new_canvas', () =>
+      startCreateFile(path, FILE_TYPE_PRESETS.canvas),
+    );
     registerCommand('file.new_folder', () => startCreateFolder(path));
     return () => {
       unregisterCommand('file.new_note');
+      unregisterCommand('file.new_canvas');
       unregisterCommand('file.new_folder');
     };
   }, [path, startCreateFile, startCreateFolder]);

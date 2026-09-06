@@ -137,6 +137,42 @@ export const settingsRegistry = {
     default: false,
   }),
 
+  // -- Canvas ---------------------------------------------------------
+  'canvas.showGrid': defineBoolean({
+    section: 'appearance',
+    group: 'Canvas',
+    scope: 'global',
+    label: 'Canvas grid',
+    default: true,
+    // Its own variable rather than reusing `--canvas-grid-opacity`: that one is
+    // the image viewer's, and hiding the dots behind a photograph should not
+    // also strip the surface a board is drawn on.
+    cssVar: {
+      name: '--canvas-board-grid-opacity',
+      format: (v) => (v ? '0.35' : '0'),
+    },
+  }),
+
+  'canvas.snapToGrid': defineBoolean({
+    section: 'editor',
+    group: 'Canvas',
+    scope: 'workspace',
+    label: 'Snap to grid',
+    // On by default: a board that tidies itself is worth more than pixel
+    // placement, and holding Alt (or Cmd) turns it off for the one drag that
+    // needs it.
+    default: true,
+  }),
+
+  'canvas.showMinimap': defineBoolean({
+    section: 'appearance',
+    group: 'Canvas',
+    scope: 'global',
+    label: 'Canvas minimap',
+    // Off by default: it only earns its corner on a board too large to see.
+    default: false,
+  }),
+
   // -- Editor ---------------------------------------------------------
   'editor.autosave': defineEnum({
     section: 'editor',

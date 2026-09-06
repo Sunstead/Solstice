@@ -116,6 +116,14 @@ type MilkdownEditorProps = {
   path: string;
   initialContent: string;
   onError: (message: string) => void;
+  /**
+   * Populated with a "commit and write right now" callback once the editor is
+   * ready, and cleared back to `null` on unmount. Plain prop rather than a
+   * `forwardRef` handle: the one caller that needs this (a canvas file card)
+   * already has nowhere more natural to keep a ref, and every other caller
+   * simply never passes it.
+   */
+  flushRef?: React.MutableRefObject<(() => void) | null>;
 };
 
 type PresetBinding = {
@@ -229,6 +237,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
   path,
   initialContent,
   onError,
+  flushRef,
 }) => {
   const instanceId = useId();
   const loaded = useKeymapStore((s) => s.loaded);
@@ -451,6 +460,27 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       ctx.get(serializerCtx)(ctx.get(editorViewCtx).state.doc),
     );
   }, [get]);
+
+  // Populates the caller's flush handle, when it asked for one. Reads the
+  // *live* document via `getMarkdown()` rather than waiting on
+  // `markdownUpdated`'s ~200ms debounce, so a caller that flushes right before
+  // unmounting this editor -- a canvas card leaving edit mode -- gets the
+  // truly latest keystrokes rather than whatever the debounce had already
+  // reported.
+  useEffect(() => {
+    if (!flushRef) return;
+
+    flushRef.current = () => {
+      const markdown = getMarkdown();
+      if (markdown === null) return;
+      autosaver.current?.schedule(markdown);
+      autosaver.current?.flush();
+    };
+
+    return () => {
+      flushRef.current = null;
+    };
+  }, [flushRef, getMarkdown]);
 
   const { status, reload, keepMine, dismiss } = useExternalFileChanges({
     path,

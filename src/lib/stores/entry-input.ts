@@ -5,10 +5,26 @@ export type FileTypePreset = {
   id: string;
   label: string;
   extension: string;
+  /**
+   * Written immediately after creation, for formats where a zero-byte file is
+   * not a valid empty document.
+   *
+   * `create_file` makes an empty file, which is fine for a note and wrong for
+   * a canvas: `""` is not JSON. Seeding here rather than papering over it in
+   * the reader means the file is also valid to everything *outside* this app
+   * -- git, Obsidian, `jq` -- from the moment it exists.
+   */
+  initialContents?: string;
 };
 
 export const FILE_TYPE_PRESETS: Record<string, FileTypePreset> = {
   markdown: { id: 'markdown', label: 'Note', extension: 'md' },
+  canvas: {
+    id: 'canvas',
+    label: 'Canvas',
+    extension: 'canvas',
+    initialContents: '{\n  "nodes": [],\n  "edges": []\n}\n',
+  },
   pdf: { id: 'pdf', label: 'PDF', extension: 'pdf' },
 };
 
