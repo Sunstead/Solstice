@@ -120,11 +120,11 @@ export function useEntryMenuItems(
   };
 
   if (isDir) {
-    for (const preset of Object.values(FILE_TYPE_PRESETS)) {
+    for (const preset of Object.values(FILE_TYPE_PRESETS).filter((p) => p.creatable)) {
       items.push({
         kind: 'item',
         id: `new-${preset.id}`,
-        label: `New ${preset.label}`,
+        label: `New ${preset.label.toLocaleLowerCase()}...`,
         icon: getFileIcon(preset.extension),
         run: createIn(() => startCreateFile(path, preset)),
       });
@@ -133,14 +133,14 @@ export function useEntryMenuItems(
     items.push({
       kind: 'item',
       id: 'new-folder',
-      label: 'New Folder',
+      label: 'New folder...',
       icon: getFolderIcon(),
       run: createIn(() => startCreateFolder(path)),
     });
     items.push({
       kind: 'item',
       id: 'new-file',
-      label: 'New File',
+      label: 'New file...',
       icon: getFileIcon(''),
       run: createIn(() => startCreateFile(path)),
     });

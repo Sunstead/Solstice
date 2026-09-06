@@ -15,15 +15,17 @@ export type FileTypePreset = {
    * -- git, Obsidian, `jq` -- from the moment it exists.
    */
   initialContents?: string;
+  creatable?: boolean;
 };
 
 export const FILE_TYPE_PRESETS: Record<string, FileTypePreset> = {
-  markdown: { id: 'markdown', label: 'Note', extension: 'md' },
+  markdown: { id: 'markdown', label: 'Note', extension: 'md', creatable: true },
   canvas: {
     id: 'canvas',
     label: 'Canvas',
     extension: 'canvas',
     initialContents: '{\n  "nodes": [],\n  "edges": []\n}\n',
+    creatable: true,
   },
   pdf: { id: 'pdf', label: 'PDF', extension: 'pdf' },
 };

@@ -62,9 +62,7 @@ export function ExplorerSidebar() {
   }
 
   if (!path) {
-    return <SidebarContent>
-      No workspace open
-    </SidebarContent>;
+    return <SidebarContent>No workspace open</SidebarContent>;
   }
 
   return (
@@ -84,8 +82,9 @@ export function ExplorerSidebar() {
                 }
               />
               <DropdownMenuContent>
-                {Object.values(FILE_TYPE_PRESETS).map(
-                  (value: FileTypePreset) => {
+                {Object.values(FILE_TYPE_PRESETS)
+                  .filter((p) => p.creatable)
+                  .map((value: FileTypePreset) => {
                     const Icon = getFileIcon(value.extension);
                     return (
                       <DropdownMenuItem
@@ -96,8 +95,7 @@ export function ExplorerSidebar() {
                         {value.label}
                       </DropdownMenuItem>
                     );
-                  },
-                )}
+                  })}
                 <DropdownMenuItem onClick={() => startCreateFolder(path)}>
                   {(() => {
                     const Icon = getFolderIcon();
@@ -125,7 +123,8 @@ export function ExplorerSidebar() {
                 ref={rootDropRef}
                 className={cn(
                   'h-full py-0',
-                  (isDropDestination || (isRootOver && canDropOnRoot)) && 'bg-accent/30',
+                  (isDropDestination || (isRootOver && canDropOnRoot)) &&
+                    'bg-accent/30',
                 )}
               >
                 <SidebarGroupContent className='max-w-(--sidebar-width)'>
