@@ -134,9 +134,12 @@ export function CanvasMinimap() {
     <canvas
       ref={canvasRef}
       onPointerDown={(event) => {
-        // The board's own handler must not see this as a background press.
         event.stopPropagation();
         jumpTo(event);
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        if (event.buttons === 1) jumpTo(event);
       }}
       className='solstice-canvas-minimap'
       style={{ width: WIDTH, height: HEIGHT }}
