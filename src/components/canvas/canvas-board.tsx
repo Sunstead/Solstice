@@ -248,7 +248,12 @@ export function CanvasBoard({ path }: { path: string }) {
 
       let dx = -event.deltaX;
       let dy = -event.deltaY;
-      if (event.shiftKey) {
+      // Shift+wheel means "scroll horizontally", but plenty of platforms
+      // (Chrome/Firefox on Windows/Linux, notably) already convert that
+      // gesture into deltaX themselves before it reaches us -- deltaY comes
+      // in as 0. Only remap manually when the browser hasn't, or this
+      // overwrites an already-correct dx with nothing.
+      if (event.shiftKey && dx === 0) {
         dx = dy;
         dy = 0;
       }
