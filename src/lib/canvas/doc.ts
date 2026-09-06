@@ -15,21 +15,16 @@ import {
 /**
  * Every operation a canvas document supports.
  *
- * Pure: each takes a `CanvasDoc` and returns a new one, sharing every object it
- * did not change. That is what makes the undo stack cheap enough to hold whole
- * snapshots -- an entry is a shallow array copy plus the handful of nodes that
- * actually moved -- and it keeps the store free of mutation bugs that only show
- * up after an undo.
+ * All pure: each takes a `CanvasDoc` and returns a new one, sharing every
+ * object it did not change, which is what lets the undo stack hold whole
+ * snapshots. Each also returns the *same* document when it changed nothing, so
+ * a no-op never reaches history or the autosaver.
  */
 
 // ------------------------------------------------------------------ reading --
 
 export function nodeMap(doc: CanvasDoc): Map<string, CanvasNode> {
   return new Map(doc.nodes.map((node) => [node.id, node]));
-}
-
-export function findNode(doc: CanvasDoc, id: string): CanvasNode | undefined {
-  return doc.nodes.find((node) => node.id === id);
 }
 
 export function rectOf(node: CanvasNode): Rect {
@@ -61,11 +56,8 @@ export function boundsOfIds(doc: CanvasDoc, ids: Iterable<string>): Rect | null 
 }
 
 /**
- * Whether an edge can actually be drawn.
- *
- * An edge naming a node the file no longer contains is kept in the document so
- * that opening a board is never destructive, which means every consumer that
- * draws has to filter for itself.
+ * An edge naming a missing node is kept in the document, so that opening a
+ * board is never destructive. Consumers that draw must filter for themselves.
  */
 export function isEdgeDrawable(
   edge: CanvasEdge,
@@ -108,13 +100,11 @@ export function addNode(doc: CanvasDoc, node: CanvasNode): CanvasDoc {
 }
 
 /**
- * Applies `change` to one node.
- *
- * Typed as a callback rather than a patch object so callers narrowing on
- * `node.type` keep their narrowing -- a `Partial<CanvasNode>` patch would let
- * `text` be set on a group node.
+ * Applies `change` to one node. A callback rather than a patch object so
+ * callers keep their narrowing on `node.type` -- a `Partial<CanvasNode>` patch
+ * would let `text` be set on a group.
  */
-export function updateNode(
+function updateNode(
   doc: CanvasDoc,
   id: string,
   change: (node: CanvasNode) => CanvasNode,
@@ -126,8 +116,6 @@ export function updateNode(
     return change(node);
   });
 
-  // Returning the same object when nothing matched keeps a no-op out of the
-  // undo stack and out of the autosaver.
   return changed ? { ...doc, nodes } : doc;
 }
 
@@ -149,8 +137,10 @@ export function moveNodes(
   };
 }
 
-/** Places nodes at absolute rects. Used by drag and resize, which recompute
- *  from the gesture's start rather than accumulating per-frame deltas. */
+/**
+ * Places nodes at absolute rects, for drag and resize -- both recompute from
+ * the gesture's start rather than accumulating per-frame deltas.
+ */
 export function placeNodes(
   doc: CanvasDoc,
   rects: ReadonlyMap<string, Rect>,
@@ -174,13 +164,10 @@ export function placeNodes(
 }
 
 /**
- * Deletes nodes together with every edge that touched them.
- *
- * Leaving the edges behind would be the more literal reading of "delete these
- * nodes", but it accumulates invisible cruft in the file: those edges are
- * unrenderable and there is no UI that could ever reach them again.
+ * Deletes nodes together with every edge that touched them. Orphaned edges
+ * would be unrenderable cruft in the file that no UI could reach again.
  */
-export function removeNodes(doc: CanvasDoc, ids: ReadonlySet<string>): CanvasDoc {
+function removeNodes(doc: CanvasDoc, ids: ReadonlySet<string>): CanvasDoc {
   if (ids.size === 0) return doc;
 
   return {
@@ -225,12 +212,8 @@ export function updateEdge(
 }
 
 /**
- * Sets which ends of the selected edges carry an arrowhead.
- *
- * `undefined` for either end leaves it alone, so a single call can change just
- * one end without having to read the other back first. Applied to every edge
- * in `ids` in one pass, so a multi-edge change is one history entry rather
- * than one per edge.
+ * Sets which ends of the selected edges carry an arrowhead. `undefined` leaves
+ * an end alone, so one call can change one end without reading the other back.
  */
 export function setEdgeEnds(
   doc: CanvasDoc,
@@ -283,11 +266,8 @@ export function setNodeText(
 }
 
 /**
- * Raises nodes to the end of the array.
- *
- * Paint order *is* array order, so the file already records the stacking and
- * there is no separate z-index to keep in sync. Relative order among the moved
- * nodes is preserved.
+ * Raises nodes to the end of the array. Paint order *is* array order, so the
+ * file already records the stacking; relative order among them is preserved.
  */
 export function bringToFront(
   doc: CanvasDoc,
@@ -313,12 +293,9 @@ export function sendToBack(doc: CanvasDoc, ids: ReadonlySet<string>): CanvasDoc 
 }
 
 /**
- * Renames a group or an edge.
- *
- * One function for both because the selection is one id and the caller does not
- * otherwise care which it is. An empty name removes the key rather than writing
- * `""` -- the spec has the field optional, and a board that round-trips through
- * a rename and back should be byte-identical to the one that started.
+ * Renames a group or an edge -- one function, since the caller has one id and
+ * does not care which it is. An empty name removes the key rather than writing
+ * `""`, so a rename and back leaves the file byte-identical.
  */
 export function setLabel(
   doc: CanvasDoc,

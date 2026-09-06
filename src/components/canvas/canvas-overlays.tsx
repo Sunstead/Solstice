@@ -6,27 +6,18 @@ import { useCanvasStore } from '@/lib/canvas/use-canvas-store';
 import { toScreen, type Viewport } from '@/lib/canvas/viewport';
 
 /**
- * Everything drawn over the board that is not part of the document: the
- * marquee, the alignment guides, and the resize handles.
+ * Everything drawn over the board that is not part of the document: marquee,
+ * alignment guides, resize zones, ports and the edge being drawn.
  *
- * All of it in *screen* space. A handle inside the zoom transform would be
- * eight pixels wide at 100% and one pixel at 12%, and a guide would stop being
- * a hairline the moment anyone zoomed in. Projecting a rect costs two
- * multiplications and makes every size mean what it says.
+ * All in screen space, so every size means what it says -- inside the zoom
+ * transform a handle would be eight pixels at 100% and one at 12%.
  */
 
 /**
- * Resize zones: the whole perimeter, invisible.
- *
- * Nothing is drawn for these -- the selection outline already says the card is
- * selected, and eight dots on top of it were both noise and a smaller target
- * than the edge they sat on. The cursor is the affordance, which is the
- * convention every window manager and drawing tool already trained people on.
- *
- * `CORNER` is the square claimed at each corner, `EDGE` the thickness of the
- * strip along each side; the strips are inset by the corners so the two never
- * overlap and a corner drag is never ambiguous. Both are screen pixels, so the
- * grab target is the same size at every zoom.
+ * Resize zones: the whole perimeter, invisible, with the cursor as the only
+ * affordance. `CORNER` is the square claimed at each corner and `EDGE` the
+ * thickness of each side strip, the strips inset by the corners so a corner
+ * drag is never ambiguous.
  */
 const CORNER = 16;
 const EDGE = 9;
@@ -47,7 +38,7 @@ function resizeZones(box: Rect): { handle: Handle; style: React.CSSProperties }[
   const { x, y, width, height } = box;
 
   // A card smaller than its own corners has no room for side strips; the
-  // corners still work, and `Math.max` keeps the geometry from going negative.
+  // corners still work.
   const spanX = Math.max(width - CORNER, 0);
   const spanY = Math.max(height - CORNER, 0);
 
@@ -70,15 +61,11 @@ const PORT_SIDES: NodeSide[] = ['top', 'right', 'bottom', 'left'];
 const PORT_SIZE = 16;
 
 /**
- * How far a port sits outside the card's edge.
+ * How far a port sits outside the card's edge, in screen pixels.
  *
- * Load-bearing, not decoration. Ports were originally drawn *on* the edge
- * midpoints -- which is exactly where the `n`/`e`/`s`/`w` resize handles are,
- * so all four landed on top of a handle, one pixel apart and visually
- * identical. There was then no way to tell the two affordances apart, and no
- * discoverable way to start a connection at all. Screen pixels, so the gap
- * holds at any zoom. Kept a few pixels clear of the (larger) port itself so the
- * stub reads as a tail rather than disappearing under it.
+ * Load-bearing: an edge midpoint is exactly where the `n`/`e`/`s`/`w` resize
+ * zone is, so a port drawn there would sit on top of one, leaving no way to
+ * tell the two affordances apart.
  */
 const PORT_OFFSET = 12;
 
@@ -110,17 +97,15 @@ export function CanvasOverlays() {
   const view = useCanvasStore((state) => state.view);
   const editingNodeId = useCanvasStore((state) => state.editingNodeId);
 
-  // Handles belong to one node. With several selected there is no single
-  // rectangle a corner could anchor to that would not silently rescale
-  // everything else, so the affordance is simply not offered.
+  // Resize belongs to one node: with several selected there is no rectangle a
+  // corner could anchor to without silently rescaling the rest.
   const selectedNodes = doc.nodes.filter((node) => selection.has(node.id));
   const only = selectedNodes.length === 1 ? selectedNodes[0] : null;
 
   /*
-   * The one selected edge, in screen space, so its ends can be marked.
-   *
-   * Only when exactly one is selected: two edges sharing an endpoint would put
-   * two handles in the same place with nothing to say which was which.
+   * The one selected edge, so its ends can be marked. Only when exactly one is
+   * selected: two edges sharing an endpoint would stack two handles in one
+   * place with nothing to tell them apart.
    */
   const selectedEdge = (() => {
     const edges = doc.edges.filter((edge) => selection.has(edge.id));
@@ -142,15 +127,10 @@ export function CanvasOverlays() {
     };
   })();
 
-  // Ports belong to the selected card, and only to it. Offering them on hover
-  // meant four targets appearing under the pointer every time it crossed a
-  // card, which is noise while doing anything else on the board.
-  //
-  // A card being edited gets none either: the caret is in it, the gesture on
-  // offer is selecting text, and four drag targets ringing the thing you are
-  // typing into are just in the way.
-  //
-  // Groups get none: an edge to a region is not something the spec expresses.
+  // Ports show on the selected card only -- on hover they appeared under the
+  // pointer every time it crossed a card. Not while editing, where the gesture
+  // on offer is selecting text, and never on a group, since the spec has no
+  // way to express an edge to a region.
   const portsFor =
     only && only.type !== 'group' && only.id !== editingNodeId ? only : null;
 
@@ -195,11 +175,8 @@ export function CanvasOverlays() {
           );
         })}
 
-      {/*
-        A selected edge shows its two ends, which is where they can be picked up
-        and moved. Dragging the line itself does the same thing -- this is the
-        affordance for it, not the only route to it.
-      */}
+      {/* Where a selected edge's ends can be picked up. Dragging the line
+          does the same thing; this is the affordance, not the only route. */}
       {selectedEdge && interaction.kind === 'idle' && (
         <>
           {(['start', 'end'] as const).map((which) => {
@@ -234,8 +211,8 @@ export function CanvasOverlays() {
 
             return (
               <div key={`port-${side}`}>
-                {/* The stub back to the card, so a floating dot reads as the
-                    start of a line rather than as a stray handle. */}
+                {/* A stub back to the card, so the dot reads as the start of
+                    a line rather than a stray handle. */}
                 <div
                   className='solstice-canvas-port-stub'
                   style={{
@@ -273,9 +250,8 @@ export function CanvasOverlays() {
             ? doc.nodes.find((n) => n.id === interaction.hoverNode)
             : null;
 
-          // Snapped to the target's own anchor when there is one, so the line
-          // shows exactly the edge that would be created rather than pointing
-          // at the cursor beside it.
+          // Snapped to the target's anchor when there is one, so the draft
+          // shows the edge that would be created.
           const end = target
             ? screenRect(view, rectOf(target))
             : (() => {

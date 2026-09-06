@@ -9,29 +9,22 @@
 /* ----------------------------------------------------------------- board -- */
 
 /*
- * The board owns its `position`, because everything inside it is placed
- * against this box. Feature stylesheets load after Tailwind, so this rule beats
- * a `position` utility on the same element -- callers must therefore *size* the
- * board (`size-full`, a fixed height) and never try to position it.
+ * The board owns its `position`; everything inside is placed against this box.
+ * Feature stylesheets load after Tailwind, so this beats a `position` utility
+ * on the same element -- callers must *size* the board, never position it.
  */
 .solstice-canvas-board {
   position: relative;
   overflow: hidden;
   background-color: var(--background);
-  /*
-   * A marquee drag sweeps across cards, and without this the browser starts
-   * selecting their text instead. Re-enabled on a card that is being edited,
-   * where selecting text is the whole point.
-   */
+  /* Or a marquee drag selects the text of every card it sweeps across.
+     Re-enabled on the card being edited. */
   user-select: none;
 }
 
 /*
- * The board's own grid opacity.
- *
- * Deliberately not `--canvas-grid-opacity`: that one belongs to the image
- * viewer, and turning the dots off behind a photograph should not also strip
- * the surface a board is drawn on.
+ * Its own variable, not the image viewer's `--canvas-grid-opacity`: hiding the
+ * dots behind a photograph must not strip the surface a board is drawn on.
  */
 .solstice-canvas-board .solstice-canvas-grid {
   opacity: var(--canvas-board-grid-opacity, 0.35);
@@ -40,11 +33,8 @@
 /* The transformed world. Everything inside is in canvas coordinates. */
 .solstice-canvas-world {
   position: absolute;
-  /*
-   * Zero-sized with a `0 0` transform origin, so the translation *is* where
-   * canvas (0, 0) lands on screen -- which is exactly what `CanvasGrid` reads
-   * to weld its dots to the content.
-   */
+  /* Zero-sized with a `0 0` origin, so the translation *is* where canvas
+     (0, 0) lands on screen -- what `CanvasGrid` reads to weld its dots. */
   width: 0;
   height: 0;
   transform-origin: 0 0;
@@ -54,9 +44,8 @@
 
 .solstice-canvas-node {
   position: absolute;
-  /* The card's accent, set inline from the document's colour. Everything below
-     derives from this one value, so a preset and a hand-picked hex take the
-     same path. */
+  /* Set inline from the document's colour; everything below derives from it,
+     so a preset and a hand-picked hex take the same path. */
   --canvas-node-color: var(--border-color);
 
   display: flex;
@@ -66,32 +55,27 @@
     color-mix(in oklch, var(--canvas-node-color) 55%, transparent);
   border-radius: var(--radius-lg);
   /*
-   * Mixed against `--card` rather than used as the fill. A hex someone picked
-   * in another app, or in the other theme, can be unreadable behind text;
-   * letting only the border carry the hue at full strength keeps every card
-   * legible in both themes without ever rewriting what the file says.
+   * Mixed against `--card` rather than used as the fill: a hex picked in
+   * another app can be unreadable behind text, and letting only the border
+   * carry the hue keeps every card legible in both themes.
    *
-   * In `oklab`, not `oklch`: cylindrical mixing interpolates *hue*, and every
-   * ground colour in this theme is achromatic -- which nominally means hue 0.
-   * Mixing 12% of green (h 145) into it therefore lands at h ~17, so every
-   * card came out the same faint pink whatever colour the file said. Lab
-   * coordinates have no hue to interpolate and give the tint the file asked
-   * for.
+   * `oklab`, not `oklch`: cylindrical mixing interpolates hue, and the ground
+   * colours here are achromatic (nominally hue 0), so any tint came out the
+   * same faint pink whatever the file said.
    */
   background-color: color-mix(in oklab, var(--canvas-node-color) 12%, var(--card));
   color: var(--card-foreground);
   box-shadow: 0 1px 2px oklch(0 0 0 / 0.06), 0 2px 8px oklch(0 0 0 / 0.04);
-  /* Cheap culling that needs no unmounting: a card scrolled far off screen
-     stops laying its contents out at all. */
+  /* Cheap culling with no unmounting: a card far off screen stops laying its
+     contents out. */
   content-visibility: auto;
   contain-intrinsic-size: auto 200px;
 }
 
 /*
- * `:not([data-canvas-editing])` rather than relying on source order: this
- * selector's specificity (class + attribute + class) otherwise beats the
- * plain `.solstice-canvas-node[data-canvas-editing]` rule below regardless of
- * which one is written later, and the grab hand won every editing card.
+ * `:not(...)` rather than source order: this selector's specificity otherwise
+ * beats the `[data-canvas-editing]` rule below whichever is written later, and
+ * the grab hand wins on every editing card.
  */
 .solstice-canvas-board[data-interactive='true']
   .solstice-canvas-node:not([data-canvas-editing]) {
@@ -99,10 +83,9 @@
 }
 
 /*
- * A preview is a picture of a board, not a board. Making the whole surface
- * inert is what lets the card around it own the click -- and it means the
- * preview cannot acquire an interaction by accident as the editor grows new
- * ones.
+ * A preview is a picture of a board. Making the surface inert lets the card
+ * around it own the click, and stops the preview acquiring an interaction by
+ * accident as the editor grows new ones.
  */
 .solstice-canvas-board[data-interactive='false'] {
   pointer-events: none;
@@ -115,21 +98,17 @@
 }
 
 /*
- * The editor inside a card is a *card*, not a page.
- *
- * `prosemirror.css` dresses `.ProseMirror` as a note: 4rem of top padding, ten
- * of bottom for scroll-past-end, and horizontal padding that centres the text
- * on an 80ch measure. All of that is right for a tab and absurd inside a card
- * a few hundred pixels wide -- entering edit mode shoved the text down and in
- * by a wild margin. Replaced here with the same 0.75rem the read-mode body
- * uses, so the text does not move when the caret arrives.
+ * The editor inside a card is a card, not a page: `prosemirror.css` dresses
+ * `.ProseMirror` with a note's 4rem top padding, scroll-past-end bottom and
+ * 80ch measure. Replaced with the 0.75rem the read-mode body uses, so text
+ * does not move when the caret arrives.
  */
 .solstice-canvas-node[data-canvas-editing] .ProseMirror {
   padding: 0.75rem;
   min-height: 100%;
 }
 
-/* Milkdown's own block margins would reintroduce the gap at the top edge. */
+/* Milkdown's block margins would reintroduce the gap at the edges. */
 .solstice-canvas-node[data-canvas-editing] .ProseMirror > :first-child {
   margin-block-start: 0;
 }
@@ -164,18 +143,15 @@
 }
 
 /*
- * Read-mode cards clip rather than scroll.
- *
- * A scrollable card would compete with the board for the wheel, and a surface
- * that pans only sometimes is worse than one that never does. The fade says
- * "there is more here" without offering a gesture that will not work.
+ * Read-mode cards clip rather than scroll: a scrollable one would compete with
+ * the board for the wheel. The fade says there is more without offering a
+ * gesture that will not work.
  */
 .solstice-canvas-node-body[data-clipped='true'] {
   mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent);
 }
 
-/* Past this zoom WKWebView rasterises card text below legibility; the card
-   shows a title instead, and this centres it. */
+/* Centres the title a card shows in place of its body when zoomed out. */
 .solstice-canvas-node-glyph {
   display: flex;
   flex: 1;
@@ -189,10 +165,7 @@
 
 /* ---------------------------------------------------------------- groups -- */
 
-/*
- * A frame, not a card: a group is a region of the board, and filling it would
- * put a translucent wash over every node inside.
- */
+/* A frame, not a card: filling it would wash over every node inside. */
 .solstice-canvas-group {
   position: absolute;
   border: 2px solid
@@ -217,8 +190,8 @@
   outline-offset: 1px;
 }
 
-/* Sits above the frame's top edge, the way a fieldset legend does, so it never
-   overlaps whatever the group contains. */
+/* Above the frame's top edge, like a fieldset legend, so it never overlaps
+   what the group contains. */
 .solstice-canvas-group-label {
   position: absolute;
   bottom: 100%;
@@ -238,8 +211,8 @@
   position: absolute;
   inset: 0;
   overflow: visible;
-  /* The layer ignores the pointer; individual hit paths opt back in, so the
-     gaps between edges never eat a drag aimed at the board. */
+  /* Hit paths opt back in individually, so the gaps between edges never eat
+     a drag aimed at the board. */
   pointer-events: none;
 }
 
@@ -285,14 +258,10 @@
 }
 
 /*
- * Connection ports.
- *
- * `--primary` rather than a canvas preset colour: a port is app chrome, not
- * document content, so it should read as the same "interactive accent" as
- * everything else in the UI (a focus ring, a selected menu item) rather than
- * as one more colour choice on the board. The `--background` ring is what
- * lets it read as a dot sitting *on* the canvas rather than a hole cut out of
- * it, over any card colour or either theme.
+ * Connection ports. `--primary` rather than a canvas preset: a port is app
+ * chrome, not document content, and should read as the same interactive accent
+ * as the rest of the UI. The `--background` ring makes it a dot sitting *on*
+ * the canvas over any card colour, in either theme.
  */
 .solstice-canvas-port {
   position: absolute;
@@ -366,12 +335,9 @@ html[data-reduce-motion='true'] .solstice-canvas-port {
 }
 
 /*
- * Resize zones. Deliberately invisible: the whole perimeter of a selected card
- * resizes it, and the cursor is what says so. Drawing anything here would sit
- * on top of the selection outline and make a smaller target than the edge it
- * covered.
- *
- * Screen-space, so the grab depth is the same at every zoom.
+ * Resize zones: invisible, with the cursor as the affordance. Anything drawn
+ * here would sit on the selection outline and be a smaller target than the
+ * edge it covered. Screen-space, so the grab depth holds at every zoom.
  */
 .solstice-canvas-handle {
   position: absolute;
@@ -397,11 +363,9 @@ html[data-reduce-motion='true'] .solstice-canvas-port {
 /* ---------------------------------------------------------------- embeds -- */
 
 /*
- * The preview a note gets for `![[board.canvas]]`.
- *
- * Inline-block for the same reason `embed.css` gives: these are inline atom
- * node views, and a `display: block` box inside inline content leaves the caret
- * in an anonymous line box that shifts as text is typed around it.
+ * The preview a note gets for `![[board.canvas]]`. Inline-block for the reason
+ * `embed.css` gives: a `display: block` box inside inline content leaves the
+ * caret in an anonymous line box that shifts as text is typed around it.
  */
 .solstice-embed-canvas {
   display: inline-block;
@@ -409,33 +373,23 @@ html[data-reduce-motion='true'] .solstice-canvas-port {
   vertical-align: top;
 }
 
-
 /* --------------------------------------------------------------- cursors -- */
 
-/*
- * Inside an editing card, only the text itself takes a caret. The chrome
- * around it -- a file card's header strip and its buttons -- does what it did
- * in read mode, and links stay links.
- */
+/* Only the text takes a caret; a file card's header strip is still chrome. */
 .solstice-canvas-node[data-canvas-editing] [data-canvas-chrome] {
   cursor: default;
 }
 
-.solstice-canvas-node[data-canvas-editing] a,
-.solstice-canvas-node[data-canvas-editing] button,
 .solstice-canvas-node a,
 .solstice-canvas-node button {
   cursor: pointer;
 }
 
 /*
- * The cursor for a gesture in progress.
- *
- * `!important`, and applied to every descendant, because the pointer is
- * captured for the duration: it can be anywhere on screen, over a card, an
- * edge or a port, and every one of those has its own cursor that would
- * otherwise flicker through mid-drag. What the gesture *is* outranks what the
- * pointer happens to be over.
+ * The cursor for a gesture in progress. `!important`, and on every descendant,
+ * because the pointer is captured: it can be over a card, an edge or a port,
+ * each with its own cursor, and what the gesture *is* outranks what it happens
+ * to be over.
  */
 [data-canvas-gesture='drag'],
 [data-canvas-gesture='drag'] *,

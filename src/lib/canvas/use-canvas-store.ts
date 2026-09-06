@@ -4,11 +4,9 @@ import { useStore } from 'zustand';
 import type { CanvasState, CanvasStore } from './store';
 
 /**
- * The React binding for a board's store.
- *
- * A context rather than a module-level store, because the store is per tab --
- * two boards open in a split each need their own selection, viewport and undo
- * stack.
+ * The React binding for a board's store. A context rather than a module-level
+ * store: two boards open in a split each need their own selection, viewport
+ * and undo stack.
  */
 const CanvasStoreContext = createContext<CanvasStore | null>(null);
 

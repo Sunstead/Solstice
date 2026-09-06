@@ -20,22 +20,17 @@ import { editorSchemaPlugins } from '@/lib/editor/plugins';
 import { wikilink } from '@/lib/wikilink';
 
 /**
- * A real editor, mounted for the one card being edited.
+ * A real editor, mounted for the one card being edited and never more than
+ * one: two hundred live ProseMirrors would each bring their own undo history
+ * and command surface for a card nobody is looking at. Read mode renders
+ * statically from the same schema, so entering edit mode changes what a card
+ * can do rather than what it looks like.
  *
- * Never more than one at a time. A board of two hundred cards each holding a
- * live ProseMirror would need viewport virtualization just to open, and every
- * one of those instances would bring its own undo history and command surface
- * for a card nobody is looking at. Read mode renders statically instead, from
- * the same schema -- so entering and leaving edit mode changes what the card
- * can *do*, not what it looks like.
- *
- * No autosaver of its own: a text card's content lives in the `.canvas` JSON,
- * and the board's autosaver is the only writer on that path. Built from
- * `editorSchemaPlugins()` rather than `createEditorFeatures()`, which means no
- * React node views -- a card editor gets the schema's own rendering for code
- * blocks and images rather than CodeMirror and resolved asset URLs. That is the
- * price of not mounting a full editor per card; read mode, which is what a card
- * shows almost all of the time, resolves them properly.
+ * No autosaver of its own -- a text card's content lives in the `.canvas`
+ * JSON, and the board's autosaver is the only writer. Built from
+ * `editorSchemaPlugins()` rather than `createEditorFeatures()`, so there are
+ * no React node views: code blocks and images get the schema's own rendering
+ * here, and read mode resolves them properly.
  */
 function TextEditorCore({ node }: { node: TextNode }) {
   const store = useCanvasStoreApi();
@@ -50,11 +45,9 @@ function TextEditorCore({ node }: { node: TextNode }) {
 
           ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
             const state = store.getState();
-            // Straight into the document, per keystroke, so the board's
-            // autosaver runs and closing the tab mid-sentence loses nothing.
-            // The coalesce key is what stops a sentence becoming two hundred
-            // undo entries: consecutive edits to the same card replace the top
-            // entry instead of stacking, and any other action closes the run.
+            // Per keystroke, so the board's autosaver runs and closing the
+            // tab mid-sentence loses nothing. The coalesce key stops a
+            // sentence becoming two hundred undo entries.
             state.commit(setNodeText(state.doc, node.id, markdown), {
               coalesceKey: `text:${node.id}`,
             });
@@ -63,19 +56,18 @@ function TextEditorCore({ node }: { node: TextNode }) {
         .use(listener)
         .use(commonmark)
         .use(gfm)
-        // Its own undo stack while the caret is in the card, so Cmd+Z steps
-        // back through typing rather than through the board's gestures.
+        // Its own undo stack, so Cmd+Z in a card steps back through typing
+        // rather than through the board's gestures.
         .use(history)
         .use(clipboard)
         .use(wikilink)
         .use(editorSchemaPlugins()),
-    // Built once. `node.text` is only read for the initial value; letting it
-    // rebuild on every keystroke would destroy the caret.
+    // Built once: `node.text` is only the initial value, and rebuilding on
+    // every keystroke would destroy the caret.
     [node.id],
   );
 
-  // Focus on mount, so double-clicking a card puts the caret in it rather than
-  // requiring a second click.
+  // So double-clicking a card puts the caret in it.
   useEffect(() => {
     if (loading) return;
     const editor = getEditor();
@@ -87,12 +79,10 @@ function TextEditorCore({ node }: { node: TextNode }) {
     });
   }, [loading, getEditor]);
 
-  // Registers this card's "commit right now" callback -- see
-  // `registerCardFlush`. Reads the *live* ProseMirror document directly,
-  // rather than waiting on `markdownUpdated`'s debounce, which is exactly the
-  // thing that would otherwise still be pending when the card unmounts. Same
-  // coalesce key as the listener above: this is not a separate edit, only a
-  // guarantee that the last one lands before the editor goes away.
+  // See `registerCardFlush`: reads the live ProseMirror document rather than
+  // waiting on `markdownUpdated`'s debounce, which would still be pending when
+  // the card unmounts. Same coalesce key as the listener above -- not a
+  // separate edit, just a guarantee the last one lands.
   useEffect(() => {
     if (loading) return;
     const editor = getEditor();

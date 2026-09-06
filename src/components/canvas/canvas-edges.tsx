@@ -14,19 +14,13 @@ import { toScreen, type Viewport } from '@/lib/canvas/viewport';
 import { TITLE_ONLY_SCALE } from './canvas-node';
 
 /**
- * Every edge on the board, laid over the content in *screen* space.
+ * Every edge on the board, drawn in screen space rather than inside the zoom
+ * transform -- a transformed `stroke-width` becomes a ribbon at 4x and a
+ * hairline at 0.1x, and arrowheads and labels go the same way.
  *
- * Screen space rather than inside the zoom transform, which is the obvious
- * place for it: a transformed `stroke-width` becomes a ribbon at 4x and a
- * hairline at 0.1x, and the same happens to arrowheads and label text.
- * Fighting that with `vector-effect` and `markerUnits` works but leaves every
- * visual dimension expressed as a special case. Projecting two rects per edge
- * costs a handful of multiplications and gives direct control instead.
- *
- * Split into two layers because they want opposite stacking. The *lines* go
- * under the cards, so an edge never draws across a card's text. The *labels*
- * go over them: a label is text meant to be read, and an edge between two
- * adjacent cards has nowhere to put one except on top of something.
+ * Two layers, because they want opposite stacking: lines under the cards so an
+ * edge never crosses a card's text, labels over them so they stay readable
+ * when an edge runs between two adjacent cards.
  */
 
 const STROKE_WIDTH = 2;
@@ -75,12 +69,8 @@ export function useEdgeLayout(
   view: Viewport,
   selection: ReadonlySet<string>,
   /**
-   * An edge to leave out entirely.
-   *
-   * Used while one of its ends is being dragged: the overlay already draws a
-   * draft line following the pointer, and without this the committed edge
-   * kept rendering in its old place underneath it -- two lines for one
-   * gesture, one of them stale the instant the drag moved.
+   * An edge to leave out entirely, while one of its ends is being dragged --
+   * the overlay draws the live draft in its place.
    */
   hiddenEdgeId?: string | null,
 ): EdgeLayout[] {
@@ -90,9 +80,7 @@ export function useEdgeLayout(
     for (const edge of doc.edges) {
       if (edge.id === hiddenEdgeId) continue;
 
-      // An edge naming a node the file no longer contains stays in the
-      // document -- opening a board must never be destructive -- but there is
-      // nothing to draw it between.
+      // Kept in the document, but there is nothing to draw it between.
       if (!isEdgeDrawable(edge, nodes)) continue;
 
       const from = screenRect(view, rectOf(nodes.get(edge.fromNode)!));
@@ -171,8 +159,8 @@ export const CanvasEdgeLines = memo(function CanvasEdgeLines({
               />
             )}
 
-            {/* Widened invisible twin, so a hairline is still grabbable. Last
-                in the group so it sits above the visible paint. */}
+            {/* Invisible widened twin, so a hairline is still grabbable.
+                Last in the group, so it sits above the visible paint. */}
             {interactive && (
               <path
                 className='solstice-canvas-edge-hit'
@@ -195,10 +183,8 @@ export const CanvasEdgeLabels = memo(function CanvasEdgeLabels({
 }: Pick<EdgeLayerProps, 'layouts' | 'scale'>) {
   const size = clamp(LABEL_SIZE * scale, MIN_LABEL, MAX_LABEL);
 
-  // Below the zoom at which cards give up their bodies, labels go too. The
-  // floor on the font size means they would otherwise be the largest thing on
-  // a board being navigated rather than read, and they overlap each other and
-  // the cards at exactly the moment nothing else is legible anyway.
+  // Labels go when cards give up their bodies: the font-size floor would
+  // otherwise leave them the largest thing on a board being navigated.
   if (scale < TITLE_ONLY_SCALE) return null;
 
   return (

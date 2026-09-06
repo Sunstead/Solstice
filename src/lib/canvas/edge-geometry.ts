@@ -9,15 +9,12 @@ import {
 } from './types';
 
 /**
- * Where an edge is drawn.
+ * Where an edge is drawn. Coordinate-system agnostic: hand it two rects and it
+ * returns a path in the same space.
  *
- * Coordinate-system agnostic: hand it two rects and it returns a path in the
- * same space. The renderer passes *screen*-space rects, because drawing edges
- * inside the zoom transform would scale their stroke width into ribbons at 4x
- * and hairlines at 0.1x, and every fix for that (`vector-effect`,
- * `markerUnits`) is another special case. Projecting two corners per edge and
- * recomputing the path is a handful of multiplications and buys direct control
- * of every visual dimension.
+ * The renderer passes screen-space rects, since drawing inside the zoom
+ * transform would scale stroke widths into ribbons at 4x and hairlines at
+ * 0.1x, and every fix for that is another special case.
  */
 
 export interface EdgeGeometry {
@@ -51,15 +48,9 @@ const OUTWARD: Record<NodeSide, Point> = {
 const BACKWARD_PENALTY = 100_000;
 
 /**
- * Bounds on how far a control point is pushed out of its anchor, in *canvas*
- * units.
- *
- * The caller works in screen space, so these have to be scaled to match before
- * they clamp anything. Leaving them as raw screen pixels made the clamp bite at
- * a different point at every zoom, so the curve changed shape as you zoomed and
- * the edges appeared to crawl away from the cards they were pinned to. Scaling
- * them makes the whole path exactly `scale` times the canvas-space path -- the
- * same curve, drawn bigger.
+ * How far a control point is pushed out of its anchor, in *canvas* units.
+ * Callers working in screen space must scale these, or the clamp bites at a
+ * different point at every zoom and the curve changes shape as you zoom.
  */
 const MIN_CURVE = 24;
 const MAX_CURVE = 160;
@@ -78,21 +69,14 @@ export function anchorOf(rect: Rect, side: NodeSide): Point {
   }
 }
 
-export function centerOf(rect: Rect): Point {
-  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-}
-
 function distance(a: Point, b: Point): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 /**
- * Picks the sides the spec left unspecified.
- *
- * Scored rather than switched on the dominant axis alone: the shortest pair of
- * anchors is usually right, but only among sides that actually face the other
- * node -- otherwise an edge between two nodes a few pixels apart happily leaves
- * one of them through the back and loops all the way around.
+ * Picks the sides the file left unspecified: the shortest pair of anchors, but
+ * only among sides facing the other node. Without the penalty an edge between
+ * two close nodes leaves through the back and loops around.
  */
 export function resolveSides(
   from: Rect,
@@ -150,9 +134,8 @@ export function edgeGeometry(
       }
     : resolveSides(from, to, edge.fromSide, edge.toSide);
 
-  // A loop leaving and re-entering through the same side would have both
-  // anchors in one place and no curve at all. Rotating one a quarter turn
-  // reuses the ordinary bezier below rather than adding a second path builder.
+  // Both anchors in one place would give no curve at all; a quarter turn
+  // reuses the ordinary bezier rather than adding a second path builder.
   if (selfEdge && fromSide === toSide) {
     toSide = SIDES[(SIDES.indexOf(fromSide) + 1) % SIDES.length];
   }
@@ -161,9 +144,8 @@ export function edgeGeometry(
   const end = anchorOf(to, toSide);
 
   const span = distance(start, end);
-  // A self-edge's anchors are close together by construction, so scaling the
-  // curve off their distance would collapse the loop; give it a floor from the
-  // node's own size instead.
+  // A self-edge's anchors are close by construction, so scaling off their
+  // distance would collapse the loop; use the node's own size instead.
   const reach = selfEdge
     ? Math.max(from.width, from.height) * 0.5
     : Math.min(
@@ -183,11 +165,10 @@ export function edgeGeometry(
     end,
     fromSide,
     toSide,
-    // The tangent at each end points along the last control leg. Taken from the
-    // control point rather than sampling the curve, which is exact and free.
+    // The tangent points along the control leg: exact, and free.
     startAngle: Math.atan2(start.y - c1.y, start.x - c1.x),
     endAngle: Math.atan2(end.y - c2.y, end.x - c2.x),
-    // A cubic at t=0.5 reduces to this; no sampling loop needed.
+    // A cubic at t=0.5 reduces to this.
     mid: {
       x: (start.x + 3 * c1.x + 3 * c2.x + end.x) / 8,
       y: (start.y + 3 * c1.y + 3 * c2.y + end.y) / 8,
@@ -205,11 +186,9 @@ export function toEndOf(edge: CanvasEdge): EdgeEnd {
 }
 
 /**
- * The three points of an arrowhead, as an SVG polygon path.
- *
- * Drawn by hand rather than as an SVG `<marker>`: one code path serves both
- * ends, the size is exact in whatever units the caller is working in, and there
- * is no `<defs>` entry to mint per colour.
+ * An arrowhead as an SVG polygon path. Hand-drawn rather than a `<marker>`:
+ * one code path serves both ends, sized in the caller's own units, with no
+ * `<defs>` entry to mint per colour.
  */
 export function arrowPath(at: Point, angle: number, size: number): string {
   const spread = Math.PI / 7;

@@ -11,10 +11,9 @@ import { CanvasCardEditor } from './canvas-card-editor';
 import { isEditableCard } from '@/lib/canvas/editable';
 
 /**
- * Below this zoom, WKWebView rasterises card text at the scaled resolution and
- * it stops being legible. Showing a title instead is a legibility fix and a
- * large rendering win at once -- at this zoom a board is being navigated, not
- * read.
+ * Below this zoom WKWebView rasterises card text past legibility. A title
+ * instead is both a legibility fix and a large rendering win; at this zoom a
+ * board is being navigated, not read.
  */
 export const TITLE_ONLY_SCALE = 0.4;
 
@@ -52,8 +51,8 @@ function NodeBody({
     case 'link':
       return <CanvasNodeLink node={node} />;
     default:
-      // A card type this version does not know. Rendered rather than hidden so
-      // it can be moved out of the way, and never rewritten.
+      // A card type this version does not know: rendered so it can be moved
+      // out of the way, and never rewritten.
       return (
         <div className='flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground'>
           <FileQuestion className='size-8 shrink-0' />
@@ -77,13 +76,9 @@ export interface CanvasNodeProps {
 }
 
 /**
- * One card.
- *
- * Carries the `data-canvas-node` attribute the surface's delegated pointer
- * handler reads, and nothing else about interaction: hit testing is the
- * browser's job here, since it already knows about z-order, transforms and
- * rounded corners -- and it is the only approach under which a real editor
- * mounted inside a card keeps working.
+ * One card. Carries the `data-canvas-node` attribute the surface's delegated
+ * handler reads and nothing else about interaction: hit testing is left to the
+ * browser, which already knows about z-order, transforms and rounded corners.
  */
 export const CanvasNode = memo(function CanvasNode({
   node,
@@ -101,7 +96,7 @@ export const CanvasNode = memo(function CanvasNode({
   };
 
   // A custom property rather than a class per preset, so the six spec colours
-  // and an arbitrary hex take exactly the same path through the stylesheet.
+  // and an arbitrary hex take the same path through the stylesheet.
   const accent = color
     ? ({ '--canvas-node-color': color } as React.CSSProperties)
     : undefined;
@@ -131,8 +126,7 @@ export const CanvasNode = memo(function CanvasNode({
         {node.label && (
           <div
             className='solstice-canvas-group-label'
-            // Counter-scaled so a group's name stays readable at any zoom,
-            // which is the whole point of a label on a region this large.
+            // Counter-scaled, so a group's name stays readable at any zoom.
             style={{ fontSize: `${Math.min(14 / scale, 14 / TITLE_ONLY_SCALE)}px` }}
           >
             {node.label}
@@ -150,9 +144,9 @@ export const CanvasNode = memo(function CanvasNode({
     <div
       data-canvas-node={node.id}
       data-selected={selected || undefined}
-      // The one attribute the board's pointer and key handlers look for before
-      // doing anything. Read from the DOM rather than from `editingNodeId`,
-      // which can disagree with reality for a frame during a focus transition.
+      // What the board's pointer and key handlers check before doing
+      // anything, read from the DOM rather than `editingNodeId`, which can lag
+      // by a frame during a focus change.
       data-canvas-editing={liveEditor ? '' : undefined}
       className='solstice-canvas-node'
       style={{ ...geometry, ...accent }}
@@ -168,8 +162,8 @@ export const CanvasNode = memo(function CanvasNode({
         <div
           className='solstice-canvas-node-body'
           data-clipped={liveEditor ? undefined : 'true'}
-          // A card being edited is flush too: the editor inside carries the
-          // inset, so read and edit mode put the text in the same place.
+          // A card being edited is flush too: the editor carries the inset,
+          // so read and edit mode put the text in the same place.
           data-flush={
             node.type === 'file' || node.type === 'link' || liveEditor
               ? ''

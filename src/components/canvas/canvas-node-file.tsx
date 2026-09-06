@@ -20,16 +20,9 @@ import { basename, joinWorkspacePath } from '@/lib/wikilink/target';
 import { StaticMarkdown } from './static-markdown';
 
 /**
- * A file card, showing the file.
- *
- * Dispatches through `embedKind` -- the same table that decides what a tab
- * renders and what `![[target]]` renders in a note -- so a card showing a file
- * shows the same thing every other surface in the app would. A card that only
- * showed an icon and a filename was, reasonably, read as broken.
- *
- * The path in the document is relative to the vault root, which is what JSON
- * Canvas stores and what Obsidian writes; an absolute one would break the
- * moment the vault moved.
+ * A file card, showing the file. Dispatches through `embedKind` -- the same
+ * table a tab and `![[target]]` use -- so a file looks the same wherever it
+ * appears. Paths are vault-relative, as JSON Canvas stores them.
  */
 export function CanvasNodeFile({ node }: { node: FileNode }) {
   const workspaceRoot = useWorkspace((state) => state.path);
@@ -65,10 +58,8 @@ export function CanvasNodeFile({ node }: { node: FileNode }) {
 }
 
 /**
- * The filename, and a way into the real file.
- *
- * A card is a view of a file, not the file itself -- there has to be a route to
- * the thing it is showing, and the card's own body is taken up by content.
+ * The filename, and a way into the real file: a card is a view of a file, and
+ * its body is taken up by content.
  */
 export function FileCardHeader({
   path,
@@ -77,8 +68,7 @@ export function FileCardHeader({
   path: string | null;
   name: string;
 }) {
-  // The same icon and the same name formatting a tab and the breadcrumb use, so
-  // one file looks like itself wherever it appears -- including obeying
+  // The icon and name formatting a tab and the breadcrumb use, including
   // `explorer.showFileExtensions`, which `FormattedFileName` reads.
   const Icon = getFileIcon(getFileExtension(name));
 
@@ -95,8 +85,7 @@ export function FileCardHeader({
           title='Open in a tab'
           aria-label='Open in a tab'
           className='shrink-0 rounded-sm p-0.5 hover:bg-accent hover:text-accent-foreground'
-          // The board's delegated handler would otherwise read this as a press
-          // on the card and start dragging it.
+          // Or the board's delegated handler starts dragging the card.
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
@@ -136,20 +125,16 @@ function FileCardBody({
         </div>
       );
     default:
-      // Including `canvas`: a board inside a board inside a board is a depth
-      // problem the preview card guards, but the guard needs a chain context
-      // this card is not inside. An icon is honest until that is wired.
+      // Including `canvas`: nesting needs the preview card's depth guard,
+      // which needs a chain context this card is not inside.
       return <Fallback file={file} />;
   }
 }
 
 /**
- * A note's content, rendered read-only.
- *
- * `loadEmbedSource` is the same cache note transclusions use: a file shown on
- * several cards is read once, it invalidates on `fileSystemChanged`, and it
- * hears about this app's own writes -- so a card stays current while the same
- * note is edited in another tab.
+ * A note's content, read-only. `loadEmbedSource` is the cache transclusions
+ * use: read once across cards, invalidated on `fileSystemChanged`, and aware
+ * of this app's own writes, so a card stays current as the note is edited.
  */
 function MarkdownBody({
   absolutePath,
@@ -237,8 +222,8 @@ function ImageBody({
       src={asset.url}
       alt={basename(file)}
       draggable={false}
-      // `contain` rather than `cover`: a card is a view of the whole picture,
-      // and cropping it to fill would hide whatever the card was made for.
+      // `contain`, not `cover`: cropping to fill would hide what the card was
+      // made for.
       className='size-full object-contain select-none'
     />
   );

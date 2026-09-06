@@ -1,14 +1,9 @@
 import type { CanvasDoc } from './types';
 
 /**
- * Undo for a board.
- *
- * An entry is a whole document snapshot, not a patch. Because every operation
- * in `doc.ts` returns a new object sharing what it did not change, a snapshot
- * is a shallow array copy plus the handful of nodes that actually moved --
- * cheap enough that patches would buy memory nobody needs while introducing
- * inverse-patch bugs on exactly the operations that matter most (deleting
- * thirty nodes and every edge that touched them).
+ * Undo for a board. An entry is a whole document snapshot rather than a patch:
+ * `doc.ts` operations share everything they did not change, so a snapshot is a
+ * shallow array copy plus the nodes that actually moved.
  */
 
 /** Deep enough to cover a working session, shallow enough to stay bounded. */
@@ -19,11 +14,8 @@ export interface History {
   future: CanvasDoc[];
   /**
    * Set while consecutive edits of one kind should replace the top entry
-   * rather than stack on it.
-   *
-   * Only typing uses this. A drag needs no coalescing at all, because the
-   * document is only committed on pointerup -- every frame in between is a
-   * preview the history never sees.
+   * rather than stack on it. Only typing uses it -- a drag commits once, on
+   * pointerup, so every frame in between is a preview history never sees.
    */
   coalesceKey: string | null;
 }
@@ -40,7 +32,7 @@ export function pushHistory(
   coalesceKey?: string,
 ): History {
   // A run of keystrokes in one card replaces its own top entry, so undo steps
-  // back over the whole run rather than one character at a time.
+  // over the run rather than one character at a time.
   const coalescing =
     coalesceKey !== undefined &&
     coalesceKey === history.coalesceKey &&
@@ -52,7 +44,7 @@ export function pushHistory(
 
   return {
     past,
-    // Any new edit abandons the redo branch, as everywhere else.
+    // Any new edit abandons the redo branch.
     future: [],
     coalesceKey: coalesceKey ?? null,
   };
@@ -79,8 +71,8 @@ export function undoHistory(
     history: {
       past: history.past.slice(0, -1),
       future: [...history.future, present],
-      // Undoing closes any open typing run: the next keystroke has to start a
-      // new entry, or it would silently rewrite the one just restored.
+      // Undoing closes any open typing run, or the next keystroke would
+      // rewrite the entry just restored.
       coalesceKey: null,
     },
   };

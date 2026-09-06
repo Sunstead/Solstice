@@ -31,10 +31,8 @@ const COPY: Record<RenameKind, { title: string; description: string; label: stri
   };
 
 /**
- * Names a group or an edge.
- *
- * Empty is a legitimate answer -- it is how a label is removed -- so unlike the
- * link dialog this one has no non-empty guard on its submit button.
+ * Names a group or an edge. Empty is a legitimate answer -- it is how a label
+ * is removed -- so there is no non-empty guard on the submit button.
  */
 export function CanvasRenameDialog({
   open,
@@ -51,8 +49,8 @@ export function CanvasRenameDialog({
 }) {
   const [value, setValue] = useState(initialValue);
 
-  // Seeded on open rather than on mount: the dialog outlives any one target,
-  // so a second rename would otherwise still hold the first one's name.
+  // Seeded on open: the dialog outlives any one target, so a second rename
+  // would otherwise still hold the first one's name.
   useEffect(() => {
     if (open) setValue(initialValue);
   }, [open, initialValue]);

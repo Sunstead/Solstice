@@ -1,20 +1,15 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
 /**
- * Theme colours resolved to values a `<canvas>` will accept as a fill.
+ * Theme colours resolved to values a `<canvas>` accepts as a fill, since it
+ * cannot paint with `var(--ring)`.
  *
- * A canvas cannot paint with `var(--ring)`; it needs a concrete colour. Reading
- * one means `getComputedStyle`, which forces a style recalculation -- far too
- * expensive to do inside a draw that runs every frame -- so the values are
- * cached in a ref and re-read only when the theme actually changes, which shows
- * up as an attribute change on `<html>`.
+ * Resolving means `getComputedStyle`, which forces a style recalculation, so
+ * values are cached and re-read only when the theme changes. A ref rather than
+ * state: a draw effect reads it during layout, and re-rendering would put a
+ * paint between the colour changing and the canvas being redrawn.
  *
- * Returns a ref rather than state on purpose: a draw effect reads it during
- * layout, and making this a re-render would put a paint between the colour
- * changing and the canvas being redrawn.
- *
- * @param properties CSS properties or custom properties to resolve, e.g.
- *   `['color']` or `['--canvas-color-1', '--muted-foreground']`.
+ * @param properties CSS or custom properties, e.g. `['--canvas-color-1']`.
  */
 export function useResolvedColors(
   ref: RefObject<HTMLElement | null>,

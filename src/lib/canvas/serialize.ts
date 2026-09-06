@@ -2,34 +2,29 @@ import { DEFAULT_INDENT } from './parse';
 import type { CanvasDoc, CanvasEdge, CanvasNode } from './types';
 
 /**
- * Writing a `.canvas` file.
+ * Writing a `.canvas` file. Keys go out in the spec's order, then anything
+ * preserved.
  *
- * Keys go out in the order the spec lists them, then anything preserved. That
- * determinism is not cosmetic: it is what makes
- * `serializeCanvas(parseCanvas(text).doc) === text` hold for a file this app
- * wrote, which in turn lets the autosaver's `getLastWritten()` comparison and
- * the external-change check stay plain string equality with no normalization
- * layer in between. It also keeps a board's diff to the lines that changed.
+ * That determinism is what makes `serializeCanvas(parseCanvas(t).doc) === t`
+ * hold for a file this app wrote, which lets the autosaver's `getLastWritten`
+ * comparison and the external-change check stay plain string equality. It also
+ * keeps a board's diff to the lines that changed.
  *
- * `JSON.stringify` drops keys whose value is `undefined`, so an optional field
- * the document does not carry simply never appears -- there is no need to build
- * the object conditionally.
+ * `JSON.stringify` drops `undefined` values, so an optional field the document
+ * does not carry simply never appears.
  */
-
-/** The spec stores positions and sizes as integers. */
-const round = (value: number) => Math.round(value);
 
 function serializeNode(node: CanvasNode): Record<string, unknown> {
   const base = {
     id: node.id,
-    // An unrecognised card writes back the `type` string it arrived with. When
-    // that was absent or not a string, `unknownType` is empty and the original
-    // value -- if there was one -- comes back out of `extra` below instead.
+    // An unrecognised card writes back the `type` it arrived with; when that
+    // was absent, `unknownType` is empty and `extra` carries it instead.
     type: node.type === 'unknown' ? node.unknownType || undefined : node.type,
-    x: round(node.x),
-    y: round(node.y),
-    width: round(node.width),
-    height: round(node.height),
+    // The spec stores positions and sizes as integers.
+    x: Math.round(node.x),
+    y: Math.round(node.y),
+    width: Math.round(node.width),
+    height: Math.round(node.height),
     color: node.color,
   };
 
@@ -82,6 +77,6 @@ export function serializeCanvas(
     ...doc.extra,
   };
 
-  // The trailing newline is table stakes for a text file under version control.
+  // Trailing newline, for a text file under version control.
   return `${JSON.stringify(value, null, indent)}\n`;
 }

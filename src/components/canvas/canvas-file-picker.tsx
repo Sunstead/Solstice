@@ -9,12 +9,9 @@ import { selectAllFiles, useFileIndex } from '@/lib/stores/use-file-index';
 import { getFileExtension } from '@/lib/utils';
 
 /**
- * Picks a workspace file for a new file card.
- *
- * A thin wrapper on the same dialog quick-open and move-to-folder use, so
- * searching for a file feels the same wherever you do it. The path handed back
- * is workspace-relative, which is what JSON Canvas stores -- an absolute path
- * would break the moment the vault moved.
+ * Picks a workspace file for a new file card, wrapping the same dialog
+ * quick-open uses. The path handed back is workspace-relative, which is what
+ * JSON Canvas stores.
  */
 export function CanvasFilePicker({
   open,

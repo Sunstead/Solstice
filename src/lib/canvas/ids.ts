@@ -1,10 +1,6 @@
 /**
- * Ids for nodes and edges.
- *
- * Sixteen lowercase hex characters, which is what Obsidian writes. The spec
- * only asks for uniqueness, but matching the format means a board that has
- * been round-tripped through both apps has one kind of id in it rather than a
- * mix of hex strings and UUIDs.
+ * Sixteen lowercase hex characters, matching what Obsidian writes so a board
+ * round-tripped through both apps has one kind of id in it.
  */
 export function createCanvasId(): string {
   const bytes = new Uint8Array(8);

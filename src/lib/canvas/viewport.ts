@@ -1,18 +1,12 @@
 import type { Point, Rect, Size } from './types';
 
 /**
- * Screen ⇄ canvas coordinates.
+ * Screen <-> canvas coordinates, shared by the tab, the embedded preview and
+ * the minimap.
  *
- * The model is the image viewer's, lifted out as pure functions so the tab, the
- * embedded preview card and the minimap all share one definition of where
- * things are. `offset` is the screen position of the content's origin, and the
- * content is transformed about `0 0` -- which makes the translation *be* the
- * offset, and is exactly what lets `CanvasGrid` read the same pair and land its
- * dots on whole canvas coordinates.
- *
- * Unlike the image viewer these take no refs and hold no state: the viewport
- * lives in the canvas store, so a handler bound once reads `getState().view`
- * and there is nothing to mirror and nothing to go stale.
+ * `offset` is the screen position of the content's origin, and content is
+ * transformed about `0 0`, so the translation *is* the offset -- which is what
+ * lets `CanvasGrid` read the same pair and land its dots on whole coordinates.
  */
 
 export interface Viewport {
@@ -29,9 +23,9 @@ export const ZOOM_STOPS = [
 ] as const;
 
 /**
- * Zoom per wheel event, by input device. Keyed on the *sign* of the delta only:
- * a trackpad's stream is noisy, and scaling by its magnitude makes every frame
- * a different step, which a regular lattice of dots shows as jitter.
+ * Zoom per wheel event, by device. Keyed on the delta's sign only: scaling by
+ * its magnitude makes every frame a different step, which the dot lattice
+ * shows as jitter.
  */
 export const TOUCHPAD_STEP = 1.03;
 export const MOUSE_STEP = 1.2;
@@ -44,7 +38,7 @@ export const FIT_PADDING = 48;
 
 export const IDENTITY_VIEWPORT: Viewport = { scale: 1, offset: { x: 0, y: 0 } };
 
-export function clampScale(scale: number): number {
+function clampScale(scale: number): number {
   return Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
 }
 
@@ -75,10 +69,8 @@ export function clientToCanvas(
 }
 
 /**
- * Zooms about a point in the pane's pixel space, holding it still on screen.
- *
- * The content coordinate under the pointer is what must not move; everything
- * else follows from solving for the offset that keeps it there.
+ * Zooms about a point in the pane's pixel space. The content coordinate under
+ * the pointer is what must not move; the offset follows from that.
  */
 export function zoomAbout(
   view: Viewport,
@@ -102,8 +94,7 @@ export function zoomAbout(
 
 /** The next stop above or below the current scale. */
 export function stepScale(scale: number, direction: 1 | -1): number {
-  // A tolerance, so landing exactly on a stop does not make the next press a
-  // no-op against floating-point noise.
+  // A tolerance, so landing on a stop does not make the next press a no-op.
   if (direction > 0) {
     return ZOOM_STOPS.find((stop) => stop > scale + 1e-4) ?? MAX_SCALE;
   }

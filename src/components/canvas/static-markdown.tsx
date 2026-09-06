@@ -5,13 +5,12 @@ import { renderMarkdownFragment } from '@/lib/editor/static-markdown';
 import { cn } from '@/lib/utils';
 
 /**
- * Markdown rendered read-only, exactly as a note would render it.
+ * Markdown rendered read-only, as a note would render it.
  *
- * The DOM is owned by the effect rather than by React: the renderer hands back
- * a `DocumentFragment` built from the editor's own schema, and reconciling that
- * against JSX children would mean rebuilding it as React elements and keeping
- * the two definitions of "what a callout looks like" in step forever.
- * `Transclusion` in `embed-view.tsx` does the same thing for the same reason.
+ * The effect owns the DOM rather than React: the renderer returns a
+ * `DocumentFragment` built from the editor's own schema, and reconciling that
+ * against JSX would mean maintaining a second definition of every node type.
+ * `Transclusion` in `embed-view.tsx` works the same way.
  */
 export function StaticMarkdown({
   markdown,
@@ -29,17 +28,16 @@ export function StaticMarkdown({
   useEffect(() => {
     let cancelled = false;
 
-    // `Editor.create()` is async, so this always resolves a tick late. The tab
-    // warms the renderer on mount, which makes that a microtask rather than
-    // anything visible.
+    // `Editor.create()` is async, so this resolves a tick late; the tab warms
+    // the renderer on mount to keep that invisible.
     void renderMarkdownFragment(markdown, { sourcePath, workspaceRoot }).then(
       (fragment) => {
         if (cancelled) return;
         const host = hostRef.current;
         if (!host) return;
 
-        // No renderer means showing the source, which is still the content --
-        // better than an empty card that looks like data loss.
+        // No renderer: show the source, rather than an empty card that reads
+        // as data loss.
         if (fragment) host.replaceChildren(fragment);
         else host.textContent = markdown;
       },

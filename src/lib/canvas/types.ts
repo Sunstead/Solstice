@@ -1,21 +1,14 @@
 /**
- * The JSON Canvas 1.0 document model.
+ * The JSON Canvas 1.0 document model: https://jsoncanvas.org/spec/1.0/
  *
- * https://jsoncanvas.org/spec/1.0/
- *
- * Types only -- the vocabulary every other module in `lib/canvas` speaks. The
- * shapes deliberately mirror the spec's own key names rather than improving on
- * them, because these objects are written back to a file other applications
- * read: a rename here is a compatibility break, not a refactor.
+ * Key names mirror the spec because these objects are written back to a file
+ * other applications read -- a rename here is a compatibility break, not a
+ * refactor.
  */
 
 /**
- * A hex string (`"#FF0000"`) or one of the six preset indices `"1"`..`"6"`
- * (red, orange, yellow, green, cyan, purple).
- *
- * Left as a plain `string` rather than a union: the spec allows any hex value,
- * and narrowing the presets would not stop an arbitrary one arriving from a
- * file anyway. `resolveCanvasColor` in `color.ts` is where the two forms part.
+ * A hex string (`"#FF0000"`) or a preset index `"1"`..`"6"`. Plain `string`
+ * because a file can hold anything; `resolveCanvasColor` parts the two forms.
  */
 export type CanvasColor = string;
 
@@ -39,12 +32,8 @@ interface BaseNode extends Rect {
   id: string;
   color?: CanvasColor;
   /**
-   * Every key the spec does not define, kept verbatim.
-   *
-   * The same forward-compatibility contract the settings files hold: a board
-   * written by a newer Obsidian, or by a plugin, has to survive a round trip
-   * through this editor untouched. Anything we do not understand is data we
-   * are holding on someone else's behalf, not noise to discard.
+   * Every key the spec does not define, kept verbatim so a board written by a
+   * newer Obsidian or by a plugin survives a round trip untouched.
    */
   extra?: Record<string, unknown>;
 }
@@ -70,13 +59,10 @@ export type GroupNode = BaseNode & {
 };
 
 /**
- * A node whose `type` this version does not recognise.
- *
- * Discriminated as `'unknown'` with the file's own string parked in
- * `unknownType`, so the union stays exhaustively switchable -- a bare
- * `type: string` member would swallow every other branch. Geometry stays
- * editable and the payload is echoed back on write, so an unrecognised card
- * can still be moved out of the way without corrupting whatever wrote it.
+ * A node whose `type` this version does not recognise. Discriminated as
+ * `'unknown'` with the file's own string parked in `unknownType`, so the union
+ * stays exhaustively switchable; geometry stays editable and the payload is
+ * echoed back on write.
  */
 export type UnknownNode = BaseNode & { type: 'unknown'; unknownType: string };
 
@@ -109,19 +95,13 @@ export interface CanvasDoc {
   extra: Record<string, unknown>;
 }
 
-export const EMPTY_DOC: CanvasDoc = { nodes: [], edges: [], extra: {} };
-
-/**
- * The spec's own defaults for the ends of an edge, which are asymmetric: an
- * edge points *at* its target unless told otherwise.
- */
+/** The spec's defaults, asymmetric: an edge points at its target. */
 export const DEFAULT_FROM_END: EdgeEnd = 'none';
 export const DEFAULT_TO_END: EdgeEnd = 'arrow';
 
 /**
- * Sizes for newly created cards, and the repair value for a node that arrives
- * without one. Chosen to match what Obsidian creates, so a board built here
- * and a board built there look like the same kind of object.
+ * Sizes for new cards, and the repair value for a node that arrives without
+ * one. Matches what Obsidian creates.
  */
 export const DEFAULT_NODE_SIZE: Record<CanvasNodeType, Size> = {
   text: { width: 250, height: 60 },

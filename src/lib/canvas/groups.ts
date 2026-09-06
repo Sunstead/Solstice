@@ -1,62 +1,34 @@
 import { rectOf } from './doc';
-import type { CanvasNode, GroupNode, Rect } from './types';
+import type { CanvasNode, GroupNode } from './types';
 import { rectContains } from './viewport';
 
 /**
- * Group membership, which JSON Canvas does not store.
- *
- * The spec gives a group an id, a rectangle and a label, and nothing that says
- * which nodes are in it. Containment is therefore geometric and computed on
- * demand -- which is also why it must be computed *once, at the start of a
- * drag*: re-evaluating mid-gesture would have a group grab every card it
- * happened to slide over on the way past.
+ * Group membership, which JSON Canvas does not store -- a group is just a
+ * labelled rectangle, so membership is geometric and computed on demand.
  */
 
-export function isGroup(node: CanvasNode): node is GroupNode {
+function isGroup(node: CanvasNode): node is GroupNode {
   return node.type === 'group';
 }
 
 /**
- * The nodes inside `group`.
- *
- * Fully contained, not merely intersecting. Intersection would make dragging a
- * group sweep up half the board, because a group is large and almost everything
- * clips its edge at some point.
+ * The nodes inside `group`. Fully contained, not merely intersecting: a group
+ * is large, and intersection would sweep up half the board.
  */
-export function membersOf(
-  group: GroupNode,
-  nodes: readonly CanvasNode[],
-): CanvasNode[] {
+function membersOf(group: GroupNode, nodes: readonly CanvasNode[]): CanvasNode[] {
   const bounds = rectOf(group);
   return nodes.filter(
     (node) => node.id !== group.id && rectContains(bounds, rectOf(node)),
   );
 }
 
-/** The groups a node sits inside, innermost (smallest) first. */
-export function groupsContaining(
-  node: CanvasNode,
-  nodes: readonly CanvasNode[],
-): GroupNode[] {
-  const bounds = rectOf(node);
-  return nodes
-    .filter(
-      (other): other is GroupNode =>
-        isGroup(other) &&
-        other.id !== node.id &&
-        rectContains(rectOf(other), bounds),
-    )
-    .sort((a, b) => a.width * a.height - b.width * b.height);
-}
-
 /**
- * Everything that moves when `ids` are dragged: the selection itself, plus the
- * contents of every selected group, transitively.
+ * Everything that moves when `ids` are dragged: the selection, plus the
+ * contents of every selected group, transitively -- a group inside another is
+ * itself a member and travels with it.
  *
- * Transitive because a group fully inside another is itself a member and has to
- * travel with it. Resolved by repeatedly expanding rather than recursing, which
- * cannot loop however the rectangles overlap -- a node already in the set is
- * never expanded twice.
+ * Callers must resolve this once at the start of a gesture. Re-running it
+ * mid-drag would have a group capture whatever it slid over on the way past.
  */
 export function expandWithGroupMembers(
   ids: ReadonlySet<string>,
@@ -65,6 +37,8 @@ export function expandWithGroupMembers(
   const moving = new Set(ids);
   const queue = nodes.filter((node) => ids.has(node.id) && isGroup(node));
 
+  // Iterative rather than recursive so overlapping rectangles cannot loop: a
+  // node already in the set is never expanded twice.
   while (queue.length > 0) {
     const group = queue.pop() as GroupNode;
 
@@ -76,14 +50,4 @@ export function expandWithGroupMembers(
   }
 
   return moving;
-}
-
-/** A rectangle sized to hold `contents` with `padding` of clearance. */
-export function boundsWithPadding(rect: Rect, padding: number): Rect {
-  return {
-    x: rect.x - padding,
-    y: rect.y - padding,
-    width: rect.width + padding * 2,
-    height: rect.height + padding * 2,
-  };
 }
