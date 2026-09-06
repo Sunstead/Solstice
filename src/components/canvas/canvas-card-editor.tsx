@@ -11,18 +11,15 @@ import { FileCardHeader } from './canvas-node-file';
 import { CanvasTextEditor } from './canvas-text-editor';
 
 /**
- * The editor a card gets, chosen by where its content actually lives.
+ * The editor a card gets, chosen by where its content lives.
  *
- * A **text card** holds its markdown inside the `.canvas` file, so it gets a
- * lightweight editor with no autosaver of its own -- the board's autosaver is
- * the only writer on that path.
+ * A **text card** holds its markdown in the `.canvas` file, so it gets a
+ * lightweight editor with no autosaver -- the board's is the only writer.
  *
  * A **file card** is a view of a real note, so it gets `MilkdownEditorWrapper`
- * verbatim: everything that makes that component wrong for a text card (it
- * creates an autosaver for its path, watches that path for external changes,
- * takes the command seat while focused) is exactly what is wanted here. Edits
- * land in the note, and the note's other open tabs hear about them through the
- * machinery that already exists.
+ * verbatim: everything that makes that component wrong for a text card (its
+ * own autosaver, external-change watching, the command seat) is exactly right
+ * here, and the note's other open tabs hear about edits as they always do.
  */
 export function CanvasCardEditor({ node }: { node: CanvasNode }) {
   if (node.type === 'text') {
@@ -50,10 +47,9 @@ function FileCardEditor({ id, file }: { id: string; file: string }) {
 
   useFocusWhenReady(hostRef, content !== null);
 
-  // Registers the note's own "commit and write right now" -- see
-  // `registerCardFlush`. `MilkdownEditorWrapper` populates `flushRef` once its
-  // editor is ready, so this only needs to forward whatever is there at the
-  // moment the card is asked to leave edit mode.
+  // See `registerCardFlush`. `MilkdownEditorWrapper` fills `flushRef` once its
+  // editor is ready, so this forwards whatever is there when the card is asked
+  // to leave edit mode.
   useEffect(
     () => store.getState().registerCardFlush(id, () => flushRef.current?.()),
     [store, id],
@@ -63,9 +59,8 @@ function FileCardEditor({ id, file }: { id: string; file: string }) {
     ? joinWorkspacePath(workspaceRoot, file)
     : null;
 
-  // Read directly rather than through `loadEmbedSource`: that cache exists to
-  // serve many read-only previews of one file, and an editor needs the bytes it
-  // is about to start writing over, not a possibly-shared snapshot.
+  // Read directly rather than through `loadEmbedSource`: an editor needs the
+  // bytes it is about to write over, not a shared preview snapshot.
   useEffect(() => {
     if (!absolutePath) return;
     let cancelled = false;
@@ -97,8 +92,7 @@ function FileCardEditor({ id, file }: { id: string; file: string }) {
 
   return (
     <div className='flex h-full min-h-0 flex-col'>
-      {/* Kept while editing, so entering edit mode does not pull the content
-          up by the height of a header that vanished. */}
+      {/* Kept while editing, or the content jumps up by its height. */}
       <FileCardHeader path={absolutePath} name={basename(file)} />
       <div ref={hostRef} className='typeset min-h-0 flex-1 overflow-auto'>
         <MilkdownEditorWrapper
@@ -115,19 +109,16 @@ function FileCardEditor({ id, file }: { id: string; file: string }) {
 /**
  * Puts the caret in the editor as soon as one appears.
  *
- * `MilkdownEditorWrapper` builds itself asynchronously and does not focus --
- * reasonably, since a note tab should not steal focus on open. In a card it
- * must: the card was double-clicked to type in it, and until something inside
- * it holds focus the *board* does, which means a Backspace deletes the card
- * instead of a character. An observer rather than a timeout because there is no
- * knowing which frame the editor lands on.
+ * `MilkdownEditorWrapper` builds asynchronously and does not focus itself,
+ * which is right for a note tab and wrong in a card: until something inside it
+ * holds focus the board does, and a Backspace then deletes the card instead of
+ * a character. An observer, since there is no knowing which frame it lands on.
  */
 function useFocusWhenReady(
   ref: React.RefObject<HTMLElement | null>,
   /**
-   * False while the file is still being read. Without this the effect runs
-   * once, on a render where the component returned its loading state and the
-   * ref was attached to nothing, and never runs again.
+   * False while the file is still being read. Without it the effect runs once,
+   * on a render where the ref is attached to nothing, and never again.
    */
   ready: boolean,
 ) {

@@ -5,10 +5,8 @@ import type { CanvasColor } from '@/lib/canvas/types';
 import { cn } from '@/lib/utils';
 
 /**
- * The six colours JSON Canvas defines, plus a way back to none.
- *
- * A plain component rather than anything in the settings registry: a card's
- * colour is document data that lives in the `.canvas` file, not a preference.
+ * The six colours JSON Canvas defines, plus a way back to none. Not a setting:
+ * a card's colour is document data living in the `.canvas` file.
  */
 export function CanvasColorPicker({
   value,

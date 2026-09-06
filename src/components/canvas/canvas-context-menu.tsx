@@ -79,19 +79,12 @@ export function CanvasContextMenuContent({
   /*
    * What this menu *is*, so React rebuilds it when it becomes a different one.
    *
-   * Both branches below are lists of `ContextMenuItem`s in a fragment, so
-   * without a key React reconciles them slot by slot and reuses the DOM node
-   * at each position -- the sixth item is `ContextMenuItem` either way, so
-   * "Zoom to fit" became "Send to back" by having its text and icon swapped in
-   * place rather than by being replaced.
-   *
-   * That is wrong on its own terms (these are different items, and reusing a
-   * node carries Base UI's per-item state across with it), and in WebKit it
-   * showed: the popup paints over a `backdrop-filter` layer, and while
-   * swapping the icon inserts an element and dirties the region, rewriting a
-   * text node in place did not always invalidate it. The old label stayed on
-   * screen until hovering the item repainted it. Fresh nodes have nothing to
-   * leave behind.
+   * Both branches are flat lists of `ContextMenuItem`s, so without a key React
+   * reconciles them slot by slot and relabels the node at each position rather
+   * than replacing it. That carries Base UI's per-item state across, and in
+   * WebKit the old label could stay on screen: the popup paints over a
+   * `backdrop-filter` layer, which an in-place text change did not always
+   * invalidate.
    */
   const shape = [
     hasSelection ? 'selection' : 'board',

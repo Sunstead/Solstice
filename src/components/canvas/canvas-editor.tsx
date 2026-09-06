@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileWarning } from 'lucide-react';
 
 import { commands } from '@/bindings';
@@ -17,12 +17,10 @@ import { CanvasBoard } from './canvas-board';
 import '@/styles/canvas.css';
 
 /**
- * The `.canvas` tab.
- *
- * The only file in the feature that knows about `path`: it reads the document,
- * owns the autosaver, and hands everything below it a parsed board. That is
- * what lets the same render layer serve both this tab and the read-only preview
- * a note embeds.
+ * The `.canvas` tab: the only file in the feature that knows about `path`. It
+ * reads the document, owns the autosaver, and hands everything below a parsed
+ * board -- which is what lets one render layer serve both this and the
+ * read-only preview a note embeds.
  */
 export function CanvasEditor({ path }: { path: string }) {
   const [parsed, setParsed] = useState<ParseResult | null>(null);
@@ -35,9 +33,8 @@ export function CanvasEditor({ path }: { path: string }) {
 
     void commands.readFile(path).then((result) => {
       if (cancelled) return;
-      // `typedError` resolves failures rather than rejecting, so this has to be
-      // checked explicitly: a bare `.then` would take an error for content and
-      // then try to parse the error message as a board.
+      // `typedError` resolves failures rather than rejecting, so a bare
+      // `.then` would try to parse the error message as a board.
       if (result.status === 'error') setLoadError(result.error);
       else setParsed(parseCanvas(result.data));
     });
@@ -71,16 +68,9 @@ export function CanvasEditor({ path }: { path: string }) {
     return <InvalidCanvas path={path} message={parsed.message} raw={parsed.raw} />;
   }
 
-  // Keyed on the path so switching files rebuilds the store and the autosaver
-  // from scratch, rather than trying to reconcile one board's history onto
-  // another's document.
-  return (
-    <LoadedCanvas
-      key={path}
-      path={path}
-      parsed={parsed}
-    />
-  );
+  // Keyed on the path, so switching files rebuilds the store and the autosaver
+  // rather than reconciling one board's history onto another's document.
+  return <LoadedCanvas key={path} path={path} parsed={parsed} />;
 }
 
 function LoadedCanvas({
@@ -100,9 +90,8 @@ function LoadedCanvas({
   const indent = useRef(parsed.indent);
 
   const [store] = useState<CanvasStore>(() => {
-    // The text the autosaver should consider already written. Serialized rather
-    // than the raw bytes, so `getLastWritten()` compares like with like even
-    // when the file arrived with a different key order.
+    // Serialized rather than the raw bytes, so `getLastWritten()` compares
+    // like with like even when the file arrived with a different key order.
     const initialText = serializeCanvas(parsed.doc, parsed.indent);
     const saver = createAutosaver(path, initialText, (message) =>
       console.error(`[canvas] write to "${path}" failed:`, message),
@@ -110,23 +99,18 @@ function LoadedCanvas({
     autosaver.current = saver;
 
     return createCanvasStore(parsed.doc, (next) => {
-      // Mirrors the two-signal split in `autosave.ts`: `markDirty` runs
-      // synchronously with the change so the tab's saving indicator never
-      // trails it, and `schedule` carries the bytes. Serializing a board is
-      // cheap enough to do inline -- unlike a ProseMirror document, there is no
-      // slow path worth keeping this off.
+      // The two-signal split from `autosave.ts`: `markDirty` runs with the
+      // change so the saving indicator never trails it, `schedule` carries the
+      // bytes. Serializing a board is cheap enough to do inline.
       saver.markDirty();
       saver.schedule(serializeCanvas(next, indent.current));
     });
   });
 
   useEffect(() => {
-    // Leaving a card's edit mode already lands its text in `doc` -- see
-    // `registerCardFlush` -- but the board's own autosaver would otherwise
-    // still wait out `editor.autosaveDelay` before writing it. A card that was
-    // just being typed into is exactly the moment someone is watching for the
-    // save to land, so force it through immediately rather than leaving the
-    // usual debounce to catch up.
+    // `registerCardFlush` lands a card's text in `doc` as it stops being
+    // edited, but the autosaver would still wait out `editor.autosaveDelay`.
+    // Leaving a card is exactly when someone is watching for the save.
     let wasEditing = store.getState().editingNodeId !== null;
     return store.subscribe((state) => {
       const isEditing = state.editingNodeId !== null;
@@ -163,15 +147,14 @@ function LoadedCanvas({
   const applyDiskContent = useCallback(
     (text: string) => {
       const disk = parseCanvas(text);
-      // Another process part-way through a write leaves invalid JSON for a few
-      // milliseconds. Ignoring it here is safe: the watcher reports the
-      // completed write too, and this path only ever *reads*.
+      // Another process mid-write leaves invalid JSON for a few milliseconds.
+      // Safe to ignore: the watcher reports the completed write too.
       if (disk.status === 'invalid') return;
 
       indent.current = disk.indent;
       const { setView, view } = store.getState();
-      // A reload replaces the document but not the viewport: the reader is
-      // still looking at the same part of the same board.
+      // The document, not the viewport: the reader is still looking at the
+      // same part of the same board.
       store.setState({ doc: disk.doc });
       setView(view);
     },
@@ -192,11 +175,11 @@ function LoadedCanvas({
     release: () => autosaver.current?.release(),
   });
 
-  // Writing the buffer back is what actually resolves the divergence; merely
-  // dismissing would leave the board permanently out of sync with disk.
+  // Writing the buffer back is what resolves the divergence; dismissing alone
+  // would leave the board permanently out of sync with disk.
   const handleKeepMine = useCallback(() => {
     keepMine();
-    // The file was abandoned when it vanished, to stop stale flushes from
+    // The file was abandoned when it vanished, to stop stale flushes
     // resurrecting it. Saving it back is the user asking for exactly that.
     clearAbandoned(path);
     autosaver.current?.schedule(serializeCanvas(store.getState().doc, indent.current));
@@ -208,8 +191,6 @@ function LoadedCanvas({
     dismiss();
     useLayout.getState().closeFileTab(path);
   }, [dismiss, path]);
-
-  const provider = useMemo(() => store, [store]);
 
   return (
     <ViewerFrame path={path}>
@@ -224,7 +205,7 @@ function LoadedCanvas({
         </div>
       )}
 
-      <CanvasStoreProvider value={provider}>
+      <CanvasStoreProvider value={store}>
         <CanvasBoard path={path} />
       </CanvasStoreProvider>
     </ViewerFrame>
@@ -232,12 +213,9 @@ function LoadedCanvas({
 }
 
 /**
- * A file that is not a canvas.
- *
- * Deliberately inert: no store and no autosaver exist in this state, so there
- * is no code path by which a render error could write an empty board over
- * whatever is actually in the file. Replacing it is available, but only as
- * something the user asks for by name.
+ * A file that is not a canvas. Deliberately inert: no store and no autosaver
+ * exist in this state, so no code path can write an empty board over whatever
+ * is actually in the file.
  */
 function InvalidCanvas({
   path,

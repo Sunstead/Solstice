@@ -17,13 +17,11 @@ import {
 import { CanvasNode } from './canvas-node';
 
 /**
- * Everything a board *looks* like, and nothing about how it is edited.
+ * Everything a board looks like, and nothing about how it is edited.
  *
- * This component never imports the canvas store. That is the whole seam
- * between the `.canvas` tab and the read-only preview a note embeds: both
- * render through here, so the preview cannot drift from the editor as the
- * editor grows. The tab passes selection and its own overlays as children; the
- * preview passes `interactive={false}` and nothing else.
+ * Never imports the canvas store -- that is the seam between the `.canvas` tab
+ * and the read-only preview a note embeds. The tab passes selection and its
+ * own overlays as children; the preview passes `interactive={false}`.
  */
 
 /** Above this many nodes, cards outside the viewport stop being rendered. */
@@ -70,8 +68,7 @@ export const CanvasSurface = memo(function CanvasSurface({
   const visible = useMemo(() => {
     if (!pane || doc.nodes.length <= VIRTUALIZE_ABOVE) return doc.nodes;
 
-    // One viewport of margin, so a card is mounted before it scrolls in rather
-    // than popping into existence at the edge.
+    // One viewport of margin, so a card mounts before it scrolls in.
     const box = visibleRect(view, pane);
     const margin = {
       x: box.x - box.width / 2,
@@ -82,17 +79,15 @@ export const CanvasSurface = memo(function CanvasSurface({
 
     return doc.nodes.filter(
       (node) =>
-        // Culling the card being edited would destroy a live editor mid-edit,
-        // and culling a selected one would take its handles away the moment it
-        // was scrolled to the edge. Both are guards, not optimisations.
+        // Culling the edited card would destroy a live editor; culling a
+        // selected one would take its handles away.
         node.id === editingNodeId ||
         selection.has(node.id) ||
         rectsIntersect(rectOf(node), margin),
     );
   }, [doc.nodes, pane, view, editingNodeId, selection]);
 
-  // Groups paint behind everything, largest first, so a group nested inside
-  // another is still on top of it and still clickable.
+  // Largest first, so a group nested inside another stays clickable.
   const groups = useMemo(
     () =>
       visible
@@ -120,11 +115,8 @@ export const CanvasSurface = memo(function CanvasSurface({
     >
       <CanvasGrid scale={view.scale} offset={view.offset} />
 
-      {/*
-        Two transformed containers rather than one, so the edge overlay can sit
-        between them: groups below the lines, cards above. A single container
-        could not sandwich a screen-space sibling.
-      */}
+      {/* Two transformed containers, so the edge overlay can sit between
+          them: groups below the lines, cards above. */}
       <div className='solstice-canvas-world' style={worldStyle}>
         {groups.map((node) => (
           <CanvasNode
@@ -157,8 +149,8 @@ export const CanvasSurface = memo(function CanvasSurface({
         ))}
       </div>
 
-      {/* Over the cards, unlike the lines: an edge between two adjacent cards
-          has nowhere to put its label except on top of one of them. */}
+      {/* Over the cards, unlike the lines: a label between two adjacent cards
+          has nowhere else to go. */}
       <CanvasEdgeLabels layouts={edgeLayouts} scale={view.scale} />
 
       {children}

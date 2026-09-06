@@ -4,15 +4,10 @@ import type { Rect } from './types';
 /**
  * Where a dragged rectangle actually lands.
  *
- * Two things want to correct the same number: the dot grid, and alignment with
- * whatever else is on the board. Rather than layering one on the other -- which
- * makes them fight, and makes which one won depend on the order they ran -- they
- * are treated as two candidates for the same correction, arbitrated per axis,
- * closest wins.
- *
- * Ties go to the guide. A guide is a deliberate relationship with a visible
- * object; the grid is background convenience, and being pulled off a neighbour's
- * edge by half a pixel of grid is the more annoying failure.
+ * The dot grid and alignment with other cards both want to correct the same
+ * number. Rather than layering one on the other, they are two candidates for
+ * one correction, arbitrated per axis, closest wins -- ties going to the
+ * guide, which is a deliberate relationship where the grid is convenience.
  */
 
 export interface Guide {
@@ -35,14 +30,11 @@ export interface SnapContext {
 
 /**
  * The three values on an axis a rectangle can align by: leading edge, centre,
- * trailing edge. Compared *pairwise* -- leading to leading, centre to centre,
- * trailing to trailing.
+ * trailing edge.
  *
- * Comparing every value against every other was the obvious first cut and is
- * wrong: it matches a dragged card's right edge to a neighbour's left edge, so
- * anything passing within a few units of another card gets glued to it edge to
- * edge. Butting two cards together is a real thing to want, but it is not what
- * an alignment guide means, and at this tolerance it hijacked ordinary drags.
+ * Compared pairwise by index, never every value against every other -- that
+ * matches a dragged card's trailing edge to a neighbour's leading one, gluing
+ * cards together whenever they pass close.
  */
 function referencesX(rect: Rect): number[] {
   return [rect.x, rect.x + rect.width / 2, rect.x + rect.width];
@@ -107,8 +99,7 @@ export function resolveSnap(
   if (!context.enabled) return { rect: moved, guides: [] };
 
   const step = snapStepForScale(context.scale);
-  // A screen-pixel threshold converted to canvas units, so snapping feels
-  // identical at every zoom rather than getting stickier as you zoom out.
+  // Converted to canvas units, so snapping feels the same at every zoom.
   const tolerance = SNAP_PX / context.scale;
 
   const guides: Guide[] = [];
@@ -155,8 +146,8 @@ export function resolveSnap(
   const dx = resolveAxis(gridX, guideX, 'x');
   const dy = resolveAxis(gridY, guideY, 'y');
 
-  // Guides are drawn against the rectangle's *final* position, so the line
-  // spans both the neighbour and the thing that just aligned to it.
+  // Drawn against the final position, so the line spans both the neighbour
+  // and the thing that just aligned to it.
   const rect = { ...moved, x: moved.x + dx, y: moved.y + dy };
 
   for (const guide of guides) {

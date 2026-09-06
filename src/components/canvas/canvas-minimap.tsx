@@ -6,11 +6,9 @@ import { useResolvedColors } from '@/lib/canvas/use-resolved-color';
 import { fitTo, toScreen, visibleRect } from '@/lib/canvas/viewport';
 
 /**
- * A whole board at a glance, and a way to jump around it.
- *
- * Drawn on a canvas rather than as scaled-down DOM: at minimap size a card is a
- * few pixels of coloured rectangle, and rendering the real thing would mean
- * every card laying out twice.
+ * A whole board at a glance, and a way to jump around it. Drawn on a canvas
+ * rather than scaled-down DOM: at this size a card is a few pixels of coloured
+ * rectangle, and the real thing would lay every card out twice.
  */
 
 const WIDTH = 180;
@@ -39,8 +37,8 @@ export function CanvasMinimap() {
   const colors = useResolvedColors(canvasRef, COLOUR_PROPERTIES);
   const [, forceDraw] = useState(0);
 
-  // The transform that fits the whole board into the minimap. Shared by the
-  // draw and by the click handler, so what you point at is what you get.
+  // Shared by the draw and the click handler, so what you point at is what
+  // you get.
   const bounds = boundsOf(doc.nodes);
   const mini = fitTo(bounds, { width: WIDTH, height: HEIGHT }, PADDING);
 
@@ -69,8 +67,8 @@ export function CanvasMinimap() {
         (node.color?.startsWith('#') ? node.color : null) ||
         neutral;
 
-      // Groups as an outline, cards as a solid block -- the same distinction
-      // the board makes, at the only fidelity this size allows.
+      // Groups as an outline, cards solid: the board's own distinction, at
+      // the only fidelity this size allows.
       if (node.type === 'group') {
         context.strokeStyle = colour;
         context.globalAlpha = 0.5;
@@ -83,8 +81,7 @@ export function CanvasMinimap() {
       }
     }
 
-    // What is currently on screen, clipped to the minimap so a zoomed-in view
-    // does not draw a rectangle miles outside it.
+    // What is currently on screen.
     context.globalAlpha = 1;
     if (pane.width && pane.height) {
       const seen = visibleRect(view, pane);
@@ -125,9 +122,9 @@ export function CanvasMinimap() {
     [store, mini],
   );
 
-  // The colour cache is filled by an effect, which runs after the first draw;
-  // one extra pass gets the palette in rather than leaving a grey minimap until
-  // something else changes.
+  // `useResolvedColors` fills its cache in an effect, which runs after the
+  // first draw; one extra pass picks up the palette rather than leaving a grey
+  // minimap until something else changes.
   useLayoutEffect(() => {
     const id = requestAnimationFrame(() => forceDraw((n) => n + 1));
     return () => cancelAnimationFrame(id);
@@ -137,11 +134,10 @@ export function CanvasMinimap() {
     <canvas
       ref={canvasRef}
       onPointerDown={(event) => {
-        // The board's own handler must not also see this as a background press.
+        // The board's own handler must not see this as a background press.
         event.stopPropagation();
         jumpTo(event);
       }}
-      onClick={jumpTo}
       className='solstice-canvas-minimap'
       style={{ width: WIDTH, height: HEIGHT }}
       aria-label='Canvas minimap'

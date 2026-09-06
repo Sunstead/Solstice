@@ -13,25 +13,20 @@ import { CanvasSurface } from './canvas-surface';
 import '@/styles/canvas.css';
 
 /**
- * A board embedded in a note.
+ * A board embedded in a note: the same `CanvasSurface` the tab renders, with
+ * `interactive={false}`, so a preview cannot drift from the editor.
  *
- * The same `CanvasSurface` the tab renders, with `interactive={false}` -- so a
- * preview cannot drift from the editor as the editor grows, and adding a card
- * type never means implementing it twice.
- *
- * Fitted and inert. Panning inside an embed would fight the note's own scroll,
- * and a board is a place you go to rather than a thing you nudge in passing;
- * the whole card opens it.
+ * Fitted and inert -- panning here would fight the note's own scroll, and the
+ * whole card opens the board instead.
  */
 
 /** Boards this preview is rendered inside, outermost first. */
 const CanvasChainContext = createContext<readonly string[]>([]);
 
 /**
- * A board embedding itself -- directly, or through a note it transcludes --
- * would recurse until the renderer gave out. Mirrors `EmbedChainContext` in
- * `embed-view.tsx`, and is deliberately shallower: a board inside a board is
- * already hard to read at one level of nesting.
+ * A board embedding itself, directly or through a note it transcludes, would
+ * recurse until the renderer gave out. Mirrors `EmbedChainContext` in
+ * `embed-view.tsx`, deliberately shallower.
  */
 const MAX_CANVAS_DEPTH = 2;
 
@@ -73,10 +68,8 @@ export function CanvasPreviewCard({
     if (cyclic || tooDeep) return;
     let cancelled = false;
 
-    // `loadEmbedSource` already caches per path, invalidates on
-    // `fileSystemChanged`, and hears about this app's own writes -- so a board
-    // embedded ten times is read once, and stays current while it is edited in
-    // another tab.
+    // Cached per path and aware of this app's writes, so a board embedded ten
+    // times is read once and stays current as it is edited elsewhere.
     const read = () => {
       void loadEmbedSource(path).then((text) => {
         if (cancelled) return;

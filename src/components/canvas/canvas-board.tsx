@@ -67,19 +67,13 @@ import { CanvasOverlays } from './canvas-overlays';
 import { CanvasSurface } from './canvas-surface';
 
 /**
- * The board as an editable surface.
+ * The board as an editable surface: the viewport, the toolbar, the context
+ * menu and the dialogs that create cards.
  *
- * The viewport and the interaction state live in the store rather than in React
- * state, so the wheel listener and the pointer handlers -- both bound once --
- * read current values without a ref mirroring each one. Rendering still goes
- * through `CanvasSurface`, which knows nothing about any of this and is what
- * the embedded preview renders too.
- *
- * What is left here is the board's *chrome*: the viewport, the toolbar, the
- * context menu and the dialogs that create cards. Pointer and keyboard handling
- * live in `useCanvasGestures`, and the transitions they drive are pure and live
- * in `interaction.ts` -- three layers, so none of them is a six-hundred-line
- * switch.
+ * Rendering goes through `CanvasSurface`, which knows none of this and is what
+ * the embedded preview renders too. Pointer and keyboard handling live in
+ * `useCanvasGestures`, and the transitions they drive are pure and live in
+ * `interaction.ts`.
  */
 export function CanvasBoard({ path }: { path: string }) {
   const store = useCanvasStoreApi();
@@ -96,9 +90,8 @@ export function CanvasBoard({ path }: { path: string }) {
   const editingNodeId = useCanvasStore((state) => state.editingNodeId);
   const interaction = useCanvasStore((state) => state.interaction);
 
-  // Hidden while one of its ends is being dragged: the overlay draws the live
-  // draft in its place, and rendering both left a stale copy of the edge
-  // sitting under the line actually following the pointer.
+  // Hidden while one of its ends is being dragged; the overlay draws the live
+  // draft in its place.
   const hiddenEdgeId =
     interaction.kind === 'edge' ? interaction.edgeId : null;
 
@@ -143,11 +136,9 @@ export function CanvasBoard({ path }: { path: string }) {
   }, [store]);
 
   /**
-   * Where a new card goes.
-   *
-   * The middle of what is on screen, unless the board's own context menu said
-   * otherwise -- a card asked for by right-clicking should appear under the
-   * pointer, not wherever the view happens to be centred.
+   * Where a new card goes: the middle of the screen, unless the context menu
+   * set a point, since a card asked for by right-clicking belongs under the
+   * pointer.
    */
   const placementRef = useRef<Point | null>(null);
 
@@ -161,8 +152,8 @@ export function CanvasBoard({ path }: { path: string }) {
         toCanvas(state.view, state.pane.width / 2, state.pane.height / 2);
       placementRef.current = null;
 
-      // Centred on the anchor, then snapped, so a new card lands on the same
-      // lattice a dragged one would.
+      // Centred then snapped, so a new card lands on the same lattice a
+      // dragged one would.
       const step = getSetting('canvas.snapToGrid')
         ? snapStepForScale(state.view.scale)
         : 1;
@@ -174,8 +165,7 @@ export function CanvasBoard({ path }: { path: string }) {
       const node = createNode(type, at, extra as never);
       state.commit(addNode(state.doc, node));
       state.select([node.id], 'replace');
-      // A new text card opens straight into edit mode: nobody adds an empty
-      // card in order to look at it.
+      // Straight into edit mode: nobody adds an empty card to look at it.
       if (type === 'text') state.setEditing(node.id);
     },
     [store],
@@ -183,9 +173,9 @@ export function CanvasBoard({ path }: { path: string }) {
 
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
-  // Captured when the menu item is clicked rather than read from the selection
-  // when the dialog submits: opening the dialog moves focus off the board, and
-  // whatever changes the selection in between must not redirect the rename.
+  // Captured when the menu item is clicked, not read back when the dialog
+  // submits: opening it moves focus off the board, and anything that changes
+  // the selection in between must not redirect the rename.
   const [rename, setRename] = useState<
     { id: string; kind: RenameKind; value: string } | null
   >(null);
@@ -205,12 +195,9 @@ export function CanvasBoard({ path }: { path: string }) {
   });
 
   /*
-   * Fitted on open.
-   *
-   * `pane` is a dependency because the first measurement arrives after mount
-   * and there is nothing to fit to before it; `doc` deliberately is not, or
-   * every edit would throw away the position the user had settled on. The ref
-   * makes this run once per file.
+   * Fitted on open. `pane` is a dependency because the first measurement
+   * arrives after mount; `doc` deliberately is not, or every edit would throw
+   * away the position the user had settled on. The ref makes it once per file.
    */
   const fittedFor = useRef<string | null>(null);
   useEffect(() => {
@@ -225,16 +212,12 @@ export function CanvasBoard({ path }: { path: string }) {
     if (!node) return;
 
     const onWheel = (event: WheelEvent) => {
-      // A card being edited owns its own scroll -- it is the thing with
-      // `overflow: auto` in canvas.css, precisely so an editor taller than its
-      // card scrolls rather than clipping. Panning the board underneath a
-      // plain scroll would fight that scroll, or as it did before this guard,
-      // win outright. Bailing before `preventDefault` leaves the wheel event
-      // to do what it would over any other scrollable element.
+      // A card being edited owns its own scroll -- it carries the
+      // `overflow: auto` in canvas.css. Bailing before `preventDefault` leaves
+      // the wheel to do what it would over any scrollable element.
       //
-      // Zoom is exempt: it is a distinct gesture (ctrl/meta held, or a
-      // trackpad pinch which arrives the same way) that should still reach
-      // the board even while a card underneath it is being edited.
+      // Zoom is exempt: a distinct gesture, and it should still reach the
+      // board while a card is being edited.
       const zooming = event.ctrlKey || event.metaKey;
       if (
         !zooming &&
@@ -292,8 +275,7 @@ export function CanvasBoard({ path }: { path: string }) {
     [store],
   );
 
-  // What the picker shows as current: the colour the selection agrees on, or
-  // nothing when it does not.
+  // The colour the selection agrees on, or nothing when it does not.
   const selectionColor = (() => {
     const coloured = [...selection]
       .map(
@@ -305,8 +287,8 @@ export function CanvasBoard({ path }: { path: string }) {
     return coloured.length === 1 ? coloured[0] : undefined;
   })();
 
-  // The arrowhead menu only makes sense when the whole selection is edges --
-  // mixing in a node leaves nothing for "Start"/"End" to refer to.
+  // Only when the whole selection is edges: a node in it leaves nothing for
+  // "Start"/"End" to refer to.
   const selectedEdges = [...selection]
     .map((id) => doc.edges.find((edge) => edge.id === id))
     .filter((edge): edge is NonNullable<typeof edge> => edge !== undefined);
@@ -317,8 +299,7 @@ export function CanvasBoard({ path }: { path: string }) {
     return 'mixed';
   };
 
-  // Only ever one thing: "rename" has no sensible meaning for a mixed bag, and
-  // a multi-select rename would overwrite several names with one.
+  // One thing only: a multi-select rename would overwrite several names.
   const renameTarget = (() => {
     if (selection.size !== 1) return null;
     const [id] = [...selection];
@@ -350,10 +331,9 @@ export function CanvasBoard({ path }: { path: string }) {
               tabIndex={0}
               data-command-surface='true'
               data-editor-id={scopeId}
-              // What the pointer is doing, so the stylesheet can put the right
-              // cursor on the *whole* surface for the duration. The pointer is
-              // captured during a gesture, so whatever it happens to be over
-              // is irrelevant and must not get a say.
+              // What the pointer is doing, so the stylesheet can put one
+              // cursor on the whole surface for the duration -- the pointer is
+              // captured, so what it is over must not get a say.
               data-canvas-gesture={interaction.kind}
               data-canvas-resize={
                 interaction.kind === 'resize' ? interaction.handle : undefined
@@ -445,8 +425,8 @@ export function CanvasBoard({ path }: { path: string }) {
 
       <div className='pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4'>
         <ViewerToolbar>
-          {/* Same icons as the context menu's "New ..." items, so a card's
-              type reads the same way whichever surface added it. */}
+          {/* The context menu's icons, so a card's type reads the same way
+              whichever surface added it. */}
           <Button
             size='icon-sm'
             variant='ghost'

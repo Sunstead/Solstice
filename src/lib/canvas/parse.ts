@@ -11,18 +11,13 @@ import {
 } from './types';
 
 /**
- * Reading a `.canvas` file.
+ * Reading a `.canvas` file, under two rules.
  *
- * Two rules govern everything here.
- *
- * **Never throw.** A tab that crashes on a malformed board is a tab that cannot
- * show the user what is wrong with it.
- *
- * **Never discard.** Every key the spec does not define is carried through to
- * `extra` and written back out, so a board authored by a newer Obsidian or by
- * a plugin survives being opened here. The one exception is a value we replace
- * to make the document usable at all -- a missing id, non-finite geometry --
- * and each of those is logged.
+ * **Never throw:** a tab that crashes on a malformed board cannot show what is
+ * wrong with it. **Never discard:** unrecognised keys are carried through to
+ * `extra` and written back out. The only exceptions are values replaced to
+ * make the document usable at all -- a missing id, non-finite geometry -- and
+ * each of those is logged.
  */
 
 export type ParseResult =
@@ -45,13 +40,9 @@ const KNOWN_TYPES: readonly string[] = ['text', 'file', 'link', 'group'];
 export const DEFAULT_INDENT = '  ';
 
 /**
- * The indentation the file already uses, so writing it back does not restyle
- * it.
- *
- * Obsidian and this app do not agree on indent width, and a board edited in
- * both would otherwise rewrite every line on every save -- turning `git diff`
- * for a canvas into noise. Sniffing one character is much cheaper than that
- * argument, and a file with no indentation to copy just gets ours.
+ * The indentation the file already uses. Obsidian and this app disagree on
+ * width, and a board edited in both would otherwise rewrite every line on
+ * every save.
  */
 function detectIndent(text: string): string {
   const match = /\n([ \t]+)"/.exec(text);
@@ -66,12 +57,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Consumes a key from `rest`, so whatever is left over at the end is exactly
- * the set of keys this parser did not understand.
- *
- * Taking rather than reading is what makes preservation the default: a key
- * added to the spec later is carried through without anyone remembering to
- * add it to an allow-list.
+ * Consumes a key, so what is left over is exactly what this parser did not
+ * understand. Taking rather than reading makes preservation the default.
  */
 function take(rest: Record<string, unknown>, key: string): unknown {
   const value = rest[key];
@@ -90,11 +77,9 @@ function takeString(
 }
 
 /**
- * Takes a value only when it is one of `allowed`.
- *
- * A side of `"north"` stays in `extra` rather than being dropped or coerced:
- * the geometry code can then trust the type, and the odd value still comes
- * back out of the serializer untouched.
+ * Takes a value only when it is one of `allowed`. A side of `"north"` stays in
+ * `extra`, so geometry code can trust the type and the odd value still round
+ * trips.
  */
 function takeEnum<T extends string>(
   rest: Record<string, unknown>,
@@ -135,15 +120,13 @@ function parseNode(raw: unknown, index: number): CanvasNode | null {
   let id = takeString(rest, 'id');
   if (id === undefined || id === '') {
     // A node with no id cannot be selected, moved or referenced by an edge.
-    // Generating one changes the file on next write, which is the lesser evil.
     id = createCanvasId();
     console.warn(`[canvas] node ${index} has no id; assigned ${id}`);
   }
 
-  // Any string `type` is consumed -- a recognised one discriminates the node, an
-  // unrecognised one is parked in `unknownType` and written back verbatim. Only
-  // a `type` that is not a string at all (a number, an object) is left in
-  // `extra`, because there is nowhere better to keep it.
+  // Any string `type` is consumed: recognised ones discriminate the node,
+  // unrecognised ones are parked in `unknownType`. A non-string `type` is left
+  // in `extra`, there being nowhere better for it.
   const rawType = rest.type;
   if (typeof rawType === 'string') delete rest.type;
 
@@ -213,9 +196,8 @@ function parseNode(raw: unknown, index: number): CanvasNode | null {
       return {
         ...base,
         type: 'unknown',
-        // Empty when `type` was absent or not a string, in which case the odd
-        // value (if any) is still sitting in `extra` and gets written from
-        // there instead.
+        // Empty when `type` was absent or not a string; the odd value, if
+        // any, is in `extra` and written from there.
         unknownType: typeof rawType === 'string' ? rawType : '',
         extra: leftovers(rest),
       };
@@ -238,10 +220,8 @@ function parseEdge(raw: unknown, index: number): CanvasEdge | null {
 
   return {
     id,
-    // An edge naming a node that is not in the file is kept, not dropped: the
-    // missing node may be restored by the next external edit, and throwing the
-    // edge away would make opening the board a destructive act. The renderer
-    // skips it.
+    // An edge naming a missing node is kept, not dropped: the node may come
+    // back on the next external edit. The renderer skips it.
     fromNode: takeString(rest, 'fromNode') ?? '',
     fromSide: takeEnum<NodeSide>(rest, 'fromSide', NODE_SIDES),
     fromEnd: takeEnum<EdgeEnd>(rest, 'fromEnd', EDGE_ENDS),
@@ -255,8 +235,8 @@ function parseEdge(raw: unknown, index: number): CanvasEdge | null {
 }
 
 export function parseCanvas(text: string): ParseResult {
-  // A file `touch`ed into existence, or one this app created a moment before
-  // its seed landed. An empty board, not an error.
+  // A file `touch`ed into existence, or one created a moment before its seed
+  // landed. An empty board, not an error.
   if (text.trim() === '') {
     return {
       status: 'empty',
@@ -288,8 +268,8 @@ export function parseCanvas(text: string): ParseResult {
   const rawNodes = take(rest, 'nodes');
   const rawEdges = take(rest, 'edges');
 
-  // Present but not an array means data we can neither render nor safely carry
-  // through. Refusing the file keeps the editor from writing over it.
+  // Neither renderable nor safe to carry through, so refuse the file rather
+  // than let the editor write over it.
   if (rawNodes !== undefined && !Array.isArray(rawNodes)) {
     return { status: 'invalid', message: '"nodes" is not an array.', raw: text };
   }

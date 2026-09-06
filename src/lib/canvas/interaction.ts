@@ -14,17 +14,13 @@ import type {
 import { rectFromPoints } from './viewport';
 
 /**
- * What the pointer is currently doing.
+ * What the pointer is currently doing, as pure transitions -- so the fiddly
+ * parts (snap arbitration, group capture, which corner a resize anchors to)
+ * can be reasoned about without a DOM.
  *
- * Pure transitions, so the surface component stays a renderer rather than
- * becoming a six-hundred-line switch, and so the fiddly parts -- snapping
- * arbitration, group capture, which corner a resize is anchored to -- can be
- * reasoned about without a DOM.
- *
- * Everything is recomputed from the gesture's *origin* plus the total delta,
- * never accumulated frame to frame. A coalesced or dropped pointermove is then
- * simply a frame that did not render, rather than a permanent drift between
- * where the pointer is and where the content ended up.
+ * Everything recomputes from the gesture's origin plus the total delta, never
+ * accumulating frame to frame, so a dropped pointermove is a frame that did
+ * not render rather than permanent drift.
  */
 
 export type Handle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
@@ -69,11 +65,9 @@ export type Interaction =
   | {
       kind: 'edge';
       /**
-       * The edge being re-attached, or null while drawing a new one.
-       *
-       * One state serves both because they are the same gesture: an end
-       * follows the pointer, the other stays put, and dropping on a card
-       * connects them. Only what happens on release differs.
+       * The edge being re-attached, or null while drawing a new one. One state
+       * serves both: an end follows the pointer, the other stays put, and only
+       * what happens on release differs.
        */
       edgeId: string | null;
       /** Which end follows the pointer. */
@@ -85,12 +79,10 @@ export type Interaction =
       hoverNode: string | null;
       hoverSide: NodeSide | null;
       /**
-       * Whether the pointer has travelled far enough to count as a drag.
-       *
-       * Load-bearing for re-attachment: an edge is grabbed by clicking the line
-       * itself, and a line often crosses a card. Committing on a press that
-       * never moved would silently reconnect an edge to whatever it happened to
-       * be drawn over.
+       * Whether the pointer travelled far enough to count as a drag. An edge
+       * is grabbed by its line, which often crosses a card, so committing on a
+       * press that never moved would reconnect it to whatever it was drawn
+       * over.
        */
       moved: boolean;
     };
@@ -98,10 +90,8 @@ export type Interaction =
 export const IDLE: Interaction = { kind: 'idle' };
 
 /**
- * Canvas units the pointer must travel before a press becomes a drag.
- *
- * Without it, a click that wobbles by one pixel commits a one-pixel move to
- * the file and to the undo stack.
+ * Canvas units the pointer must travel before a press becomes a drag, so a
+ * click that wobbles does not commit a one-pixel move to the file.
  */
 const DRAG_THRESHOLD = 3;
 
@@ -153,9 +143,8 @@ export function updateDrag(
   const primary = state.origin.get(state.primaryId);
   if (!primary) return { ...state, delta: raw, moved };
 
-  // Only the grabbed node's own edges are snapped. Every other node in the
-  // gesture then takes the *same* correction, so relative positions inside a
-  // group or a multi-selection are preserved exactly.
+  // Only the grabbed node snaps; everything else in the gesture takes the same
+  // correction, preserving relative positions exactly.
   const { rect, guides } = resolveSnap(
     { ...primary, x: primary.x + raw.x, y: primary.y + raw.y },
     state.neighbours,
@@ -204,8 +193,8 @@ export function updateResize(
   const dy = canvasPoint.y - state.startCanvas.y;
   const { x, y, width, height } = state.origin;
 
-  // Each handle moves the edges named in it and leaves the opposite ones where
-  // they are, which is what makes a resize feel anchored to the far corner.
+  // Each handle moves the edges named in it, leaving the opposite ones put,
+  // which is what anchors a resize to the far corner.
   const west = state.handle.includes('w');
   const east = state.handle.includes('e');
   const north = state.handle.includes('n');
@@ -214,14 +203,8 @@ export function updateResize(
   const step = context.enabled ? snapStepForScale(context.scale) : 0;
   const snap = (value: number) => (step ? snapValue(value, step) : value);
 
-  /*
-   * Snapped edge by edge, not as a whole rectangle.
-   *
-   * Snapping the rect meant dragging the *east* edge also snapped `x`, so a
-   * card being made wider quietly slid sideways -- the one edge nobody was
-   * touching was the one that moved. An edge that is not being dragged keeps
-   * its original coordinate exactly.
-   */
+  // Snapped edge by edge, not as a rectangle: snapping the rect would move
+  // edges nobody is dragging, sliding a card sideways as it is widened.
   let left = x;
   let right = x + width;
   let top = y;
@@ -232,8 +215,8 @@ export function updateResize(
   if (north) top = snap(y + dy);
   if (south) bottom = snap(bottom + dy);
 
-  // Dragging an edge past its opposite flips the rectangle inside out; folding
-  // it back keeps the geometry positive without interrupting the gesture.
+  // Dragging an edge past its opposite flips the rect inside out; folding it
+  // back keeps the geometry positive without interrupting the gesture.
   if (right < left) [left, right] = [right, left];
   if (bottom < top) [top, bottom] = [bottom, top];
 
@@ -309,14 +292,7 @@ export function beginEdgeReattach(
   };
 }
 
-/**
- * Which end of `edge` a press at `point` should pick up.
- *
- * Whichever endpoint is nearer, which is what the old implementation worked out
- * by sampling the curve and asking which half the press landed in. Comparing
- * the two endpoints directly gives the same answer everywhere it matters and
- * needs no sampling loop.
- */
+/** Which end of `edge` a press at `point` picks up: whichever is nearer. */
 export function closerEnd(
   from: Rect,
   to: Rect,
@@ -332,19 +308,14 @@ export function closerEnd(
 }
 
 /**
- * What an edge being drawn would connect to.
+ * What an edge being drawn would connect to. Dropping anywhere on a card
+ * connects to it; near a port, that port wins and fixes the side.
  *
- * Dropping *anywhere on* a card connects to it -- asking someone to hit a port
- * exactly is a needless test of aim. Near a port, that port wins and fixes the
- * side, which is how a deliberate choice is expressed.
- *
- * A card hit anywhere else returns a null side, and the edge is stored with no
- * `toSide` at all. The spec makes both sides optional, and leaving it out is
- * strictly better than guessing: `resolveSides` then picks the facing pair
- * every time the edge is drawn, so the connection still looks right after
- * either card is moved to the other side of the board.
+ * A card hit anywhere else returns a null side and the edge is stored without
+ * one, so `resolveSides` picks the facing pair afresh every time it is drawn
+ * and the connection still looks right after either card moves.
  */
-export function findEdgeTarget(
+function findEdgeTarget(
   nodes: readonly CanvasNode[],
   point: Point,
   excludeId: string,
@@ -370,13 +341,12 @@ export function findEdgeTarget(
     return { nodeId: nearestPort.nodeId, side: nearestPort.side };
   }
 
-  // Topmost first: later nodes paint over earlier ones, so a card dropped on
-  // where two overlap should connect to the one actually visible there.
+  // Topmost first: later nodes paint over earlier ones, so a drop where two
+  // overlap connects to the one actually visible.
   for (let i = nodes.length - 1; i >= 0; i--) {
     const node = nodes[i];
     if (node.id === excludeId) continue;
-    // Groups are regions, not cards; connecting to one by dropping anywhere
-    // inside it would make every drop inside a group ambiguous.
+    // Groups are regions, not cards: dropping inside one would be ambiguous.
     if (node.type === 'group') continue;
 
     const rect = rectOf(node);
@@ -404,8 +374,7 @@ export function updateEdgeDraw(
     Math.abs(point.x - state.toPoint.x) + Math.abs(point.y - state.toPoint.y) >
       DRAG_THRESHOLD;
 
-  // The anchor is excluded so an edge cannot be collapsed onto its own other
-  // end by accident, which is what the old implementation did too.
+  // Excluding the anchor stops an edge collapsing onto its own other end.
   const target = findEdgeTarget(doc.nodes, point, state.anchorNode, tolerance);
 
   return {
