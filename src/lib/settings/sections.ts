@@ -2,7 +2,6 @@ import {
   Files,
   Keyboard,
   PenLine,
-  Paintbrush,
   Palette,
   Type,
   type LucideIcon,
@@ -22,20 +21,18 @@ export interface SettingsSection {
 }
 
 export const settingsSections = [
+  // Themes and the leftover visual toggles (viewers, canvas) live under one
+  // "Appearance" section; typography stays separate since it is comprehensive
+  // enough to deserve its own nav item.
   {
-    id: 'theme',
-    label: 'Theme',
+    id: 'appearance',
+    label: 'Appearance',
     icon: Palette,
   },
   {
     id: 'typography',
     label: 'Typography',
     icon: Type,
-  },
-  {
-    id: 'appearance',
-    label: 'Appearance',
-    icon: Paintbrush,
   },
   {
     id: 'editor',
