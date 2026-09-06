@@ -4,6 +4,7 @@ import { MilkdownEditorWrapper } from '@/components/milkdown-editor';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { isEditableCard } from '@/lib/canvas/editable';
 import type { CanvasNode } from '@/lib/canvas/types';
+import { useCanvasStoreApi } from '@/lib/canvas/use-canvas-store';
 import { commands } from '@/bindings';
 import { basename, joinWorkspacePath } from '@/lib/wikilink/target';
 import { FileCardHeader } from './canvas-node-file';
@@ -33,19 +34,30 @@ export function CanvasCardEditor({ node }: { node: CanvasNode }) {
   }
 
   if (node.type === 'file' && isEditableCard(node)) {
-    return <FileCardEditor file={node.file} />;
+    return <FileCardEditor id={node.id} file={node.file} />;
   }
 
   return null;
 }
 
-function FileCardEditor({ file }: { file: string }) {
+function FileCardEditor({ id, file }: { id: string; file: string }) {
+  const store = useCanvasStoreApi();
   const workspaceRoot = useWorkspace((state) => state.path);
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const flushRef = useRef<(() => void) | null>(null);
 
   useFocusWhenReady(hostRef, content !== null);
+
+  // Registers the note's own "commit and write right now" -- see
+  // `registerCardFlush`. `MilkdownEditorWrapper` populates `flushRef` once its
+  // editor is ready, so this only needs to forward whatever is there at the
+  // moment the card is asked to leave edit mode.
+  useEffect(
+    () => store.getState().registerCardFlush(id, () => flushRef.current?.()),
+    [store, id],
+  );
 
   const absolutePath = workspaceRoot
     ? joinWorkspacePath(workspaceRoot, file)
@@ -93,6 +105,7 @@ function FileCardEditor({ file }: { file: string }) {
           path={absolutePath}
           initialContent={content}
           onError={setError}
+          flushRef={flushRef}
         />
       </div>
     </div>
