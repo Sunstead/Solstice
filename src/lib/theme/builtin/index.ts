@@ -12,6 +12,8 @@ import { bubblegum } from './bubblegum';
 import { blueprint } from './blueprint';
 import { inferno } from './inferno';
 import { stone } from './stone';
+import { concrete } from './concrete';
+import { amethyst } from './amethyst';
 
 /**
  * The two neutrals first, then the coloured pairs, then the shape-led "fun"
@@ -31,7 +33,9 @@ export const builtinThemes: CatalogueTheme[] = [
   orchard,
   verdigris,
   brutalist,
+  concrete,
   bubblegum,
+  amethyst,
   blueprint,
   inferno,
 ].map((theme) => ({ ...theme, source: 'builtin' }));
