@@ -6,6 +6,12 @@ import {
   type SettingKey,
   type SettingValue,
 } from './registry';
+import {
+  hasWork,
+  migrateGlobal,
+  migrateRescopedTypography,
+  type LayerPatch,
+} from './migrations';
 import type {
   AnySettingDef,
   NumberDef,
@@ -85,6 +91,17 @@ function coerce(def: AnySettingDef, raw: unknown): unknown {
       return typeof raw === 'string' ? raw : undefined;
     case 'enum':
       return def.options.some((o) => o.value === raw) ? raw : undefined;
+    case 'select':
+      if (typeof raw !== 'string') return undefined;
+      // A dynamic option list is only as complete as whatever has loaded so
+      // far, so validating against it would drop a perfectly good stored theme
+      // id during the tick before the catalogue arrives. Static lists are
+      // checked as usual; dynamic ones defer the question to the consumer,
+      // which already has to handle an id whose theme was deleted on disk.
+      if (typeof def.options === 'function') return raw;
+      return def.options.some((o) => o.value === raw) ? raw : undefined;
+    case 'font':
+      return typeof raw === 'string' ? raw : undefined;
   }
 }
 
@@ -189,12 +206,43 @@ async function loadLayer(scope: SettingScope) {
   useSettingsStore.setState(
     scope === 'global' ? { global: layer, globalLoaded: true } : { workspace: layer },
   );
+  return layer;
 }
 
-export const loadGlobalSettings = () => loadLayer('global');
+/**
+ * Writes a migration's result straight to disk rather than through
+ * `setSetting`, which would drop anything equal to the default -- correct for a
+ * user's edit, wrong for a rewrite that exists to preserve what a file already
+ * said.
+ */
+async function applyPatch(scope: SettingScope, patch: LayerPatch) {
+  if (!hasWork(patch)) return;
+
+  const current = useSettingsStore.getState()[scope];
+  const next: Layer = { ...current, ...patch.set };
+  for (const key of patch.remove) delete next[key];
+  applyLayer(scope, next);
+
+  try {
+    const store = await fileFor(scope);
+    for (const [key, value] of Object.entries(patch.set)) await store.set(key, value);
+    for (const key of patch.remove) await store.delete(key);
+  } catch (error) {
+    console.error(`Failed to migrate ${scope} settings:`, error);
+  }
+}
+
+export async function loadGlobalSettings() {
+  const layer = await loadLayer('global');
+  await applyPatch('global', migrateGlobal(layer));
+}
 
 /** Called from `syncScopedStores` on every workspace switch. */
-export const loadWorkspaceSettings = () => loadLayer('workspace');
+export async function loadWorkspaceSettings() {
+  const workspace = await loadLayer('workspace');
+  const { global } = useSettingsStore.getState();
+  await applyPatch('global', migrateRescopedTypography(workspace, global));
+}
 
 /**
  * File writes coalesced per layer and key. A slider drag calls the setter once

@@ -19,7 +19,7 @@
 
 .math-inline-source {
   color: var(--primary);
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--editor-font-mono, var(--font-mono, ui-monospace, monospace));
   font-size: 0.9375em;
 }
 
@@ -82,7 +82,7 @@
   border-radius: calc(var(--radius) * 0.75);
   background-color: var(--muted);
   padding: 0.5rem 0.75rem;
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--editor-font-mono, var(--font-mono, ui-monospace, monospace));
   font-size: 0.875em;
   line-height: 1.6;
   color: var(--foreground);

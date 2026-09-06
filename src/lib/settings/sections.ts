@@ -1,4 +1,13 @@
-import { Files, Keyboard, PenLine, Paintbrush, type LucideIcon, PersonStanding } from 'lucide-react';
+import {
+  Files,
+  Keyboard,
+  PenLine,
+  Paintbrush,
+  Palette,
+  Type,
+  type LucideIcon,
+  PersonStanding,
+} from 'lucide-react';
 
 /**
  * The nav down the left of the settings dialog, shaped like `primaryViews` in
@@ -13,6 +22,16 @@ export interface SettingsSection {
 }
 
 export const settingsSections = [
+  {
+    id: 'theme',
+    label: 'Theme',
+    icon: Palette,
+  },
+  {
+    id: 'typography',
+    label: 'Typography',
+    icon: Type,
+  },
   {
     id: 'appearance',
     label: 'Appearance',

@@ -60,6 +60,11 @@
  * sibling of the content, the block then resized when that font swapped in.
  */
 .solstice-code-block .cm-scroller {
-  font-family: var(--font-mono);
+  font-family: var(--editor-font-mono, var(--font-mono));
+  /* Matches the `pre` rule in typeset.css, so a fenced block and a rendered
+     code block are the same size. The line-height stays fixed -- inheriting
+     the note's broke the gutter's row alignment. */
+  font-size: calc(1em * var(--editor-code-scale, 0.875));
+  font-variant-ligatures: var(--editor-mono-ligatures, normal);
   line-height: 1.6;
 }

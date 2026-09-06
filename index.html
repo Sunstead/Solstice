@@ -4,7 +4,30 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri + React + Typescript</title>
+    <title>Solstice</title>
+    <script>
+      /*
+       * Paints the last-used theme before the first frame. The settings store
+       * loads asynchronously, so without this the app draws once in whatever
+       * `:root` says and then flashes to the real palette. Pure optimisation --
+       * `lib/theme/apply.ts` writes this key and wins a tick later either way,
+       * so a stale or missing value costs nothing but the flash it prevents.
+       */
+      try {
+        var saved = JSON.parse(localStorage.getItem('solstice.theme.lastApplied'));
+        if (saved && (saved.appearance === 'light' || saved.appearance === 'dark')) {
+          document.documentElement.classList.add(saved.appearance);
+          for (var i = 0; i < saved.vars.length; i++) {
+            var entry = saved.vars[i];
+            if (entry[0].indexOf('--') === 0) {
+              document.documentElement.style.setProperty(entry[0], entry[1]);
+            }
+          }
+        }
+      } catch (error) {
+        /* No stored theme, or storage is unavailable. */
+      }
+    </script>
   </head>
 
   <body>
