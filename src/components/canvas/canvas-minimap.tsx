@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 
 import { boundsOf } from '@/lib/canvas/doc';
 import { useCanvasStore, useCanvasStoreApi } from '@/lib/canvas/use-canvas-store';
@@ -35,7 +35,6 @@ export function CanvasMinimap() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const colors = useResolvedColors(canvasRef, COLOUR_PROPERTIES);
-  const [, forceDraw] = useState(0);
 
   // Shared by the draw and the click handler, so what you point at is what
   // you get.
@@ -96,7 +95,7 @@ export function CanvasMinimap() {
         seen.height * mini.scale,
       );
     }
-  }, [doc, view, pane, mini, colors]);
+  }, [doc, view, pane, mini, colors.version]);
 
   /** Centres the board on the point clicked. */
   const jumpTo = useCallback(
@@ -122,13 +121,9 @@ export function CanvasMinimap() {
     [store, mini],
   );
 
-  // `useResolvedColors` fills its cache in an effect, which runs after the
-  // first draw; one extra pass picks up the palette rather than leaving a grey
-  // minimap until something else changes.
-  useLayoutEffect(() => {
-    const id = requestAnimationFrame(() => forceDraw((n) => n + 1));
-    return () => cancelAnimationFrame(id);
-  }, []);
+  // `useResolvedColors` now bumps `version` itself once its first read lands
+  // (and again on every theme change), so the draw effect above re-runs on
+  // its own -- no separate kick needed to escape the grey first frame.
 
   return (
     <canvas

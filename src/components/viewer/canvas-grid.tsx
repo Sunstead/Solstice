@@ -96,7 +96,7 @@ export function CanvasGrid({
 
     context.fillStyle = colors.current.color || 'currentColor';
     context.fill(path);
-  }, [scale, offset, size, colors]);
+  }, [scale, offset, size, colors.version]);
 
   return <canvas ref={canvasRef} aria-hidden className='solstice-canvas-grid' />;
 }
