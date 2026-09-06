@@ -30,6 +30,12 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-canvas-6: var(--canvas-color-6);
+  --color-canvas-5: var(--canvas-color-5);
+  --color-canvas-4: var(--canvas-color-4);
+  --color-canvas-3: var(--canvas-color-3);
+  --color-canvas-2: var(--canvas-color-2);
+  --color-canvas-1: var(--canvas-color-1);
   --color-syntax-tag: var(--syntax-tag);
   --color-syntax-constant: var(--syntax-constant);
   --color-syntax-property: var(--syntax-property);
@@ -130,6 +136,24 @@
   --syntax-property: oklch(0.52 0.19 305);
   --syntax-constant: oklch(0.58 0.17 48);
   --syntax-tag: oklch(0.55 0.22 340);
+
+  /*
+   * The six preset colours JSON Canvas defines by index ("1".."6" = red,
+   * orange, yellow, green, cyan, purple).
+   *
+   * Unlike `--syntax-*` the hues are not ours to pick -- the spec fixes what
+   * each index means, and a board authored in another app has to read as the
+   * same board here. What is ours is lightness and chroma, tuned to the ranges
+   * the syntax palette uses so a canvas sits in the same visual register as a
+   * code block. Yellow carries more lightness than its neighbours in both
+   * themes; at the surrounding L it reads as olive rather than yellow.
+   */
+  --canvas-color-1: oklch(0.58 0.2 25);
+  --canvas-color-2: oklch(0.63 0.17 55);
+  --canvas-color-3: oklch(0.7 0.15 90);
+  --canvas-color-4: oklch(0.6 0.16 145);
+  --canvas-color-5: oklch(0.63 0.12 205);
+  --canvas-color-6: oklch(0.56 0.19 300);
 }
 
 .dark {
@@ -178,6 +202,15 @@
   --syntax-property: oklch(0.78 0.15 305);
   --syntax-constant: oklch(0.8 0.14 48);
   --syntax-tag: oklch(0.76 0.17 340);
+
+  /* Lifted in L and eased in C, so a coloured card reads on a dark ground
+     without glowing. */
+  --canvas-color-1: oklch(0.72 0.17 25);
+  --canvas-color-2: oklch(0.77 0.14 55);
+  --canvas-color-3: oklch(0.82 0.13 90);
+  --canvas-color-4: oklch(0.76 0.14 145);
+  --canvas-color-5: oklch(0.78 0.11 205);
+  --canvas-color-6: oklch(0.72 0.16 300);
 }
 
 @layer base {
