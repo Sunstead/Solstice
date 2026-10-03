@@ -67,8 +67,21 @@ pub fn run() {
         )
         .expect("failed to export typescript bindings");
 
-    tauri::Builder
-        ::default()
+    let app = tauri::Builder::default();
+
+    // First, so a second launch (e.g. a `solstice://` link clicked while the
+    // app runs) hands its arguments to this process and exits. The
+    // `deep-link` feature passes the link on to the deep-link plugin.
+    #[cfg(desktop)]
+    let app = app.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+
+    app
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -82,6 +95,16 @@ pub fn run() {
             // Registers the event registry so `events.keymapChanged.listen(...)`
             // works on the frontend.
             builder.mount_events(app);
+
+            // Installers register `solstice://` on Windows and Linux; this
+            // covers dev builds and AppImages. macOS reads it from the bundle.
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                if let Err(e) = app.deep_link().register_all() {
+                    eprintln!("Couldn't register solstice:// links: {e}");
+                }
+            }
 
             let config = WindowConfig {
                 label: "main".into(),
