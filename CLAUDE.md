@@ -15,7 +15,7 @@ apps/
   desktop/        the Tauri app (@solstice/desktop): src/ (React), src-tauri/ (Rust)
 crates/
   solstice-core/  vault paths, wikilinks, front matter: pure Rust, shared by app, Sync and Atlas
-                  (solstice-sync, the CRDT engine, comes next)
+                  (solstice-sync, the CRDT engine, comes next; design in docs/sync.md)
 packages/         shared TS packages (none yet)
 ```
 
