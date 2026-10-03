@@ -13,7 +13,9 @@ crates with it:
 ```
 apps/
   desktop/        the Tauri app (@solstice/desktop): src/ (React), src-tauri/ (Rust)
-crates/           shared Rust crates (to come: solstice-core, solstice-sync)
+crates/
+  solstice-core/  vault paths, wikilinks, front matter: pure Rust, shared by app, Sync and Atlas
+                  (solstice-sync, the CRDT engine, comes next)
 packages/         shared TS packages (none yet)
 ```
 
@@ -85,6 +87,7 @@ The Markdown editor is [Milkdown](https://milkdown.dev) (a ProseMirror wrapper) 
 - The mark wraps the literal `[[target]]` source text rather than replacing it with a node — editing a link is just editing text, with no special mode.
 - A decoration plugin collapses each link to its filename unless the selection is inside it, in which case the raw source is revealed for editing.
 - Link resolution status (does the target exist, is it ambiguous) comes from a workspace-wide file index (`useWikilinkIndex` / `useFileIndex`), rebuilt on workspace switch and invalidated on file create/rename/delete.
+- `crates/solstice-core` ports target normalization, parsing and resolution to Rust for Sync and Atlas. The two must agree: `wikilink-index.test.ts` and `solstice-core/src/wikilink.rs` test the same cases, so change both together.
 
 ### Layout
 
