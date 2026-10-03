@@ -38,3 +38,9 @@ notify-debouncer-full = "0.7.0"
 trash = "5"
 # Enumerates installed font families for the typography settings' font picker.
 font-kit = "0.14"
+# `solstice://` links (Atlas opens notes with them). Single instance forwards
+# a link that launches a second process to the running one.
+tauri-plugin-deep-link = "2"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
