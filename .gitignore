@@ -23,5 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-.tanstack/*
-src/generated/*
+# Rust workspace output
+/target/
+
+.tanstack/
+apps/desktop/src/generated/
