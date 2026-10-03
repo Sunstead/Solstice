@@ -128,8 +128,10 @@ type MilkdownEditorProps = {
 
 type PresetBinding = {
   id: CommandId;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Milkdown command keys are typed per command
   keymapKey: any;
   action: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Milkdown command keys are typed per command
   command: { key: any };
   payload?: unknown;
 };
@@ -138,6 +140,7 @@ function run(binding: PresetBinding) {
   return callCommand(binding.command.key, binding.payload);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Milkdown command keys are typed per command
 function canRun(key: any, payload?: unknown) {
   return (ctx: Ctx) => {
     try {
@@ -231,6 +234,7 @@ const PRESET_BINDINGS_BY_KEYMAP = PRESET_BINDINGS.reduce((map, binding) => {
   group.push(binding);
   map.set(binding.keymapKey, group);
   return map;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Milkdown command keys are typed per command
 }, new Map<any, PresetBinding[]>());
 
 const MilkdownEditor: React.FC<MilkdownEditorProps> = ({

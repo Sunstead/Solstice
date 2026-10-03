@@ -62,7 +62,7 @@ function append(map: Map<string, string[]>, key: string, path: string) {
   else map.set(key, [path]);
 }
 
-function buildSnapshot(paths: string[]): WikilinkIndexSnapshot {
+export function buildSnapshot(paths: string[]): WikilinkIndexSnapshot {
   const byPath = new Map<string, string>();
   const byStem = new Map<string, string[]>();
   const byName = new Map<string, string[]>();

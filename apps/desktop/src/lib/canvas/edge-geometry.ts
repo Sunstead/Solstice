@@ -127,12 +127,14 @@ export function edgeGeometry(
    */
   scale = 1,
 ): EdgeGeometry {
-  let { fromSide, toSide } = selfEdge
+  const sides = selfEdge
     ? {
         fromSide: edge.fromSide ?? 'right',
         toSide: edge.toSide ?? 'bottom',
       }
     : resolveSides(from, to, edge.fromSide, edge.toSide);
+  const { fromSide } = sides;
+  let { toSide } = sides;
 
   // Both anchors in one place would give no curve at all; a quarter turn
   // reuses the ordinary bezier rather than adding a second path builder.

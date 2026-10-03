@@ -27,7 +27,8 @@ import { useThemeEffect } from '@/hooks/use-theme';
 import { useFileCommands } from '@/hooks/use-file-commands';
 
 export const Route = createRootRoute({
-  component: () => {
+  // Named, so the hooks linter knows it's a component.
+  component: function RootLayout() {
     const sidebarCollapsed = useWorkspaceUIStore((s) => s.sidebarCollapsed);
     const setSidebarCollapsed = useWorkspaceUIStore(
       (s) => s.setSidebarCollapsed,

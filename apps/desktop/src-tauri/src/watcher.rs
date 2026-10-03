@@ -353,15 +353,17 @@ mod tests {
     fn rewrites_canonical_paths_back_into_the_frontends_namespace() {
         let given = Path::new("/tmp/vault");
         let canonical = Path::new("/private/tmp/vault");
+        // Joined with the platform's separator, as the frontend's own paths are.
+        let expected = Some(given.join("note.md").to_string_lossy().into_owned());
 
         assert_eq!(
             to_frontend_path(given, canonical, Path::new("/private/tmp/vault/note.md")),
-            Some("/tmp/vault/note.md".to_string()),
+            expected,
         );
         // Already in the frontend's namespace (Linux/inotify).
         assert_eq!(
             to_frontend_path(given, canonical, Path::new("/tmp/vault/note.md")),
-            Some("/tmp/vault/note.md".to_string()),
+            expected,
         );
         // The root itself, and anything outside the workspace, carry nothing
         // the frontend can act on.
