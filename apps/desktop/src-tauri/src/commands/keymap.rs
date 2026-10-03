@@ -139,6 +139,7 @@ pub fn set_menu_accelerators_enabled(app: AppHandle, enabled: bool) -> Result<()
 }
 
 /// Whether menu items should be built with their accelerators attached.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))] // the native menu is macOS-only
 pub fn menu_accelerators_enabled(app: &AppHandle) -> bool {
     app.state::<MenuAccelerators>()
         .0.lock()

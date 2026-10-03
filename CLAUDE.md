@@ -6,18 +6,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Solstice is a local-first Markdown note-taking desktop app (Tauri v2 + React 19 + TypeScript), in the vein of Obsidian. A "workspace" is just a folder on disk the user opens; notes are plain `.md` files, wikilinks (`[[target]]`) resolve against the open workspace, and settings/layout persist as JSON files under a `.solstice/` folder inside that workspace (or the OS app-data dir when no workspace is open).
 
-## Commands
+The repo is a monorepo, so Solstice Sync (a CRDT sync server, planned in
+`Cosmos/docs/ROADMAP.md`, section 5) can live next to the app and share Rust
+crates with it:
 
-```bash
-npm run dev          # Vite dev server only (frontend, no Tauri window)
-npm run tauri dev    # Full app: Rust backend + webview, hot-reloads both sides
-npm run build         # tsc typecheck + vite build (frontend only)
-npm run tauri build   # Production app bundle
+```
+apps/
+  desktop/        the Tauri app (@solstice/desktop): src/ (React), src-tauri/ (Rust)
+crates/           shared Rust crates (to come: solstice-core, solstice-sync)
+packages/         shared TS packages (none yet)
 ```
 
-Rust side (from `src-tauri/`): standard `cargo build` / `cargo check` also work directly.
+The root is an npm workspace (`apps/*`, `packages/*`) and a Cargo workspace;
+`target/` and `node_modules/` live at the root. Below, `src/` and `src-tauri/`
+mean `apps/desktop/src/` and `apps/desktop/src-tauri/`.
 
-There is currently no test suite and no linter/formatter configured (no ESLint/Prettier/Vitest) — don't assume `npm test` or `npm run lint` exist.
+## Commands
+
+Run from the repo root:
+
+```bash
+npm install          # once
+npm run dev          # full app: tauri dev (Rust backend + webview, hot reload)
+npm run dev:web      # Vite dev server only (frontend, no Tauri window)
+npm run build        # tsc typecheck + vite build (frontend only)
+npm run tauri build  # production app bundle
+npm run lint         # eslint, whole repo
+npm test             # vitest in every workspace that has tests
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+Lint has 0 errors. The desktop app predates linting, so a few React Compiler
+rules (`set-state-in-effect`, `refs`, `static-components`) are warnings for
+existing code (`eslint.config.js`); don't add new ones. Tests sit next to the
+code as `*.test.ts` (`apps/desktop/vitest.config.ts`). CI
+(`.github/workflows/ci.yml`) runs lint, tests, build, cargo test and clippy.
 
 ## Architecture
 
@@ -25,25 +49,25 @@ There is currently no test suite and no linter/formatter configured (no ESLint/P
 
 - `src-tauri/` — Rust backend (Tauri commands: filesystem ops, workspace state, native menu, keymap).
 - `src/` — React frontend.
-- `src/bindings.ts` is **generated** by `tauri-specta` from `specta_builder()` in [src-tauri/src/lib.rs](src-tauri/src/lib.rs) every debug build (`tauri dev` / `cargo run`). Never hand-edit it. To add a Tauri command or event, write it in Rust with `#[tauri::command] #[specta::specta]`, register it in `specta_builder()`'s `collect_commands!`/`collect_events!`, then rebuild in dev mode to regenerate the TS side.
+- `src/bindings.ts` is **generated** by `tauri-specta` from `specta_builder()` in [src-tauri/src/lib.rs](apps/desktop/src-tauri/src/lib.rs) every debug build (`tauri dev` / `cargo run`). Never hand-edit it. To add a Tauri command or event, write it in Rust with `#[tauri::command] #[specta::specta]`, register it in `specta_builder()`'s `collect_commands!`/`collect_events!`, then rebuild in dev mode to regenerate the TS side.
 
 ### Command / keybind / menu system
 
-One dotted-string `CommandId` enum is the single source of truth, defined via the `command_id!` macro in [src-tauri/src/commands/command_registry.rs](src-tauri/src/commands/command_registry.rs) (e.g. `"edit.bold"`, `"file.new_note"`). `default_commands()` in the same file gives each id a label and default accelerator.
+One dotted-string `CommandId` enum is the single source of truth, defined via the `command_id!` macro in [src-tauri/src/commands/command_registry.rs](apps/desktop/src-tauri/src/commands/command_registry.rs) (e.g. `"edit.bold"`, `"file.new_note"`). `default_commands()` in the same file gives each id a label and default accelerator.
 
-- [commands/keymap.rs](src-tauri/src/commands/keymap.rs) resolves user overrides on top of the defaults and emits a `KeymapChanged` event when they change.
-- [commands/menu_layout.rs](src-tauri/src/commands/menu_layout.rs) declares the menu tree once (`menu_spec()`, a mix of `Command`/`Native`/`Separator`/`Submenu`) and resolves it against the current keymap into a `ResolvedMenu` the frontend can render. `NativeItem` (Undo/Redo/Cut/Copy/Paste/SelectAll) is deliberately *not* a `CommandMeta` — those are handled natively, not routed through the command registry.
-- On macOS, [commands/menu.rs](src-tauri/src/commands/menu.rs) builds a real native `Menu` from that same spec; menu clicks and OS-dispatched accelerators come back through `on_menu_event` in `lib.rs` and are re-emitted as a `MenuCommand` event. Non-macOS platforms get no native menu — the frontend renders one from `get_menu_layout` and binds every accelerator itself, since nothing else claims them (see `get_native_menu_command_ids`, which tells the frontend which ids the OS already owns on the current platform so it never double-binds).
+- [commands/keymap.rs](apps/desktop/src-tauri/src/commands/keymap.rs) resolves user overrides on top of the defaults and emits a `KeymapChanged` event when they change.
+- [commands/menu_layout.rs](apps/desktop/src-tauri/src/commands/menu_layout.rs) declares the menu tree once (`menu_spec()`, a mix of `Command`/`Native`/`Separator`/`Submenu`) and resolves it against the current keymap into a `ResolvedMenu` the frontend can render. `NativeItem` (Undo/Redo/Cut/Copy/Paste/SelectAll) is deliberately *not* a `CommandMeta` — those are handled natively, not routed through the command registry.
+- On macOS, [commands/menu.rs](apps/desktop/src-tauri/src/commands/menu.rs) builds a real native `Menu` from that same spec; menu clicks and OS-dispatched accelerators come back through `on_menu_event` in `lib.rs` and are re-emitted as a `MenuCommand` event. Non-macOS platforms get no native menu — the frontend renders one from `get_menu_layout` and binds every accelerator itself, since nothing else claims them (see `get_native_menu_command_ids`, which tells the frontend which ids the OS already owns on the current platform so it never double-binds).
 
-On the frontend, [src/lib/commands.ts](src/lib/commands.ts) is the dispatch layer: `registerCommand`/`runCommand` for app-global handlers, `registerScopedCommand`/`unregisterScopedCommand` for handlers that only apply to the focused editor (resolved via `useActiveEditorStore`). Keybinds are bound with `tinykeys` in `useGlobalKeybinds`; native menu activations are consumed in `useNativeMenuCommands` by listening for the `MenuCommand` event — both paths end up calling `runCommand` with the same `CommandId`, so a command's behavior is defined in exactly one place regardless of how it was triggered.
+On the frontend, [src/lib/commands.ts](apps/desktop/src/lib/commands.ts) is the dispatch layer: `registerCommand`/`runCommand` for app-global handlers, `registerScopedCommand`/`unregisterScopedCommand` for handlers that only apply to the focused editor (resolved via `useActiveEditorStore`). Keybinds are bound with `tinykeys` in `useGlobalKeybinds`; native menu activations are consumed in `useNativeMenuCommands` by listening for the `MenuCommand` event — both paths end up calling `runCommand` with the same `CommandId`, so a command's behavior is defined in exactly one place regardless of how it was triggered.
 
 ### Workspace state
 
-A workspace is a directory path, nothing more. [src-tauri/src/workspace.rs](src-tauri/src/workspace.rs) keeps it in an in-memory `HashMap<window_label, path>` (`set_workspace`/`get_workspace` commands). The frontend mirrors this in [src/hooks/use-workspace.ts](src/hooks/use-workspace.ts) (`useWorkspace`), which also tracks recently-opened workspaces (`useKnownWorkspaces`) and restores the last one on startup. Switching workspaces (`setWorkspace`) resets and reloads every workspace-scoped store: layout, settings, the file tree, and the file index.
+A workspace is a directory path, nothing more. [src-tauri/src/workspace.rs](apps/desktop/src-tauri/src/workspace.rs) keeps it in an in-memory `HashMap<window_label, path>` (`set_workspace`/`get_workspace` commands). The frontend mirrors this in [src/hooks/use-workspace.ts](apps/desktop/src/hooks/use-workspace.ts) (`useWorkspace`), which also tracks recently-opened workspaces (`useKnownWorkspaces`) and restores the last one on startup. Switching workspaces (`setWorkspace`) resets and reloads every workspace-scoped store: layout, settings, the file tree, and the file index.
 
 ### Scoped persistence
 
-Two storage scopes, both backed by `tauri-plugin-store` (JSON files), wired via [src/lib/stores/scoped-storage.ts](src/lib/stores/scoped-storage.ts):
+Two storage scopes, both backed by `tauri-plugin-store` (JSON files), wired via [src/lib/stores/scoped-storage.ts](apps/desktop/src/lib/stores/scoped-storage.ts):
 
 - `'global'` — app data dir, survives across workspaces.
 - `'workspace'` — `<workspace>/.solstice/<file>.json`, scoped to the open folder.
@@ -52,11 +76,11 @@ Two storage scopes, both backed by `tauri-plugin-store` (JSON files), wired via 
 
 ### Settings
 
-Every setting is declared once in [src/lib/settings/registry.ts](src/lib/settings/registry.ts) (`settingsRegistry`): dotted key, section/group for the UI, `scope` (`'global'` | `'workspace'`), default, control type, and optionally how it applies itself — a `cssVar` or `domAttr` binding. [src/lib/settings/apply.ts](src/lib/settings/apply.ts) pushes every such binding onto `<html>` reactively, so most appearance settings need no code beyond the registry entry (stylesheets just consume the CSS var). [src/lib/settings/store.ts](src/lib/settings/store.ts) handles resolution (workspace layer overrides global overrides default), debounced disk writes, clamping/snapping numeric values to their step grid, and `visibleWhen` conditional visibility. Settings files are flat dotted-key JSON, not a Zustand persist envelope, specifically so they're safe to hand-edit and forward-compatible (unknown keys are preserved).
+Every setting is declared once in [src/lib/settings/registry.ts](apps/desktop/src/lib/settings/registry.ts) (`settingsRegistry`): dotted key, section/group for the UI, `scope` (`'global'` | `'workspace'`), default, control type, and optionally how it applies itself — a `cssVar` or `domAttr` binding. [src/lib/settings/apply.ts](apps/desktop/src/lib/settings/apply.ts) pushes every such binding onto `<html>` reactively, so most appearance settings need no code beyond the registry entry (stylesheets just consume the CSS var). [src/lib/settings/store.ts](apps/desktop/src/lib/settings/store.ts) handles resolution (workspace layer overrides global overrides default), debounced disk writes, clamping/snapping numeric values to their step grid, and `visibleWhen` conditional visibility. Settings files are flat dotted-key JSON, not a Zustand persist envelope, specifically so they're safe to hand-edit and forward-compatible (unknown keys are preserved).
 
 ### Editor & wikilinks
 
-The Markdown editor is [Milkdown](https://milkdown.dev) (a ProseMirror wrapper) — see [src/components/milkdown-editor.tsx](src/components/milkdown-editor.tsx) and [file-editor.tsx](src/components/file-editor.tsx). Wikilinks (`[[target]]`) are implemented as a custom ProseMirror mark/plugin set in [src/lib/wikilink/](src/lib/wikilink/):
+The Markdown editor is [Milkdown](https://milkdown.dev) (a ProseMirror wrapper) — see [src/components/milkdown-editor.tsx](apps/desktop/src/components/milkdown-editor.tsx) and [file-editor.tsx](apps/desktop/src/components/file-editor.tsx). Wikilinks (`[[target]]`) are implemented as a custom ProseMirror mark/plugin set in [src/lib/wikilink/](apps/desktop/src/lib/wikilink/):
 
 - The mark wraps the literal `[[target]]` source text rather than replacing it with a node — editing a link is just editing text, with no special mode.
 - A decoration plugin collapses each link to its filename unless the selection is inside it, in which case the raw source is revealed for editing.
@@ -64,15 +88,15 @@ The Markdown editor is [Milkdown](https://milkdown.dev) (a ProseMirror wrapper) 
 
 ### Layout
 
-Tab/pane layout is [flexlayout-react](https://github.com/caplin/FlexLayout), wrapped by [src/hooks/use-layout.ts](src/hooks/use-layout.ts) (`useLayout`). Tabs are one of two kinds by `component`: `'editor'` (carries `{ path }` in its config) or `'blank'` (a fresh untitled tab). The model is persisted per-workspace (debounced) via the workspace-layout store. Explorer state that sits outside the FlexLayout model — sidebar width/collapse and which folders are expanded — persists alongside it in `workspace-ui.json`; `useFiles.loadRoot` replays the saved expansions after the store rehydrates. Opening a file that's already open selects its existing tab rather than duplicating it; opening a file while a blank tab is focused replaces that blank tab in place.
+Tab/pane layout is [flexlayout-react](https://github.com/caplin/FlexLayout), wrapped by [src/hooks/use-layout.ts](apps/desktop/src/hooks/use-layout.ts) (`useLayout`). Tabs are one of two kinds by `component`: `'editor'` (carries `{ path }` in its config) or `'blank'` (a fresh untitled tab). The model is persisted per-workspace (debounced) via the workspace-layout store. Explorer state that sits outside the FlexLayout model — sidebar width/collapse and which folders are expanded — persists alongside it in `workspace-ui.json`; `useFiles.loadRoot` replays the saved expansions after the store rehydrates. Opening a file that's already open selects its existing tab rather than duplicating it; opening a file while a blank tab is focused replaces that blank tab in place.
 
 ### UI components
 
-shadcn/ui-based, configured in [components.json](components.json) (style `base-vega`, neutral base color). Primitives live in `src/components/ui/`, feature components directly under `src/components/`. Path alias `@/` → `src/` (see [vite.config.ts](vite.config.ts) and [tsconfig.json](tsconfig.json)).
+shadcn/ui-based, configured in [components.json](apps/desktop/components.json) (style `base-vega`, neutral base color). Primitives live in `src/components/ui/`, feature components directly under `src/components/`. Path alias `@/` → `src/` (see [vite.config.ts](apps/desktop/vite.config.ts) and [tsconfig.json](apps/desktop/tsconfig.json)).
 
 ### Window chrome
 
-The main window uses an overlay title bar with custom traffic-light positioning on macOS (configured in `lib.rs`'s `setup` hook) and fully custom decorations elsewhere (`decorations(false)`, drawn in React — see [src/components/title-bar.tsx](src/components/title-bar.tsx) and [window-controls.tsx](src/components/window-controls.tsx)).
+The main window uses an overlay title bar with custom traffic-light positioning on macOS (configured in `lib.rs`'s `setup` hook) and fully custom decorations elsewhere (`decorations(false)`, drawn in React — see [src/components/title-bar.tsx](apps/desktop/src/components/title-bar.tsx) and [window-controls.tsx](apps/desktop/src/components/window-controls.tsx)).
 
 ## Conventions
 
