@@ -106,7 +106,7 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             let win_builder = win_builder.decorations(false);
 
-            let window = win_builder.build()?;
+            win_builder.build()?;
 
             #[cfg(target_os = "macos")]
             {
