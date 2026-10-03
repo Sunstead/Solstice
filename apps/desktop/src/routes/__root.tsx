@@ -25,6 +25,7 @@ import { startFsWatch } from '@/lib/stores/fs-watch';
 import { useSettingsDomBindings } from '@/lib/settings/apply';
 import { useThemeEffect } from '@/hooks/use-theme';
 import { useFileCommands } from '@/hooks/use-file-commands';
+import { useDeepLinks } from '@/hooks/use-deep-links';
 
 export const Route = createRootRoute({
   // Named, so the hooks linter knows it's a component.
@@ -54,6 +55,7 @@ export const Route = createRootRoute({
     useFileCommands();
     useThemeEffect();
     useSettingsDomBindings();
+    useDeepLinks();
 
     useEffect(() => {
       // Global settings first: the workspace layer that `init` goes on to load

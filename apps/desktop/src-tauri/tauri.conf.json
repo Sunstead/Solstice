@@ -19,6 +19,13 @@
       }
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["solstice"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
