@@ -36,7 +36,7 @@ const blankTabActions: {
   },
 ];
 
-export function BlankTab({}: { tabId: string }) {
+export function BlankTab(_props: { tabId: string }) {
   const commands = useKeymapStore((s) => s.commands);
 
   return (
