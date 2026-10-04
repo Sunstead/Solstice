@@ -59,7 +59,7 @@ code as `*.test.ts` (`apps/desktop/vitest.config.ts`). CI
 
 - `src-tauri/` — Rust backend (Tauri commands: filesystem ops, workspace state, native menu, keymap).
 - `src/` — React frontend.
-- `src/bindings.ts` is **generated** by `tauri-specta` from `specta_builder()` in [src-tauri/src/lib.rs](apps/desktop/src-tauri/src/lib.rs) every debug build (`tauri dev` / `cargo run`). Never hand-edit it. To add a Tauri command or event, write it in Rust with `#[tauri::command] #[specta::specta]`, register it in `specta_builder()`'s `collect_commands!`/`collect_events!`, then rebuild in dev mode to regenerate the TS side.
+- `src/bindings.ts` is **generated** by `tauri-specta` from `specta_builder()` in [src-tauri/src/lib.rs](apps/desktop/src-tauri/src/lib.rs) every debug build (`tauri dev` / `cargo run`). Never hand-edit it. To add a Tauri command or event, write it in Rust with `#[tauri::command] #[specta::specta]`, register it in `specta_builder()`'s `collect_commands!`/`collect_events!`, then regenerate the TS side: run the app in dev mode, or `cargo run -p solstice -- --export-bindings` from `apps/desktop/src-tauri` (no window). CI fails if it's stale (`bindings_are_current`, skipped on Windows, where Tauri test binaries can't load).
 
 ### Command / keybind / menu system
 
@@ -87,6 +87,10 @@ Two storage scopes, both backed by `tauri-plugin-store` (JSON files), wired via 
 ### Settings
 
 Every setting is declared once in [src/lib/settings/registry.ts](apps/desktop/src/lib/settings/registry.ts) (`settingsRegistry`): dotted key, section/group for the UI, `scope` (`'global'` | `'workspace'`), default, control type, and optionally how it applies itself — a `cssVar` or `domAttr` binding. [src/lib/settings/apply.ts](apps/desktop/src/lib/settings/apply.ts) pushes every such binding onto `<html>` reactively, so most appearance settings need no code beyond the registry entry (stylesheets just consume the CSS var). [src/lib/settings/store.ts](apps/desktop/src/lib/settings/store.ts) handles resolution (workspace layer overrides global overrides default), debounced disk writes, clamping/snapping numeric values to their step grid, and `visibleWhen` conditional visibility. Settings files are flat dotted-key JSON, not a Zustand persist envelope, specifically so they're safe to hand-edit and forward-compatible (unknown keys are preserved).
+
+### Sync
+
+A linked workspace syncs through Solstice Sync (`src-tauri/src/sync/`, `crates/solstice-sync-client`, design in [docs/sync.md](docs/sync.md)). The frontend only mirrors it: `lib/stores/sync.ts` (status and reviews, refreshed on the `syncChanged` event), the Sync settings pane, the title bar indicator, and the review bar and dialog in `components/sync/`. Two hooks matter to editors: the autosaver reports what an editor holds (`syncEditorOpened`, on load and on every adopt), and in a synced workspace a dirty note editor that sees its file change saves and reloads the merge instead of showing the conflict bar (canvases still ask: they sync whole, last writer wins).
 
 ### Editor & wikilinks
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { commands } from '@/bindings';
 import { getSetting } from '@/lib/settings/store';
+import { isSynced } from '@/lib/stores/sync';
 import {
   clearExternalChange,
   useExternalChange,
@@ -25,6 +26,12 @@ type Options = {
   adopt: (text: string) => void;
   hold: () => void;
   release: () => void;
+  /**
+   * Write the buffer now. Editors whose saves sync merges (notes) pass it;
+   * without it (canvases, which sync whole, last writer wins) a dirty buffer
+   * still asks.
+   */
+  flush?: () => void;
 };
 
 /**
@@ -32,6 +39,8 @@ type Options = {
  *
  * A clean buffer reloads in place; a dirty one holds its writes and surfaces
  * the choice, since either version would otherwise be discarded silently.
+ * In a synced folder nothing has to be chosen: the buffer is saved, sync
+ * merges it with the change, and the merged file then reloads here.
  */
 export function useExternalFileChanges({
   path,
@@ -43,6 +52,7 @@ export function useExternalFileChanges({
   adopt,
   hold,
   release,
+  flush,
 }: Options) {
   const [status, setStatus] = useState<ExternalStatus>({ kind: 'none' });
   const change = useExternalChange(path);
@@ -81,6 +91,18 @@ export function useExternalFileChanges({
 
       // Our own write coming back to us.
       if (diskText === getLastWritten()) return;
+
+      if (isSynced() && flush) {
+        // Unsaved edits are saved, merged by sync, and come back as another
+        // change; a clean buffer just takes the merged file.
+        if (isDirty()) {
+          flush();
+        } else {
+          applyDiskContent(diskText);
+          adopt(diskText);
+        }
+        return;
+      }
 
       if (!isDirty() && getSetting('editor.externalChanges') !== 'prompt') {
         applyDiskContent(diskText);

@@ -490,6 +490,15 @@ export const settingsRegistry = {
   }),
 
   // -- Explorer -------------------------------------------------------
+  // Rendered by the Sync pane itself (`components/settings/sync-pane.tsx`).
+  'sync.server': defineText({
+    section: 'sync',
+    scope: 'global',
+    label: 'Sync server',
+    default: 'https://solstice.jupiter.sunstead.net',
+    placeholder: 'https://solstice.jupiter.sunstead.net',
+  }),
+
   'explorer.watchFilesystem': defineBoolean({
     section: 'explorer',
     scope: 'workspace',

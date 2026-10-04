@@ -1,5 +1,6 @@
 import {
   Files,
+  RefreshCw,
   Keyboard,
   PenLine,
   Palette,
@@ -43,6 +44,11 @@ export const settingsSections = [
     id: 'explorer',
     label: 'Explorer',
     icon: Files,
+  },
+  {
+    id: 'sync',
+    label: 'Sync',
+    icon: RefreshCw,
   },
   {
     id: 'keybindings',
