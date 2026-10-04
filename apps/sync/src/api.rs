@@ -1,6 +1,6 @@
 //! The HTTP surface:
 //!
-//! - `GET /healthz`, `GET /v1/info` (how apps sign in): public.
+//! - `GET /`, `GET /healthz`, `GET /v1/info` (how apps sign in): public.
 //! - `GET /v1/vaults`, `POST /v1/vaults/{id}/notes`: apps and API tokens.
 //! - `POST /v1/vaults`, `/v1/tokens`, blobs, and `GET /v1/sync` (the
 //!   WebSocket): apps only.
@@ -31,6 +31,14 @@ const MAX_BLOB: usize = 256 * 1024 * 1024;
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        // For people (and uptime checks) who open the address in a browser.
+        .route(
+            "/",
+            get(|| async {
+                "Solstice Sync is running. Connect to it from the Solstice app.
+"
+            }),
+        )
         .route("/healthz", get(|| async { "ok" }))
         .route("/v1/info", get(info))
         .route("/v1/vaults", get(list_vaults).post(create_vault))
