@@ -71,9 +71,21 @@ pub fn is_linked(folder: &Path) -> bool {
     path(folder).exists()
 }
 
-/// Which vault `folder` is linked to.
+/// Which vault `folder` is linked to. Reads only that, read-only, so it's
+/// cheap even for a large vault (and safe while its client runs).
 pub fn read_link(folder: &Path) -> Result<Link, Error> {
-    Store::open(folder).map(|(_, saved)| saved.link)
+    if !is_linked(folder) {
+        return Err(Error::NotLinked);
+    }
+    let conn = Connection::open_with_flags(
+        path(folder),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(Error::store)?;
+    let json: String = conn
+        .query_row("SELECT value FROM meta WHERE key = 'link'", [], |r| r.get(0))
+        .map_err(Error::store)?;
+    serde_json::from_str(&json).map_err(Error::io)
 }
 
 #[derive(Clone)]
@@ -247,6 +259,7 @@ mod tests {
             device: "laptop".into(),
         };
         assert!(matches!(Store::open(tmp.path()), Err(Error::NotLinked)));
+        assert!(matches!(read_link(tmp.path()), Err(Error::NotLinked)));
         let store = Store::create(tmp.path(), &link).unwrap();
         let mut placed = Placed::new();
         placed.insert("id".into(), ("a.md".into(), "hash".into()));
@@ -263,6 +276,7 @@ mod tests {
             .unwrap();
         drop(store);
         assert!(is_linked(tmp.path()));
+        assert_eq!(read_link(tmp.path()).unwrap(), link);
         let (_, saved) = Store::open(tmp.path()).unwrap();
         assert_eq!(saved.link, link);
         assert_eq!(saved.docs.len(), 2);

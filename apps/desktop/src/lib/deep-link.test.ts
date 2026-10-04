@@ -41,4 +41,17 @@ describe('workspacesForVault', () => {
     expect(workspacesForVault('Work', known)).toHaveLength(1);
     expect(workspacesForVault('Other', known)).toEqual([]);
   });
+
+  it('prefers folders synced to a vault of that name', () => {
+    const known = [
+      { path: '/home/pwb/Notes', name: 'Notes', lastOpenedAt: 5 },
+      { path: '/home/pwb/Laptop notes', name: 'Laptop notes', lastOpenedAt: 1 },
+    ];
+    const linked = new Map([['/home/pwb/Laptop notes', 'Notes']]);
+    expect(workspacesForVault('notes', known, linked).map((w) => w.path)).toEqual([
+      '/home/pwb/Laptop notes',
+      '/home/pwb/Notes',
+    ]);
+    expect(workspacesForVault('Laptop notes', known, new Map())).toHaveLength(1);
+  });
 });
