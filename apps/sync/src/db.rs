@@ -140,7 +140,10 @@ impl Db {
     }
 
     fn init(mut conn: Connection) -> Result<Self> {
-        conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;")?;
+        // temp_store: the image's root filesystem is read-only, so no temp files.
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA temp_store = MEMORY;",
+        )?;
         migrate(&mut conn)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),

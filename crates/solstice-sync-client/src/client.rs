@@ -156,6 +156,7 @@ impl Client {
             tx: tx.clone(),
             backoff: Duration::from_secs(1),
             reconnect_at: Some(Instant::now()),
+            connected_at: None,
             save_at: None,
             settle_at: None,
         };
@@ -271,6 +272,9 @@ struct Actor {
     tx: mpsc::UnboundedSender<Cmd>,
     backoff: Duration,
     reconnect_at: Option<Instant>,
+    /// When the socket last opened: a token expiring soon after means
+    /// something's off, so that reconnect backs off instead.
+    connected_at: Option<Instant>,
     save_at: Option<Instant>,
     settle_at: Option<Instant>,
 }
@@ -377,6 +381,7 @@ impl Actor {
         match self.server.connect(token.as_deref()).await {
             Ok(s) => {
                 *socket = Some(s);
+                self.connected_at = Some(Instant::now());
                 self.backoff = Duration::from_secs(1);
                 self.set_status(Status::Syncing);
                 if let Err(e) = self.upload_blobs().await {
@@ -476,6 +481,22 @@ impl Actor {
                 let notice: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
                 match notice["notice"].as_str() {
                     Some("unknown_vault") => self.relink(socket),
+                    // The connection lasts as long as its token: reconnect
+                    // now, with a fresh one.
+                    Some("token_expired") => {
+                        *socket = None;
+                        let fresh = self
+                            .connected_at
+                            .is_some_and(|at| at.elapsed() < Duration::from_secs(30));
+                        self.reconnect_at = Some(if fresh {
+                            self.set_status(Status::Offline {
+                                message: "the sign-in expired straight away".into(),
+                            });
+                            Instant::now() + Duration::from_secs(30)
+                        } else {
+                            Instant::now()
+                        });
+                    }
                     other => tracing::warn!(notice = ?other, "notice from the sync server"),
                 }
             }

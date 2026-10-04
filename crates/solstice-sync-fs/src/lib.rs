@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use solstice_sync::{content_hash, Content, FileId, Kind, Msg, Vault};
+use solstice_sync::{content_hash, is_content_hash, Content, FileId, Kind, Msg, Vault};
 
 /// One file as found on disk.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -210,7 +210,12 @@ impl VaultDir {
     }
 
     /// An attachment's bytes: from the cache, or any file that has them.
+    /// `None` for anything that isn't a hash (they come from peers, and
+    /// name a file here).
     pub fn get_blob(&self, hash: &str) -> Option<Vec<u8>> {
+        if !is_content_hash(hash) {
+            return None;
+        }
         if let Ok(bytes) = std::fs::read(self.blob_path(hash)) {
             return Some(bytes);
         }
@@ -524,5 +529,7 @@ mod tests {
         let hash = vd.put_blob(b"bytes").unwrap();
         assert_eq!(vd.get_blob(&hash).unwrap(), b"bytes");
         assert!(vd.get_blob("missing").is_none());
+        assert!(vd.get_blob("../../state.db").is_none());
+        assert!(vd.get_blob(&"A".repeat(64)).is_none());
     }
 }

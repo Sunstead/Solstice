@@ -165,7 +165,9 @@ impl Manifest {
         apply(&self.doc, update)
     }
 
-    /// Every file ever recorded, deleted ones included.
+    /// Every file ever recorded, deleted ones included. Entries whose path
+    /// isn't a plain, visible vault path are left out: any peer can write
+    /// the manifest, and its paths become files on every other one.
     pub fn entries(&self) -> BTreeMap<FileId, Entry> {
         let txn = self.doc.transact();
         let ids: BTreeSet<String> = self
@@ -175,7 +177,8 @@ impl Manifest {
             .collect();
         ids.into_iter()
             .filter_map(|id| {
-                let path = string(self.files.get(&txn, &key(&id, "path")))?;
+                let path =
+                    string(self.files.get(&txn, &key(&id, "path"))).filter(|p| is_safe_path(p))?;
                 let kind = match string(self.files.get(&txn, &key(&id, "kind"))).as_deref() {
                     Some("blob") => Kind::Blob,
                     _ => Kind::Note,
@@ -351,6 +354,15 @@ impl Manifest {
     }
 }
 
+/// A path as [`VaultPath`] writes it (relative, `/`-separated, no `.` or
+/// `..`, nothing empty) and not hidden, so it stays inside the vault folder
+/// and out of `.solstice/`.
+///
+/// [`VaultPath`]: solstice_core::VaultPath
+fn is_safe_path(path: &str) -> bool {
+    solstice_core::VaultPath::parse(path).is_ok_and(|p| p.as_str() == path && !p.is_hidden())
+}
+
 /// `notes/Untitled.md` → `notes/Untitled 1.md`, the same rule as the
 /// desktop app's `save_attachment`.
 pub fn numbered(path: &str, n: u32) -> String {
@@ -390,6 +402,39 @@ mod tests {
         assert_eq!(paths, ["todo.md"]);
         m.restore(&img);
         assert_eq!(m.materialize().len(), 2);
+    }
+
+    #[test]
+    fn ignores_paths_that_leave_the_vault() {
+        let m = Manifest::new(0);
+        let (ok, _) = m.create("notes/fine.md", None);
+        {
+            // What a hostile peer could write straight into the Y.Map.
+            let mut txn = m.doc.transact_mut();
+            for (i, bad) in [
+                "../escape.md",
+                "notes/../../escape.md",
+                "/etc/passwd",
+                "C:/Windows/evil.md",
+                ".solstice/state.db",
+                "notes/.git/config",
+                "notes//double.md",
+                "notes\\back.md",
+                "",
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                m.files
+                    .insert(&mut txn, key(&format!("bad{i}"), "path"), bad);
+            }
+        }
+        let entries = m.entries();
+        assert_eq!(entries.keys().collect::<Vec<_>>(), [&ok]);
+        assert_eq!(
+            m.materialize().into_keys().collect::<Vec<_>>(),
+            ["notes/fine.md"]
+        );
     }
 
     #[test]
