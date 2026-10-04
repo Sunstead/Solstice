@@ -211,6 +211,49 @@ async fn a_vault_read_and_changed_from_the_web() {
 }
 
 #[tokio::test]
+async fn a_save_never_writes_over_an_edit_made_in_the_folder() {
+    let s = serve(
+        AuthMode::Dev {
+            username: "pwb".into(),
+        },
+        None,
+    )
+    .await;
+    let c = client();
+    let vault = json_of(
+        web(&c, reqwest::Method::POST, format!("{}/v1/vaults", s.base))
+            .json(&json!({ "name": "Notes" }))
+            .send()
+            .await
+            .unwrap(),
+    )
+    .await;
+    let v = format!("{}/v1/vaults/{}", s.base, vault["id"].as_str().unwrap());
+    web(&c, reqwest::Method::POST, format!("{v}/ops"))
+        .json(&json!({ "op": "create_note", "path": "a.md", "text": "one\ntwo\n" }))
+        .send()
+        .await
+        .unwrap();
+    let read = json_of(c.get(format!("{v}/notes/a.md")).send().await.unwrap()).await;
+
+    // Someone edits the file on the server, and before the folder watcher
+    // reports it, a save arrives.
+    let file = s.state.notes_dir.join("pwb/Notes/a.md");
+    std::fs::write(&file, "one\ntwo\nthree, typed on the server\n").unwrap();
+    let saved = json_of(
+        web(&c, reqwest::Method::PUT, format!("{v}/notes/a.md"))
+            .json(&json!({ "text": "ONE\ntwo\n", "base": read["base"] }))
+            .send()
+            .await
+            .unwrap(),
+    )
+    .await;
+    let both = "ONE\ntwo\nthree, typed on the server\n";
+    assert_eq!(saved["text"], both);
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), both);
+}
+
+#[tokio::test]
 async fn signing_in_on_the_web() {
     let p = provider("k1").await;
     let auth = AuthMode::Oidc(OidcConfig {

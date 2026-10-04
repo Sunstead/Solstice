@@ -331,6 +331,8 @@ impl VaultTask {
     fn handle(&mut self, cmd: Cmd) {
         match cmd {
             Cmd::Web { op, reply } => {
+                let paths: Vec<String> = op.paths().into_iter().map(str::to_owned).collect();
+                self.absorb_first(&paths);
                 let _ = reply.send(self.web(op));
             }
             Cmd::Watch { tx } => self.watchers.push(tx),
@@ -342,7 +344,18 @@ impl VaultTask {
             Cmd::Disconnect { conn } => {
                 self.sessions.remove(&conn);
             }
-            Cmd::Frame { conn, msgs } => self.frame(conn, msgs),
+            Cmd::Frame { conn, msgs } => {
+                let placed = self.dir.placed();
+                let paths: Vec<String> = msgs
+                    .iter()
+                    .filter_map(|m| match &m.doc {
+                        DocKey::Note(id) => placed?.get(id).map(|(p, _)| p.clone()),
+                        DocKey::Manifest => None,
+                    })
+                    .collect();
+                self.absorb_first(&paths);
+                self.frame(conn, msgs)
+            }
             Cmd::CreateNote { path, text, reply } => {
                 let result = self
                     .vault
@@ -379,6 +392,21 @@ impl VaultTask {
                     tracing::warn!(vault = %self.row.id, error = %e, "can't read the vault folder")
                 }
             },
+        }
+    }
+
+    /// Folds in edits made directly in the folder that the watcher hasn't
+    /// reported yet, if any of `paths` has one: a change about to be written
+    /// to that file then merges with the edit instead of writing over it.
+    fn absorb_first(&mut self, paths: &[String]) {
+        if !paths.iter().any(|p| self.dir.changed_on_disk(p)) {
+            return;
+        }
+        match self.dir.absorb(&mut self.vault) {
+            Ok(msgs) => self.changed(None, msgs),
+            Err(e) => {
+                tracing::warn!(vault = %self.row.id, error = %e, "can't read the vault folder")
+            }
         }
     }
 

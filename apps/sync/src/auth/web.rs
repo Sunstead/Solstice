@@ -451,7 +451,6 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Result<Res
     Ok(res)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
