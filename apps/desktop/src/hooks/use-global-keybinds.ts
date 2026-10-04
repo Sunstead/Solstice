@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { tinykeys, defaultKeybindingsHandlerIgnore } from 'tinykeys';
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { runCommand } from '../lib/commands';
 import { toTinykeysFormat } from '../lib/accelerator';

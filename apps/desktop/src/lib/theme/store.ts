@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { builtinThemes } from './builtin';
 import { loadUserThemes, type ThemeLoadIssue } from './load';
 import type { CatalogueTheme } from './types';

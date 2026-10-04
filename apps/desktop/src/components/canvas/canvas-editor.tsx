@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileWarning } from 'lucide-react';
 
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { ExternalChangeBar } from '@/components/external-change-bar';
 import { Button } from '@sunstead/ui/components/button';
 import { ViewerFrame } from '@/components/viewer/viewer-frame';

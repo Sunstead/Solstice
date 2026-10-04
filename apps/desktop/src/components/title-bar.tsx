@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  getCurrentWindow,
-  type Window as TauriWindow,
-} from '@tauri-apps/api/window';
+import { getCurrentWindow, type Window as TauriWindow } from '@/lib/backend/window';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import SolsticeIcon from '@/assets/icons/app/icon.svg?react';
 import { useIsMac } from '@/hooks/use-platform';

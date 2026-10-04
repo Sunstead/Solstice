@@ -1,5 +1,5 @@
-import { load, type Store } from '@tauri-apps/plugin-store';
-import { mkdir } from '@tauri-apps/plugin-fs';
+import { load, type Store } from '@/lib/backend/store';
+import { mkdir } from '@/lib/backend/store';
 import type { StateStorage } from 'zustand/middleware';
 import { useWorkspace } from '@/hooks/use-workspace';
 

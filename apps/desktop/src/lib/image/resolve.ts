@@ -1,4 +1,4 @@
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { assetUrl } from '@/lib/backend/shell';
 
 import {
   useWikilinkIndex,
@@ -70,7 +70,7 @@ export function resolveAsset(
   // also covers the Windows `C:\...` form, which `HAS_SCHEME` deliberately
   // does not match (a drive letter is one character, a scheme is two or more).
   if (decoded.startsWith('/') || /^[a-z]:[\\/]/i.test(decoded)) {
-    return { status: 'resolved', absolutePath: decoded, url: convertFileSrc(decoded) };
+    return { status: 'resolved', absolutePath: decoded, url: assetUrl(decoded) };
   }
 
   if (!workspaceRoot) return { status: 'unresolved' };
@@ -99,5 +99,5 @@ export function resolveAsset(
 
 function resolvedAt(workspaceRoot: string, relativePath: string): ResolvedAsset {
   const absolutePath = joinWorkspacePath(workspaceRoot, relativePath);
-  return { status: 'resolved', absolutePath, url: convertFileSrc(absolutePath) };
+  return { status: 'resolved', absolutePath, url: assetUrl(absolutePath) };
 }

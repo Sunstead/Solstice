@@ -10,7 +10,7 @@ import { useNodeViewContext } from '@prosemirror-adapter/react';
 import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
 import type { Ctx } from '@milkdown/kit/ctx';
 import { DOMSerializer } from '@milkdown/kit/prose/model';
-import { openPath } from '@tauri-apps/plugin-opener';
+import { openPath } from '@/lib/backend/shell';
 import { FileWarning, Link2Off, RefreshCcw } from 'lucide-react';
 
 import { CanvasPreviewCard } from '@/components/canvas/canvas-preview-card';

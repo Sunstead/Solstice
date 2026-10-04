@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { getSetting } from '@/lib/settings/store';
 import { isSynced } from '@/lib/stores/sync';
 import {

@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Copy, RefreshCw } from 'lucide-react';
 
-import {
-  commands,
-  type SyncLinkReport,
-  type SyncServerInfo,
-  type SyncVault,
-} from '@/bindings';
+import { commands } from '@/lib/backend';
+import { type SyncLinkReport, type SyncServerInfo, type SyncVault } from '@/bindings';
 import { Button } from '@sunstead/ui/components/button';
 import { Input } from '@sunstead/ui/components/input';
 import { useWorkspace } from '@/hooks/use-workspace';

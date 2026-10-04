@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
-import { commands, FileEntry } from '@/bindings';
+import { commands } from '@/lib/backend';
+import { FileEntry } from '@/bindings';
 import { isWithin } from '@/lib/path-utils';
 
 /**

@@ -1,4 +1,4 @@
-import { openPath } from '@tauri-apps/plugin-opener';
+import { openPath } from '@/lib/backend/shell';
 import { FileQuestion } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';

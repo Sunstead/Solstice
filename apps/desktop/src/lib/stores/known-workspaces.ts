@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { load } from '@tauri-apps/plugin-store';
+import { load } from '@/lib/backend/store';
 
 export interface KnownWorkspace {
   path: string;

@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
 
-import { commands, FileEntry } from '@/bindings';
+import { commands } from '@/lib/backend';
+import { FileEntry } from '@/bindings';
 import { useSetting } from '@/lib/settings/store';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import {

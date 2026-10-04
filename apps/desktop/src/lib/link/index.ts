@@ -4,7 +4,7 @@ import type { MarkType } from '@milkdown/kit/prose/model';
 import { Plugin, PluginKey, type EditorState } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { $inputRule, $prose } from '@milkdown/kit/utils';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openUrl } from '@/lib/backend/shell';
 
 import { attributeFromEvent } from '@/lib/editor/event-target';
 import { getSetting } from '@/lib/settings/store';

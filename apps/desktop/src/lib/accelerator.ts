@@ -1,4 +1,4 @@
-import { platform } from '@tauri-apps/plugin-os';
+import { platform } from '@/lib/backend/shell';
 
 /**
  * Tauri accelerators write single-character keys in uppercase

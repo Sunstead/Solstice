@@ -1,4 +1,4 @@
-import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
+import { openPath, revealItemInDir } from '@/lib/backend/shell';
 
 import type { FileTreeNode } from '@/hooks/use-files';
 import { useFiles } from '@/hooks/use-files';

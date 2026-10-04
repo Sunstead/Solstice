@@ -5,7 +5,7 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { isEditableCard } from '@/lib/canvas/editable';
 import type { CanvasNode } from '@/lib/canvas/types';
 import { useCanvasStoreApi } from '@/lib/canvas/use-canvas-store';
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { basename, joinWorkspacePath } from '@/lib/wikilink/target';
 import { FileCardHeader } from './canvas-node-file';
 import { CanvasTextEditor } from './canvas-text-editor';

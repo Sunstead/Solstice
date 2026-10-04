@@ -1,4 +1,4 @@
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { applyFsChanges, selfChange } from '@/lib/fs-sync';
 import type { FileTreeNode } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';

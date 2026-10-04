@@ -1,4 +1,4 @@
-import { commands, events } from '@/bindings';
+import { commands, events } from '@/lib/backend';
 
 /**
  * Markdown of transcluded notes, shared by every embed pointing at the same

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { isTauri } from '@tauri-apps/api/core';
+import { isDesktop } from '@/lib/backend';
 
 export type Platform = 'macos' | 'windows' | 'linux' | 'unknown';
 
@@ -8,12 +8,12 @@ let inFlight: Promise<Platform> | null = null;
 
 async function resolvePlatform(): Promise<Platform> {
   if (cachedPlatform) return cachedPlatform;
-  if (!isTauri()) {
+  if (!isDesktop) {
     cachedPlatform = 'unknown';
     return cachedPlatform;
   }
   if (!inFlight) {
-    inFlight = import('@tauri-apps/plugin-os').then(({ platform }) => {
+    inFlight = import('@/lib/backend/shell').then(({ platform }) => {
       cachedPlatform = platform() as Platform;
       return cachedPlatform;
     });

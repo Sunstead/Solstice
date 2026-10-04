@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { assetUrl } from '@/lib/backend/shell';
 
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { isWithin } from '@/lib/path-utils';
 
@@ -27,7 +27,7 @@ function immediate(path: string): AssetUrl {
   // frame at all. Only files from elsewhere pay for one.
   const workspace = useWorkspace.getState().path;
   if (granted.has(path) || (workspace && isWithin(path, workspace))) {
-    return { status: 'ready', url: convertFileSrc(path) };
+    return { status: 'ready', url: assetUrl(path) };
   }
 
   return { status: 'loading' };
@@ -63,7 +63,7 @@ export function useAssetUrl(path: string): AssetUrl {
         }
 
         granted.add(path);
-        setState({ status: 'ready', url: convertFileSrc(path) });
+        setState({ status: 'ready', url: assetUrl(path) });
       })
       .catch((error: unknown) => {
         if (!cancelled) setState({ status: 'error', message: String(error) });
