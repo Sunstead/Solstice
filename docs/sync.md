@@ -167,7 +167,7 @@ Atlas. `SOLSTICE_DEV_USER` signs everyone in as one user, for development.
 
 | Route | Who | |
 |---|---|---|
-| `GET /healthz`, `GET /v1/info` | anyone | Info says how to sign in, and the protocol version. |
+| `GET /`, `GET /healthz`, `GET /v1/info` | anyone | Info says how to sign in, and the protocol version. |
 | `GET /v1/vaults` | apps, tokens | The user's vaults. |
 | `POST /v1/vaults` `{name}` | apps | A vault is a folder name. |
 | `POST /v1/vaults/{id}/notes` `{path, text}` | apps, tokens | Returns `{id, path}`; a taken path gets the next number. |
