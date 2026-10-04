@@ -270,6 +270,7 @@ export const webCommands: Commands = {
   listUserThemes: () => Promise.resolve({ status: 'ok', data: [] }),
   ensureThemeDir: () => desktopOnly('A themes folder'),
   listSystemFonts: () => Promise.resolve({ status: 'ok', data: [] }),
+  syncAccount: () => attempt(async () => (await apiJson<{ username: string }>('/v1/me')).username),
   syncServerInfo: () => desktopOnly('Linking a folder to sync'),
   syncSignIn: () => desktopOnly('Signing in to sync'),
   syncSignOut: () => desktopOnly('Signing out of sync'),

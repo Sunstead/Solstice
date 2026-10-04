@@ -53,6 +53,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             sync::sync_server_info,
             sync::sync_sign_in,
             sync::sync_sign_out,
+            sync::sync_account,
             sync::sync_vaults,
             sync::sync_create_vault,
             sync::sync_create_token,

@@ -115,6 +115,8 @@ export const commands = {
 	syncServerInfo: (server: string) => typedError<SyncServerInfo, string>(__TAURI_INVOKE("sync_server_info", { server })),
 	syncSignIn: (server: string) => typedError<null, string>(__TAURI_INVOKE("sync_sign_in", { server })),
 	syncSignOut: (server: string) => typedError<null, string>(__TAURI_INVOKE("sync_sign_out", { server })),
+	/**  Who's signed in to `server`, or `None` when nobody is. */
+	syncAccount: (server: string) => typedError<string | null, string>(__TAURI_INVOKE("sync_account", { server })),
 	syncVaults: (server: string) => typedError<SyncVault[], string>(__TAURI_INVOKE("sync_vaults", { server })),
 	syncCreateVault: (server: string, name: string) => typedError<SyncVault, string>(__TAURI_INVOKE("sync_create_vault", { server, name })),
 	/**  An API token for Atlas (it can only list vaults and create notes). */

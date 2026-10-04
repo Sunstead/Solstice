@@ -11,8 +11,6 @@ import {
 import type { ILayoutApi } from 'flexlayout-react';
 import 'flexlayout-react/style/alpha_dark.css';
 import {
-  ArrowLeft,
-  ArrowRight,
   ChevronDown,
   Maximize,
   Minimize,
@@ -36,13 +34,12 @@ import {
   findCornerTabset,
   syncTopEdgeTabsetDrag,
 } from '@/lib/flexlayout-utils';
-import { useSidebar } from '@sunstead/ui/components/resizable-sidebar';
-import { AppMenubar } from './app-menu-dropdown';
+import { HeaderControlsSpacer } from './header-controls';
 import { getFileIcon } from '@/assets/icons';
 import { getFileExtension } from '@/lib/utils';
 import { Button } from '@sunstead/ui/components/button';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
-import { registerCommand, runCommand, unregisterCommand } from '@/lib/commands';
+import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { stripPresetExtension } from '@/lib/stores/entry-input';
 import { useSetting } from '@/lib/settings/store';
 import { TabCloseIcon } from './tab-close-icon';
@@ -76,7 +73,6 @@ export default function FlexLayoutRoot() {
   const workspacePath = useWorkspace((s) => s.path);
   const containerRef = useRef<HTMLDivElement>(null);
   const isMac = useIsMac();
-  const { open: isSidebarOpen } = useSidebar();
   // Subscribed here so flipping the setting re-renders <Layout>, which is what
   // makes onRenderTab below run again with the new value.
   const showExtensions = useSetting('explorer.showFileExtensions');
@@ -113,9 +109,6 @@ export default function FlexLayoutRoot() {
   );
 
   const { visit } = useNavigationHistory();
-
-  const canGoBack = useNavigationHistory((s) => s.past.length > 0);
-  const canGoForward = useNavigationHistory((s) => s.future.length > 0);
 
   const modelRef = useRef<Model | null>(null);
   useEffect(() => {
@@ -336,28 +329,10 @@ export default function FlexLayoutRoot() {
             </Button>,
           );
 
-          if (node === topLeftTabset && !isSidebarOpen) {
-            renderValues.leading = (
-              <div className='no-drag flex h-full items-center gap-x-1'>
-                {isMac ? <span className='w-8' /> : <AppMenubar />}
-                <Button
-                  variant='ghost'
-                  size='icon-sm'
-                  disabled={!canGoBack}
-                  onClick={() => runCommand('navigation.back')}
-                >
-                  <ArrowLeft />
-                </Button>
-                <Button
-                  variant='ghost'
-                  size='icon-sm'
-                  disabled={!canGoForward}
-                  onClick={() => runCommand('navigation.forward')}
-                >
-                  <ArrowRight />
-                </Button>
-              </div>
-            );
+          // The header controls overhang this tabset when the sidebar is
+          // collapsed; the spacer makes room for them.
+          if (node === topLeftTabset) {
+            renderValues.leading = <HeaderControlsSpacer />;
           }
 
           // A browser tab has its own window controls.
