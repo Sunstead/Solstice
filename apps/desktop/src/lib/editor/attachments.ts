@@ -1,4 +1,4 @@
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { applyFsChanges, selfChange } from '@/lib/fs-sync';
 import { joinPath, parentOf, relativeFromDirectory } from '@/lib/path-utils';
 import { getSetting } from '@/lib/settings/store';

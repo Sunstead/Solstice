@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
-import { message } from '@tauri-apps/plugin-dialog';
-import { commands } from '@/bindings';
+import { getCurrent, onOpenUrl } from '@/lib/backend/shell';
+import { message } from '@/lib/backend/shell';
+import { commands } from '@/lib/backend';
 import { useLayout } from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { folderName, parseDeepLink, workspacesForVault } from '@/lib/deep-link';

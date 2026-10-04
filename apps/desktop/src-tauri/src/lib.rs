@@ -76,7 +76,10 @@ pub fn run() {
     // Regenerates bindings.ts on every `tauri dev` build so the frontend
     // types can never drift from the Rust command/event definitions.
     #[cfg(debug_assertions)]
-    export_bindings(std::path::Path::new("../src/bindings.ts"));
+    {
+        export_bindings(std::path::Path::new("../src/bindings.ts"));
+        export_registry(std::path::Path::new(REGISTRY_PATH));
+    }
 
     let app = tauri::Builder::default();
 
@@ -198,6 +201,23 @@ pub fn export_bindings(path: &std::path::Path) {
         .expect("failed to export typescript bindings");
 }
 
+/// Where [`registry_json`] goes, from `src-tauri`.
+pub const REGISTRY_PATH: &str = "../src/lib/backend/registry.json";
+
+/// The default command registry and menus. The web app has no Rust to ask
+/// for them, so it reads this copy; written with the bindings, and checked
+/// with them.
+pub fn registry_json() -> String {
+    let commands = commands::command_registry::default_commands();
+    let menus = commands::menu_layout::menu_layout_for(&commands);
+    let value = serde_json::json!({ "commands": commands, "menus": menus });
+    serde_json::to_string_pretty(&value).expect("the registry serializes") + "\n"
+}
+
+pub fn export_registry(path: &std::path::Path) {
+    std::fs::write(path, registry_json()).expect("failed to write the command registry");
+}
+
 // Windows test binaries can't load once they reference the app's UI code
 // (Tauri embeds the manifest that needs only into the real executable), so
 // this runs on macOS and Linux, which is where CI is.
@@ -213,6 +233,10 @@ mod bindings {
         assert!(
             fresh_text == committed,
             "src/bindings.ts is stale: run `cargo run -p solstice -- --export-bindings` in apps/desktop/src-tauri"
+        );
+        assert!(
+            super::registry_json() == read(std::path::Path::new(super::REGISTRY_PATH)),
+            "src/lib/backend/registry.json is stale: run `cargo run -p solstice -- --export-bindings` in apps/desktop/src-tauri"
         );
     }
 }

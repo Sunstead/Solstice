@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { CommandId, commands, events, type CommandMeta } from "@/bindings";
+import { commands, events } from "@/lib/backend";
+import { CommandId, type CommandMeta } from "@/bindings";
 
 interface KeymapState {
   commands: CommandMeta[];

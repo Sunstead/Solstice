@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openUrl } from '@/lib/backend/shell';
 import { Check, Copy, ExternalLink, Link2Off, Pencil } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';

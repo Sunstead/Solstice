@@ -274,8 +274,13 @@ pub fn resolve_app_menu(app: &AppHandle) -> Vec<ResolvedMenuEntry> {
 }
 
 pub fn resolve_menu_layout(app: &AppHandle) -> Vec<ResolvedMenu> {
-    let commands = resolved_commands(app);
-    let lookup = command_lookup(&commands);
+    menu_layout_for(&resolved_commands(app))
+}
+
+/// The menus for these commands, accelerators included. Needs no app, so
+/// the web app's copy can be exported (`registry_json` in lib.rs).
+pub fn menu_layout_for(commands: &[CommandMeta]) -> Vec<ResolvedMenu> {
+    let lookup = command_lookup(commands);
 
     menu_spec()
         .into_iter()

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
-import { commands, type FileEntry } from '@/bindings';
+import { commands } from '@/lib/backend';
+import { type FileEntry } from '@/bindings';
 import {
   basename,
   indexKey,

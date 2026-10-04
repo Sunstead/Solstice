@@ -3,7 +3,8 @@ import { RotateCcw } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { cn } from '@/lib/utils';
-import { commands, type CommandMeta } from '@/bindings';
+import { commands } from '@/lib/backend';
+import { type CommandMeta } from '@/bindings';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { KeybindRecorder } from './keybind-recorder';
 

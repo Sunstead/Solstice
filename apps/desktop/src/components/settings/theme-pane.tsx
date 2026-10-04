@@ -1,10 +1,10 @@
 import { useEffect, type CSSProperties } from 'react';
 import { AlertTriangle, Check, FolderOpen, RefreshCw } from 'lucide-react';
-import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { revealItemInDir } from '@/lib/backend/shell';
 
 import { Button } from '@sunstead/ui/components/button';
 import { cn } from '@/lib/utils';
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { setSetting, useSetting } from '@/lib/settings/store';
 import { hasOpenWorkspace } from '@/lib/stores/scoped-storage';
 import { DEFAULT_LIGHT_THEME_ID, DEFAULT_THEME_ID } from '@/lib/theme/builtin';

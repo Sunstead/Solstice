@@ -1,6 +1,7 @@
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@/lib/backend/window';
 
-import { commands, events, type FsChange } from '@/bindings';
+import { commands, events } from '@/lib/backend';
+import { type FsChange } from '@/bindings';
 import { getSetting, subscribeToSetting } from '@/lib/settings/store';
 import { useFiles } from '@/hooks/use-files';
 import { useWorkspace } from '@/hooks/use-workspace';

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { commands, unwrap } from '@/lib/backend';
 
 import { ScrollArea } from '@sunstead/ui/components/scroll-area';
 import { MilkdownEditorWrapper } from './milkdown-editor';
@@ -21,7 +21,7 @@ export function FileEditor({ path }: FileEditorProps) {
     setContent(null); // reset so a stale doc from the previous file never flashes
     if (!path) return;
 
-    invoke<string>('read_file', { path })
+    unwrap(commands.readFile(path))
       .then((text) => {
         if (!cancelled) setContent(text);
       })

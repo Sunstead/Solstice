@@ -1,4 +1,4 @@
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 
 export type FontKind = 'sans' | 'serif' | 'mono';
 

@@ -1,0 +1,732 @@
+{
+  "commands": [
+    {
+      "accelerator": "CmdOrCtrl+,",
+      "id": "app.settings",
+      "is_overridden": false,
+      "label": "Settings..."
+    },
+    {
+      "accelerator": "CmdOrCtrl+N",
+      "id": "file.new_note",
+      "is_overridden": false,
+      "label": "New Note"
+    },
+    {
+      "accelerator": null,
+      "id": "file.new_canvas",
+      "is_overridden": false,
+      "label": "New Canvas"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+N",
+      "id": "file.new_folder",
+      "is_overridden": false,
+      "label": "New Folder"
+    },
+    {
+      "accelerator": "CmdOrCtrl+O",
+      "id": "file.open_file",
+      "is_overridden": false,
+      "label": "Open File"
+    },
+    {
+      "accelerator": "CmdOrCtrl+T",
+      "id": "file.new_tab",
+      "is_overridden": false,
+      "label": "New Tab"
+    },
+    {
+      "accelerator": "CmdOrCtrl+W",
+      "id": "file.close_tab",
+      "is_overridden": false,
+      "label": "Close Tab"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Shift+O",
+      "id": "file.open_folder",
+      "is_overridden": false,
+      "label": "Open Folder"
+    },
+    {
+      "accelerator": null,
+      "id": "file.reveal_in_explorer",
+      "is_overridden": false,
+      "label": "Reveal in Explorer"
+    },
+    {
+      "accelerator": null,
+      "id": "file.reveal_in_system",
+      "is_overridden": false,
+      "label": "Show in File Explorer"
+    },
+    {
+      "accelerator": null,
+      "id": "file.open_in_default_app",
+      "is_overridden": false,
+      "label": "Open in Default App"
+    },
+    {
+      "accelerator": null,
+      "id": "file.copy_path",
+      "is_overridden": false,
+      "label": "Copy Absolute Path"
+    },
+    {
+      "accelerator": null,
+      "id": "file.copy_relative_path",
+      "is_overridden": false,
+      "label": "Copy Relative Path"
+    },
+    {
+      "accelerator": null,
+      "id": "file.copy_wikilink",
+      "is_overridden": false,
+      "label": "Copy Wikilink"
+    },
+    {
+      "accelerator": "F2",
+      "id": "file.rename",
+      "is_overridden": false,
+      "label": "Rename..."
+    },
+    {
+      "accelerator": null,
+      "id": "file.duplicate",
+      "is_overridden": false,
+      "label": "Duplicate"
+    },
+    {
+      "accelerator": null,
+      "id": "file.move_to",
+      "is_overridden": false,
+      "label": "Move to..."
+    },
+    {
+      "accelerator": null,
+      "id": "file.delete",
+      "is_overridden": false,
+      "label": "Delete"
+    },
+    {
+      "accelerator": "CmdOrCtrl+B",
+      "id": "edit.bold",
+      "is_overridden": false,
+      "label": "Bold"
+    },
+    {
+      "accelerator": "CmdOrCtrl+I",
+      "id": "edit.italic",
+      "is_overridden": false,
+      "label": "Italic"
+    },
+    {
+      "accelerator": "CmdOrCtrl+E",
+      "id": "edit.inline_code",
+      "is_overridden": false,
+      "label": "Inline code"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+X",
+      "id": "edit.strikethrough",
+      "is_overridden": false,
+      "label": "Strikethrough"
+    },
+    {
+      "accelerator": "CmdOrCtrl+F",
+      "id": "edit.find",
+      "is_overridden": false,
+      "label": "Find..."
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+1",
+      "id": "edit.heading1",
+      "is_overridden": false,
+      "label": "Heading 1"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+2",
+      "id": "edit.heading2",
+      "is_overridden": false,
+      "label": "Heading 2"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+3",
+      "id": "edit.heading3",
+      "is_overridden": false,
+      "label": "Heading 3"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+4",
+      "id": "edit.heading4",
+      "is_overridden": false,
+      "label": "Heading 4"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+5",
+      "id": "edit.heading5",
+      "is_overridden": false,
+      "label": "Heading 5"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+6",
+      "id": "edit.heading6",
+      "is_overridden": false,
+      "label": "Heading 6"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Shift+B",
+      "id": "edit.blockquote",
+      "is_overridden": false,
+      "label": "Blockquote"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+8",
+      "id": "edit.bullet_list",
+      "is_overridden": false,
+      "label": "Bullet list"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+7",
+      "id": "edit.ordered_list",
+      "is_overridden": false,
+      "label": "Ordered list"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+C",
+      "id": "edit.code_block",
+      "is_overridden": false,
+      "label": "Code block"
+    },
+    {
+      "accelerator": "Shift+Enter",
+      "id": "edit.hard_break",
+      "is_overridden": false,
+      "label": "Insert hard break"
+    },
+    {
+      "accelerator": "CmdOrCtrl+Alt+0",
+      "id": "edit.paragraph",
+      "is_overridden": false,
+      "label": "Paragraph"
+    },
+    {
+      "accelerator": null,
+      "id": "edit.insert_image",
+      "is_overridden": false,
+      "label": "Insert image..."
+    },
+    {
+      "accelerator": "CmdOrCtrl+Shift+E",
+      "id": "view.toggle_sidebar",
+      "is_overridden": false,
+      "label": "Toggle sidebar"
+    },
+    {
+      "accelerator": "Alt+ArrowLeft",
+      "id": "navigation.back",
+      "is_overridden": false,
+      "label": "Go Back"
+    },
+    {
+      "accelerator": "Alt+ArrowRight",
+      "id": "navigation.forward",
+      "is_overridden": false,
+      "label": "Go Forward"
+    },
+    {
+      "accelerator": null,
+      "id": "canvas.new_text",
+      "is_overridden": false,
+      "label": "New Card"
+    },
+    {
+      "accelerator": null,
+      "id": "canvas.new_file",
+      "is_overridden": false,
+      "label": "New File Card..."
+    },
+    {
+      "accelerator": null,
+      "id": "canvas.new_group",
+      "is_overridden": false,
+      "label": "New Group"
+    },
+    {
+      "accelerator": null,
+      "id": "canvas.zoom_to_fit",
+      "is_overridden": false,
+      "label": "Zoom to Fit"
+    },
+    {
+      "accelerator": null,
+      "id": "canvas.zoom_to_selection",
+      "is_overridden": false,
+      "label": "Zoom to Selection"
+    },
+    {
+      "accelerator": null,
+      "id": "canvas.toggle_snap",
+      "is_overridden": false,
+      "label": "Snap to Grid"
+    },
+    {
+      "accelerator": null,
+      "id": "canvas.toggle_minimap",
+      "is_overridden": false,
+      "label": "Show Minimap"
+    }
+  ],
+  "menus": [
+    {
+      "entries": [
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+N",
+            "id": "file.new_note",
+            "is_overridden": false,
+            "label": "New Note"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": null,
+            "id": "file.new_canvas",
+            "is_overridden": false,
+            "label": "New Canvas"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+Alt+N",
+            "id": "file.new_folder",
+            "is_overridden": false,
+            "label": "New Folder"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+T",
+            "id": "file.new_tab",
+            "is_overridden": false,
+            "label": "New Tab"
+          }
+        },
+        "Separator",
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+O",
+            "id": "file.open_file",
+            "is_overridden": false,
+            "label": "Open File"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+Shift+O",
+            "id": "file.open_folder",
+            "is_overridden": false,
+            "label": "Open Folder"
+          }
+        },
+        "Separator",
+        {
+          "Submenu": {
+            "entries": [
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.reveal_in_explorer",
+                  "is_overridden": false,
+                  "label": "Reveal in Explorer"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.reveal_in_system",
+                  "is_overridden": false,
+                  "label": "Show in File Explorer"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.open_in_default_app",
+                  "is_overridden": false,
+                  "label": "Open in Default App"
+                }
+              },
+              "Separator",
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.copy_path",
+                  "is_overridden": false,
+                  "label": "Copy Absolute Path"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.copy_relative_path",
+                  "is_overridden": false,
+                  "label": "Copy Relative Path"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.copy_wikilink",
+                  "is_overridden": false,
+                  "label": "Copy Wikilink"
+                }
+              },
+              "Separator",
+              {
+                "Command": {
+                  "accelerator": "F2",
+                  "id": "file.rename",
+                  "is_overridden": false,
+                  "label": "Rename..."
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.duplicate",
+                  "is_overridden": false,
+                  "label": "Duplicate"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.move_to",
+                  "is_overridden": false,
+                  "label": "Move to..."
+                }
+              },
+              "Separator",
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.delete",
+                  "is_overridden": false,
+                  "label": "Delete"
+                }
+              }
+            ],
+            "title": "Current File"
+          }
+        },
+        "Separator",
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+W",
+            "id": "file.close_tab",
+            "is_overridden": false,
+            "label": "Close Tab"
+          }
+        },
+        "Separator",
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+,",
+            "id": "app.settings",
+            "is_overridden": false,
+            "label": "Settings..."
+          }
+        }
+      ],
+      "title": "File"
+    },
+    {
+      "entries": [
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+F",
+            "id": "edit.find",
+            "is_overridden": false,
+            "label": "Find..."
+          }
+        },
+        "Separator",
+        {
+          "Native": {
+            "accelerator": "CmdOrCtrl+Z",
+            "item": "Undo",
+            "label": "Undo"
+          }
+        },
+        {
+          "Native": {
+            "accelerator": "CmdOrCtrl+Shift+Z",
+            "item": "Redo",
+            "label": "Redo"
+          }
+        },
+        "Separator",
+        {
+          "Native": {
+            "accelerator": "CmdOrCtrl+X",
+            "item": "Cut",
+            "label": "Cut"
+          }
+        },
+        {
+          "Native": {
+            "accelerator": "CmdOrCtrl+C",
+            "item": "Copy",
+            "label": "Copy"
+          }
+        },
+        {
+          "Native": {
+            "accelerator": "CmdOrCtrl+V",
+            "item": "Paste",
+            "label": "Paste"
+          }
+        },
+        {
+          "Native": {
+            "accelerator": "CmdOrCtrl+A",
+            "item": "SelectAll",
+            "label": "Select All"
+          }
+        }
+      ],
+      "title": "Edit"
+    },
+    {
+      "entries": [
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+Shift+E",
+            "id": "view.toggle_sidebar",
+            "is_overridden": false,
+            "label": "Toggle sidebar"
+          }
+        },
+        "Separator",
+        {
+          "Submenu": {
+            "entries": [
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "canvas.new_text",
+                  "is_overridden": false,
+                  "label": "New Card"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "canvas.new_file",
+                  "is_overridden": false,
+                  "label": "New File Card..."
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "canvas.new_group",
+                  "is_overridden": false,
+                  "label": "New Group"
+                }
+              },
+              "Separator",
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "canvas.zoom_to_fit",
+                  "is_overridden": false,
+                  "label": "Zoom to Fit"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "canvas.zoom_to_selection",
+                  "is_overridden": false,
+                  "label": "Zoom to Selection"
+                }
+              },
+              "Separator",
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "canvas.toggle_snap",
+                  "is_overridden": false,
+                  "label": "Snap to Grid"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "canvas.toggle_minimap",
+                  "is_overridden": false,
+                  "label": "Show Minimap"
+                }
+              }
+            ],
+            "title": "Canvas"
+          }
+        }
+      ],
+      "title": "View"
+    },
+    {
+      "entries": [
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+B",
+            "id": "edit.bold",
+            "is_overridden": false,
+            "label": "Bold"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+I",
+            "id": "edit.italic",
+            "is_overridden": false,
+            "label": "Italic"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+E",
+            "id": "edit.inline_code",
+            "is_overridden": false,
+            "label": "Inline code"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+Alt+X",
+            "id": "edit.strikethrough",
+            "is_overridden": false,
+            "label": "Strikethrough"
+          }
+        },
+        "Separator",
+        {
+          "Submenu": {
+            "entries": [
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+0",
+                  "id": "edit.paragraph",
+                  "is_overridden": false,
+                  "label": "Paragraph"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+1",
+                  "id": "edit.heading1",
+                  "is_overridden": false,
+                  "label": "Heading 1"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+2",
+                  "id": "edit.heading2",
+                  "is_overridden": false,
+                  "label": "Heading 2"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+3",
+                  "id": "edit.heading3",
+                  "is_overridden": false,
+                  "label": "Heading 3"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+4",
+                  "id": "edit.heading4",
+                  "is_overridden": false,
+                  "label": "Heading 4"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+5",
+                  "id": "edit.heading5",
+                  "is_overridden": false,
+                  "label": "Heading 5"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+6",
+                  "id": "edit.heading6",
+                  "is_overridden": false,
+                  "label": "Heading 6"
+                }
+              },
+              "Separator",
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Shift+B",
+                  "id": "edit.blockquote",
+                  "is_overridden": false,
+                  "label": "Blockquote"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+8",
+                  "id": "edit.bullet_list",
+                  "is_overridden": false,
+                  "label": "Bullet list"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+7",
+                  "id": "edit.ordered_list",
+                  "is_overridden": false,
+                  "label": "Ordered list"
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+C",
+                  "id": "edit.code_block",
+                  "is_overridden": false,
+                  "label": "Code block"
+                }
+              }
+            ],
+            "title": "Turn into"
+          }
+        },
+        "Separator",
+        {
+          "Command": {
+            "accelerator": null,
+            "id": "edit.insert_image",
+            "is_overridden": false,
+            "label": "Insert image..."
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "Shift+Enter",
+            "id": "edit.hard_break",
+            "is_overridden": false,
+            "label": "Insert hard break"
+          }
+        }
+      ],
+      "title": "Format"
+    }
+  ]
+}

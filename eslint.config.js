@@ -54,4 +54,31 @@ export default tseslint.config(
       'react-hooks/static-components': 'warn',
     },
   },
+  {
+    // Everything that reaches Tauri goes through src/lib/backend, so the UI
+    // also runs as the web app. Types from the bindings are fine anywhere.
+    files: ['apps/desktop/src/**/*.{ts,tsx}'],
+    ignores: ['apps/desktop/src/lib/backend/**'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@tauri-apps/*'],
+              message: 'Reach Tauri through @/lib/backend, so the web app can run this too.',
+            },
+          ],
+          paths: [
+            {
+              name: '@/bindings',
+              importNames: ['commands', 'events'],
+              allowTypeImports: true,
+              message: 'Import commands and events from @/lib/backend.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

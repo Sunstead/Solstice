@@ -1,4 +1,4 @@
-import { commands } from '@/bindings';
+import { commands } from '@/lib/backend';
 import { getSetting, subscribeToSetting } from '@/lib/settings/store';
 import { setBufferDirty } from '@/lib/stores/buffer-status';
 import { clearAbandoned, isAbandoned } from '@/lib/stores/external-changes';

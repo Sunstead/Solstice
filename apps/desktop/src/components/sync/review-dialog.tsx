@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import { commands, type SyncReview, type SyncVersions } from '@/bindings';
+import { commands } from '@/lib/backend';
+import { type SyncReview, type SyncVersions } from '@/bindings';
 import { Button } from '@sunstead/ui/components/button';
 import {
   Dialog,

@@ -1,5 +1,5 @@
 import { ExternalLink, Link2 } from 'lucide-react';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openUrl } from '@/lib/backend/shell';
 
 import { isSafeExternalHref } from '@/lib/link/url';
 import type { LinkNode } from '@/lib/canvas/types';

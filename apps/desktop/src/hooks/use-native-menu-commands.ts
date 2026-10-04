@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { events } from '@/bindings';
+import { events } from '@/lib/backend';
 import { runCommand } from '../lib/commands';
 
 /**

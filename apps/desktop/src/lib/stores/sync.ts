@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { create } from 'zustand';
 
-import { commands, events, type SyncInfo, type SyncReview } from '@/bindings';
+import { commands, events } from '@/lib/backend';
+import { type SyncInfo, type SyncReview } from '@/bindings';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { normalizePath } from '@/lib/path-utils';
 

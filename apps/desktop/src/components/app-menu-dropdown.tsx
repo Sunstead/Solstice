@@ -12,13 +12,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@sunstead/ui/components/dropdown-menu';
-import {
-  commands,
-  events,
-  type ResolvedMenu,
-  type ResolvedMenuEntry,
-  type NativeItem,
-} from '@/bindings';
+import { commands, events } from '@/lib/backend';
+import { type ResolvedMenu, type ResolvedMenuEntry, type NativeItem } from '@/bindings';
 import { isCommandEnabled, NativeCommandId, runCommand } from '@/lib/commands';
 import { toDisplayFormat } from '@/lib/accelerator';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
