@@ -75,12 +75,7 @@ pub fn run() {
     // Regenerates bindings.ts on every `tauri dev` build so the frontend
     // types can never drift from the Rust command/event definitions.
     #[cfg(debug_assertions)]
-    builder
-        .export(
-            specta_typescript::Typescript::default(),
-            "../src/bindings.ts", // adjust to wherever your frontend src/ lives
-        )
-        .expect("failed to export typescript bindings");
+    export_bindings(std::path::Path::new("../src/bindings.ts"));
 
     let app = tauri::Builder::default();
 
@@ -193,4 +188,30 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+/// Writes the frontend's command and event bindings (`src/bindings.ts`).
+/// Debug runs do it on startup; `solstice --export-bindings` does it alone.
+pub fn export_bindings(path: &std::path::Path) {
+    specta_builder()
+        .export(specta_typescript::Typescript::default(), path)
+        .expect("failed to export typescript bindings");
+}
+
+// Windows test binaries can't load once they reference the app's UI code
+// (Tauri embeds the manifest that needs only into the real executable), so
+// this runs on macOS and Linux, which is where CI is.
+#[cfg(all(test, not(windows)))]
+mod bindings {
+    #[test]
+    fn bindings_are_current() {
+        let read = |p: &std::path::Path| std::fs::read_to_string(p).unwrap_or_default().replace("\r\n", "\n");
+        let fresh = std::env::temp_dir().join(format!("solstice-bindings-{}.ts", std::process::id()));
+        super::export_bindings(&fresh);
+        let (fresh_text, committed) = (read(&fresh), read(std::path::Path::new("../src/bindings.ts")));
+        let _ = std::fs::remove_file(&fresh);
+        assert!(
+            fresh_text == committed,
+            "src/bindings.ts is stale: run `cargo run -p solstice -- --export-bindings` in apps/desktop/src-tauri"
+        );
+    }
 }

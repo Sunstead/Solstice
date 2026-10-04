@@ -1,6 +1,7 @@
 import type * as React from 'react';
 import type { SectionId } from '@/lib/settings/sections';
 import { KeybindingsPane } from './keybindings-pane';
+import { SyncPane } from './sync-pane';
 import { ThemePane } from './theme-pane';
 import { TypographyPane } from './typography-pane';
 
@@ -13,4 +14,5 @@ export const customPanes: Partial<Record<SectionId, React.ComponentType>> = {
   appearance: ThemePane,
   typography: TypographyPane,
   keybindings: KeybindingsPane,
+  sync: SyncPane,
 };

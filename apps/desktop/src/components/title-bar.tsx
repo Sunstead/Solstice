@@ -12,6 +12,7 @@ import { AppMenubar } from './app-menu-dropdown';
 import { Button } from './ui/button';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { runCommand } from '@/lib/commands';
+import { SyncIndicator } from './sync/status';
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
@@ -79,6 +80,7 @@ export default function TitleBar() {
             >
               <ArrowRight />
             </Button>
+            <SyncIndicator />
           </div>
         </div>
       </div>

@@ -112,6 +112,40 @@ export const commands = {
 	 *  lazily the first time a font control is opened and caches the result.
 	 */
 	listSystemFonts: () => typedError<string[], string>(__TAURI_INVOKE("list_system_fonts")),
+	syncServerInfo: (server: string) => typedError<SyncServerInfo, string>(__TAURI_INVOKE("sync_server_info", { server })),
+	syncSignIn: (server: string) => typedError<null, string>(__TAURI_INVOKE("sync_sign_in", { server })),
+	syncSignOut: (server: string) => typedError<null, string>(__TAURI_INVOKE("sync_sign_out", { server })),
+	syncVaults: (server: string) => typedError<SyncVault[], string>(__TAURI_INVOKE("sync_vaults", { server })),
+	syncCreateVault: (server: string, name: string) => typedError<SyncVault, string>(__TAURI_INVOKE("sync_create_vault", { server, name })),
+	/**  An API token for Atlas (it can only list vaults and create notes). */
+	syncCreateToken: (server: string, name: string) => typedError<string, string>(__TAURI_INVOKE("sync_create_token", { server, name })),
+	/**  Links the window's workspace to a vault and starts syncing it. */
+	syncLink: (server: string, vaultId: string, vaultName: string) => typedError<SyncLinkReport, string>(__TAURI_INVOKE("sync_link", { server, vaultId, vaultName })),
+	/**
+	 *  Stops syncing the window's workspace and forgets its link. Its files
+	 *  stay as they are.
+	 */
+	syncUnlink: () => typedError<null, string>(__TAURI_INVOKE("sync_unlink")),
+	/**  The window's workspace's sync, or `None` if it isn't linked. */
+	syncStatus: () => typedError<{
+	server: string,
+	vault_id: string,
+	vault_name: string,
+	device: string,
+	state: string,
+	message: string | null,
+	reviews: number,
+} | null, string>(__TAURI_INVOKE("sync_status")),
+	syncReconnect: () => typedError<null, string>(__TAURI_INVOKE("sync_reconnect")),
+	syncReviews: () => typedError<SyncReview[], string>(__TAURI_INVOKE("sync_reviews")),
+	syncReviewVersions: (id: string) => typedError<SyncVersions, string>(__TAURI_INVOKE("sync_review_versions", { id })),
+	/**  Clears a review, first saving `text` as the note if given. */
+	syncResolveReview: (id: string, text: string | null) => typedError<null, string>(__TAURI_INVOKE("sync_resolve_review", { id, text })),
+	/**
+	 *  An editor loaded (or reloaded) a file's text. Its later saves are merged
+	 *  against exactly this.
+	 */
+	syncEditorOpened: (path: string, text: string) => __TAURI_INVOKE<void>("sync_editor_opened", { path, text }),
 };
 
 /** Events */
@@ -119,6 +153,7 @@ export const events = {
 	fileSystemChanged: makeEvent<FileSystemChanged>("file-system-changed"),
 	keymapChanged: makeEvent<KeymapChanged>("keymap-changed"),
 	menuCommand: makeEvent<MenuCommand>("menu-command"),
+	syncChanged: makeEvent<SyncChanged>("sync-changed"),
 };
 
 /* Types */
@@ -202,6 +237,64 @@ export type ResolvedMenuEntry = ({ Command: CommandMeta }) & { Native?: never; S
 	title: string,
 	entries: ResolvedMenuEntry[],
 } }) & { Command?: never; Native?: never };
+
+/**  Something about a workspace's sync changed (status, reviews): ask again. */
+export type SyncChanged = {
+	root: string,
+};
+
+/**
+ *  `state` is `connecting`, `syncing`, `synced`, `offline`, `signed_out` or
+ *  `relink`.
+ */
+export type SyncInfo = {
+	server: string,
+	vault_id: string,
+	vault_name: string,
+	device: string,
+	state: string,
+	message: string | null,
+	reviews: number,
+};
+
+export type SyncLinkReport = {
+	same: number,
+	downloaded: number,
+	uploaded: number,
+	kept_both: string[],
+};
+
+export type SyncReview = {
+	id: string,
+	path: string | null,
+	/**
+	 *  `overlap` (two devices edited the same text) or `restored` (edited
+	 *  on one device while deleted on another).
+	 */
+	kind: string,
+	/**  Unix milliseconds. */
+	at: number | null,
+	device: string,
+};
+
+export type SyncServerInfo = {
+	version: string,
+	/**  `oidc` or `dev` (a development server: no sign-in). */
+	auth: string,
+	signed_in: boolean,
+};
+
+export type SyncVault = {
+	id: string,
+	name: string,
+};
+
+export type SyncVersions = {
+	base: string | null,
+	local: string | null,
+	remote: string | null,
+	merged: string,
+};
 
 /**
  *  One theme file as found on disk. The contents are handed over unparsed:
