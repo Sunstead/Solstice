@@ -141,11 +141,15 @@ export const commands = {
 	syncReviewVersions: (id: string) => typedError<SyncVersions, string>(__TAURI_INVOKE("sync_review_versions", { id })),
 	/**  Clears a review, first saving `text` as the note if given. */
 	syncResolveReview: (id: string, text: string | null) => typedError<null, string>(__TAURI_INVOKE("sync_resolve_review", { id, text })),
+	syncEditorOpened: (path: string, text: string) => __TAURI_INVOKE<void>("sync_editor_opened", { path, text }),
 	/**
 	 *  An editor loaded (or reloaded) a file's text. Its later saves are merged
 	 *  against exactly this.
+	 *  The sync vault each folder is linked to (`None` if it isn't), so a
+	 *  `solstice://open?vault=` link finds a folder by its vault's name even
+	 *  when the folder is named differently.
 	 */
-	syncEditorOpened: (path: string, text: string) => __TAURI_INVOKE<void>("sync_editor_opened", { path, text }),
+	syncVaultNames: (paths: string[]) => __TAURI_INVOKE<(string | null)[]>("sync_vault_names", { paths }),
 };
 
 /** Events */

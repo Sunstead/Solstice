@@ -64,6 +64,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             sync::sync_review_versions,
             sync::sync_resolve_review,
             sync::sync_editor_opened,
+            sync::sync_vault_names,
         ])
         .events(tauri_specta::collect_events![KeymapChanged, MenuCommand, FileSystemChanged, sync::SyncChanged])
 }

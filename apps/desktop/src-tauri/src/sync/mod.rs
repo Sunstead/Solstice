@@ -412,6 +412,22 @@ pub async fn sync_resolve_review(
 
 /// An editor loaded (or reloaded) a file's text. Its later saves are merged
 /// against exactly this.
+/// The sync vault each folder is linked to (`None` if it isn't), so a
+/// `solstice://open?vault=` link finds a folder by its vault's name even
+/// when the folder is named differently.
+#[tauri::command]
+#[specta::specta]
+pub async fn sync_vault_names(paths: Vec<String>) -> Vec<Option<String>> {
+    tokio::task::spawn_blocking(move || {
+        paths
+            .iter()
+            .map(|p| solstice_sync_client::read_link(Path::new(p)).ok().map(|l| l.vault_name))
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn sync_editor_opened(app: AppHandle, path: String, text: String) {

@@ -19,14 +19,27 @@ async function openDeepLink(raw: string) {
     return;
   }
 
+  // Which sync vault each known folder is linked to, if any.
+  const known = useKnownWorkspaces.getState().workspaces;
+  const current = useWorkspace.getState().path;
+  const paths = [...new Set([...known.map((w) => w.path), ...(current ? [current] : [])])];
+  const names = await commands.syncVaultNames(paths).catch(() => [] as (string | null)[]);
+  const linked = new Map(paths.flatMap((p, i) => (names[i] ? [[p, names[i]] as const] : [])));
+
   // The open workspace wins when it matches, so a link never switches away
   // from the vault being worked in.
-  const current = useWorkspace.getState().path;
-  let root = current && folderName(current).toLowerCase() === link.vault.toLowerCase() ? current : null;
+  const wanted = link.vault.toLowerCase();
+  let root =
+    current &&
+    (linked.get(current)?.toLowerCase() === wanted || folderName(current).toLowerCase() === wanted)
+      ? current
+      : null;
   if (!root) {
-    const [match] = workspacesForVault(link.vault, useKnownWorkspaces.getState().workspaces);
+    const [match] = workspacesForVault(link.vault, known, linked);
     if (!match) {
-      await warn(`Open the "${link.vault}" folder in Solstice once, then try the link again.`);
+      await warn(
+        `Open the "${link.vault}" vault in Solstice once (a folder synced to it, or named after it), then try the link again.`,
+      );
       return;
     }
     root = match.path;
