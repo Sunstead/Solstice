@@ -1,0 +1,469 @@
+//! One task per vault in use. It owns the vault's Yjs state (the engine's
+//! [`Vault`]), its folder, and the sessions of the devices connected to it:
+//!
+//! - Device frames go through that connection's server-side [`Session`];
+//!   replies go back to it and updates go on to the vault's other devices.
+//! - Changes are written to the folder at once, and the state saved to the
+//!   database a moment later. Files first: after a crash the folder is never
+//!   behind the database, so "the folder wins" at startup is always safe.
+//!   State lost in that moment heals itself, since devices keep full history
+//!   and resend whatever the server is missing.
+//! - A watcher turns edits made in the folder into changes for devices.
+//!
+//! A vault's task stops after a while with no connections and starts again
+//! on demand.
+
+use std::collections::{BTreeSet, HashMap};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use solstice_sync::{DocKey, Event, Frame, Manifest, Msg, NoteDoc, Session, Vault};
+use tokio::sync::{mpsc, oneshot};
+
+use crate::db::{now, Db, DocRow, VaultRow};
+use crate::files::VaultDir;
+
+const SAVE_AFTER: Duration = Duration::from_secs(2);
+const IDLE_AFTER: Duration = Duration::from_secs(10 * 60);
+const MANIFEST: &str = "manifest";
+
+/// What a connection's writer sends to its device.
+#[derive(Debug, Clone)]
+pub enum Outgoing {
+    /// An encoded [`Frame`].
+    Frame(Vec<u8>),
+    /// A JSON notice, e.g. an unknown vault.
+    Notice(String),
+}
+
+pub type ConnId = u64;
+
+pub enum Cmd {
+    Connect {
+        conn: ConnId,
+        tx: mpsc::UnboundedSender<Outgoing>,
+    },
+    Disconnect {
+        conn: ConnId,
+    },
+    Frame {
+        conn: ConnId,
+        msgs: Vec<Msg>,
+    },
+    CreateNote {
+        path: String,
+        text: String,
+        reply: oneshot::Sender<Result<(String, String), String>>,
+    },
+    PutBlob {
+        bytes: Vec<u8>,
+        reply: oneshot::Sender<Result<String, String>>,
+    },
+    GetBlob {
+        hash: String,
+        reply: oneshot::Sender<Option<Vec<u8>>>,
+    },
+    FolderChanged,
+    /// Save and stop (server shutdown).
+    Stop {
+        done: oneshot::Sender<()>,
+    },
+}
+
+#[derive(Clone)]
+pub struct Hub {
+    db: Db,
+    notes_dir: PathBuf,
+    running: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<Cmd>>>>,
+}
+
+impl Hub {
+    pub fn new(db: Db, notes_dir: PathBuf) -> Self {
+        Self {
+            db,
+            notes_dir,
+            running: Arc::default(),
+        }
+    }
+
+    pub fn folder(&self, username: &str, vault: &str) -> PathBuf {
+        self.notes_dir.join(username).join(vault)
+    }
+
+    /// Sends to a vault's task, starting it if needed.
+    pub async fn send(&self, vault: &VaultRow, username: &str, cmd: Cmd) -> Result<(), String> {
+        let mut cmd = cmd;
+        for _ in 0..2 {
+            let tx = self.task(vault, username).await?;
+            match tx.send(cmd) {
+                Ok(()) => return Ok(()),
+                // It stopped between lookup and send: start it again.
+                Err(mpsc::error::SendError(back)) => {
+                    cmd = back;
+                    self.running
+                        .lock()
+                        .unwrap_or_else(|p| p.into_inner())
+                        .remove(&vault.id);
+                }
+            }
+        }
+        Err("the vault's task isn't running".into())
+    }
+
+    async fn task(
+        &self,
+        vault: &VaultRow,
+        username: &str,
+    ) -> Result<mpsc::UnboundedSender<Cmd>, String> {
+        if let Some(tx) = self
+            .running
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(&vault.id)
+        {
+            if !tx.is_closed() {
+                return Ok(tx.clone());
+            }
+        }
+        let state = VaultTask::load(
+            self.db.clone(),
+            vault.clone(),
+            self.folder(username, &vault.name),
+        )
+        .await?;
+        let (tx, rx) = mpsc::unbounded_channel();
+        let mut running = self.running.lock().unwrap_or_else(|p| p.into_inner());
+        // Another request may have started it while this one loaded.
+        if let Some(existing) = running.get(&vault.id).filter(|t| !t.is_closed()) {
+            return Ok(existing.clone());
+        }
+        running.insert(vault.id.clone(), tx.clone());
+        drop(running);
+        let running = self.running.clone();
+        let id = vault.id.clone();
+        let watch_tx = tx.clone();
+        tokio::spawn(async move {
+            state.run(rx, watch_tx).await;
+            running
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .remove(&id);
+        });
+        Ok(tx)
+    }
+
+    /// Saves and stops every vault's task, for a clean shutdown.
+    pub async fn shutdown(&self) {
+        let senders: Vec<_> = self
+            .running
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .values()
+            .cloned()
+            .collect();
+        let mut waits = Vec::new();
+        for tx in senders {
+            let (done, wait) = oneshot::channel();
+            if tx.send(Cmd::Stop { done }).is_ok() {
+                waits.push(wait);
+            }
+        }
+        for wait in waits {
+            let _ = tokio::time::timeout(Duration::from_secs(10), wait).await;
+        }
+    }
+
+    /// Stops sending to a connection on every vault it used.
+    pub fn disconnect(&self, conn: ConnId, vaults: &BTreeSet<String>) {
+        let running = self.running.lock().unwrap_or_else(|p| p.into_inner());
+        for id in vaults {
+            if let Some(tx) = running.get(id) {
+                let _ = tx.send(Cmd::Disconnect { conn });
+            }
+        }
+    }
+}
+
+struct VaultTask {
+    db: Db,
+    row: VaultRow,
+    vault: Vault,
+    dir: VaultDir,
+    sessions: HashMap<ConnId, (Session, mpsc::UnboundedSender<Outgoing>)>,
+    dirty: BTreeSet<DocKey>,
+}
+
+impl VaultTask {
+    /// Loads the vault's state and brings it in line with its folder, which
+    /// wins: anything changed there while the server was down (or the state
+    /// lost) becomes a change devices will receive.
+    async fn load(db: Db, row: VaultRow, folder: PathBuf) -> Result<Self, String> {
+        let docs = db.docs(&row.id).await.map_err(|e| e.to_string())?;
+        let mut manifest = None;
+        let mut notes = Vec::new();
+        for doc in docs {
+            if doc.doc == MANIFEST {
+                manifest = Some(Manifest::load(&doc.state, doc.epoch).map_err(|e| e.to_string())?);
+            } else {
+                notes.push((
+                    doc.doc.clone(),
+                    NoteDoc::load(&doc.state, doc.epoch).map_err(|e| e.to_string())?,
+                ));
+            }
+        }
+        let mut dirty = BTreeSet::new();
+        let fresh_manifest = manifest.is_none();
+        let manifest = manifest.unwrap_or_else(|| {
+            // No state for this vault (new, or the database was lost): a new
+            // epoch, so linked devices know to link again.
+            dirty.insert(DocKey::Manifest);
+            Manifest::new(now() as u32)
+        });
+        let mut vault = Vault::load("server", manifest, notes);
+        let mut dir = VaultDir::open(folder).map_err(|e| e.to_string())?;
+
+        if !fresh_manifest {
+            // Notes whose state was lost but whose file survived: rebuild
+            // them under a new epoch.
+            let files = vault.files();
+            let missing: Vec<(String, String)> = files
+                .iter()
+                .filter(|(_, (id, _))| {
+                    vault
+                        .manifest
+                        .entry(id)
+                        .is_some_and(|e| e.kind == solstice_sync::Kind::Note)
+                })
+                .filter(|(_, (id, _))| vault.note(id).is_none())
+                .filter_map(|(path, (id, _))| {
+                    Some((id.clone(), String::from_utf8(dir.read(path).ok()?).ok()?))
+                })
+                .filter(|(_, text)| !text.is_empty())
+                .collect();
+            for (id, text) in missing {
+                tracing::warn!(vault = %row.id, note = %id, "note state missing; rebuilding it from its file");
+                vault.rebuild_note(&id, &text);
+                dirty.insert(DocKey::Note(id));
+            }
+        }
+
+        let msgs = dir.absorb(&mut vault).map_err(|e| e.to_string())?;
+        dirty.extend(msgs.into_iter().map(|m| m.doc));
+        let mut task = Self {
+            db,
+            row,
+            vault,
+            dir,
+            sessions: HashMap::new(),
+            dirty,
+        };
+        task.save().await;
+        Ok(task)
+    }
+
+    async fn run(mut self, mut rx: mpsc::UnboundedReceiver<Cmd>, tx: mpsc::UnboundedSender<Cmd>) {
+        let watcher = watch(self.dir.root(), tx);
+        let mut save_at: Option<tokio::time::Instant> = None;
+        let mut idle_since = tokio::time::Instant::now();
+        let mut stopped = None;
+        loop {
+            let deadline = save_at.unwrap_or_else(|| tokio::time::Instant::now() + IDLE_AFTER);
+            tokio::select! {
+                cmd = rx.recv() => {
+                    let Some(cmd) = cmd else { break };
+                    if let Cmd::Stop { done } = cmd {
+                        stopped = Some(done);
+                        break;
+                    }
+                    self.handle(cmd);
+                    if !self.dirty.is_empty() && save_at.is_none() {
+                        save_at = Some(tokio::time::Instant::now() + SAVE_AFTER);
+                    }
+                    if !self.sessions.is_empty() {
+                        idle_since = tokio::time::Instant::now();
+                    }
+                }
+                _ = tokio::time::sleep_until(deadline) => {
+                    if save_at.take().is_some() {
+                        self.save().await;
+                    }
+                    if self.sessions.is_empty() && idle_since.elapsed() >= IDLE_AFTER {
+                        break;
+                    }
+                }
+            }
+        }
+        self.save().await;
+        drop(watcher);
+        tracing::debug!(vault = %self.row.id, "vault task stopped");
+        if let Some(done) = stopped {
+            let _ = done.send(());
+        }
+    }
+
+    fn handle(&mut self, cmd: Cmd) {
+        match cmd {
+            Cmd::Connect { conn, tx } => {
+                self.sessions
+                    .entry(conn)
+                    .or_insert_with(|| (Session::server(), tx));
+            }
+            Cmd::Disconnect { conn } => {
+                self.sessions.remove(&conn);
+            }
+            Cmd::Frame { conn, msgs } => self.frame(conn, msgs),
+            Cmd::CreateNote { path, text, reply } => {
+                let result = self
+                    .vault
+                    .create_note(&path, &text)
+                    .map_err(|e| e.to_string());
+                let _ = reply.send(match result {
+                    Ok((id, msgs)) => {
+                        self.changed(None, msgs);
+                        // Where it landed: numbered if the path was taken.
+                        let placed = self
+                            .vault
+                            .files()
+                            .into_iter()
+                            .find(|(_, (i, _))| *i == id)
+                            .map(|(p, _)| p);
+                        Ok((id, placed.unwrap_or(path)))
+                    }
+                    Err(e) => Err(e),
+                });
+            }
+            Cmd::PutBlob { bytes, reply } => {
+                let result = self.dir.put_blob(&bytes).map_err(|e| e.to_string());
+                // Its manifest entry may have arrived first.
+                self.write_out();
+                let _ = reply.send(result);
+            }
+            Cmd::GetBlob { hash, reply } => {
+                let _ = reply.send(self.dir.get_blob(&hash));
+            }
+            Cmd::Stop { .. } => unreachable!("handled by run"),
+            Cmd::FolderChanged => match self.dir.absorb(&mut self.vault) {
+                Ok(msgs) => self.changed(None, msgs),
+                Err(e) => {
+                    tracing::warn!(vault = %self.row.id, error = %e, "can't read the vault folder")
+                }
+            },
+        }
+    }
+
+    fn frame(&mut self, conn: ConnId, msgs: Vec<Msg>) {
+        let Some((session, tx)) = self.sessions.get_mut(&conn) else {
+            return;
+        };
+        let tx = tx.clone();
+        let mut replies = Vec::new();
+        let mut forward = Vec::new();
+        for msg in msgs {
+            match session.receive(&mut self.vault, msg) {
+                Ok(out) => {
+                    replies.extend(out.replies);
+                    for event in out.events {
+                        match event {
+                            Event::Forward(m) => forward.push(m),
+                            Event::Changed(doc) => {
+                                self.dirty.insert(doc);
+                            }
+                            Event::Review(_) | Event::Relink => {}
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(vault = %self.row.id, error = %e, "bad message from a device");
+                    let _ = tx.send(Outgoing::Notice(notice(&self.row.id, "bad_message")));
+                }
+            }
+        }
+        if !replies.is_empty() {
+            let _ = tx.send(Outgoing::Frame(Frame::new(&self.row.id, replies).encode()));
+        }
+        self.changed(Some(conn), forward);
+    }
+
+    /// Records changes, writes the folder, and sends them to every device
+    /// except `from`.
+    fn changed(&mut self, from: Option<ConnId>, msgs: Vec<Msg>) {
+        if msgs.is_empty() {
+            return;
+        }
+        self.dirty.extend(msgs.iter().map(|m| m.doc.clone()));
+        self.write_out();
+        let bytes = Frame::new(&self.row.id, msgs).encode();
+        for (conn, (_, tx)) in &self.sessions {
+            if Some(*conn) != from {
+                let _ = tx.send(Outgoing::Frame(bytes.clone()));
+            }
+        }
+    }
+
+    fn write_out(&mut self) {
+        if let Err(e) = self.dir.materialize(&self.vault) {
+            tracing::warn!(vault = %self.row.id, error = %e, "can't write the vault folder");
+        }
+    }
+
+    async fn save(&mut self) {
+        let docs: Vec<DocRow> = std::mem::take(&mut self.dirty)
+            .into_iter()
+            .filter_map(|key| match key {
+                DocKey::Manifest => Some(DocRow {
+                    doc: MANIFEST.into(),
+                    epoch: self.vault.manifest.epoch,
+                    state: self.vault.manifest.encode_state(),
+                }),
+                DocKey::Note(id) => {
+                    let note = self.vault.note(&id)?;
+                    Some(DocRow {
+                        doc: id,
+                        epoch: note.epoch,
+                        state: note.encode_state(),
+                    })
+                }
+            })
+            .collect();
+        if let Err(e) = self.db.save_docs(&self.row.id, docs).await {
+            tracing::error!(vault = %self.row.id, error = %e, "can't save vault state");
+        }
+    }
+}
+
+pub fn notice(vault: &str, code: &str) -> String {
+    serde_json::json!({ "vault": vault, "notice": code }).to_string()
+}
+
+/// Watches the folder and pokes the task when it changes. Our own writes
+/// show up too; `absorb` finds nothing new in them.
+fn watch(root: &std::path::Path, tx: mpsc::UnboundedSender<Cmd>) -> Option<impl Drop> {
+    use notify::RecursiveMode;
+    use notify_debouncer_full::{new_debouncer, DebounceEventResult};
+    let root_for_filter = root.to_path_buf();
+    let mut debouncer = new_debouncer(
+        Duration::from_secs(1),
+        None,
+        move |result: DebounceEventResult| {
+            if let Ok(events) = result {
+                let outside_own = events.iter().flat_map(|e| e.event.paths.iter()).any(|p| {
+                    p.strip_prefix(&root_for_filter)
+                        .ok()
+                        .and_then(|rel| rel.iter().next())
+                        .is_some_and(|first| first != ".solstice")
+                });
+                if outside_own {
+                    let _ = tx.send(Cmd::FolderChanged);
+                }
+            }
+        },
+    )
+    .map_err(|e| tracing::warn!(error = %e, "can't watch a vault folder"))
+    .ok()?;
+    debouncer
+        .watch(root, RecursiveMode::Recursive)
+        .map_err(|e| tracing::warn!(error = %e, "can't watch a vault folder"))
+        .ok()?;
+    Some(debouncer)
+}

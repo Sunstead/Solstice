@@ -552,3 +552,39 @@ fn a_rebuilt_note_never_duplicates_text() {
     );
     let _ = net.id("Colour.md");
 }
+
+#[test]
+fn a_new_device_joins_the_servers_epoch_and_a_synced_one_relinks() {
+    let mut net = Net::new(2);
+    let (_, msgs) = net.devices[0].vault.create_note("A.md", "a").unwrap();
+    net.send(0, msgs);
+    net.pump();
+    net.disconnect(0);
+    net.disconnect(1);
+
+    // The server's manifest gets a new epoch (it was rebuilt).
+    net.server.manifest.epoch = 9;
+
+    // A device that never synced, with a note of its own, joins it...
+    net.devices[1] = Device {
+        vault: Vault::new("fresh"),
+        session: Session::device(),
+        online: false,
+        editor: BTreeMap::new(),
+    };
+    net.devices[1]
+        .vault
+        .create_note("Mine.md", "made before linking")
+        .unwrap();
+    net.connect(1);
+    let events = net.pump();
+    assert!(!events.iter().any(|(_, e)| *e == Event::Relink));
+    assert_eq!(net.devices[1].vault.manifest.epoch, 9);
+    assert!(net.server.files().contains_key("Mine.md"));
+    assert!(net.devices[1].vault.files().contains_key("A.md"));
+
+    // ...while one that synced before the rebuild is told to link again.
+    net.connect(0);
+    let events = net.pump();
+    assert!(events.contains(&(0, Event::Relink)));
+}

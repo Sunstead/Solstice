@@ -13,6 +13,7 @@ crates with it:
 ```
 apps/
   desktop/        the Tauri app (@solstice/desktop): src/ (React), src-tauri/ (Rust)
+  sync/           Solstice Sync's server (solstice-sync-server, bin `solstice-sync`)
 crates/
   solstice-core/  vault paths, wikilinks, front matter: pure Rust, shared by app, Sync and Atlas
   solstice-sync/  the sync engine (Yjs via yrs): notes, manifest, protocol, merge review; no I/O
@@ -38,6 +39,10 @@ npm run lint         # eslint, whole repo
 npm test             # vitest in every workspace that has tests
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
+
+# Solstice Sync's server, locally (state and notes under .data/):
+SOLSTICE_DEV_USER=dev cargo run -p solstice-sync-server
+docker build -f apps/sync/Dockerfile -t solstice-sync .   # from the root
 ```
 
 Lint has 0 errors. The desktop app predates linting, so a few React Compiler
