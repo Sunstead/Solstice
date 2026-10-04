@@ -41,6 +41,8 @@ npm run lint         # eslint, whole repo
 npm test             # vitest in every workspace that has tests
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
+npm run icons -w @solstice/desktop    # app and web icons from icon_square.svg (macOS: icons:mac, on a Mac)
+npm run release:app -- 0.2.0 --push   # desktop release: bump, tag app-v0.2.0 (RELEASING.md)
 
 # Solstice Sync's server, locally (state and notes under .data/):
 SOLSTICE_DEV_USER=dev cargo run -p solstice-sync-server
@@ -78,6 +80,8 @@ On the frontend, [src/lib/commands.ts](apps/desktop/src/lib/commands.ts) is the 
 ### Workspace state
 
 A workspace is a directory path, nothing more. [src-tauri/src/workspace.rs](apps/desktop/src-tauri/src/workspace.rs) keeps it in an in-memory `HashMap<window_label, path>` (`set_workspace`/`get_workspace` commands). The frontend mirrors this in [src/hooks/use-workspace.ts](apps/desktop/src/hooks/use-workspace.ts) (`useWorkspace`), which also tracks recently-opened workspaces (`useKnownWorkspaces`) and restores the last one on startup. Switching workspaces (`setWorkspace`) resets and reloads every workspace-scoped store: layout, settings, the file tree, and the file index.
+
+Making a workspace is not opening one: the New workspace dialog ([components/new-workspace-dialog.tsx](apps/desktop/src/components/new-workspace-dialog.tsx), `file.new_workspace`) makes the folder with `create_workspace` (an empty one is adopted, a full one refused) and can link it to a new or existing vault; "Open folder as workspace" (`file.open_folder`) takes any folder as it is. On the web a new workspace is a new vault.
 
 ### Scoped persistence
 
@@ -126,11 +130,19 @@ The same frontend runs in a browser as the web app, served by the Solstice Sync 
 - A workspace is a vault, at the path `/<vault name>`. The file tree comes from the server, and its change socket (`/v1/web/events`) becomes `fileSystemChanged` events, so the explorer, tabs and external-change handling work unchanged.
 - A note is read with a `base` and saved against it: the server merges the save with whatever other devices did since, as a synced desktop folder does.
 - Settings and layout are kept on the server per user (`/v1/web/settings`), not in `.solstice/`; the workspace list is the user's vaults.
+- Shortcuts: browsers keep Ctrl/Cmd+N, T and W, so `registry.json` carries the web's own defaults (Alt+N, Alt+T, Alt+W, Alt+Shift+N; `web_commands()` in `command_registry.rs`) and leaves out what the web can't do (`NOT_ON_WEB`: open a folder, show in the file manager).
 - What needs a computer is hidden or says so: window controls, picking a folder, theme folders, system fonts, showing a file in the file manager, the Sync pane (the web shows the account and Sign out instead). File pickers hand back blob URLs that `importAttachment` uploads. `/open?vault=&path=` is the web's `solstice://open` link.
 
 ### Window chrome
 
 The main window uses an overlay title bar with custom traffic-light positioning on macOS (configured in `lib.rs`'s `setup` hook) and fully custom decorations elsewhere (`decorations(false)`, drawn in React — see [src/components/title-bar.tsx](apps/desktop/src/components/title-bar.tsx) and [window-controls.tsx](apps/desktop/src/components/window-controls.tsx)).
+
+The menu, Back, Forward and sync buttons ([header-controls.tsx](apps/desktop/src/components/header-controls.tsx)) render once, in the title bar, and never move. The title bar spans only the sidebar column; when the sidebar collapses it narrows to the rail and the controls overhang the top-left tab strip, whose `HeaderControlsSpacer` (`leading` in `onRenderTabSet`) makes room for them, animated with the sidebar. Don't copy them into the tab strip, and don't give the title bar's children a `z-index` (a stacking context there puts the controls under the editor).
+
+### Icons and releases
+
+- **Icons:** `src/assets/icons/app/icon_square.svg` is the flat icon (Windows, Linux, mobile, the web's favicon, touch icon and manifest; `npm run icons -w @solstice/desktop`, `scripts/build-icons.mjs`). `mac.icon` is the same design as an Icon Composer document, compiled to `src-tauri/icons/Assets.car` (Liquid Glass, `CFBundleIconName` in `src-tauri/Info.plist`) and the fallback `icon.icns` by `scripts/build-mac-icon.sh`, which needs Xcode 26. The **App icons** workflow runs both on a Mac and uploads the results; outputs are committed. The glass icon only shows in a bundled build.
+- **Releases:** the desktop app's version is `apps/desktop/package.json` (`tauri.conf.json` reads it). `npm run release:app -- <version> --push` bumps it and the app crate, commits and tags `app-v<version>`; **App release** builds a universal macOS `.dmg` and Windows installers into a draft GitHub release. The sync server is versioned apart (`sync-v*`). See [RELEASING.md](RELEASING.md).
 
 ## Conventions
 

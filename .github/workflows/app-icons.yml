@@ -1,0 +1,55 @@
+name: App icons
+
+# Builds every app icon from its source and uploads them, to be committed:
+#   src/assets/icons/app/icon_square.svg -> Windows, Linux, mobile and web icons
+#   src/assets/icons/app/mac.icon        -> Assets.car (Liquid Glass) and icon.icns
+# The macOS half needs Xcode 26's actool and Icon Composer, so this runs on a
+# Mac. Download the `app-icons` artifact and copy it over apps/desktop.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - apps/desktop/src/assets/icons/app/**
+      - apps/desktop/scripts/build-icons.mjs
+      - apps/desktop/scripts/build-mac-icon.sh
+      - .github/workflows/app-icons.yml
+
+permissions:
+  contents: read
+
+jobs:
+  icons:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Windows, Linux, mobile and web
+        run: npm run icons -w @solstice/desktop
+
+      - name: macOS
+        run: npm run icons:mac -w @solstice/desktop
+
+      - name: Changed from what's committed
+        run: git status --short apps/desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-icons
+          path: |
+            apps/desktop/src-tauri/icons/
+            apps/desktop/public/favicon.svg
+            apps/desktop/public/apple-touch-icon.png
+            apps/desktop/public/icon-192.png
+            apps/desktop/public/icon-512.png
+            apps/desktop/public/manifest.webmanifest
+          if-no-files-found: error
+          retention-days: 7
