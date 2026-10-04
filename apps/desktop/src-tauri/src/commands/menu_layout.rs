@@ -66,7 +66,9 @@ fn app_menu_spec() -> Vec<MenuEntrySpec> {
     vec![MenuEntrySpec::Command(CommandId::AppSettings)]
 }
 
-fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
+/// The menus as laid out on macOS (`true`, Settings in the application
+/// menu) or everywhere else.
+fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
     use MenuEntrySpec::*;
     use NativeItem::*;
     use CommandId::*;
@@ -109,7 +111,7 @@ fn menu_spec() -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                 ];
                 // Only macOS has an application menu to put Settings in;
                 // everywhere else it belongs at the bottom of File.
-                if !cfg!(target_os = "macos") {
+                if !macos {
                     items.push(Separator);
                     items.push(Command(AppSettings));
                 }
@@ -280,9 +282,14 @@ pub fn resolve_menu_layout(app: &AppHandle) -> Vec<ResolvedMenu> {
 /// The menus for these commands, accelerators included. Needs no app, so
 /// the web app's copy can be exported (`registry_json` in lib.rs).
 pub fn menu_layout_for(commands: &[CommandMeta]) -> Vec<ResolvedMenu> {
+    menu_layout_on(commands, cfg!(target_os = "macos"))
+}
+
+/// [`menu_layout_for`] as laid out on macOS or elsewhere, whatever this is.
+pub fn menu_layout_on(commands: &[CommandMeta], macos: bool) -> Vec<ResolvedMenu> {
     let lookup = command_lookup(commands);
 
-    menu_spec()
+    menu_spec_for(macos)
         .into_iter()
         .map(|(title, entries)| ResolvedMenu {
             title: title.to_string(),

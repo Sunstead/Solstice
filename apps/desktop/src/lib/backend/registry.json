@@ -58,7 +58,7 @@
       "accelerator": null,
       "id": "file.reveal_in_system",
       "is_overridden": false,
-      "label": "Show in File Explorer"
+      "label": "Show in File Manager"
     },
     {
       "accelerator": null,
@@ -346,7 +346,7 @@
                   "accelerator": null,
                   "id": "file.reveal_in_system",
                   "is_overridden": false,
-                  "label": "Show in File Explorer"
+                  "label": "Show in File Manager"
                 }
               },
               {

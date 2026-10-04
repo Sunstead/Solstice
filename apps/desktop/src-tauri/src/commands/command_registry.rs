@@ -126,6 +126,12 @@ fn reveal_in_system_label() -> &'static str {
 }
 
 pub fn default_commands() -> Vec<CommandMeta> {
+    commands_labelled(reveal_in_system_label())
+}
+
+/// The registry with `reveal` as the file manager command's label. The web
+/// app's copy uses a neutral one, so it's the same whatever exported it.
+pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
     vec![
         // -- App --
         CommandMeta {
@@ -192,7 +198,7 @@ pub fn default_commands() -> Vec<CommandMeta> {
         },
         CommandMeta {
             id: CommandId::FileRevealInSystem,
-            label: reveal_in_system_label().into(),
+            label: reveal.into(),
             accelerator: None,
             is_overridden: false,
         },

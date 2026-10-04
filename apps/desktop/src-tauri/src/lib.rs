@@ -208,8 +208,9 @@ pub const REGISTRY_PATH: &str = "../src/lib/backend/registry.json";
 /// for them, so it reads this copy; written with the bindings, and checked
 /// with them.
 pub fn registry_json() -> String {
-    let commands = commands::command_registry::default_commands();
-    let menus = commands::menu_layout::menu_layout_for(&commands);
+    // As on Linux, whatever exports it: the web app runs everywhere.
+    let commands = commands::command_registry::commands_labelled("Show in File Manager");
+    let menus = commands::menu_layout::menu_layout_on(&commands, false);
     let value = serde_json::json!({ "commands": commands, "menus": menus });
     serde_json::to_string_pretty(&value).expect("the registry serializes") + "\n"
 }
