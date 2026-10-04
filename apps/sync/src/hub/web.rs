@@ -64,6 +64,20 @@ pub enum WebOp {
     },
 }
 
+impl WebOp {
+    /// The vault paths this would change, as given.
+    pub fn paths(&self) -> Vec<&str> {
+        match self {
+            WebOp::SaveNote { path, .. }
+            | WebOp::WriteFile { path, .. }
+            | WebOp::Trash { path }
+            | WebOp::Resolve { path, .. } => vec![path],
+            WebOp::Rename { from, to } => vec![from, to],
+            _ => vec![],
+        }
+    }
+}
+
 pub enum WebReply {
     Json(serde_json::Value),
     File { path: String, bytes: Vec<u8> },

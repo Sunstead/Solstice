@@ -122,6 +122,20 @@ impl VaultDir {
         Ok(out)
     }
 
+    /// Whether the file at `rel` was changed (or added, or removed) by
+    /// something else since it was last written or scanned here, by the same
+    /// size and mtime check [`VaultDir::scan`] trusts. A change about to be
+    /// written to that file should wait for [`VaultDir::absorb`], or it would
+    /// write over the edit.
+    pub fn changed_on_disk(&self, rel: &str) -> bool {
+        let meta = std::fs::metadata(self.abs(rel)).ok();
+        match (self.seen.get(rel), meta) {
+            (Some(f), Some(m)) => f.size != m.len() || f.modified != m.modified().ok(),
+            (None, None) => false,
+            _ => true,
+        }
+    }
+
     /// Records the file at `rel` as it is now (an editor just wrote it, and
     /// the caller has applied that write to the vault), so a later
     /// [`VaultDir::absorb`] doesn't count it again.
@@ -512,6 +526,27 @@ mod tests {
 
         // Nothing changed since: nothing to send.
         assert!(vd.absorb(&mut vault).unwrap().is_empty());
+    }
+
+    #[test]
+    fn knows_a_file_was_edited_behind_its_back() {
+        let (_tmp, mut vd) = dir();
+        let mut vault = Vault::new("server");
+        vault.create_note("a.md", "one").unwrap();
+        vd.materialize(&vault).unwrap();
+        assert!(!vd.changed_on_disk("a.md"));
+        assert!(!vd.changed_on_disk("never.md"));
+
+        let root = vd.root().to_path_buf();
+        std::fs::write(root.join("a.md"), "one, and a longer edit").unwrap();
+        std::fs::write(root.join("new.md"), "x").unwrap();
+        assert!(vd.changed_on_disk("a.md"));
+        assert!(vd.changed_on_disk("new.md"));
+
+        vd.absorb(&mut vault).unwrap();
+        assert!(!vd.changed_on_disk("a.md"));
+        std::fs::remove_file(root.join("a.md")).unwrap();
+        assert!(vd.changed_on_disk("a.md"));
     }
 
     #[test]
