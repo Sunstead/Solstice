@@ -302,6 +302,27 @@ pub fn menu_layout_on(commands: &[CommandMeta], macos: bool) -> Vec<ResolvedMenu
         .collect()
 }
 
+/// The menus with `ids` taken out, for a registry that leaves them out.
+pub fn menu_layout_without(commands: &[CommandMeta], macos: bool, ids: &[CommandId]) -> Vec<ResolvedMenu> {
+    fn strip(entries: Vec<ResolvedMenuEntry>, ids: &[CommandId]) -> Vec<ResolvedMenuEntry> {
+        entries
+            .into_iter()
+            .filter_map(|entry| match entry {
+                ResolvedMenuEntry::Command(c) if ids.contains(&c.id) => None,
+                ResolvedMenuEntry::Submenu { title, entries } => Some(ResolvedMenuEntry::Submenu {
+                    title,
+                    entries: strip(entries, ids),
+                }),
+                other => Some(other),
+            })
+            .collect()
+    }
+    menu_layout_on(commands, macos)
+        .into_iter()
+        .map(|menu| ResolvedMenu { title: menu.title, entries: strip(menu.entries, ids) })
+        .collect()
+}
+
 fn collect_accelerated_commands(entries: &[ResolvedMenuEntry], out: &mut Vec<CommandId>) {
     for entry in entries {
         match entry {
