@@ -83,8 +83,9 @@
   --size-mini-scroll-indicator: 4px;
 
   --color-toolbar-button-hover: var(--color-2);
-  --tab-button-radius: var(--radius-lg);
-  --border-button-radius: var(--radius-md);
+  /* Capped, so a very round theme (Bubblegum) keeps tidy tabs. */
+  --tab-button-radius: var(--tab-curve-r);
+  --border-button-radius: min(var(--radius-md), 10px);
 
   --color-float-window-header-background: var(--color-tabset-background);
 }
@@ -103,7 +104,7 @@
   min-width: 32px;
   width: max-content;
   height: 32px;
-  border-radius: var(--radius-md);
+  border-radius: min(var(--radius-md), 10px);
   display: inline-flex;
   justify-content: center;
   align-items: center;
@@ -185,7 +186,7 @@
 .flexlayout-custom
   .flexlayout__tab_button:hover:not(.flexlayout__tab_button--selected) {
   background-color: var(--color-muted);
-  border-radius: var(--radius-md);
+  border-radius: min(var(--radius-md), 10px);
   border: none;
 }
 
@@ -214,7 +215,7 @@
 .flexlayout-custom .flexlayout__tab_button_trailing {
   margin-left: auto;
   padding: 4px;
-  border-radius: var(--radius-md);
+  border-radius: min(var(--radius-md), 10px);
 }
 
 /* tab strip layout */
@@ -267,7 +268,8 @@
 
 /* selected-tab curve, drawn via pseudo-elements */
 .flexlayout-custom {
-  --tab-curve-r: var(--radius-lg);
+  /* The selected tab's corners and flares; they must stay equal. */
+  --tab-curve-r: min(var(--radius-lg), 12px);
   --tab-motion-duration: 180ms;
   --tab-motion-ease: cubic-bezier(0.2, 0, 0, 1);
 }
@@ -386,4 +388,19 @@
   .flexlayout__tab_button_trailing:has(.tab-close-saving) {
   display: flex;
   visibility: visible;
+}
+
+/* Makes room in the top-left tab strip for the title bar's controls, which
+   overhang it when the sidebar is collapsed (header-controls.tsx). Same
+   timing as the title bar shell, so the two move together. */
+.flexlayout-custom .header-controls-spacer {
+  display: block;
+  flex: none;
+  align-self: stretch;
+  width: max(0px, calc(var(--header-controls-end, 0px) - var(--sidebar-width)));
+  transition: width 200ms ease-in-out;
+}
+
+.flexlayout-custom .header-controls-spacer[data-collapsed='true'] {
+  width: max(0px, calc(var(--header-controls-end, 0px) - var(--sidebar-width-icon)));
 }

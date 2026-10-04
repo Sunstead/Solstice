@@ -1,30 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
-import { getCurrentWindow, type Window as TauriWindow } from '@/lib/backend/window';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { getCurrentWindow } from '@/lib/backend/window';
 import SolsticeIcon from '@/assets/icons/app/icon.svg?react';
+import { isDesktop } from '@/lib/backend';
 import { useIsMac } from '@/hooks/use-platform';
 import { useSidebar } from '@sunstead/ui/components/resizable-sidebar';
 import { cn } from '@/lib/utils';
-import { AppMenubar } from './app-menu-dropdown';
-import { Button } from '@sunstead/ui/components/button';
-import { useNavigationHistory } from '@/lib/stores/navigation-history';
-import { runCommand } from '@/lib/commands';
-import { SyncIndicator } from './sync/status';
-
-const isTauri = () => '__TAURI_INTERNALS__' in window;
+import { HeaderControls } from './header-controls';
 
 export default function TitleBar() {
-  const [isDesktop, setIsDesktop] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const appWindowRef = useRef<TauriWindow | null>(null);
 
   useEffect(() => {
-    if (!isTauri()) return;
-    setIsDesktop(true);
+    if (!isDesktop) return;
 
     const appWindow = getCurrentWindow();
-    appWindowRef.current = appWindow;
-
     let unlisten: (() => void) | null = null;
 
     const init = async () => {
@@ -42,14 +31,11 @@ export default function TitleBar() {
 
   const isMac = useIsMac();
 
-  const canGoBack = useNavigationHistory((s) => s.past.length > 0);
-  const canGoForward = useNavigationHistory((s) => s.future.length > 0);
-
   return (
     <header className='bg-sidebar w-full h-10 min-h-9 draggable relative flex items-center border-b'>
       <div data-tauri-drag-region className='size-full absolute inset-0' />
 
-      <div className='flex items-center z-0 w-max h-max'>
+      <div className='flex items-center w-max h-max'>
         <div data-tauri-drag-region className='flex items-center select-none'>
           <div className='min-w-12 flex items-center justify-center'>
             {isDesktop && isMac ? (
@@ -58,27 +44,7 @@ export default function TitleBar() {
               <SolsticeIcon className='mx-2 size-5 pointer-events-none select-none [-webkit-user-drag:none]' />
             )}
           </div>
-          {!isMac && <AppMenubar />}
-
-          <div className='no-drag flex items-center gap-x-1 ml-1'>
-            <Button
-              variant='ghost'
-              size='icon-sm'
-              disabled={!canGoBack}
-              onClick={() => runCommand('navigation.back')}
-            >
-              <ArrowLeft />
-            </Button>
-            <Button
-              variant='ghost'
-              size='icon-sm'
-              disabled={!canGoForward}
-              onClick={() => runCommand('navigation.forward')}
-            >
-              <ArrowRight />
-            </Button>
-            <SyncIndicator />
-          </div>
+          <HeaderControls />
         </div>
       </div>
     </header>

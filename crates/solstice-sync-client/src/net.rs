@@ -175,6 +175,17 @@ impl Server {
             .map_err(|e| Error::BadServer(e.to_string()))
     }
 
+    /// The signed-in user's name (servers from 0.2.0).
+    pub async fn username(&self, token: Option<&str>) -> Result<String, Error> {
+        #[derive(serde::Deserialize)]
+        struct Me {
+            username: String,
+        }
+        let res = self.send(self.http.get(self.endpoint("v1/me")), token).await?;
+        let me: Me = res.json().await.map_err(|e| Error::BadServer(e.to_string()))?;
+        Ok(me.username)
+    }
+
     pub async fn create_vault(&self, token: Option<&str>, name: &str) -> Result<VaultInfo, Error> {
         let req = self
             .http

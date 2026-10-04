@@ -285,6 +285,22 @@ pub async fn sync_sign_out(server: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Who's signed in to `server`, or `None` when nobody is.
+#[tauri::command]
+#[specta::specta]
+pub async fn sync_account(server: String) -> Result<Option<String>, String> {
+    let server = Server::new(&server).map_err(err)?;
+    let info = server.info().await.map_err(err)?;
+    let token = match &info.auth {
+        AuthInfo::Dev => None,
+        AuthInfo::Oidc { issuer, client_id, .. } => match oidc::access_token(issuer, client_id).await? {
+            Some(token) => Some(token),
+            None => return Ok(None),
+        },
+    };
+    server.username(token.as_deref()).await.map(Some).map_err(err)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn sync_vaults(server: String) -> Result<Vec<SyncVault>, String> {

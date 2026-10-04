@@ -22,6 +22,7 @@ import { useEffect } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { WorkspaceSwitcher } from './workspace-switcher';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
+import { AccountButton } from './account-button';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { open, setOpen, toggleSidebar } = useSidebar();
@@ -90,6 +91,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenu className='gap-1 flex flex-col items-center'>
                 <SidebarMenuItem>
                   <ThemeToggle />
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <AccountButton />
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   {/* The dialog itself lives at the root, so the command,
