@@ -4496,6 +4496,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-store",
  "tauri-specta",
+ "tempfile",
  "tokio",
  "trash",
  "ts-rs",

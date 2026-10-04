@@ -48,6 +48,13 @@ export async function vaults(refresh = false): Promise<Vault[]> {
   return vaultList;
 }
 
+/** A new, empty vault on the server: the web app's new workspace. */
+export async function createVault(name: string): Promise<Vault> {
+  const vault = await apiJson<Vault>('/v1/vaults', { method: 'POST', json: { name } });
+  vaultList = null;
+  return vault;
+}
+
 /** A vault by name, from what's already loaded (for synchronous callers). */
 export function knownVault(name: string): Vault | undefined {
   if (current?.name === name) return current;

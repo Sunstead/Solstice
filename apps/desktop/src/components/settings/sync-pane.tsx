@@ -8,8 +8,9 @@ import { Input } from '@sunstead/ui/components/input';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { setSetting, useSetting } from '@/lib/settings/store';
 import { useSync } from '@/lib/stores/sync';
-import { cn } from '@/lib/utils';
 import { SyncStatusText } from '@/components/sync/status';
+import { VaultPicker } from '@/components/sync/vault-picker';
+import { useServerVaults } from '@/hooks/use-server-vaults';
 
 function Heading({ children }: { children: React.ReactNode }) {
   return <h3 className='pb-1 text-xs font-medium text-muted-foreground'>{children}</h3>;
@@ -183,21 +184,20 @@ function LinkedFolder({
 }
 
 function LinkForm({ server, folder, onLinked }: { server: string; folder: string; onLinked: () => void }) {
-  const [vaults, setVaults] = useState<SyncVault[] | null>(null);
+  const { vaults, error: loadError } = useServerVaults(server);
   const [choice, setChoice] = useState<string>('new');
   const [name, setName] = useState(folder);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<SyncLinkReport | null>(null);
 
-  useEffect(() => {
-    void commands.syncVaults(server).then((r) => {
-      if (r.status === 'error') return setError(r.error);
-      setVaults(r.data);
-      const same = r.data.find((v) => v.name.toLowerCase() === folder.toLowerCase());
-      if (same) setChoice(same.id);
-    });
-  }, [server, folder]);
+  // A vault with the folder's name is most likely the one it belongs to.
+  const [guessed, setGuessed] = useState(false);
+  if (vaults && !guessed) {
+    setGuessed(true);
+    const same = vaults.find((v) => v.name.toLowerCase() === folder.toLowerCase());
+    if (same) setChoice(same.id);
+  }
 
   const link = async () => {
     setBusy(true);
@@ -248,35 +248,14 @@ function LinkForm({ server, folder, onLinked }: { server: string; folder: string
         Link this folder to a vault on the server. Files on one side are copied to the other; where both
         have a file that differs, this folder's version is kept beside the vault's.
       </p>
-      {vaults === null && !error && <p className='text-muted-foreground'>Loading vaults...</p>}
-      {vaults && (
-        <div className='flex flex-col gap-1' role='radiogroup'>
-          {vaults.map((v) => (
-            <label key={v.id} className='flex items-center gap-2'>
-              <input type='radio' checked={choice === v.id} onChange={() => setChoice(v.id)} />
-              {v.name}
-            </label>
-          ))}
-          <label className='flex items-center gap-2'>
-            <input type='radio' checked={choice === 'new'} onChange={() => setChoice('new')} />
-            New vault
-            <Input
-              className={cn('h-7 max-w-56', choice !== 'new' && 'opacity-50')}
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setChoice('new');
-              }}
-            />
-          </label>
-        </div>
-      )}
+      {vaults === null && !error && !loadError && <p className='text-muted-foreground'>Loading vaults...</p>}
+      {vaults && <VaultPicker vaults={vaults} choice={choice} onChoice={setChoice} name={name} onName={setName} />}
       <div>
         <Button size='sm' disabled={busy || !vaults || (choice === 'new' && !name.trim())} onClick={() => void link()}>
           {busy ? 'Linking...' : 'Link this folder'}
         </Button>
       </div>
-      {error && <p className='text-destructive'>{error}</p>}
+      {(error ?? loadError) && <p className='text-destructive'>{error ?? loadError}</p>}
     </div>
   );
 }

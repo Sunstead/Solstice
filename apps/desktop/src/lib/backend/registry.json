@@ -43,10 +43,16 @@
       "label": "Close Tab"
     },
     {
+      "accelerator": null,
+      "id": "file.new_workspace",
+      "is_overridden": false,
+      "label": "New Workspace..."
+    },
+    {
       "accelerator": "CmdOrCtrl+Shift+O",
       "id": "file.open_folder",
       "is_overridden": false,
-      "label": "Open Folder"
+      "label": "Open Folder as Workspace..."
     },
     {
       "accelerator": null,
@@ -323,10 +329,18 @@
         },
         {
           "Command": {
+            "accelerator": null,
+            "id": "file.new_workspace",
+            "is_overridden": false,
+            "label": "New Workspace..."
+          }
+        },
+        {
+          "Command": {
             "accelerator": "CmdOrCtrl+Shift+O",
             "id": "file.open_folder",
             "is_overridden": false,
-            "label": "Open Folder"
+            "label": "Open Folder as Workspace..."
           }
         },
         "Separator",

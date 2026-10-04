@@ -20,6 +20,7 @@ import { api, apiJson, ApiError, messageOf } from './api';
 import { Emitter } from './emitter';
 import { attachmentName } from './shell';
 import {
+  createVault,
   currentSocketState,
   currentVault,
   exists,
@@ -232,6 +233,9 @@ export const webCommands: Commands = {
       return writeBytes(`${intoDir}/${attachmentName(from)}`, blob, true);
     }),
   listWorkspaceFilesRecursive: (path) => attempt(() => listRecursive(path)),
+  // A workspace on the web is a vault; there's no folder to put it in.
+  createWorkspace: (_parent, name) => attempt(async () => rootOf(await createVault(name.trim()))),
+  defaultWorkspaceParent: () => Promise.resolve(null),
   setWorkspace: (path) =>
     attempt(async () => {
       await open(path);

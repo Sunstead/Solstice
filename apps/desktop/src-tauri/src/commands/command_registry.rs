@@ -47,6 +47,7 @@ command_id! {
     FileOpenFile => "file.open_file",
     FileNewTab => "file.new_tab",
     FileNewFolder => "file.new_folder",
+    FileNewWorkspace => "file.new_workspace",
     FileOpenFolder => "file.open_folder",
     FileCloseTab => "file.close_tab",
 
@@ -180,8 +181,14 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             is_overridden: false,
         },
         CommandMeta {
+            id: CommandId::FileNewWorkspace,
+            label: "New Workspace...".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
             id: CommandId::FileOpenFolder,
-            label: "Open Folder".into(),
+            label: "Open Folder as Workspace...".into(),
             accelerator: Some("CmdOrCtrl+Shift+O".into()),
             is_overridden: false,
         },

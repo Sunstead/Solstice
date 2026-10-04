@@ -83,6 +83,7 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                     Command(FileNewTab),
                     Separator,
                     Command(FileOpenFile),
+                    Command(FileNewWorkspace),
                     Command(FileOpenFolder),
                     Separator,
                     // A submenu rather than a flat block: these all act on
