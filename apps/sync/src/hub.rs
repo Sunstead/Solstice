@@ -92,6 +92,11 @@ pub struct Hub {
     db: Db,
     notes_dir: PathBuf,
     running: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<Cmd>>>>,
+    /// Held while a vault loads. Two loads of one vault would each absorb its
+    /// folder as new, minting different ids for the same files, and both save
+    /// their state: the vault would then be served by one and stored as the
+    /// other. Loads are rare, so one at a time is plenty.
+    loading: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl Hub {
@@ -100,7 +105,17 @@ impl Hub {
             db,
             notes_dir,
             running: Arc::default(),
+            loading: Arc::default(),
         }
+    }
+
+    fn running_task(&self, vault: &str) -> Option<mpsc::UnboundedSender<Cmd>> {
+        self.running
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(vault)
+            .filter(|tx| !tx.is_closed())
+            .cloned()
     }
 
     pub fn folder(&self, username: &str, vault: &str) -> PathBuf {
@@ -132,15 +147,13 @@ impl Hub {
         vault: &VaultRow,
         username: &str,
     ) -> Result<mpsc::UnboundedSender<Cmd>, String> {
-        if let Some(tx) = self
-            .running
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .get(&vault.id)
-        {
-            if !tx.is_closed() {
-                return Ok(tx.clone());
-            }
+        if let Some(tx) = self.running_task(&vault.id) {
+            return Ok(tx);
+        }
+        let _loading = self.loading.lock().await;
+        // Another request may have started it while this one waited.
+        if let Some(tx) = self.running_task(&vault.id) {
+            return Ok(tx);
         }
         let state = VaultTask::load(
             self.db.clone(),
@@ -149,13 +162,10 @@ impl Hub {
         )
         .await?;
         let (tx, rx) = mpsc::unbounded_channel();
-        let mut running = self.running.lock().unwrap_or_else(|p| p.into_inner());
-        // Another request may have started it while this one loaded.
-        if let Some(existing) = running.get(&vault.id).filter(|t| !t.is_closed()) {
-            return Ok(existing.clone());
-        }
-        running.insert(vault.id.clone(), tx.clone());
-        drop(running);
+        self.running
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(vault.id.clone(), tx.clone());
         let running = self.running.clone();
         let id = vault.id.clone();
         let watch_tx = tx.clone();

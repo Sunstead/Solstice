@@ -211,6 +211,50 @@ async fn a_vault_read_and_changed_from_the_web() {
 }
 
 #[tokio::test]
+async fn a_vault_opened_by_many_requests_at_once_loads_once() {
+    let s = serve(
+        AuthMode::Dev {
+            username: "pwb".into(),
+        },
+        None,
+    )
+    .await;
+    let folder = s.state.notes_dir.join("pwb/Notes/plans");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("Plan.md"), "plan").unwrap();
+    std::fs::write(folder.join("../Welcome.md"), "hello").unwrap();
+    let c = client();
+    // Listing finds the folder and makes it a vault, not yet loaded.
+    let vaults = json_of(c.get(format!("{}/v1/vaults", s.base)).send().await.unwrap()).await;
+    let id = vaults[0]["id"].as_str().unwrap().to_owned();
+
+    // The web app's first load: several requests at once.
+    let first: Vec<_> = (0..8)
+        .map(|_| c.get(format!("{}/v1/vaults/{id}/tree", s.base)).send())
+        .collect();
+    for res in futures_util::future::join_all(first).await {
+        assert_eq!(res.unwrap().status(), StatusCode::OK);
+    }
+    // Every request saw the same notes.
+    let tree = json_of(
+        c.get(format!("{}/v1/vaults/{id}/tree", s.base))
+            .send()
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(tree["files"].as_array().unwrap().len(), 2);
+    // And only those were ever stored: one load, one id per file.
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    let docs = s.state.db.docs(&id).await.unwrap();
+    assert_eq!(
+        docs.iter().filter(|d| d.doc != "manifest").count(),
+        2,
+        "{docs:?}"
+    );
+}
+
+#[tokio::test]
 async fn a_save_never_writes_over_an_edit_made_in_the_folder() {
     let s = serve(
         AuthMode::Dev {
