@@ -211,9 +211,15 @@ pub const REGISTRY_PATH: &str = "../src/lib/backend/registry.json";
 /// for them, so it reads this copy; written with the bindings, and checked
 /// with them.
 pub fn registry_json() -> String {
-    // As on Linux, whatever exports it: the web app runs everywhere.
-    let commands = commands::command_registry::commands_labelled("Show in File Manager");
-    let menus = commands::menu_layout::menu_layout_on(&commands, false);
+    use commands::command_registry::{commands_labelled, web_commands, NOT_ON_WEB};
+    // As on Linux, whatever exports it: the web app runs everywhere. The
+    // menus are laid out over every command (the layout names them all),
+    // then lose the ones the web leaves out.
+    let all = commands_labelled("Show in File Manager");
+    let commands = web_commands();
+    let web: std::collections::HashMap<_, _> = commands.iter().map(|c| (c.id, c)).collect();
+    let with_web_keys: Vec<_> = all.iter().map(|c| web.get(&c.id).map_or_else(|| c.clone(), |w| (*w).clone())).collect();
+    let menus = commands::menu_layout::menu_layout_without(&with_web_keys, false, &NOT_ON_WEB);
     let value = serde_json::json!({ "commands": commands, "menus": menus });
     serde_json::to_string_pretty(&value).expect("the registry serializes") + "\n"
 }

@@ -7,7 +7,7 @@
       "label": "Settings..."
     },
     {
-      "accelerator": "CmdOrCtrl+N",
+      "accelerator": "Alt+N",
       "id": "file.new_note",
       "is_overridden": false,
       "label": "New Note"
@@ -19,7 +19,7 @@
       "label": "New Canvas"
     },
     {
-      "accelerator": "CmdOrCtrl+Alt+N",
+      "accelerator": "Alt+Shift+N",
       "id": "file.new_folder",
       "is_overridden": false,
       "label": "New Folder"
@@ -31,13 +31,13 @@
       "label": "Open File"
     },
     {
-      "accelerator": "CmdOrCtrl+T",
+      "accelerator": "Alt+T",
       "id": "file.new_tab",
       "is_overridden": false,
       "label": "New Tab"
     },
     {
-      "accelerator": "CmdOrCtrl+W",
+      "accelerator": "Alt+W",
       "id": "file.close_tab",
       "is_overridden": false,
       "label": "Close Tab"
@@ -49,22 +49,10 @@
       "label": "New Workspace..."
     },
     {
-      "accelerator": "CmdOrCtrl+Shift+O",
-      "id": "file.open_folder",
-      "is_overridden": false,
-      "label": "Open Folder as Workspace..."
-    },
-    {
       "accelerator": null,
       "id": "file.reveal_in_explorer",
       "is_overridden": false,
       "label": "Reveal in Explorer"
-    },
-    {
-      "accelerator": null,
-      "id": "file.reveal_in_system",
-      "is_overridden": false,
-      "label": "Show in File Manager"
     },
     {
       "accelerator": null,
@@ -288,7 +276,7 @@
       "entries": [
         {
           "Command": {
-            "accelerator": "CmdOrCtrl+N",
+            "accelerator": "Alt+N",
             "id": "file.new_note",
             "is_overridden": false,
             "label": "New Note"
@@ -304,7 +292,7 @@
         },
         {
           "Command": {
-            "accelerator": "CmdOrCtrl+Alt+N",
+            "accelerator": "Alt+Shift+N",
             "id": "file.new_folder",
             "is_overridden": false,
             "label": "New Folder"
@@ -312,7 +300,7 @@
         },
         {
           "Command": {
-            "accelerator": "CmdOrCtrl+T",
+            "accelerator": "Alt+T",
             "id": "file.new_tab",
             "is_overridden": false,
             "label": "New Tab"
@@ -335,14 +323,6 @@
             "label": "New Workspace..."
           }
         },
-        {
-          "Command": {
-            "accelerator": "CmdOrCtrl+Shift+O",
-            "id": "file.open_folder",
-            "is_overridden": false,
-            "label": "Open Folder as Workspace..."
-          }
-        },
         "Separator",
         {
           "Submenu": {
@@ -353,14 +333,6 @@
                   "id": "file.reveal_in_explorer",
                   "is_overridden": false,
                   "label": "Reveal in Explorer"
-                }
-              },
-              {
-                "Command": {
-                  "accelerator": null,
-                  "id": "file.reveal_in_system",
-                  "is_overridden": false,
-                  "label": "Show in File Manager"
                 }
               },
               {
@@ -437,7 +409,7 @@
         "Separator",
         {
           "Command": {
-            "accelerator": "CmdOrCtrl+W",
+            "accelerator": "Alt+W",
             "id": "file.close_tab",
             "is_overridden": false,
             "label": "Close Tab"

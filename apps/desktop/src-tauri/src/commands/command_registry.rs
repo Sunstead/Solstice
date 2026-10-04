@@ -126,6 +126,37 @@ fn reveal_in_system_label() -> &'static str {
     }
 }
 
+/// Commands the web app leaves out: it has no folder to open as a workspace
+/// and no file manager to show a file in.
+pub const NOT_ON_WEB: [CommandId; 2] = [CommandId::FileOpenFolder, CommandId::FileRevealInSystem];
+
+/// The web app's default where it differs. Browsers keep Ctrl/Cmd+N, T and W
+/// (new window, new tab, close tab) for themselves, so those move to Alt.
+fn web_accelerator(id: CommandId) -> Option<&'static str> {
+    match id {
+        CommandId::FileNewNote => Some("Alt+N"),
+        CommandId::FileNewFolder => Some("Alt+Shift+N"),
+        CommandId::FileNewTab => Some("Alt+T"),
+        CommandId::FileCloseTab => Some("Alt+W"),
+        _ => None,
+    }
+}
+
+/// The registry as the web app has it: the browser's defaults, without the
+/// commands it can't run.
+pub fn web_commands() -> Vec<CommandMeta> {
+    commands_labelled("Show in File Manager")
+        .into_iter()
+        .filter(|c| !NOT_ON_WEB.contains(&c.id))
+        .map(|mut c| {
+            if let Some(accelerator) = web_accelerator(c.id) {
+                c.accelerator = Some(accelerator.into());
+            }
+            c
+        })
+        .collect()
+}
+
 pub fn default_commands() -> Vec<CommandMeta> {
     commands_labelled(reveal_in_system_label())
 }
@@ -441,4 +472,25 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             is_overridden: false,
         }
     ]
+}
+#[cfg(test)]
+mod web_tests {
+    use super::*;
+
+    #[test]
+    fn the_web_keeps_the_browsers_keys_free() {
+        let web = web_commands();
+        let key = |id: CommandId| web.iter().find(|c| c.id == id).and_then(|c| c.accelerator.clone());
+        assert_eq!(key(CommandId::FileNewNote).as_deref(), Some("Alt+N"));
+        assert_eq!(key(CommandId::FileNewTab).as_deref(), Some("Alt+T"));
+        assert_eq!(key(CommandId::FileCloseTab).as_deref(), Some("Alt+W"));
+        for id in NOT_ON_WEB {
+            assert!(web.iter().all(|c| c.id != id), "{id} is on the web");
+        }
+        // No browser-reserved accelerator is left anywhere.
+        for c in &web {
+            let a = c.accelerator.as_deref().unwrap_or_default();
+            assert!(!["CmdOrCtrl+N", "CmdOrCtrl+T", "CmdOrCtrl+W"].contains(&a), "{} uses {a}", c.id);
+        }
+    }
 }
