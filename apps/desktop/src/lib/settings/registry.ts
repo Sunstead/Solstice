@@ -64,7 +64,7 @@ export const settingsRegistry = {
     scope: 'global',
     label: 'Theme',
     options: () => themeOptions(),
-    default: 'solstice-dark',
+    default: 'sunstead-dark',
     visibleWhen: (get) => get('theme.mode') === 'fixed',
   }),
 
@@ -74,7 +74,7 @@ export const settingsRegistry = {
     scope: 'global',
     label: 'Light theme',
     options: () => themeOptions('light'),
-    default: 'solstice-light',
+    default: 'sunstead-light',
     visibleWhen: (get) => get('theme.mode') === 'system',
   }),
 
@@ -84,7 +84,7 @@ export const settingsRegistry = {
     scope: 'global',
     label: 'Dark theme',
     options: () => themeOptions('dark'),
-    default: 'solstice-dark',
+    default: 'sunstead-dark',
     visibleWhen: (get) => get('theme.mode') === 'system',
   }),
 

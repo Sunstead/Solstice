@@ -10,7 +10,7 @@ import {
   SquarePlus,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import {
   ViewerToolbar,
   ViewerToolbarReadout,
@@ -19,7 +19,7 @@ import {
 import {
   ContextMenu,
   ContextMenuTrigger,
-} from '@/components/ui/context-menu';
+} from '@sunstead/ui/components/context-menu';
 import {
   addNode,
   boundsOf,

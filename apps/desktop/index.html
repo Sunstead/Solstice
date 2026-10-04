@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark" data-theme="sunstead-dark" data-style="rounded">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
@@ -8,25 +8,56 @@
     <script>
       /*
        * Paints the last-used theme before the first frame. The settings store
-       * loads asynchronously, so without this the app draws once in whatever
-       * `:root` says and then flashes to the real palette. Pure optimisation --
+       * loads asynchronously, so without this the app draws once in the
+       * default theme and then flashes to the real one. Pure optimisation --
        * `lib/theme/apply.ts` writes this key and wins a tick later either way,
        * so a stale or missing value costs nothing but the flash it prevents.
+       *
+       * Keep the ids, schemes and styles in step with @sunstead/ui's
+       * lib/themes.ts (themes-sync.test.ts checks).
        */
-      try {
-        var saved = JSON.parse(localStorage.getItem('solstice.theme.lastApplied'));
-        if (saved && (saved.appearance === 'light' || saved.appearance === 'dark')) {
-          document.documentElement.classList.add(saved.appearance);
+      (function () {
+        var themes = {
+          'sunstead-dark': 'dark rounded',
+          nebula: 'dark rounded',
+          aurora: 'dark rounded',
+          mars: 'dark rounded',
+          'event-horizon': 'dark rounded',
+          eclipse: 'dark rounded',
+          'deep-field': 'dark rounded',
+          stone: 'dark rounded',
+          ember: 'dark rounded',
+          concrete: 'dark rounded',
+          inferno: 'dark rounded',
+          hologram: 'dark tech',
+          terminal: 'dark tech',
+          'red-alert': 'dark tech',
+          'sunstead-light': 'light rounded',
+          solar: 'light rounded',
+          lunar: 'light rounded',
+          comet: 'light rounded',
+          orchard: 'light rounded',
+          brutalist: 'light rounded',
+          bubblegum: 'light rounded',
+          blueprint: 'light tech',
+        };
+        try {
+          var saved = JSON.parse(localStorage.getItem('solstice.theme.lastApplied'));
+          if (!saved || !Object.prototype.hasOwnProperty.call(themes, saved.theme)) return;
+          var info = themes[saved.theme].split(' ');
+          var appearance = saved.appearance === 'light' || saved.appearance === 'dark' ? saved.appearance : info[0];
+          var root = document.documentElement;
+          root.setAttribute('data-theme', saved.theme);
+          root.setAttribute('data-style', info[1]);
+          root.className = appearance;
           for (var i = 0; i < saved.vars.length; i++) {
             var entry = saved.vars[i];
-            if (entry[0].indexOf('--') === 0) {
-              document.documentElement.style.setProperty(entry[0], entry[1]);
-            }
+            if (entry[0].indexOf('--') === 0) root.style.setProperty(entry[0], entry[1]);
           }
+        } catch (error) {
+          /* No stored theme, or storage is unavailable. */
         }
-      } catch (error) {
-        /* No stored theme, or storage is unavailable. */
-      }
+      })();
     </script>
   </head>
 

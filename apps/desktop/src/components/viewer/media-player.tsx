@@ -13,14 +13,14 @@ import {
   VolumeX,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Slider } from '@/components/ui/slider';
+} from '@sunstead/ui/components/dropdown-menu';
+import { Slider } from '@sunstead/ui/components/slider';
 import { cn } from '@/lib/utils';
 import { ViewerToolbar, ViewerToolbarSeparator } from './viewer-toolbar';
 

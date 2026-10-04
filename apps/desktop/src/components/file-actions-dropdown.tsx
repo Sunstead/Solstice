@@ -1,7 +1,7 @@
 import { MoreVertical } from 'lucide-react';
 
 import { targetFromPath } from '@/lib/entry-actions';
-import { Button } from './ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { useEntryMenuItems, type EntryMenuSurface } from '@/lib/entry-menu-items';
 import { EntryMenuItems } from './entry-menu-items';
 import {
@@ -13,7 +13,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from './ui/dropdown-menu';
+} from '@sunstead/ui/components/dropdown-menu';
 
 const components = {
   Item: DropdownMenuItem,

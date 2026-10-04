@@ -1,13 +1,13 @@
 // components/blank-tab.tsx
 import { runCommand } from '@/lib/commands';
-import { Button } from './ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { FilePlusCorner, Frame, LucideIcon, Search, X } from 'lucide-react';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { CommandId } from '@/bindings';
 import { Keybind } from './keybind';
 import MonochromeIcon from '@/assets/icons/app/icon_transparent.svg?react';
 import React from 'react';
-import { ScrollArea } from './ui/scroll-area';
+import { ScrollArea } from '@sunstead/ui/components/scroll-area';
 
 const blankTabActions: {
   label: string;

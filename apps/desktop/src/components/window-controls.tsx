@@ -3,7 +3,7 @@ import {
   getCurrentWindow,
   type Window as TauriWindow,
 } from '@tauri-apps/api/window';
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 
 const appWindow: TauriWindow = getCurrentWindow(); // sync, safe at module scope
 

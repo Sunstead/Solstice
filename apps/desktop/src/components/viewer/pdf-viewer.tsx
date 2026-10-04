@@ -3,8 +3,8 @@ import { Document } from 'react-pdf';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { ChevronLeft, ChevronRight, FileWarning, Minus, Plus } from 'lucide-react';
 
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Input } from '@sunstead/ui/components/input';
+import { Button } from '@sunstead/ui/components/button';
 import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
 import type { ScopedCommandId } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';

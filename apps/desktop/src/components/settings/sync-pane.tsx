@@ -7,8 +7,8 @@ import {
   type SyncServerInfo,
   type SyncVault,
 } from '@/bindings';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@sunstead/ui/components/button';
+import { Input } from '@sunstead/ui/components/input';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { setSetting, useSetting } from '@/lib/settings/store';
 import { useSync } from '@/lib/stores/sync';

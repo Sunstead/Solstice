@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { CaseSensitive, ChevronDown, ChevronUp, WholeWord, X } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@sunstead/ui/components/button';
+import { Input } from '@sunstead/ui/components/input';
 import { useFindStore } from '@/lib/stores/find';
 import { cn } from '@/lib/utils';
 

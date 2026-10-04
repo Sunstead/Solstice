@@ -35,11 +35,11 @@ import {
   findCornerTabset,
   syncTopEdgeTabsetDrag,
 } from '@/lib/flexlayout-utils';
-import { useSidebar } from './ui/resizable-sidebar';
+import { useSidebar } from '@sunstead/ui/components/resizable-sidebar';
 import { AppMenubar } from './app-menu-dropdown';
 import { getFileIcon } from '@/assets/icons';
 import { getFileExtension } from '@/lib/utils';
-import { Button } from './ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { registerCommand, runCommand, unregisterCommand } from '@/lib/commands';
 import { stripPresetExtension } from '@/lib/stores/entry-input';

@@ -7,7 +7,7 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
-} from '@/components/ui/context-menu';
+} from '@sunstead/ui/components/context-menu';
 import type { CanvasColor, EdgeEnd } from '@/lib/canvas/types';
 import { CanvasColorPicker } from './canvas-color-picker';
 import {

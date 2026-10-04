@@ -107,7 +107,14 @@ Tab/pane layout is [flexlayout-react](https://github.com/caplin/FlexLayout), wra
 
 ### UI components
 
-shadcn/ui-based, configured in [components.json](apps/desktop/components.json) (style `base-vega`, neutral base color). Primitives live in `src/components/ui/`, feature components directly under `src/components/`. Path alias `@/` → `src/` (see [vite.config.ts](apps/desktop/vite.config.ts) and [tsconfig.json](apps/desktop/tsconfig.json)).
+The primitives come from [`@sunstead/ui`](https://github.com/Sunstead/sunstead-ui), the UI package shared by every Sunstead app, pinned to a tag in `apps/desktop/package.json`. Import them as `@sunstead/ui/components/<name>` (shadcn `base-vega` on Base UI, translucent menus, and the resizable sidebar). They were Solstice's own before they moved there, class for class, so a change to one is a change in that repo and lands in Atlas and Cosmos too. Feature components live directly under `src/components/`. Path alias `@/` → `src/` (see [vite.config.ts](apps/desktop/vite.config.ts) and [tsconfig.json](apps/desktop/tsconfig.json)).
+
+- The package is source: `styles/app.css` imports `@sunstead/ui/styles.css` and has an `@source` for it, and `vite.config.ts` keeps it out of dependency pre-bundling.
+- To work on both at once, install a packed copy (`npm pack` in sunstead-ui, then `npm install -w apps/desktop <tgz>`). Never commit it.
+
+### Themes
+
+The built-in themes are the shared Sunstead set (22, in Dark and Light groups), defined as CSS in `@sunstead/ui` (`[data-theme='<id>']` on `<html>`). [lib/theme/apply.ts](apps/desktop/src/lib/theme/apply.ts) sets that attribute, and lays a user theme (JSON in a themes folder, `user:` ids) over its appearance's default as inline variables. The choice lives in settings (`theme.mode`, `theme.preset`, `theme.lightPreset`, `theme.darkPreset`). `index.html` paints the last theme before the first frame from its own copy of the ids (`themes-sync.test.ts` keeps it in step). Solstice's older theme ids that merged into a Sunstead theme are mapped once by `migrateThemeIds` in `lib/settings/migrations.ts`. Solstice never sets `color-scheme`.
 
 ### Window chrome
 

@@ -13,9 +13,9 @@ import {
   SidebarMenuItem,
   SidebarRail,
   useSidebar,
-} from '@/components/ui/resizable-sidebar';
+} from '@sunstead/ui/components/resizable-sidebar';
 import { ThemeToggle } from './theme-toggle';
-import { Button } from './ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { primaryViews } from '@/lib/views/registry';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useEffect } from 'react';

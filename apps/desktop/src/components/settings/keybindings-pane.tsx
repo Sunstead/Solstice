@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { cn } from '@/lib/utils';
 import { commands, type CommandMeta } from '@/bindings';
 import { useKeymapStore } from '@/lib/stores/keymap';

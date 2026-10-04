@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ImageOff, Minus, Plus } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { useAssetUrl } from '@/lib/viewer/asset';
 import { basename } from '@/lib/wikilink/target';
 import { CanvasGrid } from './canvas-grid';

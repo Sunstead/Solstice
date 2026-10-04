@@ -15,6 +15,11 @@ export default defineConfig(async () => ({
     svgr(),
     react(),
   ],
+  // @sunstead/ui is source: pre-bundling would give each of its entry points
+  // its own copy of shared modules (two theme contexts, two sidebars).
+  optimizeDeps: {
+    exclude: ['@sunstead/ui'],
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

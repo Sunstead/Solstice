@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
-import { ScrollArea } from './ui/scroll-area';
+import { ScrollArea } from '@sunstead/ui/components/scroll-area';
 import { MilkdownEditorWrapper } from './milkdown-editor';
 import { ViewerHeader } from './viewer/viewer-header';
 import { LinkEditor } from './link-editor';

@@ -1,5 +1,5 @@
 import { platform } from '@tauri-apps/plugin-os';
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { Kbd, KbdGroup } from '@sunstead/ui/components/kbd';
 import { cn } from '@/lib/utils';
 
 /**

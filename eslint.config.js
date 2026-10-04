@@ -54,16 +54,4 @@ export default tseslint.config(
       'react-hooks/static-components': 'warn',
     },
   },
-  {
-    // Vendored shadcn primitives, listed last so these win. The shadcn CLI
-    // regenerates them, so rewriting them for the React Compiler rules would
-    // be undone by the next `shadcn add`.
-    files: ['apps/desktop/src/components/ui/**'],
-    rules: {
-      'react-hooks/purity': 'off',
-      'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/refs': 'off',
-      'react-refresh/only-export-components': 'off',
-    },
-  },
 );

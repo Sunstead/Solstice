@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { Check, Copy, ExternalLink, Link2Off, Pencil } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@sunstead/ui/components/button';
+import { Input } from '@sunstead/ui/components/input';
 import { isSafeExternalHref } from '@/lib/link/url';
 import { useLinkEditor, type LinkTarget } from '@/lib/stores/link-editor';
 

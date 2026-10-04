@@ -1,12 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import { AlertTriangle, Check, FolderOpen, RefreshCw } from 'lucide-react';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { cn } from '@/lib/utils';
 import { commands } from '@/bindings';
 import { setSetting, useSetting } from '@/lib/settings/store';
 import { hasOpenWorkspace } from '@/lib/stores/scoped-storage';
+import { DEFAULT_LIGHT_THEME_ID, DEFAULT_THEME_ID } from '@/lib/theme/builtin';
 import { SWATCH_TOKENS } from '@/lib/theme/tokens';
 import { useThemeCatalogue } from '@/lib/theme/store';
 import type { CatalogueTheme } from '@/lib/theme/types';
@@ -14,20 +15,28 @@ import { SettingList } from './setting-list';
 import { SettingsPane } from './settings-pane';
 
 /**
- * A theme's own colors, read straight off its declaration rather than off the
- * document — a card has to show what a theme looks like without applying it.
+ * A theme's own colors, without applying it: the strip carries the theme's
+ * `data-theme` (a built-in, or the one a user theme sits on) plus any user
+ * variables, so `var()` inside it resolves to that theme's values.
  */
 function Swatches({ theme }: { theme: CatalogueTheme }) {
+  const base =
+    theme.source === 'builtin'
+      ? theme.id
+      : theme.appearance === 'light'
+        ? DEFAULT_LIGHT_THEME_ID
+        : DEFAULT_THEME_ID;
   return (
     <div
+      data-theme={base}
       className='flex h-12 overflow-hidden rounded-md ring-1 ring-foreground/10'
-      style={{ backgroundColor: theme.vars['--background'] }}
+      style={{ ...theme.vars, backgroundColor: 'var(--background)' } as CSSProperties}
     >
       {SWATCH_TOKENS.map((token) => (
         <div
           key={token}
           className='flex-1'
-          style={{ backgroundColor: theme.vars[token] }}
+          style={{ backgroundColor: `var(${token})` }}
         />
       ))}
     </div>
@@ -151,16 +160,25 @@ export function ThemePane() {
           </Button>
         </div>
 
-        <div className='grid grid-cols-2 gap-2 lg:grid-cols-3'>
-          {themes.map((theme) => (
-            <ThemeCard
-              key={theme.id}
-              theme={theme}
-              selected={isSelected(theme)}
-              onSelect={() => select(theme)}
-            />
-          ))}
-        </div>
+        {(['dark', 'light'] as const).map((appearance) => (
+          <div key={appearance} className='pb-4 last:pb-0'>
+            <h4 className='pb-1.5 text-[0.6875rem] text-muted-foreground'>
+              {appearance === 'dark' ? 'Dark' : 'Light'}
+            </h4>
+            <div className='grid grid-cols-2 gap-2 lg:grid-cols-3'>
+              {themes
+                .filter((theme) => theme.appearance === appearance)
+                .map((theme) => (
+                  <ThemeCard
+                    key={theme.id}
+                    theme={theme}
+                    selected={isSelected(theme)}
+                    onSelect={() => select(theme)}
+                  />
+                ))}
+            </div>
+          </div>
+        ))}
       </section>
 
       {issues.length > 0 && (

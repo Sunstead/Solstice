@@ -9,6 +9,7 @@ import {
 import {
   hasWork,
   migrateGlobal,
+  migrateThemeIds,
   migrateRescopedTypography,
   type LayerPatch,
 } from './migrations';
@@ -235,6 +236,7 @@ async function applyPatch(scope: SettingScope, patch: LayerPatch) {
 export async function loadGlobalSettings() {
   const layer = await loadLayer('global');
   await applyPatch('global', migrateGlobal(layer));
+  await applyPatch('global', migrateThemeIds(useSettingsStore.getState().global));
 }
 
 /** Called from `syncScopedStores` on every workspace switch. */
