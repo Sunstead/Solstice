@@ -61,6 +61,12 @@ const MIGRATIONS: &[&str] = &[
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (vault_id, doc)
     ) WITHOUT ROWID;",
+    // 0.1: where each vault's files were last written, so a restart can tell
+    // a deleted file from one that never arrived.
+    "CREATE TABLE vault_dirs (
+        vault_id TEXT PRIMARY KEY REFERENCES vaults (id) ON DELETE CASCADE,
+        placed   TEXT NOT NULL
+    ) WITHOUT ROWID;",
 ];
 
 pub fn now() -> i64 {
@@ -391,6 +397,40 @@ impl Db {
                 }
             }
             tx.commit()?;
+            Ok(())
+        })
+        .await
+    }
+}
+
+impl Db {
+    /// [`solstice_sync_fs::VaultDir::placed`], as last saved.
+    pub async fn placed(&self, vault: &str) -> Result<Option<solstice_sync_fs::Placed>> {
+        let vault = vault.to_owned();
+        let json: Option<String> = self
+            .call(move |c| {
+                Ok(c.query_row(
+                    "SELECT placed FROM vault_dirs WHERE vault_id = ?1",
+                    [vault],
+                    |r| r.get(0),
+                )
+                .optional()?)
+            })
+            .await?;
+        Ok(json.and_then(|j| serde_json::from_str(&j).ok()))
+    }
+
+    pub async fn save_placed(&self, vault: &str, placed: &solstice_sync_fs::Placed) -> Result<()> {
+        let (vault, json) = (
+            vault.to_owned(),
+            serde_json::to_string(placed).expect("maps serialize"),
+        );
+        self.call(move |c| {
+            c.execute(
+                "INSERT INTO vault_dirs (vault_id, placed) VALUES (?1, ?2)
+                 ON CONFLICT (vault_id) DO UPDATE SET placed = excluded.placed",
+                params![vault, json],
+            )?;
             Ok(())
         })
         .await

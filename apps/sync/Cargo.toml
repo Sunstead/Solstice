@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 solstice-core = { path = "../../crates/solstice-core" }
 solstice-sync = { path = "../../crates/solstice-sync" }
+solstice-sync-fs = { path = "../../crates/solstice-sync-fs" }
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "signal", "fs"] }
 tower-http = { version = "0.6", features = ["trace"] }
@@ -29,8 +30,6 @@ base64 = "0.22"
 getrandom = "0.3"
 url = "2"
 uuid = { version = "1", features = ["v4"] }
-notify = "8"
-notify-debouncer-full = "0.7"
 futures-util = "0.3"
 dotenvy = "0.15"
 

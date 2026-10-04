@@ -1,17 +1,17 @@
-//! A vault's folder on the server: plain files, the truth Atlas and backups
+//! A synced vault's folder: plain files, the truth editors, Atlas and backups
 //! read. The sync state is written out here as files change, and edits made
-//! here directly (by hand, by a script) are read back in as sync changes.
+//! here directly (by an editor, by hand, by a script) are read back in as
+//! sync changes. Shared by Solstice Sync's server and devices.
 //!
-//! `.solstice/` inside the folder is the server's own: `blobs/` caches
-//! attachments by hash, `trash/` keeps files deleted through sync.
+//! A private folder inside it (the server's `.solstice/`, a device's
+//! `.solstice/sync/`) holds `blobs/` (attachments by hash), `trash/` (files
+//! deleted through sync) and `tmp/`. Hidden paths never sync.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use solstice_sync::{content_hash, Content, FileId, Kind, Msg, Vault};
-
-const OWN: &str = ".solstice";
 
 /// One file as found on disk.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -21,12 +21,19 @@ pub struct Found {
     pub modified: Option<SystemTime>,
 }
 
+/// Where each file was last written or read, by id: `(path, hash)`.
+pub type Placed = HashMap<FileId, (String, String)>;
+
 pub struct VaultDir {
     root: PathBuf,
+    /// The private folder, absolute.
+    own: PathBuf,
     /// Hashes by path, reused while size and mtime are unchanged.
     seen: HashMap<String, Found>,
-    /// Where each file was last written, by id: `(path, hash)`.
-    placed: HashMap<FileId, (String, String)>,
+    /// `None` until this folder and the vault have been compared once (see
+    /// [`VaultDir::absorb`]). Save it with the vault's state and restore it
+    /// with [`VaultDir::set_placed`].
+    placed: Option<Placed>,
 }
 
 fn rel_path(root: &Path, path: &Path) -> Option<String> {
@@ -40,17 +47,36 @@ fn hidden(rel: &str) -> bool {
 }
 
 impl VaultDir {
-    pub fn open(root: PathBuf) -> std::io::Result<Self> {
+    /// `own` is the private folder, relative to `root` (`.solstice`).
+    pub fn open(root: PathBuf, own: &str) -> std::io::Result<Self> {
         std::fs::create_dir_all(&root)?;
+        let own = own.split('/').fold(root.clone(), |p, s| p.join(s));
         Ok(Self {
             root,
+            own,
             seen: HashMap::new(),
-            placed: HashMap::new(),
+            placed: None,
         })
     }
 
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    pub fn own(&self) -> &Path {
+        &self.own
+    }
+
+    /// Where files were last written, for saving with the vault's state.
+    pub fn placed(&self) -> Option<&Placed> {
+        self.placed.as_ref()
+    }
+
+    /// Restores [`VaultDir::placed`]; or, on linking, records the files that
+    /// already match (an empty map means "compare from here on", unlike
+    /// never having compared).
+    pub fn set_placed(&mut self, placed: Placed) {
+        self.placed = Some(placed);
     }
 
     fn abs(&self, rel: &str) -> PathBuf {
@@ -96,6 +122,15 @@ impl VaultDir {
         Ok(out)
     }
 
+    /// Records the file at `rel` as it is now (an editor just wrote it, and
+    /// the caller has applied that write to the vault), so a later
+    /// [`VaultDir::absorb`] doesn't count it again.
+    pub fn refresh(&mut self, rel: &str) -> std::io::Result<()> {
+        let bytes = self.read(rel)?;
+        self.note_written(rel, &bytes);
+        Ok(())
+    }
+
     pub fn read(&self, rel: &str) -> std::io::Result<Vec<u8>> {
         std::fs::read(self.abs(rel))
     }
@@ -106,7 +141,7 @@ impl VaultDir {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let tmp = self.root.join(OWN).join("tmp");
+        let tmp = self.own.join("tmp");
         std::fs::create_dir_all(&tmp)?;
         let tmp = tmp.join(uuid::Uuid::new_v4().to_string());
         std::fs::write(&tmp, bytes)?;
@@ -126,7 +161,7 @@ impl VaultDir {
         }
     }
 
-    /// Moves a file into `.solstice/trash/` rather than deleting it.
+    /// Moves a file into the private `trash/` rather than deleting it.
     fn trash(&mut self, rel: &str) -> std::io::Result<()> {
         let from = self.abs(rel);
         if !from.exists() {
@@ -136,8 +171,7 @@ impl VaultDir {
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_or(0, |d| d.as_secs());
         let to = self
-            .root
-            .join(OWN)
+            .own
             .join("trash")
             .join(format!("{stamp} {}", rel.replace('/', " ∕ ")));
         std::fs::create_dir_all(to.parent().expect("trash has a parent"))?;
@@ -161,7 +195,7 @@ impl VaultDir {
     // ------------------------------------------------------------ blobs
 
     fn blob_path(&self, hash: &str) -> PathBuf {
-        self.root.join(OWN).join("blobs").join(hash)
+        self.own.join("blobs").join(hash)
     }
 
     /// Keeps an attachment's bytes by hash; returns the hash.
@@ -194,20 +228,26 @@ impl VaultDir {
     /// deletes (to the trash). Attachments whose bytes haven't arrived yet
     /// wait for the next call.
     pub fn materialize(&mut self, vault: &Vault) -> std::io::Result<()> {
+        let mut placed = self.placed.take().unwrap_or_default();
+        let result = self.materialize_into(vault, &mut placed);
+        self.placed = Some(placed);
+        result
+    }
+
+    fn materialize_into(&mut self, vault: &Vault, placed: &mut Placed) -> std::io::Result<()> {
         let target = vault.files();
         let live: HashMap<&FileId, &str> = target
             .iter()
             .map(|(path, (id, _))| (id, path.as_str()))
             .collect();
 
-        let gone: Vec<FileId> = self
-            .placed
+        let gone: Vec<FileId> = placed
             .keys()
             .filter(|id| !live.contains_key(id))
             .cloned()
             .collect();
         for id in gone {
-            if let Some((path, _)) = self.placed.remove(&id) {
+            if let Some((path, _)) = placed.remove(&id) {
                 self.trash(&path)?;
             }
         }
@@ -221,7 +261,7 @@ impl VaultDir {
                 },
             };
             let hash = content_hash(&bytes);
-            if let Some((old, _)) = self.placed.get(id).cloned() {
+            if let Some((old, _)) = placed.get(id).cloned() {
                 if old != *path && self.abs(&old).exists() && !self.abs(path).exists() {
                     self.rename(&old, path)?;
                 }
@@ -229,38 +269,49 @@ impl VaultDir {
             if self.seen.get(path).map(|f| &f.hash) != Some(&hash) || !self.abs(path).exists() {
                 self.write(path, &bytes)?;
             }
-            self.placed.insert(id.clone(), (path.clone(), hash));
+            placed.insert(id.clone(), (path.clone(), hash));
         }
         Ok(())
     }
 
-    /// Turns what changed on disk since the last [`materialize`] (or, on
-    /// first use, everything that differs from the vault) into vault
+    /// Turns what changed on disk since the last [`materialize`] into vault
     /// operations: edits, new files, renames (a vanished file and a new one
-    /// with the same content) and deletes. Returns the messages for devices.
+    /// with the same content) and deletes. Returns the messages for peers.
+    ///
+    /// Before the folder and vault were ever compared ([`VaultDir::placed`]
+    /// is `None`), everything that differs from the vault counts, and the
+    /// folder wins: files are always written before state is saved, so the
+    /// folder is never behind it. Attachments whose bytes never arrived
+    /// aren't counted as deleted.
     ///
     /// [`materialize`]: VaultDir::materialize
     pub fn absorb(&mut self, vault: &mut Vault) -> std::io::Result<Vec<Msg>> {
         let disk = self.scan()?;
         let mut msgs = Vec::new();
-        let first_run = self.placed.is_empty();
+        let first_run = self.placed.is_none();
         let files = vault.files();
 
         // What the vault believes is on disk.
         let expected: Vec<(FileId, String, String)> = if first_run {
             files
                 .iter()
-                .map(|(path, (id, content))| {
+                .filter_map(|(path, (id, content))| {
                     let hash = match content {
                         Content::Note(text) => content_hash(text.as_bytes()),
-                        Content::Blob(hash) => hash.clone(),
+                        Content::Blob(hash)
+                            if disk.contains_key(path) || self.get_blob(hash).is_some() =>
+                        {
+                            hash.clone()
+                        }
+                        Content::Blob(_) => return None,
                     };
-                    (id.clone(), path.clone(), hash)
+                    Some((id.clone(), path.clone(), hash))
                 })
                 .collect()
         } else {
             self.placed
                 .iter()
+                .flatten()
                 .map(|(id, (path, hash))| (id.clone(), path.clone(), hash.clone()))
                 .collect()
         };
@@ -344,6 +395,46 @@ impl VaultDir {
     }
 }
 
+/// Keeps a folder watch alive; dropping it stops the events.
+pub struct Watcher {
+    _inner: notify_debouncer_full::Debouncer<
+        notify::RecommendedWatcher,
+        notify_debouncer_full::RecommendedCache,
+    >,
+}
+
+/// Calls `on_change` (on notify's thread; keep it quick) about a second
+/// after files that sync change under `root`. Changes to hidden paths (the
+/// private folder, `.git`, app settings) are ignored. The caller then runs
+/// [`VaultDir::absorb`], which finds what changed; our own writes show up
+/// too and turn out to be nothing.
+pub fn watch(root: &Path, on_change: impl Fn() + Send + 'static) -> notify::Result<Watcher> {
+    use notify::RecursiveMode;
+    use notify_debouncer_full::{new_debouncer, DebounceEventResult};
+    let base = root.to_path_buf();
+    let mut debouncer = new_debouncer(
+        std::time::Duration::from_secs(1),
+        None,
+        move |result: DebounceEventResult| match result {
+            Ok(events) => {
+                let relevant = events.iter().flat_map(|e| e.event.paths.iter()).any(|p| {
+                    rel_path(&base, p).is_some_and(|rel| !rel.is_empty() && !hidden(&rel))
+                });
+                if relevant {
+                    on_change();
+                }
+            }
+            Err(errors) => {
+                for e in errors {
+                    tracing::warn!(error = %e, "file watch error");
+                }
+            }
+        },
+    )?;
+    debouncer.watch(root, RecursiveMode::Recursive)?;
+    Ok(Watcher { _inner: debouncer })
+}
+
 fn other(e: solstice_sync::Error) -> std::io::Error {
     std::io::Error::other(e.to_string())
 }
@@ -354,7 +445,7 @@ mod tests {
 
     fn dir() -> (tempfile::TempDir, VaultDir) {
         let tmp = tempfile::tempdir().unwrap();
-        let vd = VaultDir::open(tmp.path().join("Notes")).unwrap();
+        let vd = VaultDir::open(tmp.path().join("Notes"), ".solstice").unwrap();
         (tmp, vd)
     }
 

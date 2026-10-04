@@ -18,6 +18,8 @@ crates/
   solstice-core/  vault paths, wikilinks, front matter: pure Rust, shared by app, Sync and Atlas
   solstice-sync/  the sync engine (Yjs via yrs): notes, manifest, protocol, merge review; no I/O
                   (design and decisions: docs/sync.md)
+  solstice-sync-fs/      a synced vault's folder: scan, write, attachments, disk edits in
+  solstice-sync-client/  a device's side: link a folder, keep it synced (used by src-tauri/src/sync/)
 packages/         shared TS packages (none yet)
 ```
 
