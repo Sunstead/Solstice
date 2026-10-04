@@ -52,6 +52,15 @@ pub struct ServerInfo {
     pub auth: AuthInfo,
 }
 
+fn is_loopback(url: &Url) -> bool {
+    match url.host() {
+        Some(url::Host::Domain(d)) => d.eq_ignore_ascii_case("localhost"),
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
+    }
+}
+
 #[derive(Clone)]
 pub struct Server {
     base: Url,
@@ -67,10 +76,18 @@ impl Server {
     pub fn new(base: &str) -> Result<Self, Error> {
         crate::install_crypto();
         let mut base = Url::parse(base.trim()).map_err(|e| Error::BadServer(e.to_string()))?;
-        if !matches!(base.scheme(), "http" | "https") {
-            return Err(Error::BadServer(
-                "use an http:// or https:// address".into(),
-            ));
+        match base.scheme() {
+            "https" => {}
+            // Plain HTTP would carry sign-in tokens and notes in the clear:
+            // only for a server on this machine (development).
+            "http" if is_loopback(&base) => {}
+            "http" => {
+                return Err(Error::BadServer(
+                    "use an https:// address (http:// is only for a server on this computer)"
+                        .into(),
+                ))
+            }
+            _ => return Err(Error::BadServer("use an https:// address".into())),
         }
         if !base.path().ends_with('/') {
             base.set_path(&format!("{}/", base.path()));
@@ -207,6 +224,9 @@ impl Server {
         vault: &str,
         hash: &str,
     ) -> Result<Vec<u8>, Error> {
+        if !solstice_sync::is_content_hash(hash) {
+            return Err(Error::BadServer(format!("{hash:?} isn't a content hash")));
+        }
         let req = self
             .http
             .get(self.endpoint(&format!("v1/vaults/{vault}/blobs/{hash}")));
@@ -216,19 +236,33 @@ impl Server {
             .bytes()
             .await
             .map_err(|e| Error::Network(e.to_string()))?;
+        if solstice_sync::content_hash(&bytes) != hash {
+            return Err(Error::BadServer(
+                "an attachment didn't match its hash".into(),
+            ));
+        }
         Ok(bytes.to_vec())
     }
 
-    /// Opens the sync WebSocket. The token goes in the query: WebSockets
-    /// can't send headers from every platform, and the server logs paths only.
+    /// Opens the sync WebSocket, with the token in the `Authorization`
+    /// header like every other request (never the URL).
     pub async fn connect(&self, token: Option<&str>) -> Result<Socket, Error> {
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        use tokio_tungstenite::tungstenite::http::HeaderValue;
+
         let mut url = self.endpoint("v1/sync");
         let scheme = if url.scheme() == "https" { "wss" } else { "ws" };
         url.set_scheme(scheme).expect("ws schemes are valid");
+        let mut req = url
+            .as_str()
+            .into_client_request()
+            .map_err(|e| Error::BadServer(e.to_string()))?;
         if let Some(token) = token {
-            url.query_pairs_mut().append_pair("token", token);
+            let value =
+                HeaderValue::from_str(&format!("Bearer {token}")).map_err(|_| Error::SignedOut)?;
+            req.headers_mut().insert("authorization", value);
         }
-        match tokio_tungstenite::connect_async(url.as_str()).await {
+        match tokio_tungstenite::connect_async(req).await {
             Ok((socket, _)) => Ok(socket),
             Err(tokio_tungstenite::tungstenite::Error::Http(res))
                 if res.status().as_u16() == 401 =>
@@ -236,6 +270,31 @@ impl Server {
                 Err(Error::SignedOut)
             }
             Err(e) => Err(Error::Network(e.to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plain_http_only_on_this_machine() {
+        for ok in [
+            "https://solstice.jupiter.sunstead.net",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080/",
+            "http://[::1]:8080",
+        ] {
+            assert!(Server::new(ok).is_ok(), "{ok}");
+        }
+        for bad in [
+            "http://solstice.jupiter.sunstead.net",
+            "http://100.64.0.1:8080",
+            "ftp://example.com",
+            "not a url",
+        ] {
+            assert!(Server::new(bad).is_err(), "{bad}");
         }
     }
 }

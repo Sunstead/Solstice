@@ -56,6 +56,9 @@ pub struct Principal {
     pub subject: String,
     pub username: String,
     pub groups: Vec<String>,
+    /// When the token expires (seconds since the Unix epoch). A WebSocket
+    /// opened with it is closed then, so it can't outlive the sign-in.
+    pub expires: u64,
 }
 
 pub struct OidcVerifier {
@@ -86,10 +89,9 @@ struct Discovery {
 #[derive(Deserialize)]
 struct Claims {
     sub: String,
+    exp: u64,
     #[serde(default)]
     preferred_username: Option<String>,
-    #[serde(default)]
-    name: Option<String>,
     #[serde(default)]
     groups: Vec<String>,
 }
@@ -296,7 +298,7 @@ impl OidcVerifier {
         for key in self.keys_for(header.kid.as_deref()).await? {
             match decode::<Claims>(token, &key, &validation) {
                 Ok(data) => {
-                    return Ok(self.principal(data.claims));
+                    return self.principal(data.claims);
                 }
                 Err(e) => {
                     last = Some(e);
@@ -309,16 +311,23 @@ impl OidcVerifier {
         ))
     }
 
-    fn principal(&self, c: Claims) -> Principal {
-        Principal {
-            username: c
-                .preferred_username
-                .or(c.name)
-                .filter(|n| !n.is_empty())
-                .unwrap_or_else(|| c.sub.clone()),
+    /// The username names the user's folder, so it must be the provider's
+    /// own username: never a display name, which users may be able to edit.
+    fn principal(&self, c: Claims) -> Result<Principal, VerifyError> {
+        let username = c
+            .preferred_username
+            .filter(|n| !n.is_empty())
+            .ok_or_else(|| {
+                VerifyError::Invalid(
+                    "the token has no preferred_username (request the profile scope)".into(),
+                )
+            })?;
+        Ok(Principal {
+            username,
             subject: c.sub,
             groups: c.groups,
-        }
+            expires: c.exp,
+        })
     }
 }
 
@@ -422,6 +431,7 @@ pub(crate) mod tests {
         assert_eq!(who.username, "pwb");
         assert_eq!(who.subject, "abc123");
         assert_eq!(who.groups, ["homelab-users"]);
+        assert!(who.expires > now());
     }
 
     #[tokio::test]
@@ -445,6 +455,12 @@ pub(crate) mod tests {
         assert!(invalid(v.verify(&token("k1", c)).await), "another issuer");
 
         assert!(invalid(v.verify("not.a.jwt").await), "garbage");
+
+        // A display name must never stand in for the username.
+        let mut c = claims(&p.issuer, &[]);
+        c.as_object_mut().unwrap().remove("preferred_username");
+        c["name"] = json!("pwb");
+        assert!(invalid(v.verify(&token("k1", c)).await), "no username");
 
         // Same claims, signed with a shared secret: must never pass.
         let mut header = Header::new(Algorithm::HS256);

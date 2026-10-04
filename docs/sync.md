@@ -142,17 +142,32 @@ user lists them, under new ids; a device with an old id is told
 `unknown_vault` and links again.
 
 **Auth.** Apps present an Authentik access token, checked offline against
-the provider's keys (the verifier is Cosmos's): `Authorization: Bearer`, or
-`?token=` on the WebSocket. The username names the user's folder, so it must
-be one safe path segment, and belongs to one identity. API tokens
+the provider's keys (the verifier is Cosmos's), always as `Authorization:
+Bearer`, the WebSocket included: tokens never go in URLs. The username
+(`preferred_username`, never a display name) names the user's folder, so it
+must be one safe path segment, and belongs to one identity. API tokens
 (`sst_...`, stored as SHA-256) can only list vaults and create notes, for
 Atlas. `SOLSTICE_DEV_USER` signs everyone in as one user, for development.
+
+**Security.**
+- A sync WebSocket lasts as long as the access token it was opened with
+  (Authentik's are short-lived): the server sends `token_expired` and
+  closes, and the device reconnects with a fresh token, so leaving the
+  allowed groups takes effect within one token's life.
+- Any peer can write the manifest, so its paths are checked wherever they
+  are read: entries whose path isn't a plain, visible vault path (no `..`,
+  nothing absolute or hidden) are ignored by every replica alike. Blob
+  hashes must be 64 hex digits before they name a file, and devices check
+  downloaded attachments against their hash.
+- Devices refuse plain `http://` servers except on the same machine.
+- API tokens don't expire. A user deletes their own; they can only create
+  notes, never read them.
 
 **API.**
 
 | Route | Who | |
 |---|---|---|
-| `GET /healthz`, `GET /v1/info` | anyone | Info says how to sign in, and the protocol version. |
+| `GET /`, `GET /healthz`, `GET /v1/info` | anyone | Info says how to sign in, and the protocol version. |
 | `GET /v1/vaults` | apps, tokens | The user's vaults. |
 | `POST /v1/vaults` `{name}` | apps | A vault is a folder name. |
 | `POST /v1/vaults/{id}/notes` `{path, text}` | apps, tokens | Returns `{id, path}`; a taken path gets the next number. |
