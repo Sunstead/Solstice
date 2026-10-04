@@ -19,6 +19,9 @@ export default defineConfig(async () => ({
   // its own copy of shared modules (two theme contexts, two sidebars).
   optimizeDeps: {
     exclude: ['@sunstead/ui'],
+    // Base UI, reached only through it, imports this CommonJS shim; it has
+    // to be pre-bundled or the browser can't load it in dev.
+    include: ['use-sync-external-store/shim', 'use-sync-external-store/shim/with-selector'],
   },
   resolve: {
     alias: {
