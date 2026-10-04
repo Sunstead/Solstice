@@ -14,7 +14,8 @@
     "tauri": "npm run tauri -w @solstice/desktop --",
     "build": "npm run build -w @solstice/desktop",
     "lint": "eslint .",
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present",
+    "release:app": "node apps/desktop/scripts/release.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
