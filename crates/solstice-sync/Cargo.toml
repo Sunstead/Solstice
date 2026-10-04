@@ -1,0 +1,19 @@
+[package]
+name = "solstice-sync"
+version = "0.1.0"
+edition = "2021"
+description = "Solstice Sync's engine: notes as Yjs documents, the vault manifest, overlap review and the sync protocol. No I/O."
+publish = false
+
+[dependencies]
+solstice-core = { path = "../solstice-core" }
+yrs = "0.28"
+similar = "3"
+serde = { version = "1", features = ["derive"] }
+postcard = { version = "1", default-features = false, features = ["use-std"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+sha2 = "0.10"
+
+[dev-dependencies]
+rand = { version = "0.9", features = ["small_rng"] }
