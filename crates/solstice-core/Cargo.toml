@@ -2,6 +2,7 @@
 name = "solstice-core"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 description = "Vault paths, wikilinks and front matter: the note model Solstice's app, Sync and Atlas share."
 publish = false
 
