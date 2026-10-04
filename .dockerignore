@@ -1,0 +1,12 @@
+# Build context for apps/sync/Dockerfile. Keep it to sources only.
+.git
+.github
+.vscode
+target
+**/node_modules
+**/dist
+apps/desktop/src-tauri/gen
+**/.DS_Store
+*.log
+.env
+.data

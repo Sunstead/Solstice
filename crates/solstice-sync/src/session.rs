@@ -216,8 +216,16 @@ impl Session {
                 let server_sv = sv.as_deref().map(decode_state_vector).transpose()?;
                 let stale = msg.epoch != local_epoch;
                 match (&msg.doc, stale) {
+                    (DocKey::Manifest, true) if !self.seen.contains_key(&DocKey::Manifest) => {
+                        // Never synced with this server: nothing of ours is
+                        // in its history, so nothing can duplicate. Join its
+                        // epoch and merge (our entries have fresh ids).
+                        vault.manifest.epoch = msg.epoch;
+                        self.merge_manifest(vault, &bytes, server_sv.as_ref(), &mut out)?
+                    }
                     (DocKey::Manifest, true) => {
-                        // Nothing more to say until the vault is linked again.
+                        // The server rebuilt the vault since we last synced:
+                        // nothing more until it's linked again.
                         out.events.push(Event::Relink);
                         return Ok(out);
                     }

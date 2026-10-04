@@ -104,10 +104,61 @@ Found while building the engine, and worked around in `crates/solstice-sync`:
   (`postcard`-encoded binary frames of y-sync step 1, step 2 and update
   messages per `(vault, doc)`). Tests run a server and devices in memory,
   on and offline, through randomized edits, renames, deletes and stale saves.
-- `apps/sync`: the axum server (`ghcr.io/sunstead/solstice-sync`). Authentik
-  JWTs for the apps, per-user API tokens for Atlas, rusqlite for state, files
-  under `data/notes/<user>/<vault>/`, blobs over HTTP.
+- `apps/sync`: the server (`ghcr.io/sunstead/solstice-sync`, released with
+  `sync-v*` tags). Details below.
 - The desktop sync client, in Rust inside `src-tauri`, driven by its own file
   watcher, so the editor doesn't change at first.
 
 Later: binding the editor to the `Y.Text` for live co-editing, and the iOS app.
+
+## The server (`apps/sync`)
+
+**Storage.** A vault is a folder, `<notes dir>/<username>/<vault name>/`,
+holding the notes and attachments as plain files, plus each document's Yjs
+state in `sync.db` (users, API tokens, vaults, documents) in the state dir.
+`.solstice/` inside a vault folder is the server's: `blobs/` caches
+attachments by hash, `trash/` keeps files deleted through sync.
+
+**One task per vault in use** owns its documents, folder and connected
+devices. Device frames go through a server-side `Session` per connection;
+updates go on to the vault's other devices. Changes are written to the
+folder at once and the state saved about two seconds later. Files first:
+after a crash the folder is never behind the database, so the folder wins at
+startup, and state lost in those seconds heals itself because devices keep
+full history and resend what the server lacks. A task stops after ten idle
+minutes, and saves on shutdown.
+
+**The folder is live.** A watcher turns edits made there (by hand, a script)
+into changes for devices: edits, new files, renames (a vanished file and a
+new one with the same content) and deletes. At startup each vault is
+reconciled with its folder, and notes whose state was lost are rebuilt from
+their files under a new epoch. Folders in a user's notes dir that aren't
+vaults yet (made by hand, or the database was lost) become vaults when the
+user lists them, under new ids; a device with an old id is told
+`unknown_vault` and links again.
+
+**Auth.** Apps present an Authentik access token, checked offline against
+the provider's keys (the verifier is Cosmos's): `Authorization: Bearer`, or
+`?token=` on the WebSocket. The username names the user's folder, so it must
+be one safe path segment, and belongs to one identity. API tokens
+(`sst_...`, stored as SHA-256) can only list vaults and create notes, for
+Atlas. `SOLSTICE_DEV_USER` signs everyone in as one user, for development.
+
+**API.**
+
+| Route | Who | |
+|---|---|---|
+| `GET /healthz`, `GET /v1/info` | anyone | Info says how to sign in, and the protocol version. |
+| `GET /v1/vaults` | apps, tokens | The user's vaults. |
+| `POST /v1/vaults` `{name}` | apps | A vault is a folder name. |
+| `POST /v1/vaults/{id}/notes` `{path, text}` | apps, tokens | Returns `{id, path}`; a taken path gets the next number. |
+| `PUT`/`GET /v1/vaults/{id}/blobs/{sha256}` | apps | Attachment bytes; upload before the manifest names them. |
+| `GET`/`POST /v1/tokens`, `DELETE /v1/tokens/{id}` | apps | API tokens; the token is shown once. |
+| `GET /v1/sync` | apps | The WebSocket: binary `Frame`s both ways; JSON text notices (`unknown_vault`, `bad_frame`). |
+
+**Config.** `SOLSTICE_BIND` (default `0.0.0.0:8080`), `SOLSTICE_NOTES_DIR`,
+`SOLSTICE_STATE_DIR`, `SOLSTICE_OIDC_ISSUER`, `SOLSTICE_OIDC_CLIENT_ID`
+(default `solstice`), `SOLSTICE_OIDC_SCOPES`, `SOLSTICE_OIDC_ALLOWED_GROUPS`,
+`SOLSTICE_OIDC_DISCOVERY_URL`, `SOLSTICE_DEV_USER`. The server holds no
+secrets: the OIDC client is public.
+

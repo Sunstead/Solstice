@@ -26,5 +26,9 @@ dist-ssr
 # Rust workspace output
 /target/
 
+# Local settings and Sync server data for development.
+.env
+.data/
+
 .tanstack/
 apps/desktop/src/generated/
