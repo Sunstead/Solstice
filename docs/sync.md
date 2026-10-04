@@ -106,8 +106,12 @@ Found while building the engine, and worked around in `crates/solstice-sync`:
   on and offline, through randomized edits, renames, deletes and stale saves.
 - `apps/sync`: the server (`ghcr.io/sunstead/solstice-sync`, released with
   `sync-v*` tags). Details below.
-- The desktop sync client, in Rust inside `src-tauri`, driven by its own file
-  watcher, so the editor doesn't change at first.
+- `crates/solstice-sync-fs`: a synced vault's folder, shared by server and
+  devices. Scanning (hashes cached by size and mtime), writing through a
+  temp file, attachments by hash, deletes to a private `trash/`, and turning
+  disk edits into vault operations.
+- `crates/solstice-sync-client`: a device's side (details below); the
+  desktop app wraps it in `src-tauri/src/sync/`.
 
 Later: binding the editor to the `Y.Text` for live co-editing, and the iOS app.
 
@@ -161,4 +165,34 @@ Atlas. `SOLSTICE_DEV_USER` signs everyone in as one user, for development.
 (default `solstice`), `SOLSTICE_OIDC_SCOPES`, `SOLSTICE_OIDC_ALLOWED_GROUPS`,
 `SOLSTICE_OIDC_DISCOVERY_URL`, `SOLSTICE_DEV_USER`. The server holds no
 secrets: the OIDC client is public.
+
+## Devices (`crates/solstice-sync-client`)
+
+**Linking** (`link`) downloads the vault, compares it with the folder
+(`plan_link`: same files link, one-sided files copy over, differing files are
+kept both ways), applies that, uploads, and saves the link and state in
+`<folder>/.solstice/sync/state.db`. `unlink` removes the sync state; the files
+stay.
+
+**A running client** (`Client`) is one task per linked folder. Offline, edits
+keep landing in its documents and folder; online, it holds one WebSocket,
+reconnecting with backoff, and reports `connecting`, `syncing`, `synced`,
+`offline`, `signed_out` or `relink`. Attachments upload before the manifest
+names them and download in the background. Where each file was last written
+is saved with the state, so a restart can tell a deleted file from one that
+never arrived.
+
+**Editor saves.** The client keeps, for each note an editor has open, a copy
+of its document that mirrors exactly what the editor holds
+(`editor_opened`, refreshed whenever the editor loads or reloads it). A save
+(`saved`) is diffed against that copy, which is precisely the user's change,
+and merged into the real note as a concurrent edit. So a buffer that never
+reloaded can't revert changes that arrived meanwhile, even over several
+saves. Writes by anything else are read from the folder like outside edits.
+
+**Desktop.** `src-tauri/src/sync/` signs in (Cosmos's PKCE loopback flow; the
+refresh token in the OS keychain under `net.sunstead.solstice`, never in the
+webview), starts a client for each linked workspace a window has open, routes
+`write_file` saves to it, and exposes `sync_*` commands and a `SyncChanged`
+event to the frontend.
 

@@ -22,7 +22,7 @@ use solstice_sync::{DocKey, Event, Frame, Manifest, Msg, NoteDoc, Session, Vault
 use tokio::sync::{mpsc, oneshot};
 
 use crate::db::{now, Db, DocRow, VaultRow};
-use crate::files::VaultDir;
+use solstice_sync_fs::VaultDir;
 
 const SAVE_AFTER: Duration = Duration::from_secs(2);
 const IDLE_AFTER: Duration = Duration::from_secs(10 * 60);
@@ -221,7 +221,10 @@ impl VaultTask {
             Manifest::new(now() as u32)
         });
         let mut vault = Vault::load("server", manifest, notes);
-        let mut dir = VaultDir::open(folder).map_err(|e| e.to_string())?;
+        let mut dir = VaultDir::open(folder, ".solstice").map_err(|e| e.to_string())?;
+        if let Some(placed) = db.placed(&row.id).await.map_err(|e| e.to_string())? {
+            dir.set_placed(placed);
+        }
 
         if !fresh_manifest {
             // Notes whose state was lost but whose file survived: rebuild
@@ -429,6 +432,11 @@ impl VaultTask {
         if let Err(e) = self.db.save_docs(&self.row.id, docs).await {
             tracing::error!(vault = %self.row.id, error = %e, "can't save vault state");
         }
+        if let Some(placed) = self.dir.placed() {
+            if let Err(e) = self.db.save_placed(&self.row.id, placed).await {
+                tracing::error!(vault = %self.row.id, error = %e, "can't save where vault files are");
+            }
+        }
     }
 }
 
@@ -436,34 +444,14 @@ pub fn notice(vault: &str, code: &str) -> String {
     serde_json::json!({ "vault": vault, "notice": code }).to_string()
 }
 
-/// Watches the folder and pokes the task when it changes. Our own writes
-/// show up too; `absorb` finds nothing new in them.
-fn watch(root: &std::path::Path, tx: mpsc::UnboundedSender<Cmd>) -> Option<impl Drop> {
-    use notify::RecursiveMode;
-    use notify_debouncer_full::{new_debouncer, DebounceEventResult};
-    let root_for_filter = root.to_path_buf();
-    let mut debouncer = new_debouncer(
-        Duration::from_secs(1),
-        None,
-        move |result: DebounceEventResult| {
-            if let Ok(events) = result {
-                let outside_own = events.iter().flat_map(|e| e.event.paths.iter()).any(|p| {
-                    p.strip_prefix(&root_for_filter)
-                        .ok()
-                        .and_then(|rel| rel.iter().next())
-                        .is_some_and(|first| first != ".solstice")
-                });
-                if outside_own {
-                    let _ = tx.send(Cmd::FolderChanged);
-                }
-            }
-        },
-    )
+/// Pokes the task when its folder changes.
+fn watch(
+    root: &std::path::Path,
+    tx: mpsc::UnboundedSender<Cmd>,
+) -> Option<solstice_sync_fs::Watcher> {
+    solstice_sync_fs::watch(root, move || {
+        let _ = tx.send(Cmd::FolderChanged);
+    })
     .map_err(|e| tracing::warn!(error = %e, "can't watch a vault folder"))
-    .ok()?;
-    debouncer
-        .watch(root, RecursiveMode::Recursive)
-        .map_err(|e| tracing::warn!(error = %e, "can't watch a vault folder"))
-        .ok()?;
-    Some(debouncer)
+    .ok()
 }

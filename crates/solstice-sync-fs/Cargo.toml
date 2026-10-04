@@ -1,0 +1,17 @@
+[package]
+name = "solstice-sync-fs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A synced vault's folder on disk: scanning, writing, attachments, and turning disk edits into sync changes. Shared by Solstice Sync's server and devices."
+publish = false
+
+[dependencies]
+solstice-sync = { path = "../solstice-sync" }
+uuid = { version = "1", features = ["v4"] }
+tracing = "0.1"
+notify = "8"
+notify-debouncer-full = "0.7"
+
+[dev-dependencies]
+tempfile = "3"
