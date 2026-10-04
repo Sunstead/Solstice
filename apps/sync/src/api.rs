@@ -1,9 +1,13 @@
-//! The HTTP surface:
+//! The apps' HTTP surface:
 //!
-//! - `GET /`, `GET /healthz`, `GET /v1/info` (how apps sign in): public.
-//! - `GET /v1/vaults`, `POST /v1/vaults/{id}/notes`: apps and API tokens.
-//! - `POST /v1/vaults`, `/v1/tokens`, blobs, and `GET /v1/sync` (the
-//!   WebSocket): apps only.
+//! - `GET /healthz`, `GET /v1/info` (how apps sign in): public.
+//! - `GET /v1/vaults`, `POST /v1/vaults/{id}/notes`: apps, the web app and
+//!   API tokens.
+//! - `POST /v1/vaults`: apps and the web app.
+//! - `/v1/tokens`, blobs, and `GET /v1/sync` (the WebSocket): apps only.
+//!
+//! The web app's own routes are in `web_api.rs`; `/` is the web app, or a
+//! line saying the server is running (`lib.rs`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -31,14 +35,6 @@ const MAX_BLOB: usize = 256 * 1024 * 1024;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        // For people (and uptime checks) who open the address in a browser.
-        .route(
-            "/",
-            get(|| async {
-                "Solstice Sync is running. Connect to it from the Solstice app.
-"
-            }),
-        )
         .route("/healthz", get(|| async { "ok" }))
         .route("/v1/info", get(info))
         .route("/v1/vaults", get(list_vaults).post(create_vault))
@@ -52,7 +48,6 @@ pub fn router() -> Router<AppState> {
         .route("/v1/tokens", get(list_tokens).post(create_token))
         .route("/v1/tokens/{id}", delete(delete_token))
         .route("/v1/sync", get(sync))
-        .fallback(|| async { AppError::not_found() })
 }
 
 async fn info(State(state): State<AppState>) -> Json<serde_json::Value> {
@@ -116,7 +111,7 @@ async fn create_vault(
     who: CurrentUser,
     Json(body): Json<NewVault>,
 ) -> Result<(StatusCode, Json<VaultRow>), AppError> {
-    who.require_app()?;
+    who.require_person()?;
     let name = check_vault_name(&body.name)?;
     let row = state.db.create_vault(who.user.id, &name).await?;
     std::fs::create_dir_all(state.hub.folder(&who.user.username, &name))
@@ -124,7 +119,11 @@ async fn create_vault(
     Ok((StatusCode::CREATED, Json(row)))
 }
 
-async fn vault_for(state: &AppState, who: &CurrentUser, id: &str) -> Result<VaultRow, AppError> {
+pub(crate) async fn vault_for(
+    state: &AppState,
+    who: &CurrentUser,
+    id: &str,
+) -> Result<VaultRow, AppError> {
     Ok(state.db.vault(who.user.id, id).await?)
 }
 
@@ -406,6 +405,8 @@ mod tests {
             bind: "127.0.0.1:0".parse().unwrap(),
             notes_dir: root.join("notes"),
             state_dir: root.join("state"),
+            public_url: None,
+            web_dir: None,
             auth: AuthMode::Oidc(OidcConfig {
                 issuer: issuer.into(),
                 client_id: "solstice".into(),

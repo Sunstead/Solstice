@@ -25,6 +25,8 @@ async fn start(root: &Path) -> Server {
         bind: "127.0.0.1:0".parse().unwrap(),
         notes_dir: root.join("notes"),
         state_dir: root.join("state"),
+        public_url: None,
+        web_dir: None,
         auth: AuthMode::Dev {
             username: "pwb".into(),
         },
