@@ -52,6 +52,8 @@ pub fn write_file(app: tauri::AppHandle, path: String, contents: String) -> Resu
     let mut file = fs::File::create(&path).map_err(|e| e.to_string())?;
     file.write_all(contents.as_bytes()).map_err(|e| e.to_string())?;
     note_self_write(&app, Path::new(&path));
+    // In a synced folder, the save merges with changes from other devices.
+    crate::sync::saved(&app, &path, &contents);
 
     Ok(())
 }
