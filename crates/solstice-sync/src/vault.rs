@@ -128,8 +128,10 @@ impl Vault {
         update(DocKey::Manifest, self.manifest.epoch, bytes)
     }
 
+    /// Creates a note. A path another live file has (ignoring case) gets the
+    /// next free number instead, so an existing file never loses its name.
     pub fn create_note(&mut self, path: &str, text: &str) -> Result<(FileId, Vec<Msg>), Error> {
-        let path = checked(path)?;
+        let path = self.free_path(&checked(path)?, None);
         let (id, m) = self.manifest.create(&path, None);
         let note = NoteDoc::with_text(text, 0);
         let state = note.encode_state();
@@ -159,7 +161,7 @@ impl Vault {
     }
 
     pub fn create_blob(&mut self, path: &str, hash: &str) -> Result<(FileId, Vec<Msg>), Error> {
-        let path = checked(path)?;
+        let path = self.free_path(&checked(path)?, None);
         let (id, m) = self.manifest.create(&path, Some(hash));
         Ok((id, vec![self.manifest_msg(m)]))
     }
@@ -171,8 +173,9 @@ impl Vault {
         vec![self.manifest_msg(self.manifest.set_hash(id, hash))]
     }
 
+    /// Moves a file; onto a taken path, it gets the next free number.
     pub fn rename(&mut self, id: &str, path: &str) -> Result<Vec<Msg>, Error> {
-        let path = checked(path)?;
+        let path = self.free_path(&checked(path)?, Some(id));
         Ok(vec![self.manifest_msg(self.manifest.set_path(id, &path))])
     }
 
@@ -190,6 +193,33 @@ impl Vault {
             Kind::Blob => Deleted::Blob(entry.hash.unwrap_or_default()),
         };
         vec![self.manifest_msg(self.manifest.delete(id, how))]
+    }
+
+    /// `path`, or `path 1`, `path 2`... if another live file (ignoring
+    /// case) already has it. Clashes between files created on two devices
+    /// offline are settled later by [`Manifest::materialize`].
+    fn free_path(&self, path: &str, except: Option<&str>) -> String {
+        let taken: std::collections::BTreeSet<String> = self
+            .manifest
+            .entries()
+            .into_values()
+            .filter(|e| e.is_live() && Some(e.id.as_str()) != except)
+            .map(|e| e.path.to_lowercase())
+            .chain(
+                self.manifest
+                    .materialize()
+                    .into_iter()
+                    .filter(|(_, id)| Some(id.as_str()) != except)
+                    .map(|(p, _)| p.to_lowercase()),
+            )
+            .collect();
+        if !taken.contains(&path.to_lowercase()) {
+            return path.to_string();
+        }
+        (1..)
+            .map(|n| crate::manifest::numbered(path, n))
+            .find(|p| !taken.contains(&p.to_lowercase()))
+            .expect("some number is free")
     }
 
     /// Server: replaces a note's history with `text` under a new epoch, for
@@ -306,6 +336,24 @@ mod tests {
         let (id, _) = vault.create_note(r"notes\Plan.md", "").unwrap();
         assert_eq!(vault.manifest.entry(&id).unwrap().path, "notes/Plan.md");
         assert!(vault.rename(&id, "/abs.md").is_err());
+    }
+
+    #[test]
+    fn new_files_never_take_an_existing_name() {
+        let mut vault = Vault::new("test");
+        let (first, _) = vault.create_note("Note.md", "first").unwrap();
+        let (second, _) = vault.create_note("note.md", "second").unwrap();
+        let path = |v: &Vault, id: &str| v.manifest.entry(id).unwrap().path;
+        assert_eq!(path(&vault, &first), "Note.md");
+        assert_eq!(path(&vault, &second), "note 1.md");
+        vault.rename(&second, "Note.md").unwrap();
+        assert_eq!(path(&vault, &second), "Note 1.md");
+        vault.rename(&first, "Note.md").unwrap();
+        assert_eq!(
+            path(&vault, &first),
+            "Note.md",
+            "renaming onto its own path is fine"
+        );
     }
 
     #[test]
