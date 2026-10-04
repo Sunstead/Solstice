@@ -27,6 +27,8 @@ import { useThemeEffect } from '@/hooks/use-theme';
 import { useFileCommands } from '@/hooks/use-file-commands';
 import { useDeepLinks } from '@/hooks/use-deep-links';
 import { useSyncStatus } from '@/lib/stores/sync';
+import { NewWorkspaceDialog } from '@/components/new-workspace-dialog';
+import { useNewWorkspaceDialog } from '@/lib/stores/new-workspace-dialog';
 
 export const Route = createRootRoute({
   // Named, so the hooks linter knows it's a component.
@@ -75,6 +77,7 @@ export const Route = createRootRoute({
         console.log('view.toggle_sidebar'),
       );
       registerCommand('file.open_folder', () => openFolder());
+      registerCommand('file.new_workspace', () => useNewWorkspaceDialog.getState().setOpen(true));
       registerCommand('file.open_file', () => setQuickOpenOpen(true));
       registerCommand('app.settings', () =>
         useSettingsDialog.getState().openSettings(),
@@ -153,6 +156,8 @@ export const Route = createRootRoute({
             openFile(path, getFileNameFromPath(path));
           }}
         />
+
+        <NewWorkspaceDialog />
 
         {/* One app-wide instance; opened through useSettingsDialog. */}
         <SettingsDialog />

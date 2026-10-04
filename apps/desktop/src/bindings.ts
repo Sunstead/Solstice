@@ -55,6 +55,18 @@ export const commands = {
 	 *  needs to know it is running without live updates rather than assume it is.
 	 */
 	setWorkspace: (path: string) => typedError<null, string>(__TAURI_INVOKE("set_workspace", { path })),
+	/**
+	 *  Makes the folder for a new workspace, `name` inside `parent`, and returns
+	 *  its path. An empty folder of that name is fine (it may have been made by
+	 *  hand for this); one with anything in it is refused, so a new workspace
+	 *  never adopts someone else's files.
+	 */
+	createWorkspace: (parent: string, name: string) => typedError<string, string>(__TAURI_INVOKE("create_workspace", { parent, name })),
+	/**
+	 *  Where new workspaces go unless the user picks somewhere else: Documents,
+	 *  or home when there's no Documents folder.
+	 */
+	defaultWorkspaceParent: () => __TAURI_INVOKE<string | null>("default_workspace_parent"),
 	getWorkspace: () => __TAURI_INVOKE<string | null>("get_workspace"),
 	/**
 	 *  Grants `asset:` access to one file outside the open workspace.
@@ -163,7 +175,7 @@ export const events = {
 };
 
 /* Types */
-export type CommandId = "app.settings" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
+export type CommandId = "app.settings" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.new_workspace" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
 
 export type CommandMeta = {
 	id: CommandId,

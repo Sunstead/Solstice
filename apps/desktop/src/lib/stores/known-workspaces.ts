@@ -9,6 +9,8 @@ export interface KnownWorkspace {
 
 const STORE_FILE = 'known-workspaces.json';
 const STORE_KEY = 'workspaces';
+/** Where the last new workspace was made, offered for the next one. */
+const PARENT_KEY = 'lastParent';
 
 function getStore() {
   return load(STORE_FILE, { autoSave: true });
@@ -22,6 +24,8 @@ interface KnownWorkspacesState {
   workspaces: KnownWorkspace[];
   load: () => Promise<void>;
   touch: (path: string) => Promise<void>;
+  lastParent: () => Promise<string | null>;
+  rememberParent: (parent: string) => Promise<void>;
 }
 
 export const useKnownWorkspaces = create<KnownWorkspacesState>((set) => ({
@@ -42,5 +46,11 @@ export const useKnownWorkspaces = create<KnownWorkspacesState>((set) => ({
     ];
     await store.set(STORE_KEY, workspaces);
     set({ workspaces });
+  },
+
+  lastParent: async () => (await (await getStore()).get<string>(PARENT_KEY)) ?? null,
+
+  rememberParent: async (parent) => {
+    await (await getStore()).set(PARENT_KEY, parent);
   },
 }));

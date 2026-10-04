@@ -2,6 +2,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use std::path::{Path, PathBuf};
+
 use tauri::Manager;
 
 use crate::watcher::{self, FsWatcherState};
@@ -89,5 +91,111 @@ pub fn set_watch_enabled(
     match path {
         Some(path) => watcher::watch_workspace(&app, &label, &path, &watchers),
         None => Ok(()),
+    }
+}
+
+/// Where new workspaces go unless the user picks somewhere else: Documents,
+/// or home when there's no Documents folder.
+#[tauri::command]
+#[specta::specta]
+pub fn default_workspace_parent(app: tauri::AppHandle) -> Option<String> {
+    let paths = app.path();
+    paths
+        .document_dir()
+        .or_else(|_| paths.home_dir())
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
+/// Makes the folder for a new workspace, `name` inside `parent`, and returns
+/// its path. An empty folder of that name is fine (it may have been made by
+/// hand for this); one with anything in it is refused, so a new workspace
+/// never adopts someone else's files.
+#[tauri::command]
+#[specta::specta]
+pub fn create_workspace(parent: String, name: String) -> Result<String, String> {
+    create_workspace_in(Path::new(&parent), &name).map(|p| p.to_string_lossy().into_owned())
+}
+
+fn create_workspace_in(parent: &Path, name: &str) -> Result<PathBuf, String> {
+    let name = check_workspace_name(name)?;
+    if !parent.is_dir() {
+        return Err(format!("{} isn't a folder.", parent.display()));
+    }
+    let path = parent.join(name);
+    if path.exists() {
+        let empty = std::fs::read_dir(&path)
+            .map(|mut entries| entries.next().is_none())
+            .unwrap_or(false);
+        if !path.is_dir() || !empty {
+            return Err(format!("{name} already exists there. Pick another name, or open it as a workspace."));
+        }
+        return Ok(path);
+    }
+    std::fs::create_dir(&path).map_err(|e| format!("Couldn't make {}: {e}", path.display()))?;
+    Ok(path)
+}
+
+/// One visible folder name that every platform accepts.
+fn check_workspace_name(name: &str) -> Result<&str, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("Give the workspace a name.".into());
+    }
+    if name.starts_with('.') {
+        return Err("A workspace name can't start with a dot.".into());
+    }
+    if name.ends_with('.') {
+        return Err("A workspace name can't end with a dot.".into());
+    }
+    let forbidden = |c: &char| matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control();
+    if let Some(c) = name.chars().find(forbidden) {
+        return Err(format!("A workspace name can't contain {c:?}."));
+    }
+    let stem = name.split('.').next().unwrap_or(name).to_ascii_uppercase();
+    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || (stem.len() == 4
+            && (stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem.as_bytes()[3].is_ascii_digit());
+    if reserved {
+        return Err(format!("{name} is a name Windows keeps for itself."));
+    }
+    Ok(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn makes_the_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = create_workspace_in(dir.path(), "  Notes ").unwrap();
+        assert_eq!(path, dir.path().join("Notes"));
+        assert!(path.is_dir());
+    }
+
+    #[test]
+    fn adopts_an_empty_folder_but_not_a_full_one() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("Empty")).unwrap();
+        assert!(create_workspace_in(dir.path(), "Empty").is_ok());
+
+        std::fs::create_dir(dir.path().join("Full")).unwrap();
+        std::fs::write(dir.path().join("Full").join("a.md"), "x").unwrap();
+        assert!(create_workspace_in(dir.path(), "Full").is_err());
+
+        std::fs::write(dir.path().join("File"), "x").unwrap();
+        assert!(create_workspace_in(dir.path(), "File").is_err());
+    }
+
+    #[test]
+    fn refuses_bad_names() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["", "  ", ".hidden", "a/b", "a\\b", "..", "x:y", "CON", "lpt1", "trailing."] {
+            assert!(create_workspace_in(dir.path(), name).is_err(), "{name:?}");
+        }
+        assert!(create_workspace_in(dir.path(), "Console").is_ok());
+        assert!(create_workspace_in(&dir.path().join("missing"), "Notes").is_err());
     }
 }
