@@ -45,6 +45,14 @@ export default defineConfig(async () => ({
           port: 1421,
         }
       : undefined,
+    // The web app in dev (`npm run dev`, a browser on :1420) talks to a
+    // local sync server; the desktop shell never calls these.
+    proxy: Object.fromEntries(
+      ['/v1', '/auth'].map((p) => [
+        p,
+        { target: process.env.SOLSTICE_SYNC_URL ?? 'http://127.0.0.1:8080', ws: true },
+      ]),
+    ),
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**'],
