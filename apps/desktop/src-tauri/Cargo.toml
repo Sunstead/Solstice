@@ -1,6 +1,6 @@
 [package]
 name = "solstice"
-version = "0.1.0"
+version = "0.2.0"
 description = "Solstice, a local-first markdown notes app"
 authors = ["Sunstead"]
 edition = "2021"
