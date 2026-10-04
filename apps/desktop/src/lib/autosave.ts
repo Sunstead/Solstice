@@ -40,6 +40,10 @@ export function createAutosaver(
   // timer.
   clearAbandoned(path);
 
+  // In a synced folder, sync merges this editor's saves against exactly what
+  // it holds; tell it. (Elsewhere this does nothing.)
+  void commands.syncEditorOpened(path, initialContent);
+
   // Edits are counted, not flagged, so a write landing while newer edits are
   // queued clears only the edit it actually carried.
   let dirtySeq = 0;
@@ -172,6 +176,7 @@ export function createAutosaver(
     adopt: (markdown: string) => {
       savedSeq = dirtySeq;
       lastWritten = markdown;
+      void commands.syncEditorOpened(path, markdown);
       publish();
       publishDirty();
     },

@@ -26,6 +26,7 @@ import { useSettingsDomBindings } from '@/lib/settings/apply';
 import { useThemeEffect } from '@/hooks/use-theme';
 import { useFileCommands } from '@/hooks/use-file-commands';
 import { useDeepLinks } from '@/hooks/use-deep-links';
+import { useSyncStatus } from '@/lib/stores/sync';
 
 export const Route = createRootRoute({
   // Named, so the hooks linter knows it's a component.
@@ -56,6 +57,7 @@ export const Route = createRootRoute({
     useThemeEffect();
     useSettingsDomBindings();
     useDeepLinks();
+    useSyncStatus();
 
     useEffect(() => {
       // Global settings first: the workspace layer that `init` goes on to load

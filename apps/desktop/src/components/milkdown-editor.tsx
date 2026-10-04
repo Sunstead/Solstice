@@ -63,6 +63,8 @@ import { createEditorFeatures } from '@/lib/editor/plugins';
 import { insertImagesFromDialog } from '@/lib/editor/insert-image';
 import { EditorNotePathContext } from '@/components/editor/editor-file-context';
 import { ExternalChangeBar } from '@/components/external-change-bar';
+import { ReviewBar } from '@/components/sync/review-bar';
+import { useReviewFor } from '@/lib/stores/sync';
 import { findPlugin, getFindState, setFindQuery, stepFindMatch } from '@/lib/find/plugin';
 import { useFindStore } from '@/lib/stores/find';
 import { useExternalFileChanges } from '@/hooks/use-external-file-changes';
@@ -486,6 +488,8 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     };
   }, [flushRef, getMarkdown]);
 
+  const review = useReviewFor(path);
+
   const { status, reload, keepMine, dismiss } = useExternalFileChanges({
     path,
     ready: !loading,
@@ -496,6 +500,12 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     adopt: (text) => autosaver.current?.adopt(text),
     hold: () => autosaver.current?.hold(),
     release: () => autosaver.current?.release(),
+    flush: () => {
+      const markdown = getMarkdown();
+      if (markdown === null) return;
+      autosaver.current?.schedule(markdown);
+      autosaver.current?.flush();
+    },
   });
 
   // Writing the buffer back immediately is what actually resolves the
@@ -771,6 +781,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
           onClose={handleCloseTab}
         />
       )}
+      {review && <ReviewBar review={review} />}
       <Milkdown />
     </>
   );
