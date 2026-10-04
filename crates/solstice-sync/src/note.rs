@@ -140,6 +140,17 @@ impl NoteDoc {
         self.doc.transact().state_vector().encode_v1()
     }
 
+    /// Whether `snapshot` could be from this document's history: it names
+    /// no change this document hasn't seen. Check a snapshot from outside
+    /// (a web client's save base) before using it.
+    pub fn has_seen(&self, snapshot: &Snapshot) -> bool {
+        let sv = self.doc.transact().state_vector();
+        snapshot
+            .state_map
+            .iter()
+            .all(|(client, clock)| sv.get(client) >= *clock)
+    }
+
     /// Everything, for storage or a peer that has nothing.
     pub fn encode_state(&self) -> Vec<u8> {
         self.doc
@@ -376,6 +387,19 @@ mod tests {
         assert_eq!(a.text(), "ONE\ntwo\nthree\nfour from B\n");
         sync(&a, &b);
         assert_eq!(b.text(), a.text());
+    }
+
+    #[test]
+    fn knows_its_own_snapshots_from_ones_it_has_not_seen() {
+        let (a, b) = synced_pair("one\n");
+        let before = a.snapshot();
+        assert!(a.has_seen(&before));
+        b.apply_save("one\ntwo\n", None).unwrap();
+        // B's newer snapshot names a change A hasn't seen yet.
+        assert!(!a.has_seen(&b.snapshot()));
+        sync(&a, &b);
+        assert!(a.has_seen(&b.snapshot()));
+        assert!(b.has_seen(&before));
     }
 
     #[test]

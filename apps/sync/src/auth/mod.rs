@@ -1,9 +1,11 @@
 //! Who's calling. Apps present an Authentik access token and Atlas an API
 //! token (`sst_...`), both as `Authorization: Bearer`, the WebSocket
-//! included: tokens never go in URLs, where proxies and logs keep them. In
-//! dev mode everyone is the dev user.
+//! included: tokens never go in URLs, where proxies and logs keep them. The
+//! web app has a session cookie instead (`web.rs`). In dev mode everyone is
+//! the dev user.
 
 pub mod oidc;
+pub mod web;
 
 use std::sync::Arc;
 
@@ -50,6 +52,9 @@ impl Auth {
 pub enum Via {
     /// A Solstice app: everything on the user's own vaults.
     App,
+    /// The web app, by session cookie: the user's vaults through the web
+    /// routes, but not device sync or API tokens.
+    Web,
     /// An API token with this scope: listing vaults and creating notes.
     Token(String),
 }
@@ -64,10 +69,21 @@ pub struct CurrentUser {
 }
 
 impl CurrentUser {
-    /// For everything an API token may not do.
+    /// For what only the apps do (device sync, API tokens, blobs).
     pub fn require_app(&self) -> Result<(), AppError> {
         match self.via {
             Via::App => Ok(()),
+            Via::Web => Err(AppError::forbidden("Only the Solstice apps can do that")),
+            Via::Token(_) => Err(AppError::forbidden(
+                "API tokens can only list vaults and create notes",
+            )),
+        }
+    }
+
+    /// For the web routes: a person, in an app or the browser, not a token.
+    pub fn require_person(&self) -> Result<(), AppError> {
+        match self.via {
+            Via::App | Via::Web => Ok(()),
             Via::Token(_) => Err(AppError::forbidden(
                 "API tokens can only list vaults and create notes",
             )),
@@ -104,7 +120,17 @@ impl FromRequestParts<crate::AppState> for CurrentUser {
         parts: &mut Parts,
         state: &crate::AppState,
     ) -> Result<Self, Self::Rejection> {
-        authenticate(&state.auth, &state.db, presented_token(parts)).await
+        let token = presented_token(parts);
+        if token.is_none() {
+            if let Some(user) = web::session_user(state, &parts.headers).await? {
+                return Ok(CurrentUser {
+                    user,
+                    via: Via::Web,
+                    expires: None,
+                });
+            }
+        }
+        authenticate(&state.auth, &state.db, token).await
     }
 }
 

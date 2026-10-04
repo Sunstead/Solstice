@@ -9,6 +9,8 @@
 //!   State lost in that moment heals itself, since devices keep full history
 //!   and resend whatever the server is missing.
 //! - A watcher turns edits made in the folder into changes for devices.
+//! - The web app's reads and saves run here too (`web.rs`), and web apps
+//!   watching the vault hear what changed.
 //!
 //! A vault's task stops after a while with no connections and starts again
 //! on demand.
@@ -22,7 +24,11 @@ use solstice_sync::{DocKey, Event, Frame, Manifest, Msg, NoteDoc, Session, Vault
 use tokio::sync::{mpsc, oneshot};
 
 use crate::db::{now, Db, DocRow, VaultRow};
+use crate::error::AppError;
 use solstice_sync_fs::VaultDir;
+
+mod web;
+pub use web::{checked as checked_path, WebOp, WebReply};
 
 const SAVE_AFTER: Duration = Duration::from_secs(2);
 const IDLE_AFTER: Duration = Duration::from_secs(10 * 60);
@@ -65,6 +71,16 @@ pub enum Cmd {
         reply: oneshot::Sender<Option<Vec<u8>>>,
     },
     FolderChanged,
+    /// Something the web app asked for.
+    Web {
+        op: WebOp,
+        reply: oneshot::Sender<Result<WebReply, AppError>>,
+    },
+    /// A web app watching the vault: each change is sent to it as JSON
+    /// (`{"tree": bool, "notes": [path]}`).
+    Watch {
+        tx: mpsc::UnboundedSender<String>,
+    },
     /// Save and stop (server shutdown).
     Stop {
         done: oneshot::Sender<()>,
@@ -191,6 +207,7 @@ struct VaultTask {
     vault: Vault,
     dir: VaultDir,
     sessions: HashMap<ConnId, (Session, mpsc::UnboundedSender<Outgoing>)>,
+    watchers: Vec<mpsc::UnboundedSender<String>>,
     dirty: BTreeSet<DocKey>,
 }
 
@@ -259,6 +276,7 @@ impl VaultTask {
             vault,
             dir,
             sessions: HashMap::new(),
+            watchers: Vec::new(),
             dirty,
         };
         task.save().await;
@@ -283,7 +301,7 @@ impl VaultTask {
                     if !self.dirty.is_empty() && save_at.is_none() {
                         save_at = Some(tokio::time::Instant::now() + SAVE_AFTER);
                     }
-                    if !self.sessions.is_empty() {
+                    if self.in_use() {
                         idle_since = tokio::time::Instant::now();
                     }
                 }
@@ -291,7 +309,7 @@ impl VaultTask {
                     if save_at.take().is_some() {
                         self.save().await;
                     }
-                    if self.sessions.is_empty() && idle_since.elapsed() >= IDLE_AFTER {
+                    if !self.in_use() && idle_since.elapsed() >= IDLE_AFTER {
                         break;
                     }
                 }
@@ -305,8 +323,17 @@ impl VaultTask {
         }
     }
 
+    /// A device or a web app is connected.
+    fn in_use(&self) -> bool {
+        !self.sessions.is_empty() || self.watchers.iter().any(|w| !w.is_closed())
+    }
+
     fn handle(&mut self, cmd: Cmd) {
         match cmd {
+            Cmd::Web { op, reply } => {
+                let _ = reply.send(self.web(op));
+            }
+            Cmd::Watch { tx } => self.watchers.push(tx),
             Cmd::Connect { conn, tx } => {
                 self.sessions
                     .entry(conn)
@@ -396,6 +423,7 @@ impl VaultTask {
         }
         self.dirty.extend(msgs.iter().map(|m| m.doc.clone()));
         self.write_out();
+        self.notify_msgs(&msgs);
         let bytes = Frame::new(&self.row.id, msgs).encode();
         for (conn, (_, tx)) in &self.sessions {
             if Some(*conn) != from {

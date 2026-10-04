@@ -149,6 +149,27 @@ must be one safe path segment, and belongs to one identity. API tokens
 (`sst_...`, stored as SHA-256) can only list vaults and create notes, for
 Atlas. `SOLSTICE_DEV_USER` signs everyone in as one user, for development.
 
+**The web app** signs in with a session instead (`auth/web.rs`, ported from
+Atlas). The server runs the authorization code flow with PKCE and a nonce,
+on the same public `solstice` client as the apps (so a browser and a device
+are the same user), checks the ID token by the same rules, and keeps none of
+the provider's tokens: the browser gets a `__Host-solstice_session` cookie
+(HttpOnly, `SameSite=Lax`, 30 days sliding; only its hash is stored). It
+needs `SOLSTICE_PUBLIC_URL` for the redirect URI. The web routes
+(`web_api.rs`) run in the vault's task (`hub/web.rs`) through the engine, so
+devices get web changes as ordinary sync:
+- A note is read with its text and a `base` (its snapshot, opaque), and saved
+  with both: `NoteDoc::apply_save` carries the edit onto whatever arrived
+  since, so a stale editor never reverts another device's edit. A base from
+  another epoch, or naming changes the server hasn't seen, is refused (409),
+  and the app reloads.
+- Web saves never flag reviews, like a desktop editor's saves; the web app
+  shows and resolves reviews devices flagged.
+- Folders aren't in the manifest, so an empty one made on the web exists
+  only on the server's disk until it holds a file.
+- Settings that follow the user between browsers are kept per user in
+  `sync.db`; devices keep theirs in each vault's `.solstice/`.
+
 **Security.**
 - A sync WebSocket lasts as long as the access token it was opened with
   (Authentik's are short-lived): the server sends `token_expired` and
@@ -162,6 +183,15 @@ Atlas. `SOLSTICE_DEV_USER` signs everyone in as one user, for development.
 - Devices refuse plain `http://` servers except on the same machine.
 - API tokens don't expire. A user deletes their own; they can only create
   notes, never read them.
+- Cookie-authenticated changes need `X-Solstice-Request: 1` and the
+  server's own `Origin`; the events WebSocket checks the `Origin` too. A
+  session can't use device sync, blobs or API tokens.
+- A vault file is served with `nosniff` and, except PDFs, `CSP: sandbox`;
+  anything that isn't an image, media, text or PDF downloads. The web app's
+  shell gets a strict policy (scripts from the server only, plus the
+  first-paint script by hash).
+- A web session's groups are checked at sign-in only; signing out on any
+  page ends it, and the events socket notices within a minute.
 
 **API.**
 
@@ -174,12 +204,23 @@ Atlas. `SOLSTICE_DEV_USER` signs everyone in as one user, for development.
 | `PUT`/`GET /v1/vaults/{id}/blobs/{sha256}` | apps | Attachment bytes; upload before the manifest names them. |
 | `GET`/`POST /v1/tokens`, `DELETE /v1/tokens/{id}` | apps | API tokens; the token is shown once. |
 | `GET /v1/sync` | apps | The WebSocket: binary `Frame`s both ways; JSON text notices (`unknown_vault`, `bad_frame`). |
+| `GET /auth/login?return_to=`, `GET /auth/callback`, `POST /auth/logout` | browsers | Web sign-in and out. |
+| `GET /v1/me` | apps, web | Who's signed in. |
+| `GET /v1/vaults/{id}/tree` | apps, web | `{files: [{path, kind, size, modified}], folders}`. |
+| `GET`/`PUT /v1/vaults/{id}/notes/{*path}` | apps, web | `{path, text, base}`; a save sends `{text, base}` and gets the merged note back. |
+| `GET`/`PUT /v1/vaults/{id}/files/{*path}` | apps, web | Any file's bytes; a PUT writes a file that isn't a note (`?new=1`: under a free name). |
+| `POST /v1/vaults/{id}/ops` | apps, web | `{op: create_note | create_folder | rename | trash | duplicate, ...}`. |
+| `GET /v1/vaults/{id}/reviews`, `GET`/`POST .../reviews/{*path}` | apps, web | Flagged merges, their versions, and resolving one (`{text?}`). |
+| `GET /v1/web/events?vault=` | apps, web | WebSocket: `{"tree": bool, "notes": [path]}` per change. |
+| `GET`/`PUT /v1/web/settings/{scope}` | apps, web | A JSON object per scope (`global`, `vault.<id>`). |
 
 **Config.** `SOLSTICE_BIND` (default `0.0.0.0:8080`), `SOLSTICE_NOTES_DIR`,
 `SOLSTICE_STATE_DIR`, `SOLSTICE_OIDC_ISSUER`, `SOLSTICE_OIDC_CLIENT_ID`
 (default `solstice`), `SOLSTICE_OIDC_SCOPES`, `SOLSTICE_OIDC_ALLOWED_GROUPS`,
-`SOLSTICE_OIDC_DISCOVERY_URL`, `SOLSTICE_DEV_USER`. The server holds no
-secrets: the OIDC client is public.
+`SOLSTICE_OIDC_DISCOVERY_URL`, `SOLSTICE_DEV_USER`, `SOLSTICE_PUBLIC_URL`
+(web sign-in), `SOLSTICE_WEB_DIR` (the web app's build, served at `/`;
+without it `/` says the server is running). The server holds no secrets:
+the OIDC client is public.
 
 ## Devices (`crates/solstice-sync-client`)
 

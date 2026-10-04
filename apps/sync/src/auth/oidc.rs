@@ -78,12 +78,42 @@ struct Keys {
     anonymous: Vec<DecodingKey>,
     fetched_at: Option<Instant>,
     last_attempt: Option<Instant>,
+    endpoints: Endpoints,
 }
 
 #[derive(Deserialize)]
 struct Discovery {
     issuer: String,
     jwks_uri: String,
+    #[serde(default)]
+    authorization_endpoint: Option<String>,
+    #[serde(default)]
+    token_endpoint: Option<String>,
+    #[serde(default)]
+    end_session_endpoint: Option<String>,
+}
+
+/// Where the web app's sign-in goes, from discovery.
+#[derive(Clone, Debug, Default)]
+struct Endpoints {
+    authorization: Option<String>,
+    token: Option<String>,
+    end_session: Option<String>,
+}
+
+/// An ID token's claims, for web sign-in: an access token's, plus the nonce
+/// that ties it to this sign-in.
+#[derive(Deserialize)]
+struct IdClaims {
+    #[serde(flatten)]
+    claims: Claims,
+    #[serde(default)]
+    nonce: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct TokenResponse {
+    id_token: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -98,6 +128,14 @@ struct Claims {
 
 fn same_issuer(a: &str, b: &str) -> bool {
     a.trim_end_matches('/') == b.trim_end_matches('/')
+}
+
+/// The PKCE S256 challenge for a verifier.
+pub fn pkce_challenge(verifier: &str) -> String {
+    use base64::Engine;
+    use sha2::Digest;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(sha2::Sha256::digest(verifier.as_bytes()))
 }
 
 impl OidcVerifier {
@@ -207,6 +245,11 @@ impl OidcVerifier {
         }
         keys.fetched_at = Some(Instant::now());
         keys.last_attempt = keys.fetched_at;
+        keys.endpoints = Endpoints {
+            authorization: discovery.authorization_endpoint,
+            token: discovery.token_endpoint,
+            end_session: discovery.end_session_endpoint,
+        };
         *self.keys.write().unwrap_or_else(|p| p.into_inner()) = keys;
         Ok(count)
     }
@@ -279,6 +322,13 @@ impl OidcVerifier {
     }
 
     pub async fn verify(&self, token: &str) -> Result<Principal, VerifyError> {
+        let claims: Claims = self.decode(token).await?;
+        self.principal(claims)
+    }
+
+    /// Checks a JWT's signature, issuer, audience and expiry, and reads its
+    /// claims.
+    async fn decode<C: serde::de::DeserializeOwned>(&self, token: &str) -> Result<C, VerifyError> {
         let header =
             decode_header(token).map_err(|e| VerifyError::Invalid(format!("not a JWT: {e}")))?;
         if !ALLOWED.contains(&header.alg) {
@@ -296,10 +346,8 @@ impl OidcVerifier {
 
         let mut last = None;
         for key in self.keys_for(header.kid.as_deref()).await? {
-            match decode::<Claims>(token, &key, &validation) {
-                Ok(data) => {
-                    return self.principal(data.claims);
-                }
+            match decode::<C>(token, &key, &validation) {
+                Ok(data) => return Ok(data.claims),
                 Err(e) => {
                     last = Some(e);
                 }
@@ -309,6 +357,105 @@ impl OidcVerifier {
             last.map(|e| e.to_string())
                 .unwrap_or_else(|| "no key matched".into()),
         ))
+    }
+
+    async fn endpoints(&self) -> Result<Endpoints, VerifyError> {
+        let loaded = |v: &Self| {
+            let keys = v.keys.read().unwrap_or_else(|p| p.into_inner());
+            keys.fetched_at.map(|_| keys.endpoints.clone())
+        };
+        if let Some(e) = loaded(self) {
+            return Ok(e);
+        }
+        self.fetch_keys().await.map_err(|e| {
+            VerifyError::Unavailable(format!("cannot reach the identity provider: {e}"))
+        })?;
+        loaded(self).ok_or_else(|| VerifyError::Unavailable("no provider loaded".into()))
+    }
+
+    /// Where to send a browser to sign in (the web app): the authorization
+    /// code flow with PKCE, as a public client, plus a nonce.
+    pub async fn authorize_url(
+        &self,
+        redirect_uri: &str,
+        scopes: &str,
+        state: &str,
+        nonce: &str,
+        pkce_verifier: &str,
+    ) -> Result<String, VerifyError> {
+        let endpoint = self.endpoints().await?.authorization.ok_or_else(|| {
+            VerifyError::Unavailable("the provider has no authorization_endpoint".into())
+        })?;
+        let mut url = url::Url::parse(&endpoint)
+            .map_err(|e| VerifyError::Unavailable(format!("bad authorization_endpoint: {e}")))?;
+        url.query_pairs_mut()
+            .append_pair("response_type", "code")
+            .append_pair("client_id", &self.audience)
+            .append_pair("redirect_uri", redirect_uri)
+            .append_pair("scope", scopes)
+            .append_pair("state", state)
+            .append_pair("nonce", nonce)
+            .append_pair("code_challenge", &pkce_challenge(pkce_verifier))
+            .append_pair("code_challenge_method", "S256");
+        Ok(url.into())
+    }
+
+    /// Trades a web sign-in's code for who signed in, from the ID token. The
+    /// tokens themselves are dropped: the browser gets a session instead.
+    pub async fn exchange(
+        &self,
+        redirect_uri: &str,
+        code: &str,
+        pkce_verifier: &str,
+        nonce: &str,
+    ) -> Result<Principal, VerifyError> {
+        let endpoint =
+            self.endpoints().await?.token.ok_or_else(|| {
+                VerifyError::Unavailable("the provider has no token_endpoint".into())
+            })?;
+        let res = self
+            .http
+            .post(&endpoint)
+            .form(&[
+                ("grant_type", "authorization_code"),
+                ("code", code),
+                ("redirect_uri", redirect_uri),
+                ("client_id", self.audience.as_str()),
+                ("code_verifier", pkce_verifier),
+            ])
+            .send()
+            .await
+            .map_err(|e| VerifyError::Unavailable(format!("token endpoint: {e}")))?;
+        let status = res.status();
+        if status.is_server_error() {
+            return Err(VerifyError::Unavailable(format!(
+                "token endpoint: HTTP {status}"
+            )));
+        }
+        if !status.is_success() {
+            return Err(VerifyError::Invalid(format!(
+                "the token endpoint refused the code: HTTP {status}"
+            )));
+        }
+        let tokens: TokenResponse = res
+            .json()
+            .await
+            .map_err(|e| VerifyError::Unavailable(format!("token endpoint: {e}")))?;
+        let id_token = tokens
+            .id_token
+            .ok_or_else(|| VerifyError::Invalid("no id_token in the response".into()))?;
+        let claims: IdClaims = self.decode(&id_token).await?;
+        if claims.nonce.as_deref() != Some(nonce) {
+            return Err(VerifyError::Invalid(
+                "the token's nonce doesn't match this sign-in".into(),
+            ));
+        }
+        self.principal(claims.claims)
+    }
+
+    /// The provider's sign-out page, if it has one.
+    pub async fn end_session_url(&self) -> Option<String> {
+        self.endpoints().await.ok()?.end_session
     }
 
     /// The username names the user's folder, so it must be the provider's
@@ -334,7 +481,7 @@ impl OidcVerifier {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use axum::{routing::get, Json, Router};
+    use axum::{extract::Form, response::IntoResponse, routing::get, Json, Router};
     use jsonwebtoken::{encode, EncodingKey, Header};
     use serde_json::json;
     use std::sync::{
@@ -349,6 +496,10 @@ pub(crate) mod tests {
     pub struct Provider {
         pub issuer: String,
         pub jwks_hits: Arc<AtomicUsize>,
+        /// What the token endpoint answers with next.
+        pub next_id_token: Arc<std::sync::Mutex<Option<String>>>,
+        /// The last form posted to the token endpoint.
+        pub token_form: Arc<std::sync::Mutex<Option<HashMap<String, String>>>>,
     }
 
     /// A minimal OIDC provider on a random port: discovery and JWKS.
@@ -358,8 +509,17 @@ pub(crate) mod tests {
         let issuer = format!("{base}/application/o/solstice/");
         let jwks_hits = Arc::new(AtomicUsize::new(0));
 
-        let discovery = json!({ "issuer": issuer, "jwks_uri": format!("{base}/jwks") });
+        let discovery = json!({
+            "issuer": issuer,
+            "jwks_uri": format!("{base}/jwks"),
+            "authorization_endpoint": format!("{base}/application/o/authorize/"),
+            "token_endpoint": format!("{base}/application/o/token/"),
+            "end_session_endpoint": format!("{base}/application/o/solstice/end-session/"),
+        });
         let hits = jwks_hits.clone();
+        let next_id_token = Arc::new(std::sync::Mutex::new(None::<String>));
+        let token_form = Arc::new(std::sync::Mutex::new(None));
+        let (next, form) = (next_id_token.clone(), token_form.clone());
         let app = Router::new()
             .route(
                 "/application/o/solstice/.well-known/openid-configuration",
@@ -380,9 +540,28 @@ pub(crate) mod tests {
                         )
                     }
                 })
+            )
+            .route(
+                "/application/o/token/",
+                axum::routing::post(move |Form(f): Form<HashMap<String, String>>| {
+                    *form.lock().unwrap() = Some(f);
+                    let id = next.lock().unwrap().take();
+                    async move {
+                        match id {
+                            Some(t) => Json(json!({ "access_token": "at", "id_token": t }))
+                                .into_response(),
+                            None => axum::http::StatusCode::BAD_REQUEST.into_response(),
+                        }
+                    }
+                }),
             );
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        Provider { issuer, jwks_hits }
+        Provider {
+            issuer,
+            jwks_hits,
+            next_id_token,
+            token_form,
+        }
     }
 
     pub fn now() -> u64 {
@@ -408,6 +587,51 @@ pub(crate) mod tests {
             "exp": now() + 600,
             "iat": now(),
         })
+    }
+
+    /// An ID token's claims for a web sign-in with this nonce.
+    pub fn id_claims(issuer: &str, nonce: &str, groups: &[&str]) -> serde_json::Value {
+        let mut c = claims(issuer, groups);
+        c["nonce"] = json!(nonce);
+        c
+    }
+
+    #[tokio::test]
+    async fn a_web_sign_in_exchanges_its_code_as_a_public_client() {
+        let p = provider("k1").await;
+        let v = OidcVerifier::new(&cfg(&p.issuer));
+        let redirect = "https://s.example/auth/callback";
+        let url = v
+            .authorize_url(redirect, "openid profile", "st", "n1", "verifier")
+            .await
+            .unwrap();
+        let url = url::Url::parse(&url).unwrap();
+        let q: HashMap<_, _> = url.query_pairs().into_owned().collect();
+        assert_eq!(q["client_id"], "solstice");
+        assert_eq!(q["code_challenge"], pkce_challenge("verifier"));
+        assert_eq!(q["nonce"], "n1");
+
+        *p.next_id_token.lock().unwrap() = Some(token("k1", id_claims(&p.issuer, "n1", &[])));
+        let who = v
+            .exchange(redirect, "code", "verifier", "n1")
+            .await
+            .unwrap();
+        assert_eq!(who.username, "pwb");
+        let form = p.token_form.lock().unwrap().clone().unwrap();
+        assert_eq!(form["code_verifier"], "verifier");
+        assert!(!form.contains_key("client_secret"));
+
+        // Another sign-in's token: refused.
+        *p.next_id_token.lock().unwrap() = Some(token("k1", id_claims(&p.issuer, "other", &[])));
+        assert!(matches!(
+            v.exchange(redirect, "code", "verifier", "n1").await,
+            Err(VerifyError::Invalid(_))
+        ));
+        // A refused code: invalid, not unavailable.
+        assert!(matches!(
+            v.exchange(redirect, "code", "verifier", "n1").await,
+            Err(VerifyError::Invalid(_))
+        ));
     }
 
     fn cfg(issuer: &str) -> OidcConfig {

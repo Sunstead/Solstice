@@ -45,6 +45,26 @@ async fn main() {
         }
     }
 
+    match (&config.auth, &config.public_url) {
+        (AuthMode::Oidc(_), None) => {
+            tracing::info!("SOLSTICE_PUBLIC_URL isn't set: apps can sign in, browsers can't")
+        }
+        (_, Some(url)) => tracing::info!(%url, "web sign-in at this address"),
+        _ => {}
+    }
+
+    // Expired browser sessions and abandoned sign-ins, hourly.
+    let purge = db.clone();
+    tokio::spawn(async move {
+        let mut every = tokio::time::interval(std::time::Duration::from_secs(60 * 60));
+        loop {
+            every.tick().await;
+            if let Err(e) = purge.purge_expired().await {
+                tracing::warn!(error = %e, "can't purge expired sessions");
+            }
+        }
+    });
+
     let state = AppState::new(&config, db);
     state.auth.start();
     let hub = state.hub.clone();

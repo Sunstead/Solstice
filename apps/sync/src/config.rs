@@ -16,6 +16,13 @@ pub struct Config {
     /// Default `.data/state`; the image sets `/state` (a backed-up volume).
     pub state_dir: PathBuf,
     pub auth: AuthMode,
+    /// `SOLSTICE_PUBLIC_URL`, e.g. `https://solstice.jupiter.sunstead.net`:
+    /// where browsers reach the server. Web sign-in needs it (the redirect
+    /// URI, the cookie, the origin check); without it only apps sign in.
+    pub public_url: Option<url::Url>,
+    /// `SOLSTICE_WEB_DIR`: the built web app, served at `/`. The image sets
+    /// it; unset, `/` says the server is running.
+    pub web_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -107,8 +114,26 @@ impl Config {
             (None, Some(username)) => AuthMode::Dev { username },
             (None, None) => return Err(ConfigError::NoAuth),
         };
+        let public_url = match env.get("SOLSTICE_PUBLIC_URL") {
+            Some(v) => {
+                let url = url::Url::parse(&v).map_err(|e| ConfigError::Invalid {
+                    name: "SOLSTICE_PUBLIC_URL",
+                    reason: e.to_string(),
+                })?;
+                if !matches!(url.scheme(), "http" | "https") || url.host().is_none() {
+                    return Err(ConfigError::Invalid {
+                        name: "SOLSTICE_PUBLIC_URL",
+                        reason: "use an http(s) address, e.g. https://solstice.example".into(),
+                    });
+                }
+                Some(url)
+            }
+            None => None,
+        };
         Ok(Config {
             bind,
+            public_url,
+            web_dir: env.get("SOLSTICE_WEB_DIR").map(PathBuf::from),
             notes_dir: env
                 .get("SOLSTICE_NOTES_DIR")
                 .map(PathBuf::from)
@@ -165,5 +190,15 @@ mod tests {
         assert_eq!(o.client_id, "solstice");
         assert_eq!(o.allowed_groups, ["homelab-users", "family"]);
         assert!(config(&[("SOLSTICE_OIDC_ISSUER", "not a url")]).is_err());
+    }
+
+    #[test]
+    fn public_url_must_be_http() {
+        let dev = ("SOLSTICE_DEV_USER", "pwb");
+        let c = config(&[dev, ("SOLSTICE_PUBLIC_URL", "https://solstice.example")]).unwrap();
+        assert_eq!(c.public_url.unwrap().as_str(), "https://solstice.example/");
+        assert!(config(&[dev, ("SOLSTICE_PUBLIC_URL", "ftp://x")]).is_err());
+        assert!(config(&[dev, ("SOLSTICE_PUBLIC_URL", "nope")]).is_err());
+        assert!(config(&[dev]).unwrap().public_url.is_none());
     }
 }

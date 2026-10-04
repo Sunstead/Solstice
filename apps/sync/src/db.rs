@@ -67,7 +67,47 @@ const MIGRATIONS: &[&str] = &[
         vault_id TEXT PRIMARY KEY REFERENCES vaults (id) ON DELETE CASCADE,
         placed   TEXT NOT NULL
     ) WITHOUT ROWID;",
+    // 0.2: the web app. Browser sessions (only the token's hash is kept),
+    // sign-ins in progress, and settings that follow a user between browsers
+    // (devices keep theirs in each vault's .solstice/).
+    "CREATE TABLE sessions (
+        token_hash   BLOB    PRIMARY KEY,
+        user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        created_at   INTEGER NOT NULL,
+        expires_at   INTEGER NOT NULL,
+        last_seen_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
+    CREATE TABLE oidc_flows (
+        state         TEXT    PRIMARY KEY,
+        pkce_verifier TEXT    NOT NULL,
+        nonce         TEXT    NOT NULL,
+        return_to     TEXT    NOT NULL,
+        created_at    INTEGER NOT NULL
+    ) WITHOUT ROWID;
+    CREATE TABLE web_settings (
+        user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        scope      TEXT    NOT NULL,
+        value      TEXT    NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, scope)
+    ) WITHOUT ROWID;",
 ];
+
+/// Thirty days, sliding: each use within the window extends it.
+pub const SESSION_TTL_SECS: i64 = 30 * 24 * 60 * 60;
+/// How stale `last_seen_at` may get before a request rewrites it.
+const TOUCH_AFTER_SECS: i64 = 60 * 60;
+/// A sign-in has ten minutes to come back from the provider.
+pub const FLOW_TTL_SECS: i64 = 10 * 60;
+
+/// A sign-in in progress, kept server-side until its callback.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OidcFlow {
+    pub state: String,
+    pub pkce_verifier: String,
+    pub nonce: String,
+    pub return_to: String,
+}
 
 pub fn now() -> i64 {
     SystemTime::now()
@@ -205,6 +245,180 @@ impl Db {
                 id: c.last_insert_rowid(),
                 username,
             })
+        })
+        .await
+    }
+
+    pub async fn user(&self, id: i64) -> Result<User> {
+        self.call(move |c| {
+            c.query_row("SELECT id, username FROM users WHERE id = ?1", [id], |r| {
+                Ok(User {
+                    id: r.get(0)?,
+                    username: r.get(1)?,
+                })
+            })
+            .optional()?
+            .ok_or(DbError::NotFound)
+        })
+        .await
+    }
+
+    // ------------------------------------------------------------ sessions
+
+    /// Starts a browser session. Returns the token for the cookie; only its
+    /// SHA-256 is stored, so a copy of the database can't sign anyone in.
+    pub async fn create_session(&self, user: i64) -> Result<String> {
+        let token = random_token(32);
+        let hash = Sha256::digest(token.as_bytes()).to_vec();
+        self.call(move |c| {
+            let t = now();
+            c.execute(
+                "INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_seen_at)
+                 VALUES (?1, ?2, ?3, ?4, ?3)",
+                params![hash, user, t, t + SESSION_TTL_SECS],
+            )?;
+            Ok(())
+        })
+        .await?;
+        Ok(token)
+    }
+
+    /// The user a session token belongs to, if it's live. Sliding: a session
+    /// used an hour or more after it was last seen is extended.
+    pub async fn session_user(&self, token: &str) -> Result<Option<User>> {
+        let hash = Sha256::digest(token.as_bytes()).to_vec();
+        self.call(move |c| {
+            let t = now();
+            let found = c
+                .query_row(
+                    "SELECT u.id, u.username, s.expires_at, s.last_seen_at
+                     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?1",
+                    [&hash],
+                    |r| {
+                        Ok((
+                            User {
+                                id: r.get(0)?,
+                                username: r.get(1)?,
+                            },
+                            r.get::<_, i64>(2)?,
+                            r.get::<_, i64>(3)?,
+                        ))
+                    },
+                )
+                .optional()?;
+            let Some((user, expires_at, last_seen)) = found else {
+                return Ok(None);
+            };
+            if expires_at <= t {
+                c.execute("DELETE FROM sessions WHERE token_hash = ?1", [&hash])?;
+                return Ok(None);
+            }
+            if t - last_seen >= TOUCH_AFTER_SECS {
+                c.execute(
+                    "UPDATE sessions SET last_seen_at = ?2, expires_at = ?3 WHERE token_hash = ?1",
+                    params![hash, t, t + SESSION_TTL_SECS],
+                )?;
+            }
+            Ok(Some(user))
+        })
+        .await
+    }
+
+    pub async fn delete_session(&self, token: &str) -> Result<()> {
+        let hash = Sha256::digest(token.as_bytes()).to_vec();
+        self.call(move |c| {
+            c.execute("DELETE FROM sessions WHERE token_hash = ?1", [hash])?;
+            Ok(())
+        })
+        .await
+    }
+
+    pub async fn put_flow(&self, flow: OidcFlow) -> Result<()> {
+        self.call(move |c| {
+            c.execute(
+                "INSERT INTO oidc_flows (state, pkce_verifier, nonce, return_to, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    flow.state,
+                    flow.pkce_verifier,
+                    flow.nonce,
+                    flow.return_to,
+                    now()
+                ],
+            )?;
+            Ok(())
+        })
+        .await
+    }
+
+    /// Takes a flow out (so it works once), if it's younger than ten minutes.
+    pub async fn take_flow(&self, state: &str) -> Result<Option<OidcFlow>> {
+        let state = state.to_owned();
+        self.call(move |c| {
+            let found = c
+                .query_row(
+                    "DELETE FROM oidc_flows WHERE state = ?1
+                     RETURNING state, pkce_verifier, nonce, return_to, created_at",
+                    [&state],
+                    |r| {
+                        Ok((
+                            OidcFlow {
+                                state: r.get(0)?,
+                                pkce_verifier: r.get(1)?,
+                                nonce: r.get(2)?,
+                                return_to: r.get(3)?,
+                            },
+                            r.get::<_, i64>(4)?,
+                        ))
+                    },
+                )
+                .optional()?;
+            Ok(found
+                .filter(|(_, at)| now() - at < FLOW_TTL_SECS)
+                .map(|(f, _)| f))
+        })
+        .await
+    }
+
+    /// Drops expired sessions and abandoned sign-ins. Run periodically.
+    pub async fn purge_expired(&self) -> Result<usize> {
+        self.call(|c| {
+            let t = now();
+            let s = c.execute("DELETE FROM sessions WHERE expires_at <= ?1", [t])?;
+            let f = c.execute(
+                "DELETE FROM oidc_flows WHERE created_at <= ?1",
+                [t - FLOW_TTL_SECS],
+            )?;
+            Ok(s + f)
+        })
+        .await
+    }
+
+    // ------------------------------------------------------------ web settings
+
+    pub async fn web_setting(&self, user: i64, scope: &str) -> Result<Option<String>> {
+        let scope = scope.to_owned();
+        self.call(move |c| {
+            Ok(c.query_row(
+                "SELECT value FROM web_settings WHERE user_id = ?1 AND scope = ?2",
+                params![user, scope],
+                |r| r.get(0),
+            )
+            .optional()?)
+        })
+        .await
+    }
+
+    pub async fn put_web_setting(&self, user: i64, scope: &str, value: String) -> Result<()> {
+        let scope = scope.to_owned();
+        self.call(move |c| {
+            c.execute(
+                "INSERT INTO web_settings (user_id, scope, value, updated_at) VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT (user_id, scope) DO UPDATE SET value = excluded.value,
+                 updated_at = excluded.updated_at",
+                params![user, scope, value, now()],
+            )?;
+            Ok(())
         })
         .await
     }
@@ -544,6 +758,66 @@ mod tests {
             (docs.len(), docs[0].epoch, docs[0].state.clone()),
             (1, 2, vec![2])
         );
+    }
+
+    #[tokio::test]
+    async fn sessions_keep_only_a_hash_and_end() {
+        let db = Db::open_in_memory().unwrap();
+        let a = db.user_for("iss", "a", "alice").await.unwrap();
+        let token = db.create_session(a.id).await.unwrap();
+        assert_eq!(db.session_user(&token).await.unwrap(), Some(a.clone()));
+        assert_eq!(db.session_user("nope").await.unwrap(), None);
+        let stored: Vec<u8> = db
+            .call(|c| Ok(c.query_row("SELECT token_hash FROM sessions", [], |r| r.get(0))?))
+            .await
+            .unwrap();
+        assert_ne!(stored, token.as_bytes());
+        db.call(|c| Ok(c.execute("UPDATE sessions SET expires_at = 0", [])?))
+            .await
+            .unwrap();
+        assert_eq!(db.session_user(&token).await.unwrap(), None);
+
+        let token = db.create_session(a.id).await.unwrap();
+        db.delete_session(&token).await.unwrap();
+        assert_eq!(db.session_user(&token).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn a_flow_works_once_and_not_after_ten_minutes() {
+        let db = Db::open_in_memory().unwrap();
+        let flow = OidcFlow {
+            state: "s1".into(),
+            pkce_verifier: "v".into(),
+            nonce: "n".into(),
+            return_to: "/".into(),
+        };
+        db.put_flow(flow.clone()).await.unwrap();
+        assert_eq!(db.take_flow("s1").await.unwrap(), Some(flow.clone()));
+        assert_eq!(db.take_flow("s1").await.unwrap(), None);
+
+        db.put_flow(flow).await.unwrap();
+        db.call(|c| Ok(c.execute("UPDATE oidc_flows SET created_at = 0", [])?))
+            .await
+            .unwrap();
+        assert_eq!(db.take_flow("s1").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn web_settings_are_per_user() {
+        let db = Db::open_in_memory().unwrap();
+        let a = db.user_for("iss", "a", "alice").await.unwrap();
+        let b = db.user_for("iss", "b", "bob").await.unwrap();
+        db.put_web_setting(a.id, "global", r#"{"x":1}"#.into())
+            .await
+            .unwrap();
+        db.put_web_setting(a.id, "global", r#"{"x":2}"#.into())
+            .await
+            .unwrap();
+        assert_eq!(
+            db.web_setting(a.id, "global").await.unwrap().as_deref(),
+            Some(r#"{"x":2}"#)
+        );
+        assert_eq!(db.web_setting(b.id, "global").await.unwrap(), None);
     }
 
     #[test]
