@@ -10,7 +10,7 @@ import {
   MenubarSubTrigger,
   MenubarShortcut,
   MenubarTrigger,
-} from '@/components/ui/menubar';
+} from '@sunstead/ui/components/menubar';
 import {
   commands,
   events,

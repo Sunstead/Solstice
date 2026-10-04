@@ -1,8 +1,8 @@
 import { AlertCircle, Cloud, CloudOff, Loader2, LogIn, RefreshCw } from 'lucide-react';
 
 import type { SyncInfo } from '@/bindings';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@sunstead/ui/components/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@sunstead/ui/components/tooltip';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { useSync } from '@/lib/stores/sync';
 

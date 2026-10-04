@@ -3,7 +3,7 @@ import { Document, Page } from 'react-pdf';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { ExternalLink, FileWarning } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { useLayout } from '@/hooks/use-layout';
 import { getFileNameFromPath } from '@/lib/path-utils';
 import { useAssetUrl } from '@/lib/viewer/asset';

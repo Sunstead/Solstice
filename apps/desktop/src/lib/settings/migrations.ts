@@ -36,9 +36,47 @@ export function migrateGlobal(global: Layer): LayerPatch {
   if (legacy === 'system') {
     patch.set['theme.mode'] = 'system';
   } else if (legacy === 'light') {
-    patch.set['theme.preset'] = 'solstice-light';
+    patch.set['theme.preset'] = 'sunstead-light';
   } else if (legacy === 'dark') {
-    patch.set['theme.preset'] = 'solstice-dark';
+    patch.set['theme.preset'] = 'sunstead-dark';
+  }
+  return patch;
+}
+
+/**
+ * Solstice's own theme ids that merged into a Sunstead lookalike when the
+ * built-ins became the shared Sunstead set (@sunstead/ui 0.3.0). Stone,
+ * Ember, Orchard, Brutalist, Concrete, Bubblegum and Inferno kept their ids.
+ *
+ * `blueprint` is the odd one: Solstice's was dark and became Hologram, while
+ * Sunstead's Blueprint is a different, light theme with the same id. That is
+ * why this runs once, guarded by a marker, rather than on every load: a
+ * Blueprint picked after the change must stay Blueprint.
+ */
+export const RETIRED_THEME_IDS: Readonly<Record<string, string>> = {
+  'solstice-light': 'sunstead-light',
+  'solstice-dark': 'sunstead-dark',
+  blueprint: 'hologram',
+  'solstice-midnight': 'deep-field',
+  glacier: 'lunar',
+  verdigris: 'aurora',
+  amethyst: 'nebula',
+  'solstice-paper': 'solar',
+};
+
+/** Set once the theme ids have been mapped; unknown keys are preserved. */
+const THEME_IDS_MARKER = 'theme.ids';
+const THEME_ID_KEYS = ['theme.preset', 'theme.lightPreset', 'theme.darkPreset'];
+
+export function migrateThemeIds(global: Layer): LayerPatch {
+  if (global[THEME_IDS_MARKER] === 'sunstead') return EMPTY;
+
+  const patch: LayerPatch = { set: { [THEME_IDS_MARKER]: 'sunstead' }, remove: [] };
+  for (const key of THEME_ID_KEYS) {
+    const id = global[key];
+    if (typeof id === 'string' && Object.prototype.hasOwnProperty.call(RETIRED_THEME_IDS, id)) {
+      patch.set[key] = RETIRED_THEME_IDS[id];
+    }
   }
   return patch;
 }

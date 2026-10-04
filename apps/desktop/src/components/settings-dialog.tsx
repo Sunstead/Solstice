@@ -5,7 +5,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from './ui/dialog';
+} from '@sunstead/ui/components/dialog';
 import {
   Sidebar,
   SidebarContent,
@@ -16,8 +16,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from '@/components/ui/resizable-sidebar';
-import { ScrollArea } from './ui/scroll-area';
+} from '@sunstead/ui/components/resizable-sidebar';
+import { ScrollArea } from '@sunstead/ui/components/scroll-area';
 import { cn } from '@/lib/utils';
 import { customPanes } from './settings/panes';
 import { SettingsPane } from './settings/settings-pane';
@@ -30,7 +30,7 @@ import {
 } from '@/lib/settings/sections';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Button } from './ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { X } from 'lucide-react';
 
 /**

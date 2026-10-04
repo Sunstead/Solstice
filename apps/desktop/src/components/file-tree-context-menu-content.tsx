@@ -8,7 +8,7 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
-} from './ui/context-menu';
+} from '@sunstead/ui/components/context-menu';
 
 const components = {
   Item: ContextMenuItem,

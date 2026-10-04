@@ -1,7 +1,7 @@
 import { openPath } from '@tauri-apps/plugin-opener';
 import { FileQuestion } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { basename } from '@/lib/wikilink/target';
 import { ViewerFrame } from './viewer-frame';
 

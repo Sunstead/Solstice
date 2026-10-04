@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Menu } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@sunstead/ui/components/dropdown-menu';
 import {
   commands,
   events,

@@ -19,8 +19,8 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@sunstead/ui/components/button';
+import { Separator } from '@sunstead/ui/components/separator';
 import { setColumnAlignment, type ColumnAlignment } from '@/lib/table';
 import { useTableTools, type TableTarget } from '@/lib/stores/table-tools';
 

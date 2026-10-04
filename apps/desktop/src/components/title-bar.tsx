@@ -6,10 +6,10 @@ import {
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import SolsticeIcon from '@/assets/icons/app/icon.svg?react';
 import { useIsMac } from '@/hooks/use-platform';
-import { useSidebar } from './ui/resizable-sidebar';
+import { useSidebar } from '@sunstead/ui/components/resizable-sidebar';
 import { cn } from '@/lib/utils';
 import { AppMenubar } from './app-menu-dropdown';
-import { Button } from './ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { runCommand } from '@/lib/commands';
 import { SyncIndicator } from './sync/status';

@@ -3,7 +3,7 @@ import { createRootRoute, Outlet } from '@tanstack/react-router';
 import {
   SidebarInset,
   SidebarProvider,
-} from '@/components/ui/resizable-sidebar';
+} from '@sunstead/ui/components/resizable-sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { TitleBarShell } from '@/components/title-bar';
 import { QuickOpenDialog } from '@/components/quick-open-dialog';

@@ -7,7 +7,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from './ui/breadcrumb';
+} from '@sunstead/ui/components/breadcrumb';
 import { getFileIcon } from '@/assets/icons';
 import { cn, getFileExtension } from '@/lib/utils';
 import { getWorkspaceRelativeSegments } from '@/lib/path-utils';

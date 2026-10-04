@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { GitMerge, Undo2 } from 'lucide-react';
 
 import { commands, type SyncReview } from '@/bindings';
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { useSync } from '@/lib/stores/sync';
 import { ReviewDialog } from './review-dialog';
 

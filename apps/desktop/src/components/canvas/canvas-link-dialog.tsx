@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import {
   Dialog,
   DialogClose,
@@ -9,9 +9,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '@sunstead/ui/components/dialog';
+import { Input } from '@sunstead/ui/components/input';
+import { Label } from '@sunstead/ui/components/label';
 
 /** Asks for the URL a new link card should point at. */
 export function CanvasLinkDialog({

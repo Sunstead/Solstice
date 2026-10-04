@@ -3,7 +3,7 @@ import { FileWarning } from 'lucide-react';
 
 import { commands } from '@/bindings';
 import { ExternalChangeBar } from '@/components/external-change-bar';
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { ViewerFrame } from '@/components/viewer/viewer-frame';
 import { useExternalFileChanges } from '@/hooks/use-external-file-changes';
 import { useLayout } from '@/hooks/use-layout';

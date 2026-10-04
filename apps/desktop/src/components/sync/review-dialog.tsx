@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { commands, type SyncReview, type SyncVersions } from '@/bindings';
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@sunstead/ui/components/dialog';
 import { cn } from '@/lib/utils';
 import { useSync } from '@/lib/stores/sync';
 

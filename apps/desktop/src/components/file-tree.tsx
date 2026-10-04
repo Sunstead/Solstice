@@ -15,13 +15,13 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from './ui/collapsible';
-import { ContextMenu, ContextMenuTrigger } from './ui/context-menu';
+} from '@sunstead/ui/components/collapsible';
+import { ContextMenu, ContextMenuTrigger } from '@sunstead/ui/components/context-menu';
 import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-} from './ui/resizable-sidebar';
+} from '@sunstead/ui/components/resizable-sidebar';
 import { cn, getFileExtension } from '@/lib/utils';
 import { getFileIcon, getFolderIcon } from '@/assets/icons';
 import { useEffect, useRef, type KeyboardEvent } from 'react';

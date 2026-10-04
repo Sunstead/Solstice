@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import {
   Command,
   CommandEmpty,
@@ -9,8 +9,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+} from '@sunstead/ui/components/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@sunstead/ui/components/popover';
 import { cn } from '@/lib/utils';
 import { bundledFonts, installedFonts } from '@/lib/theme/fonts';
 import { resolveOptions, type FontDef, type SelectDef } from '@/lib/settings/types';

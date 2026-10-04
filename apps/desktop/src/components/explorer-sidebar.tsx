@@ -6,22 +6,22 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
-} from './ui/resizable-sidebar';
+} from '@sunstead/ui/components/resizable-sidebar';
 import { FileTree } from './file-tree';
-import { ContextMenu, ContextMenuTrigger } from './ui/context-menu';
+import { ContextMenu, ContextMenuTrigger } from '@sunstead/ui/components/context-menu';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
 import { FileActionDialogs } from './file-action-dialogs';
 import { FileTreeDragLayer } from './file-tree-drag-layer';
 import { useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { cn } from '@/lib/utils';
-import { Button } from './ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from './ui/dropdown-menu';
+} from '@sunstead/ui/components/dropdown-menu';
 import {
   FILE_TYPE_PRESETS,
   FileTypePreset,

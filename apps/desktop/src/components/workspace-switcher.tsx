@@ -7,12 +7,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem,
   DropdownMenuGroup,
-} from './ui/dropdown-menu';
+} from '@sunstead/ui/components/dropdown-menu';
 import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-} from './ui/resizable-sidebar';
+} from '@sunstead/ui/components/resizable-sidebar';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 

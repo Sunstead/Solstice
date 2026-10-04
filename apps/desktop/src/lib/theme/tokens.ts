@@ -2,14 +2,15 @@
  * The complete set of variables a theme is allowed to declare.
  *
  * This list is the enforcement point for the rule that a theme is a palette and
- * nothing else: anything a theme file declares that is not here is dropped. It
- * mirrors the `:root` block in `styles/app.css` exactly — when a token is added
- * there, add it here or themes will not be able to reach it.
+ * nothing else: anything a theme file declares that is not here is dropped. Each
+ * one is a token every @sunstead/ui theme defines (its `themes.test.ts` keeps
+ * that set whole), so a user theme can override any of them and inherit the
+ * rest from the built-in it sits on.
  *
  * Deliberately absent are the two derived variables, `--border` and
  * `--color-tab-outline`: they are computed from `--border-color` /
- * `--border-opacity`, and letting a theme set them directly would break the
- * derivation rather than participate in it.
+ * `--border-opacity` (`apply.ts`, `styles/app.css`), and letting a theme set
+ * them directly would break the derivation rather than participate in it.
  */
 export const THEME_TOKENS = [
   '--background',

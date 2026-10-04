@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
-import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
+import { Input } from '@sunstead/ui/components/input';
+import { RadioGroup, RadioGroupItem } from '@sunstead/ui/components/radio-group';
+import { Slider } from '@sunstead/ui/components/slider';
+import { Switch } from '@sunstead/ui/components/switch';
 import { clampToRange } from '@/lib/settings/store';
 import type { AnySettingDef, NumberDef } from '@/lib/settings/types';
 import { FontControl, SelectControl } from './combobox-control';

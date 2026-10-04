@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { EntryKind } from '@/lib/stores/entry-input';
 import { cn, getFileExtension } from '@/lib/utils';
 import { getFileIcon, getFolderIcon } from '@/assets/icons';
-import { InputGroup, InputGroupAddon, InputGroupInput } from './ui/input-group';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@sunstead/ui/components/input-group';
 import { ChevronRight } from 'lucide-react';
 
 export function EntryInput({

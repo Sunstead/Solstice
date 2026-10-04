@@ -1,7 +1,7 @@
 import { RotateCcw } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Button } from '@sunstead/ui/components/button';
+import { Label } from '@sunstead/ui/components/label';
 import { cn } from '@/lib/utils';
 import type { SettingKey } from '@/lib/settings/registry';
 import { hasOpenWorkspace } from '@/lib/stores/scoped-storage';

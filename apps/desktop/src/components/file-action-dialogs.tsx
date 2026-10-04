@@ -13,7 +13,7 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
   AlertDialogAction,
-} from './ui/alert-dialog';
+} from '@sunstead/ui/components/alert-dialog';
 
 /**
  * Single, app-wide instance of the delete-confirmation and move-to-folder

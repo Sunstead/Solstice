@@ -24,8 +24,8 @@ import {
   X,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@sunstead/ui/components/button';
+import { Input } from '@sunstead/ui/components/input';
 
 interface QueryFields {
   search: string;

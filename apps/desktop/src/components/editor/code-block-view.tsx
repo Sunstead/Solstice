@@ -16,19 +16,19 @@ import { Selection, TextSelection } from '@milkdown/kit/prose/state';
 import { exitCode } from '@milkdown/kit/prose/commands';
 import { Check, ChevronsUpDown, Copy } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import {
   Command,
   CommandEmpty,
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
+} from '@sunstead/ui/components/command';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
+} from '@sunstead/ui/components/popover';
 import { isSyncingFromDoc, syncFromDoc } from '@/lib/codeblock/bridge';
 import { createSearchPanel } from '@/lib/codeblock/search-panel';
 import { codeBlockHighlighting, codeBlockTheme } from '@/lib/codeblock/theme';

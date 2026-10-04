@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { ExternalLink, FileWarning } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@sunstead/ui/components/button';
 import { useLayout } from '@/hooks/use-layout';
 import { boundsOf } from '@/lib/canvas/doc';
 import { parseCanvas } from '@/lib/canvas/parse';
