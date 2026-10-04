@@ -1,0 +1,28 @@
+[package]
+name = "solstice-sync-client"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A device's side of Solstice Sync: links a folder to a vault and keeps them in sync. Used by the desktop app (and later iOS)."
+publish = false
+
+[dependencies]
+solstice-sync = { path = "../solstice-sync" }
+solstice-sync-fs = { path = "../solstice-sync-fs" }
+tokio = { version = "1", features = ["rt", "macros", "sync", "time", "net"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+url = "2"
+
+[dev-dependencies]
+solstice-sync-server = { path = "../../apps/sync" }
+axum = "0.8"
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }

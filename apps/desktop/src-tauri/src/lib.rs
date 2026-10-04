@@ -8,6 +8,7 @@ mod files;
 mod types;
 mod commands;
 mod watcher;
+mod sync;
 
 use commands::command_registry::CommandId;
 use commands::keymap::KeymapChanged;
@@ -49,8 +50,22 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::themes::list_user_themes,
             commands::themes::ensure_theme_dir,
             commands::fonts::list_system_fonts,
+            sync::sync_server_info,
+            sync::sync_sign_in,
+            sync::sync_sign_out,
+            sync::sync_vaults,
+            sync::sync_create_vault,
+            sync::sync_create_token,
+            sync::sync_link,
+            sync::sync_unlink,
+            sync::sync_status,
+            sync::sync_reconnect,
+            sync::sync_reviews,
+            sync::sync_review_versions,
+            sync::sync_resolve_review,
+            sync::sync_editor_opened,
         ])
-        .events(tauri_specta::collect_events![KeymapChanged, MenuCommand, FileSystemChanged])
+        .events(tauri_specta::collect_events![KeymapChanged, MenuCommand, FileSystemChanged, sync::SyncChanged])
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -89,6 +104,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(workspace::WorkspaceState::new())
         .manage(watcher::FsWatcherState::new())
+        .manage(sync::SyncState::default())
         .manage(commands::keymap::MenuAccelerators::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
@@ -146,6 +162,7 @@ pub fn run() {
             // window must not leave either behind.
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 watcher::unwatch(window.label(), &window.state::<watcher::FsWatcherState>());
+                sync::window_closed(window.app_handle(), window.label());
             }
         })
         .on_menu_event(|app, event| {

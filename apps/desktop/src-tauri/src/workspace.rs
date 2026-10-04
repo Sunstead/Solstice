@@ -37,6 +37,9 @@ pub fn set_workspace(
     // tabs still open from the previous workspace.
     app.asset_protocol_scope().allow_directory(&path, true).map_err(|e| e.to_string())?;
 
+    // Sync runs its own watcher, so it starts whatever the setting below says.
+    crate::sync::workspace_opened(&app, &label, &path);
+
     watcher::watch_workspace(&app, &label, &path, &watchers)
 }
 
