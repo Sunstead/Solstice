@@ -24,7 +24,7 @@ pub use note::{decode_snapshot, encode_snapshot, NoteDoc};
 pub use overlap::overlaps;
 pub use protocol::{Body, DocKey, Frame, Msg, PROTOCOL};
 pub use session::{Event, Outcome, Role, Session};
-pub use vault::{content_hash, Content, Vault};
+pub use vault::{content_hash, is_content_hash, Content, Vault};
 pub use yrs::Snapshot;
 
 #[derive(Debug, thiserror::Error)]

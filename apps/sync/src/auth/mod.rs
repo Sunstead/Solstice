@@ -1,7 +1,7 @@
-//! Who's calling. Apps present an Authentik access token (`Authorization:
-//! Bearer <jwt>`, or `?token=` on the WebSocket, which can't set headers);
-//! Atlas presents an API token (`Bearer sst_...`). In dev mode everyone is
-//! the dev user.
+//! Who's calling. Apps present an Authentik access token and Atlas an API
+//! token (`sst_...`), both as `Authorization: Bearer`, the WebSocket
+//! included: tokens never go in URLs, where proxies and logs keep them. In
+//! dev mode everyone is the dev user.
 
 pub mod oidc;
 
@@ -58,6 +58,9 @@ pub enum Via {
 pub struct CurrentUser {
     pub user: User,
     pub via: Via,
+    /// When the access token expires (Unix seconds); `None` for API tokens
+    /// and dev sign-in. The sync WebSocket closes then.
+    pub expires: Option<u64>,
 }
 
 impl CurrentUser {
@@ -86,14 +89,12 @@ pub fn check_username(name: &str) -> Result<(), AppError> {
 }
 
 fn presented_token(parts: &Parts) -> Option<String> {
-    if let Some(value) = parts.headers.get(axum::http::header::AUTHORIZATION) {
-        let value = value.to_str().ok()?;
-        return value.strip_prefix("Bearer ").map(|t| t.trim().to_owned());
-    }
-    let query = parts.uri.query()?;
-    url::form_urlencoded::parse(query.as_bytes())
-        .find(|(k, _)| k == "token")
-        .map(|(_, v)| v.into_owned())
+    let value = parts
+        .headers
+        .get(axum::http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?;
+    value.strip_prefix("Bearer ").map(|t| t.trim().to_owned())
 }
 
 impl FromRequestParts<crate::AppState> for CurrentUser {
@@ -120,6 +121,7 @@ pub async fn authenticate(
         return Ok(CurrentUser {
             user,
             via: Via::Token(scope),
+            expires: None,
         });
     }
     match auth {
@@ -129,6 +131,7 @@ pub async fn authenticate(
             Ok(CurrentUser {
                 user,
                 via: Via::App,
+                expires: None,
             })
         }
         Auth::Oidc { verifier, config } => {
@@ -153,6 +156,7 @@ pub async fn authenticate(
             Ok(CurrentUser {
                 user,
                 via: Via::App,
+                expires: Some(who.expires),
             })
         }
     }

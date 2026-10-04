@@ -21,6 +21,12 @@ pub fn content_hash(bytes: &[u8]) -> String {
         .collect()
 }
 
+/// Whether `s` could be a [`content_hash`]: 64 lowercase hex digits. Hashes
+/// arrive from peers and name files in the blob cache, so check before use.
+pub fn is_content_hash(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
 /// What a file holds, for writing it out or comparing replicas.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Content {
