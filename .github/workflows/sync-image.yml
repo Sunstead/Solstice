@@ -89,6 +89,11 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/v1/nope)" = 404
           test "$(curl -s -o /dev/null -w '%{http_code}' -H 'authorization: Bearer sst_nope' localhost:8080/v1/vaults)" = 401
 
+          # The web app: the shell with its policy (dev sign-in needs no session).
+          curl -fsS -D headers.txt localhost:8080/ | grep '<div id="root">' >/dev/null
+          grep -i "^content-security-policy: default-src 'self'; script-src 'self' 'sha256-" headers.txt >/dev/null
+          curl -fsS localhost:8080/vault/Notes | grep '<div id="root">' >/dev/null
+
           docker logs dev 2>&1 | tee sync.log
           grep 'state database migrated' sync.log >/dev/null
           if grep -q $'\x1b' sync.log; then echo 'ANSI escapes in docker logs' >&2; exit 1; fi

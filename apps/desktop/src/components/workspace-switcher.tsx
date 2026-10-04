@@ -1,4 +1,5 @@
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { isDesktop } from '@/lib/backend';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -68,13 +69,16 @@ export function WorkspaceSwitcher() {
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuGroup>
-                <DropdownMenuSeparator />
+                {isDesktop && <DropdownMenuSeparator />}
               </>
             )}
-            <DropdownMenuItem onClick={() => openFolder()}>
-              <Plus />
-              New workspace
-            </DropdownMenuItem>
+            {/* On the web, workspaces are the vaults on the server. */}
+            {isDesktop && (
+              <DropdownMenuItem onClick={() => openFolder()}>
+                <Plus />
+                New workspace
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

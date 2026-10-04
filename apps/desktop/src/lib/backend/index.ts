@@ -1,13 +1,13 @@
 /**
  * The one place the app talks to what runs it. Everything that reaches the
  * Tauri runtime (commands, events, plugins, the window) goes through here,
- * so the same UI can run on another backend: the web app, against the
- * Solstice Sync server. An ESLint rule keeps `@tauri-apps/*` and the
- * generated `@/bindings` (values; its types are fine anywhere) inside this
- * folder.
+ * so the same UI runs on another backend: the web app, against the Solstice
+ * Sync server it's served from (`web/`). An ESLint rule keeps
+ * `@tauri-apps/*` and the generated `@/bindings` (values; its types are fine
+ * anywhere) inside this folder.
  *
- * The desktop parts are thin re-exports, so the desktop app behaves exactly
- * as it did when it called Tauri directly.
+ * In the desktop shell these are the Tauri originals, so the desktop app
+ * behaves exactly as it did when it called Tauri directly.
  */
 import { isTauri } from '@tauri-apps/api/core';
 import {
@@ -18,6 +18,9 @@ import {
   type MenuCommand,
   type SyncChanged,
 } from '@/bindings';
+import { keymapChanged, webCommands } from './web/commands';
+import { Emitter } from './web/emitter';
+import { fsChanged, syncChanged } from './web/vault';
 
 /** Whether the app is running in the desktop shell. */
 export const isDesktop = isTauri();
@@ -37,8 +40,16 @@ export interface Events {
   syncChanged: EventSource<SyncChanged>;
 }
 
-export const commands: Commands = tauriCommands;
-export const events: Events = tauriEvents;
+export const commands: Commands = isDesktop ? tauriCommands : webCommands;
+export const events: Events = isDesktop
+  ? tauriEvents
+  : {
+      fileSystemChanged: fsChanged,
+      keymapChanged,
+      // The web app has no native menu to send these.
+      menuCommand: new Emitter<MenuCommand>(),
+      syncChanged,
+    };
 
 /** A command's data, or a throw with its error, as a raw `invoke` gives. */
 export async function unwrap<T, E>(

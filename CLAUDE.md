@@ -45,6 +45,10 @@ cargo clippy --workspace --all-targets -- -D warnings
 # Solstice Sync's server, locally (state and notes under .data/):
 SOLSTICE_DEV_USER=dev cargo run -p solstice-sync-server
 docker build -f apps/sync/Dockerfile -t solstice-sync .   # from the root
+
+# The web app against that server: the desktop frontend in a browser, with
+# /v1 and /auth proxied to SOLSTICE_SYNC_URL (default http://127.0.0.1:8080).
+npm run dev:web      # then open http://localhost:1420
 ```
 
 Lint has 0 errors. The desktop app predates linting, so a few React Compiler
@@ -115,6 +119,14 @@ The primitives come from [`@sunstead/ui`](https://github.com/Sunstead/sunstead-u
 ### Themes
 
 The built-in themes are the shared Sunstead set (22, in Dark and Light groups), defined as CSS in `@sunstead/ui` (`[data-theme='<id>']` on `<html>`). [lib/theme/apply.ts](apps/desktop/src/lib/theme/apply.ts) sets that attribute, and lays a user theme (JSON in a themes folder, `user:` ids) over its appearance's default as inline variables. The choice lives in settings (`theme.mode`, `theme.preset`, `theme.lightPreset`, `theme.darkPreset`). `index.html` paints the last theme before the first frame from its own copy of the ids (`themes-sync.test.ts` keeps it in step). Solstice's older theme ids that merged into a Sunstead theme are mapped once by `migrateThemeIds` in `lib/settings/migrations.ts`. Solstice never sets `color-scheme`.
+
+### The web app
+
+The same frontend runs in a browser as the web app, served by the Solstice Sync server (`SOLSTICE_WEB_DIR`, built into its image) at its own address. Signing in opens the user's vaults on the server; there are no local folders. `src/lib/backend/` picks the backend at startup: in the desktop shell the Tauri commands, in a browser `lib/backend/web/`, which answers the same `commands` and `events` from the server's web routes (`apps/sync/src/web_api.rs`).
+- A workspace is a vault, at the path `/<vault name>`. The file tree comes from the server, and its change socket (`/v1/web/events`) becomes `fileSystemChanged` events, so the explorer, tabs and external-change handling work unchanged.
+- A note is read with a `base` and saved against it: the server merges the save with whatever other devices did since, as a synced desktop folder does.
+- Settings and layout are kept on the server per user (`/v1/web/settings`), not in `.solstice/`; the workspace list is the user's vaults.
+- What needs a computer is hidden or says so: window controls, picking a folder, theme folders, system fonts, showing a file in the file manager, the Sync pane (the web shows the account and Sign out instead). File pickers hand back blob URLs that `importAttachment` uploads. `/open?vault=&path=` is the web's `solstice://open` link.
 
 ### Window chrome
 

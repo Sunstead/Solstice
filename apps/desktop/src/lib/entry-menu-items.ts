@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { isDesktop } from '@/lib/backend';
 import {
   ArrowUpRight,
   Clipboard,
@@ -188,13 +189,16 @@ export function useEntryMenuItems(
     });
   }
 
-  items.push({
-    kind: 'item',
-    id: 'reveal-in-system',
-    label: revealInSystemLabel,
-    icon: ArrowUpRight,
-    run: () => void entryActions.revealInSystem(path),
-  });
+  // The web app has no file manager to show it in.
+  if (isDesktop) {
+    items.push({
+      kind: 'item',
+      id: 'reveal-in-system',
+      label: revealInSystemLabel,
+      icon: ArrowUpRight,
+      run: () => void entryActions.revealInSystem(path),
+    });
+  }
 
   // Handing a folder to the OS just opens the file manager again, which is
   // what the item above already does.
@@ -202,7 +206,7 @@ export function useEntryMenuItems(
     items.push({
       kind: 'item',
       id: 'open-in-default-app',
-      label: 'Open in Default App',
+      label: isDesktop ? 'Open in Default App' : 'Open in New Tab',
       icon: ArrowUpRight,
       run: () => void entryActions.openInDefaultApp(path),
     });
