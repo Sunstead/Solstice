@@ -315,3 +315,31 @@ async fn offline_changes_sync_on_restart_and_unlinking_keeps_files() {
     cb.stop().await;
     p.server.stop().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_vault_deleted_on_the_server_stops_its_folders_and_keeps_their_files() {
+    let (p, ca, cb) = pair().await;
+    let res = reqwest::Client::new()
+        .delete(format!("{}/v1/vaults/{}", p.server.url, p.vault))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 204);
+
+    for client in [&ca, &cb] {
+        let mut status = client.watch_status();
+        let wait = status.wait_for(|s| *s == Status::Deleted);
+        tokio::time::timeout(Duration::from_secs(20), wait)
+            .await
+            .expect("told in time")
+            .unwrap();
+    }
+    // A change made afterwards stays here: nothing reconnects.
+    write(&p.a, "After.md", "written after\n");
+    ca.reconnect();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert_eq!(*ca.watch_status().borrow(), Status::Deleted);
+    assert_eq!(read(&p.a, "From A.md").as_deref(), Some("written on A\n"));
+    assert_eq!(read(&p.b, "From A.md").as_deref(), Some("written on A\n"));
+    p.server.stop().await;
+}

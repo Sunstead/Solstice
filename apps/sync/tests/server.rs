@@ -476,3 +476,73 @@ async fn a_restart_keeps_state_and_lost_state_asks_devices_to_relink() {
     assert!(fresh.notices.is_empty(), "{:?}", fresh.notices);
     server.stop().await;
 }
+
+#[tokio::test]
+async fn deleting_a_vault_tells_its_devices_and_moves_it_to_the_trash() {
+    let tmp = tempfile::tempdir().unwrap();
+    let server = start(tmp.path()).await;
+    let vault = server.create_vault("Notes").await;
+
+    let mut a = Device::new("laptop", &vault);
+    let (id, _) = a.vault.create_note("Plan.md", "# Plan\n").unwrap();
+    a.connect(&server).await;
+    eventually("the note on disk", || server.file("Plan.md").is_some()).await;
+
+    let client = reqwest::Client::new();
+    let res = client
+        .delete(format!("{}/v1/vaults/{vault}", server.base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 204);
+
+    // The device hears about it.
+    a.settle().await;
+    assert!(
+        a.notices.iter().any(|n| n.contains("vault_deleted")),
+        "{:?}",
+        a.notices
+    );
+
+    // The folder went to the trash, whole, and isn't a vault there.
+    assert!(server.file("Plan.md").is_none());
+    let trash = server.notes.join("pwb").join(".trash");
+    let moved: Vec<_> = std::fs::read_dir(&trash).unwrap().flatten().collect();
+    assert_eq!(moved.len(), 1);
+    assert!(moved[0].file_name().to_string_lossy().starts_with("Notes "));
+    assert_eq!(
+        std::fs::read_to_string(moved[0].path().join("Plan.md")).unwrap(),
+        "# Plan\n"
+    );
+    let listed: serde_json::Value = client
+        .get(format!("{}/v1/vaults", server.base))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(listed.as_array().unwrap().len(), 0, "{listed}");
+
+    // An edit sent afterwards doesn't bring it back.
+    a.notices.clear();
+    let msgs = a.vault.save_note(&id, "# Plan\n\nmore\n", None).unwrap();
+    a.send(msgs).await;
+    a.settle().await;
+    assert!(
+        a.notices.iter().any(|n| n.contains("vault_deleted")),
+        "{:?}",
+        a.notices
+    );
+    assert!(!server.notes.join("pwb").join("Notes").exists());
+
+    // The name is free again, and deleting twice is a 404.
+    server.create_vault("Notes").await;
+    let again = client
+        .delete(format!("{}/v1/vaults/{vault}", server.base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(again.status(), 404);
+    server.stop().await;
+}
