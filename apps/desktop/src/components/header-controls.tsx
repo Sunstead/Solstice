@@ -1,17 +1,16 @@
 import { useLayoutEffect, useRef } from 'react';
+import { create } from 'zustand';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
-import { useSidebar } from '@sunstead/ui/components/resizable-sidebar';
 import { isDesktop } from '@/lib/backend';
 import { useIsMac } from '@/hooks/use-platform';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { runCommand } from '@/lib/commands';
-import { cn } from '@/lib/utils';
 import { AppMenubar } from './app-menu-dropdown';
 import { SyncIndicator } from './sync/status';
 
 /** Where the controls end, from the window's left edge; the tab strip's spacer reads it. */
-const END_VAR = '--header-controls-end';
+const useControlsEnd = create<{ end: number }>(() => ({ end: 0 }));
 
 /**
  * The menu, Back, Forward and sync buttons. Rendered once, by the title bar,
@@ -28,8 +27,7 @@ export function HeaderControls() {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const root = document.documentElement;
-    const measure = () => root.style.setProperty(END_VAR, `${Math.ceil(el.getBoundingClientRect().right)}px`);
+    const measure = () => useControlsEnd.setState({ end: Math.ceil(el.getBoundingClientRect().right) });
     measure();
     // Size changes (the sync button appearing) and the logo slot changing
     // width (macOS fullscreen) both move the right edge.
@@ -38,7 +36,7 @@ export function HeaderControls() {
     if (el.parentElement) ro.observe(el.parentElement);
     return () => {
       ro.disconnect();
-      root.style.removeProperty(END_VAR);
+      useControlsEnd.setState({ end: 0 });
     };
   }, []);
 
@@ -68,16 +66,31 @@ export function HeaderControls() {
 
 /**
  * Leads the top-left tabset, so its tabs start after the header controls.
- * Its width tracks the sidebar column with the same easing, so tabs never
- * pass under the controls while the sidebar opens or closes.
+ * Sized from where it actually is, every frame the editor moves (the editor
+ * area resizes with the sidebar), rather than animated alongside it: two
+ * animations never quite agree, and the tabs overshot and bounced back.
  */
 export function HeaderControlsSpacer() {
-  const { state, isDraggingRail } = useSidebar();
-  return (
-    <span
-      aria-hidden
-      data-collapsed={state === 'collapsed'}
-      className={cn('header-controls-spacer', isDraggingRail && 'duration-0!')}
-    />
-  );
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const layout = el?.closest('.flexlayout__layout');
+    if (!el || !layout) return;
+    const fit = () => {
+      const width = Math.max(0, useControlsEnd.getState().end - el.getBoundingClientRect().left);
+      el.style.width = `${width}px`;
+    };
+    fit();
+    // Fires in the same frame as the resize, before paint.
+    const ro = new ResizeObserver(fit);
+    ro.observe(layout);
+    const unsubscribe = useControlsEnd.subscribe(fit);
+    return () => {
+      ro.disconnect();
+      unsubscribe();
+    };
+  }, []);
+
+  return <span ref={ref} aria-hidden className='header-controls-spacer' />;
 }

@@ -14,7 +14,6 @@ import {
   SidebarRail,
   useSidebar,
 } from '@sunstead/ui/components/resizable-sidebar';
-import { ThemeToggle } from './theme-toggle';
 import { Button } from '@sunstead/ui/components/button';
 import { primaryViews } from '@/lib/views/registry';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
@@ -89,9 +88,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroup>
             <SidebarGroupContent className='px-1.5 md:px-0 text-muted-foreground'>
               <SidebarMenu className='gap-1 flex flex-col items-center'>
-                <SidebarMenuItem>
-                  <ThemeToggle />
-                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <AccountButton />
                 </SidebarMenuItem>

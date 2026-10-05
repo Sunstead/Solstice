@@ -391,16 +391,10 @@
 }
 
 /* Makes room in the top-left tab strip for the title bar's controls, which
-   overhang it when the sidebar is collapsed (header-controls.tsx). Same
-   timing as the title bar shell, so the two move together. */
+   overhang it when the sidebar is collapsed. Sized in JS (header-controls.tsx). */
 .flexlayout-custom .header-controls-spacer {
   display: block;
   flex: none;
   align-self: stretch;
-  width: max(0px, calc(var(--header-controls-end, 0px) - var(--sidebar-width)));
-  transition: width 200ms ease-in-out;
-}
-
-.flexlayout-custom .header-controls-spacer[data-collapsed='true'] {
-  width: max(0px, calc(var(--header-controls-end, 0px) - var(--sidebar-width-icon)));
+  width: 0;
 }
