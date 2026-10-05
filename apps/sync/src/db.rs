@@ -546,6 +546,29 @@ impl Db {
         .await
     }
 
+    /// Forgets a vault: its row, the state kept for it (cascaded) and the web
+    /// app's settings for it. Its folder is the hub's to move.
+    pub async fn delete_vault(&self, user: i64, id: &str) -> Result<()> {
+        let id = id.to_owned();
+        self.call(move |c| {
+            let tx = c.transaction()?;
+            let gone = tx.execute(
+                "DELETE FROM vaults WHERE id = ?1 AND user_id = ?2",
+                params![id, user],
+            )?;
+            if gone == 0 {
+                return Err(DbError::NotFound);
+            }
+            tx.execute(
+                "DELETE FROM web_settings WHERE user_id = ?1 AND scope LIKE 'vault.' || ?2 || '.%'",
+                params![user, id],
+            )?;
+            tx.commit()?;
+            Ok(())
+        })
+        .await
+    }
+
     pub async fn create_vault(&self, user: i64, name: &str) -> Result<VaultRow> {
         let name = name.to_owned();
         self.call(move |c| {
@@ -800,6 +823,27 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(db.take_flow("s1").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn deleting_a_vault_forgets_its_state_and_web_settings() {
+        let db = Db::open_in_memory().unwrap();
+        let a = db.user_for("iss", "a", "alice").await.unwrap();
+        let notes = db.create_vault(a.id, "Notes").await.unwrap();
+        let other = db.create_vault(a.id, "Other").await.unwrap();
+        for v in [&notes, &other] {
+            db.put_web_setting(a.id, &format!("vault.{}.layout", v.id), "{}".into())
+                .await
+                .unwrap();
+        }
+        db.delete_vault(a.id, &notes.id).await.unwrap();
+        assert!(db.vault(a.id, &notes.id).await.is_err());
+        let scope = |v: &VaultRow| format!("vault.{}.layout", v.id);
+        assert_eq!(db.web_setting(a.id, &scope(&notes)).await.unwrap(), None);
+        assert!(db.web_setting(a.id, &scope(&other)).await.unwrap().is_some());
+        assert!(matches!(db.delete_vault(a.id, &notes.id).await, Err(DbError::NotFound)));
+        // The name is free again.
+        db.create_vault(a.id, "Notes").await.unwrap();
     }
 
     #[tokio::test]

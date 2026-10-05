@@ -20,6 +20,8 @@ function describe(info: SyncInfo): string {
       return 'Signed out of the sync server';
     case 'relink':
       return 'Needs linking again';
+    case 'deleted':
+      return 'The vault was deleted on the server';
     default:
       return info.state;
   }
@@ -50,10 +52,11 @@ export function SyncIndicator() {
           : Loader2
         : info.state === 'signed_out'
           ? LogIn
-          : info.state === 'relink'
+          : info.state === 'relink' || info.state === 'deleted'
             ? AlertCircle
             : CloudOff;
-  const attention = info.state === 'signed_out' || info.state === 'relink' || info.reviews > 0;
+  const attention =
+    info.state === 'signed_out' || info.state === 'relink' || info.state === 'deleted' || info.reviews > 0;
 
   return (
     <Tooltip>

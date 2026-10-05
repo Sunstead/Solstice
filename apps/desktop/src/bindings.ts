@@ -175,7 +175,7 @@ export const events = {
 };
 
 /* Types */
-export type CommandId = "app.settings" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.new_workspace" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
+export type CommandId = "app.settings" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.new_workspace" | "file.import_from_sync" | "file.manage_workspaces" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "view.toggle_sidebar" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
 
 export type CommandMeta = {
 	id: CommandId,
@@ -262,8 +262,8 @@ export type SyncChanged = {
 };
 
 /**
- *  `state` is `connecting`, `syncing`, `synced`, `offline`, `signed_out` or
- *  `relink`.
+ *  `state` is `connecting`, `syncing`, `synced`, `offline`, `signed_out`,
+ *  `relink` or `deleted`.
  */
 export type SyncInfo = {
 	server: string,

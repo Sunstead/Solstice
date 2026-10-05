@@ -3,7 +3,7 @@
 //! - `GET /healthz`, `GET /v1/info` (how apps sign in): public.
 //! - `GET /v1/vaults`, `POST /v1/vaults/{id}/notes`: apps, the web app and
 //!   API tokens.
-//! - `POST /v1/vaults`: apps and the web app.
+//! - `POST /v1/vaults`, `DELETE /v1/vaults/{id}`: apps and the web app.
 //! - `/v1/tokens`, blobs, and `GET /v1/sync` (the WebSocket): apps only.
 //!
 //! The web app's own routes are in `web_api.rs`; `/` is the web app, or a
@@ -28,7 +28,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::auth::{Auth, CurrentUser};
 use crate::db::VaultRow;
 use crate::error::AppError;
-use crate::hub::{notice, Cmd, Outgoing};
+use crate::hub::{notice, Cmd, Outgoing, DELETED};
 use crate::AppState;
 
 const MAX_BLOB: usize = 256 * 1024 * 1024;
@@ -38,6 +38,7 @@ pub fn router() -> Router<AppState> {
         .route("/healthz", get(|| async { "ok" }))
         .route("/v1/info", get(info))
         .route("/v1/vaults", get(list_vaults).post(create_vault))
+        .route("/v1/vaults/{id}", delete(delete_vault))
         .route("/v1/vaults/{id}/notes", post(create_note))
         .route(
             "/v1/vaults/{id}/blobs/{hash}",
@@ -255,6 +256,23 @@ async fn create_token(
     ))
 }
 
+/// Deletes a vault (the web app's Delete). Its notes move to the owner's
+/// `.trash` on the server; devices linked to it are told, and stop syncing it.
+async fn delete_vault(
+    State(state): State<AppState>,
+    who: CurrentUser,
+    Path(id): Path<String>,
+) -> Result<StatusCode, AppError> {
+    who.require_person()?;
+    let row = vault_for(&state, &who, &id).await?;
+    state
+        .hub
+        .delete(&row, &who.user.username)
+        .await
+        .map_err(AppError::internal)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn delete_token(
     State(state): State<AppState>,
     who: CurrentUser,
@@ -352,8 +370,9 @@ async fn connection(socket: WebSocket, state: AppState, who: CurrentUser) {
                         tx: tx.clone(),
                     };
                     if let Err(e) = state.hub.send(&row, &who.user.username, connect).await {
+                        let code = if e == DELETED { "vault_deleted" } else { "unavailable" };
                         tracing::warn!(error = %e, "can't open a vault");
-                        let _ = tx.send(Outgoing::Notice(notice(&frame.vault, "unavailable")));
+                        let _ = tx.send(Outgoing::Notice(notice(&frame.vault, code)));
                         continue;
                     }
                     vaults.insert(row.id.clone(), row.clone());
@@ -370,7 +389,12 @@ async fn connection(socket: WebSocket, state: AppState, who: CurrentUser) {
             msgs: frame.msgs,
         };
         if let Err(e) = state.hub.send(&row, &who.user.username, cmd).await {
-            tracing::warn!(error = %e, "can't reach a vault");
+            if e == DELETED {
+                vaults.remove(&row.id);
+                let _ = tx.send(Outgoing::Notice(notice(&row.id, "vault_deleted")));
+            } else {
+                tracing::warn!(error = %e, "can't reach a vault");
+            }
         }
     }
     state

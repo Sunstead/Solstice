@@ -42,8 +42,11 @@ pub enum Status {
     },
     /// The server wants a sign-in.
     SignedOut,
-    /// The vault was rebuilt on the server (or deleted): link again.
+    /// The vault was rebuilt on the server: link again.
     Relink,
+    /// The vault was deleted on the server. This folder keeps its files and
+    /// stops syncing; unlink it, or link it to another vault.
+    Deleted,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -461,7 +464,7 @@ impl Actor {
                     }
                 }
                 if relink {
-                    return self.relink(socket);
+                    return self.stop_syncing(socket, Status::Relink);
                 }
                 // Replies include changes of our own (restores, kept copies).
                 self.dirty.extend(replies.iter().map(|m| m.doc.clone()));
@@ -480,7 +483,8 @@ impl Actor {
             Message::Text(text) => {
                 let notice: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
                 match notice["notice"].as_str() {
-                    Some("unknown_vault") => self.relink(socket),
+                    Some("unknown_vault") => self.stop_syncing(socket, Status::Relink),
+                    Some("vault_deleted") => self.stop_syncing(socket, Status::Deleted),
                     // The connection lasts as long as its token: reconnect
                     // now, with a fresh one.
                     Some("token_expired") => {
@@ -508,10 +512,11 @@ impl Actor {
         }
     }
 
-    fn relink(&mut self, socket: &mut Option<Socket>) {
+    /// Stops for good: only linking again (or unlinking) moves on from here.
+    fn stop_syncing(&mut self, socket: &mut Option<Socket>, status: Status) {
         *socket = None;
         self.reconnect_at = None;
-        self.set_status(Status::Relink);
+        self.set_status(status);
     }
 
     async fn handle(&mut self, cmd: Cmd, socket: &mut Option<Socket>) {
@@ -569,7 +574,8 @@ impl Actor {
             }
             Cmd::FolderChanged => self.absorb(socket).await,
             Cmd::Reconnect => {
-                if socket.is_none() && *self.status.borrow() != Status::Relink {
+                let stopped = matches!(*self.status.borrow(), Status::Relink | Status::Deleted);
+                if socket.is_none() && !stopped {
                     self.backoff = Duration::from_secs(1);
                     self.reconnect_at = Some(Instant::now());
                 }

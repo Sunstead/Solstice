@@ -141,6 +141,14 @@ vaults yet (made by hand, or the database was lost) become vaults when the
 user lists them, under new ids; a device with an old id is told
 `unknown_vault` and links again.
 
+**Deleting a vault** (`DELETE /v1/vaults/{id}`, the web app's Delete) stops
+its task without saving, tells every connected device and web app
+`vault_deleted`, forgets its state, and moves its folder to the user's
+hidden `.trash` (`<notes>/<user>/.trash/<name> <UTC time>`), which listing
+and Atlas skip and from which an admin can recover it. A device that
+connects later hears the same notice. Devices stop syncing that folder
+(status `deleted`) and keep their files.
+
 **Auth.** Apps present an Authentik access token, checked offline against
 the provider's keys (the verifier is Cosmos's), always as `Authorization:
 Bearer`, the WebSocket included: tokens never go in URLs. The username
@@ -199,11 +207,12 @@ devices get web changes as ordinary sync:
 |---|---|---|
 | `GET /`, `GET /healthz`, `GET /v1/info` | anyone | Info says how to sign in, and the protocol version. |
 | `GET /v1/vaults` | apps, tokens | The user's vaults. |
-| `POST /v1/vaults` `{name}` | apps | A vault is a folder name. |
+| `POST /v1/vaults` `{name}` | apps, web | A vault is a folder name. |
+| `DELETE /v1/vaults/{id}` | apps, web | Moves the vault to the user's `.trash` on the server; devices are told `vault_deleted`. |
 | `POST /v1/vaults/{id}/notes` `{path, text}` | apps, tokens | Returns `{id, path}`; a taken path gets the next number. |
 | `PUT`/`GET /v1/vaults/{id}/blobs/{sha256}` | apps | Attachment bytes; upload before the manifest names them. |
 | `GET`/`POST /v1/tokens`, `DELETE /v1/tokens/{id}` | apps | API tokens; the token is shown once. |
-| `GET /v1/sync` | apps | The WebSocket: binary `Frame`s both ways; JSON text notices (`unknown_vault`, `bad_frame`). |
+| `GET /v1/sync` | apps | The WebSocket: binary `Frame`s both ways; JSON text notices (`unknown_vault`, `vault_deleted`, `token_expired`, `bad_frame`). |
 | `GET /auth/login?return_to=`, `GET /auth/callback`, `POST /auth/logout` | browsers | Web sign-in and out. |
 | `GET /v1/me` | apps, web | Who's signed in. |
 | `GET /v1/vaults/{id}/tree` | apps, web | `{files: [{path, kind, size, modified}], folders}`. |
@@ -233,7 +242,8 @@ stay.
 **A running client** (`Client`) is one task per linked folder. Offline, edits
 keep landing in its documents and folder; online, it holds one WebSocket,
 reconnecting with backoff, and reports `connecting`, `syncing`, `synced`,
-`offline`, `signed_out` or `relink`. Attachments upload before the manifest
+`offline`, `signed_out`, `relink` or `deleted` (the vault was deleted on the
+server: it stops for good, keeping the folder's files). Attachments upload before the manifest
 names them and download in the background. Where each file was last written
 is saved with the state, so a restart can tell a deleted file from one that
 never arrived.

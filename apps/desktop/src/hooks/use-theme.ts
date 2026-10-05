@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { getSetting, setSetting, useSetting } from '@/lib/settings/store';
+import { getSetting, useSetting } from '@/lib/settings/store';
 import { applyTheme } from '@/lib/theme/apply';
 import {
   DEFAULT_LIGHT_THEME_ID,
@@ -61,7 +61,6 @@ export function useThemeEffect() {
       const { id, appearance } = selection(prefersDark());
       const theme = themeFor(themes, id, appearance);
       applyTheme(theme);
-      rememberThemeChoice(theme);
     };
 
     paint();
@@ -76,43 +75,4 @@ export function useThemeEffect() {
 /** The appearance in effect right now, resolving `system`. */
 export function resolvedTheme(): Appearance {
   return selection(prefersDark()).appearance;
-}
-
-export function useTheme() {
-  const themes = useThemeCatalogue((s) => s.themes);
-  const mode = useSetting('theme.mode');
-  const preset = useSetting('theme.preset');
-
-  return {
-    mode,
-    theme: themeFor(themes, preset, 'dark'),
-    /**
-     * Flips to the other appearance, keeping the user on a theme they chose
-     * where possible: the last theme they used with that appearance, else that
-     * appearance's built-in default. From `system` mode this also pins the
-     * choice, since there is nothing else a manual flip could mean.
-     */
-    toggleAppearance: () => {
-      const next: Appearance = resolvedTheme() === 'dark' ? 'light' : 'dark';
-      const remembered = lastUsed[next];
-      const id =
-        themes.find((t) => t.id === remembered)?.id
-        ?? (next === 'light' ? DEFAULT_LIGHT_THEME_ID : DEFAULT_THEME_ID);
-
-      if (mode === 'system') setSetting('theme.mode', 'fixed');
-      setSetting('theme.preset', id);
-    },
-  };
-}
-
-/**
- * The last theme used in each appearance, so the rail toggle returns to it
- * rather than to the built-in every time. Session-only on purpose: it is a
- * convenience, not a preference, and persisting it would mean a settings key
- * the user never set.
- */
-const lastUsed: Record<Appearance, string | null> = { light: null, dark: null };
-
-export function rememberThemeChoice(theme: CatalogueTheme) {
-  lastUsed[theme.appearance] = theme.id;
 }

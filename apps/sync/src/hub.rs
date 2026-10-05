@@ -23,7 +23,7 @@ use std::time::Duration;
 use solstice_sync::{DocKey, Event, Frame, Manifest, Msg, NoteDoc, Session, Vault};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::db::{now, Db, DocRow, VaultRow};
+use crate::db::{now, Db, DbError, DocRow, VaultRow};
 use crate::error::AppError;
 use solstice_sync_fs::VaultDir;
 
@@ -85,7 +85,15 @@ pub enum Cmd {
     Stop {
         done: oneshot::Sender<()>,
     },
+    /// The vault is being deleted: tell everyone connected, and stop without
+    /// saving.
+    Delete {
+        done: oneshot::Sender<()>,
+    },
 }
+
+/// What [`Hub::send`] says about a vault deleted since its row was read.
+pub const DELETED: &str = "the vault was deleted";
 
 #[derive(Clone)]
 pub struct Hub {
@@ -155,6 +163,10 @@ impl Hub {
         if let Some(tx) = self.running_task(&vault.id) {
             return Ok(tx);
         }
+        // Or deleted it: loading would make its folder again.
+        if let Err(DbError::NotFound) = self.db.vault(vault.user_id, &vault.id).await {
+            return Err(DELETED.into());
+        }
         let state = VaultTask::load(
             self.db.clone(),
             vault.clone(),
@@ -198,6 +210,47 @@ impl Hub {
         for wait in waits {
             let _ = tokio::time::timeout(Duration::from_secs(10), wait).await;
         }
+    }
+
+    /// Deletes a vault. Its task tells connected devices and web apps and
+    /// stops without saving; then its state goes, and its folder moves to the
+    /// user's hidden `.trash` (which listing skips, as Atlas does), where an
+    /// admin can still recover it. Returns where it went.
+    pub async fn delete(&self, vault: &VaultRow, username: &str) -> Result<Option<PathBuf>, String> {
+        // No vault loads while it goes, so nothing brings it back.
+        let _loading = self.loading.lock().await;
+        if let Some(tx) = self.running_task(&vault.id) {
+            let (done, wait) = oneshot::channel();
+            if tx.send(Cmd::Delete { done }).is_ok() {
+                let _ = tokio::time::timeout(Duration::from_secs(10), wait).await;
+            }
+            self.running
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .remove(&vault.id);
+        }
+        self.db
+            .delete_vault(vault.user_id, &vault.id)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let folder = self.folder(username, &vault.name);
+        if !folder.exists() {
+            return Ok(None);
+        }
+        let trash = self.notes_dir.join(username).join(".trash");
+        std::fs::create_dir_all(&trash).map_err(|e| e.to_string())?;
+        let stamp = trash_stamp();
+        let mut to = trash.join(format!("{} {stamp}", vault.name));
+        let mut n = 2;
+        while to.exists() {
+            to = trash.join(format!("{} {stamp} {n}", vault.name));
+            n += 1;
+        }
+        std::fs::rename(&folder, &to)
+            .map_err(|e| format!("couldn't move {}: {e}", folder.display()))?;
+        tracing::info!(vault = %vault.id, to = %to.display(), "vault deleted");
+        Ok(Some(to))
     }
 
     /// Stops sending to a connection on every vault it used.
@@ -298,6 +351,7 @@ impl VaultTask {
         let mut save_at: Option<tokio::time::Instant> = None;
         let mut idle_since = tokio::time::Instant::now();
         let mut stopped = None;
+        let mut deleted = false;
         loop {
             let deadline = save_at.unwrap_or_else(|| tokio::time::Instant::now() + IDLE_AFTER);
             tokio::select! {
@@ -305,6 +359,12 @@ impl VaultTask {
                     let Some(cmd) = cmd else { break };
                     if let Cmd::Stop { done } = cmd {
                         stopped = Some(done);
+                        break;
+                    }
+                    if let Cmd::Delete { done } = cmd {
+                        self.tell_deleted();
+                        stopped = Some(done);
+                        deleted = true;
                         break;
                     }
                     self.handle(cmd);
@@ -325,12 +385,30 @@ impl VaultTask {
                 }
             }
         }
-        self.save().await;
+        // A deleted vault's state is about to go: saving would only bring
+        // some of it back.
+        if !deleted {
+            self.save().await;
+        }
         drop(watcher);
         tracing::debug!(vault = %self.row.id, "vault task stopped");
         if let Some(done) = stopped {
             let _ = done.send(());
         }
+    }
+
+    /// Tells every device and web app on this vault that it's gone.
+    fn tell_deleted(&mut self) {
+        let to_devices = notice(&self.row.id, "vault_deleted");
+        for (_, tx) in self.sessions.values() {
+            let _ = tx.send(Outgoing::Notice(to_devices.clone()));
+        }
+        let to_web = serde_json::json!({ "notice": "vault_deleted" }).to_string();
+        for tx in &self.watchers {
+            let _ = tx.send(to_web.clone());
+        }
+        self.sessions.clear();
+        self.watchers.clear();
     }
 
     /// A device or a web app is connected.
@@ -395,7 +473,7 @@ impl VaultTask {
             Cmd::GetBlob { hash, reply } => {
                 let _ = reply.send(self.dir.get_blob(&hash));
             }
-            Cmd::Stop { .. } => unreachable!("handled by run"),
+            Cmd::Stop { .. } | Cmd::Delete { .. } => unreachable!("handled by run"),
             Cmd::FolderChanged => match self.dir.absorb(&mut self.vault) {
                 Ok(msgs) => self.changed(None, msgs),
                 Err(e) => {
@@ -504,6 +582,31 @@ impl VaultTask {
             }
         }
     }
+}
+
+/// A sortable, filename-safe UTC time for the trash: `2026-10-05 14.03.07`.
+fn trash_stamp() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
+    // The civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}-{month:02}-{day:02} {:02}.{:02}.{:02}",
+        rem / 3600,
+        rem % 3600 / 60,
+        rem % 60
+    )
 }
 
 pub fn notice(vault: &str, code: &str) -> String {

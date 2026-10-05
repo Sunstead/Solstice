@@ -202,8 +202,8 @@ pub struct SyncLinkReport {
     pub kept_both: Vec<String>,
 }
 
-/// `state` is `connecting`, `syncing`, `synced`, `offline`, `signed_out` or
-/// `relink`.
+/// `state` is `connecting`, `syncing`, `synced`, `offline`, `signed_out`,
+/// `relink` or `deleted`.
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct SyncInfo {
     pub server: String,
@@ -243,6 +243,7 @@ fn status_parts(status: &Status) -> (String, Option<String>) {
         Status::Offline { message } => ("offline".into(), Some(message.clone())),
         Status::SignedOut => ("signed_out".into(), None),
         Status::Relink => ("relink".into(), None),
+        Status::Deleted => ("deleted".into(), None),
     }
 }
 
