@@ -1,4 +1,4 @@
-import { Check, ChevronsUpDown, FolderOpen, Plus } from 'lucide-react';
+import { Check, ChevronsUpDown, CloudDownload, FolderOpen, Plus, Settings2 } from 'lucide-react';
 import { isDesktop } from '@/lib/backend';
 import {
   DropdownMenu,
@@ -16,14 +16,14 @@ import {
 } from '@sunstead/ui/components/resizable-sidebar';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
-import { useNewWorkspaceDialog } from '@/lib/stores/new-workspace-dialog';
+import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
 
 export function WorkspaceSwitcher() {
   const activePath = useWorkspace((s) => s.path);
   const setWorkspace = useWorkspace((s) => s.setWorkspace);
   const openFolder = useWorkspace((s) => s.openFolder);
   const workspaces = useKnownWorkspaces((s) => s.workspaces);
-  const newWorkspace = useNewWorkspaceDialog((s) => s.setOpen);
+  const showDialog = useWorkspaceDialogs((s) => s.show);
 
   const active = workspaces.find((w) => w.path === activePath);
   const activeName =
@@ -74,17 +74,28 @@ export function WorkspaceSwitcher() {
                 <DropdownMenuSeparator />
               </>
             )}
-            <DropdownMenuItem onClick={() => newWorkspace(true)}>
+            <DropdownMenuItem onClick={() => showDialog('new')}>
               <Plus />
               New workspace…
             </DropdownMenuItem>
             {/* On the web, workspaces are the vaults on the server. */}
             {isDesktop && (
-              <DropdownMenuItem onClick={() => openFolder()}>
-                <FolderOpen />
-                Open folder as workspace…
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem onClick={() => showDialog('import')}>
+                  <CloudDownload />
+                  Import from sync…
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openFolder()}>
+                  <FolderOpen />
+                  Open folder as workspace…
+                </DropdownMenuItem>
+              </>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => showDialog('manage')}>
+              <Settings2 />
+              Manage workspaces…
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

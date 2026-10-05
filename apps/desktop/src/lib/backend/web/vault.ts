@@ -5,7 +5,7 @@
  * part after the vault is what the server calls a vault path.
  */
 import type { FileEntry, FileSystemChanged, FsChange, SyncChanged } from '@/bindings';
-import { apiJson, encodePath, signIn } from './api';
+import { api, apiJson, encodePath, signIn } from './api';
 import { Emitter } from './emitter';
 
 export interface Vault {
@@ -53,6 +53,15 @@ export async function createVault(name: string): Promise<Vault> {
   const vault = await apiJson<Vault>('/v1/vaults', { method: 'POST', json: { name } });
   vaultList = null;
   return vault;
+}
+
+/**
+ * Deletes a vault on the server: its notes move to the server's trash, and
+ * devices linked to it stop syncing it.
+ */
+export async function deleteVault(id: string): Promise<void> {
+  await api(`/v1/vaults/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  vaultList = null;
 }
 
 /** A vault by name, from what's already loaded (for synchronous callers). */
@@ -199,6 +208,14 @@ function connect() {
       return;
     }
     if (msg.notice === 'signed_out') signIn();
+    if (msg.notice === 'vault_deleted') {
+      // Deleted elsewhere: there's nothing to come back to, so start over on
+      // another vault.
+      socket = null;
+      ws.close();
+      location.assign('/');
+      return;
+    }
     if (msg.tree || msg.notes?.length) void applyTreeChange(msg.notes ?? [], msg.tree);
   };
   ws.onclose = () => {

@@ -48,6 +48,8 @@ command_id! {
     FileNewTab => "file.new_tab",
     FileNewFolder => "file.new_folder",
     FileNewWorkspace => "file.new_workspace",
+    FileImportFromSync => "file.import_from_sync",
+    FileManageWorkspaces => "file.manage_workspaces",
     FileOpenFolder => "file.open_folder",
     FileCloseTab => "file.close_tab",
 
@@ -127,8 +129,12 @@ fn reveal_in_system_label() -> &'static str {
 }
 
 /// Commands the web app leaves out: it has no folder to open as a workspace
-/// and no file manager to show a file in.
-pub const NOT_ON_WEB: [CommandId; 2] = [CommandId::FileOpenFolder, CommandId::FileRevealInSystem];
+/// or import a vault into, and no file manager to show a file in.
+pub const NOT_ON_WEB: [CommandId; 3] = [
+    CommandId::FileOpenFolder,
+    CommandId::FileImportFromSync,
+    CommandId::FileRevealInSystem,
+];
 
 /// The web app's default where it differs. Browsers keep Ctrl/Cmd+N, T and W
 /// (new window, new tab, close tab) for themselves, so those move to Alt.
@@ -214,6 +220,18 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
         CommandMeta {
             id: CommandId::FileNewWorkspace,
             label: "New Workspace...".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileImportFromSync,
+            label: "Import from Sync...".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileManageWorkspaces,
+            label: "Manage Workspaces...".into(),
             accelerator: None,
             is_overridden: false,
         },

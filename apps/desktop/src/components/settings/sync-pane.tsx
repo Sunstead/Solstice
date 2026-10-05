@@ -154,6 +154,12 @@ function LinkedFolder({
         <span className='font-medium'>{info.device}</span>.
       </p>
       <SyncStatusText info={info} />
+      {info.state === 'deleted' && (
+        <p className='text-muted-foreground'>
+          The vault was deleted on the server, so this folder stopped syncing. Its files are still here: unlink it to
+          keep it as a local workspace, or unlink it and link it to another vault.
+        </p>
+      )}
       {info.state === 'relink' && (
         <p className='text-muted-foreground'>
           The vault was rebuilt on the server. Unlink this folder, then link it again; its files stay.

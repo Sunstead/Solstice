@@ -84,7 +84,9 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                     Separator,
                     Command(FileOpenFile),
                     Command(FileNewWorkspace),
+                    Command(FileImportFromSync),
                     Command(FileOpenFolder),
+                    Command(FileManageWorkspaces),
                     Separator,
                     // A submenu rather than a flat block: these all act on
                     // whatever the focused tab has open, and inlining ten of

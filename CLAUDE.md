@@ -81,7 +81,11 @@ On the frontend, [src/lib/commands.ts](apps/desktop/src/lib/commands.ts) is the 
 
 A workspace is a directory path, nothing more. [src-tauri/src/workspace.rs](apps/desktop/src-tauri/src/workspace.rs) keeps it in an in-memory `HashMap<window_label, path>` (`set_workspace`/`get_workspace` commands). The frontend mirrors this in [src/hooks/use-workspace.ts](apps/desktop/src/hooks/use-workspace.ts) (`useWorkspace`), which also tracks recently-opened workspaces (`useKnownWorkspaces`) and restores the last one on startup. Switching workspaces (`setWorkspace`) resets and reloads every workspace-scoped store: layout, settings, the file tree, and the file index.
 
-Making a workspace is not opening one: the New workspace dialog ([components/new-workspace-dialog.tsx](apps/desktop/src/components/new-workspace-dialog.tsx), `file.new_workspace`) makes the folder with `create_workspace` (an empty one is adopted, a full one refused) and can link it to a new or existing vault; "Open folder as workspace" (`file.open_folder`) takes any folder as it is. On the web a new workspace is a new vault.
+The workspace dialogs live in [components/workspace-dialogs/](apps/desktop/src/components/workspace-dialogs/) (opened through `useWorkspaceDialogs`):
+- **New workspace** (`file.new_workspace`) makes an empty folder with `create_workspace` (an empty one is adopted, a full one refused), and with sync on, a new vault of the same name. On the web it makes a vault.
+- **Import from sync** (`file.import_from_sync`, desktop) makes a folder and links it to a vault already on the server, which downloads into it.
+- **Open folder as workspace** (`file.open_folder`, desktop) takes any folder as it is.
+- **Manage workspaces** (`file.manage_workspaces`) removes them. On desktop that only forgets the workspace (`useKnownWorkspaces.forget`); its folder stays. On the web it deletes the vault on the server, after typing its name. The open workspace can't be removed.
 
 ### Scoped persistence
 
@@ -137,7 +141,7 @@ The same frontend runs in a browser as the web app, served by the Solstice Sync 
 
 The main window uses an overlay title bar with custom traffic-light positioning on macOS (configured in `lib.rs`'s `setup` hook) and fully custom decorations elsewhere (`decorations(false)`, drawn in React — see [src/components/title-bar.tsx](apps/desktop/src/components/title-bar.tsx) and [window-controls.tsx](apps/desktop/src/components/window-controls.tsx)).
 
-The menu, Back, Forward and sync buttons ([header-controls.tsx](apps/desktop/src/components/header-controls.tsx)) render once, in the title bar, and never move. The title bar spans only the sidebar column; when the sidebar collapses it narrows to the rail and the controls overhang the top-left tab strip, whose `HeaderControlsSpacer` (`leading` in `onRenderTabSet`) makes room for them, animated with the sidebar. Don't copy them into the tab strip, and don't give the title bar's children a `z-index` (a stacking context there puts the controls under the editor).
+The menu, Back, Forward and sync buttons ([header-controls.tsx](apps/desktop/src/components/header-controls.tsx)) render once, in the title bar, and never move. The title bar spans only the sidebar column; when the sidebar collapses it narrows to the rail and the controls overhang the top-left tab strip, whose `HeaderControlsSpacer` (`leading` in `onRenderTabSet`) makes room for them. The spacer is sized from where it actually is on every resize of the editor area (a `ResizeObserver`, same frame), not animated alongside the sidebar: two animations never quite agree, and the tabs bounced. Don't copy them into the tab strip, and don't give the title bar's children a `z-index` (a stacking context there puts the controls under the editor).
 
 ### Icons and releases
 

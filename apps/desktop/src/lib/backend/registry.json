@@ -50,6 +50,12 @@
     },
     {
       "accelerator": null,
+      "id": "file.manage_workspaces",
+      "is_overridden": false,
+      "label": "Manage Workspaces..."
+    },
+    {
+      "accelerator": null,
       "id": "file.reveal_in_explorer",
       "is_overridden": false,
       "label": "Reveal in Explorer"
@@ -321,6 +327,14 @@
             "id": "file.new_workspace",
             "is_overridden": false,
             "label": "New Workspace..."
+          }
+        },
+        {
+          "Command": {
+            "accelerator": null,
+            "id": "file.manage_workspaces",
+            "is_overridden": false,
+            "label": "Manage Workspaces..."
           }
         },
         "Separator",

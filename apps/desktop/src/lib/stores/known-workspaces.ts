@@ -24,6 +24,8 @@ interface KnownWorkspacesState {
   workspaces: KnownWorkspace[];
   load: () => Promise<void>;
   touch: (path: string) => Promise<void>;
+  /** Drops a workspace from the list; its folder is untouched. */
+  forget: (path: string) => Promise<void>;
   lastParent: () => Promise<string | null>;
   rememberParent: (parent: string) => Promise<void>;
 }
@@ -44,6 +46,14 @@ export const useKnownWorkspaces = create<KnownWorkspacesState>((set) => ({
       { path, name: nameFromPath(path), lastOpenedAt: Date.now() },
       ...list.filter((w) => w.path !== path),
     ];
+    await store.set(STORE_KEY, workspaces);
+    set({ workspaces });
+  },
+
+  forget: async (path) => {
+    const store = await getStore();
+    const list = (await store.get<KnownWorkspace[]>(STORE_KEY)) ?? [];
+    const workspaces = list.filter((w) => w.path !== path);
     await store.set(STORE_KEY, workspaces);
     set({ workspaces });
   },
