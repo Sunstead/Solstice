@@ -1,6 +1,6 @@
 [package]
 name = "solstice-sync-server"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 license = "MIT"
 description = "Solstice Sync's server: vaults as plain files plus Yjs state, synced over WebSocket."
