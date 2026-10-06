@@ -12,10 +12,6 @@ import { FontControl, SelectControl } from './combobox-control';
  * Controls needing the full row width, which `SettingRow` stacks under the
  * label rather than placing beside it.
  */
-export function isWideControl(def: AnySettingDef) {
-  return def.kind === 'enum';
-}
-
 interface SettingControlProps {
   def: AnySettingDef;
   value: unknown;
@@ -83,7 +79,7 @@ export function SettingControl({ def, value, onChange, id }: SettingControlProps
       return (
         <Input
           id={id}
-          className='h-8 w-52 text-sm'
+          className='h-8 w-full text-sm sm:w-52'
           value={value as string}
           placeholder={def.placeholder}
           onChange={(event) => onChange(event.target.value)}
@@ -93,7 +89,7 @@ export function SettingControl({ def, value, onChange, id }: SettingControlProps
     case 'number':
       if (def.control === 'slider') {
         return (
-          <div className='flex w-52 items-center gap-3'>
+          <div className='flex w-full items-center gap-3 sm:w-52'>
             <Slider
               value={value as number}
               min={def.min}

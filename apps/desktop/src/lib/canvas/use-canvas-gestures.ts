@@ -28,7 +28,7 @@ import {
 } from '@/lib/canvas/interaction';
 import type { CanvasStore } from '@/lib/canvas/store';
 import type { CanvasDoc, NodeSide, Point } from '@/lib/canvas/types';
-import { clientToCanvas, rectsIntersect } from '@/lib/canvas/viewport';
+import { clientToCanvas, pinchView, rectsIntersect, type Viewport } from '@/lib/canvas/viewport';
 import { isEditableCard } from '@/lib/canvas/editable';
 import { openLinkNode } from '@/components/canvas/canvas-node-link';
 import { getSetting } from '@/lib/settings/store';
@@ -77,6 +77,44 @@ export function useCanvasGestures({
   /** A card whose second press landed; activated on release if it never moved. */
   const pendingActivate = useRef<string | null>(null);
 
+  /*
+   * Touch. One finger works like the mouse, except that on empty space it
+   * pans rather than drawing a selection box. A second finger abandons
+   * whatever the first one started and pinches: zoom with the spread, pan
+   * with the midpoint.
+   */
+  const touches = useRef(new Map<number, Point>());
+  const pinch = useRef<{ view: Viewport; from: [Point, Point] } | null>(null);
+  /** Bumped to abandon the one-pointer gesture in progress. */
+  const gestureId = useRef(0);
+
+  useEffect(() => {
+    const paneOf = (e: PointerEvent): Point => {
+      const box = containerRef.current?.getBoundingClientRect();
+      return { x: e.clientX - (box?.left ?? 0), y: e.clientY - (box?.top ?? 0) };
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!touches.current.has(e.pointerId)) return;
+      touches.current.set(e.pointerId, paneOf(e));
+      const p = pinch.current;
+      if (!p || touches.current.size < 2) return;
+      const [a, b] = [...touches.current.values()];
+      store.getState().setView(pinchView(p.view, p.from, [a, b]));
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!touches.current.delete(e.pointerId)) return;
+      if (touches.current.size < 2) pinch.current = null;
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [store, containerRef]);
+
   const onPointerDown = useCallback(
     (event: React.PointerEvent) => {
       const node = containerRef.current;
@@ -88,10 +126,32 @@ export function useCanvasGestures({
       if (target.closest('[data-canvas-editing]')) return;
 
       const state = store.getState();
+      const box = node.getBoundingClientRect();
+
+      if (event.pointerType === 'touch') {
+        touches.current.set(event.pointerId, {
+          x: event.clientX - box.left,
+          y: event.clientY - box.top,
+        });
+        if (touches.current.size >= 2) {
+          event.preventDefault();
+          if (pinch.current) return;
+          // The first finger's gesture is dropped, and whatever it previewed
+          // put back: a pinch never moves or selects anything.
+          gestureId.current += 1;
+          if (gestureBase.current) state.preview(gestureBase.current);
+          gestureBase.current = null;
+          pendingActivate.current = null;
+          state.setInteraction(IDLE);
+          const [a, b] = [...touches.current.values()];
+          pinch.current = { view: state.view, from: [a, b] };
+          return;
+        }
+      }
+
       // A press anywhere else ends editing -- here rather than on the editor's
       // blur, which also fires when the window loses focus.
       state.setEditing(null);
-      const box = node.getBoundingClientRect();
       const pointOf = (source: { clientX: number; clientY: number }) =>
         clientToCanvas(store.getState().view, source.clientX, source.clientY, box);
 
@@ -100,14 +160,24 @@ export function useCanvasGestures({
       // the grid, and one key cannot mean both.
       const additive = event.shiftKey || event.metaKey || event.ctrlKey;
       // Middle button or space; the right button belongs to the context menu.
-      const wantsPan = event.button === 1 || spaceRef.current;
+      // A finger on empty space pans too: dragging a box out by touch is
+      // rarely what's meant, and it leaves nothing to scroll the board with.
+      const onEmpty = !target.closest(
+        '[data-canvas-node], [data-canvas-port], [data-canvas-handle], [data-canvas-edge]',
+      );
+      const touchPan = event.pointerType === 'touch' && onEmpty;
+      const wantsPan = event.button === 1 || spaceRef.current || touchPan;
       if (event.button === 2) return;
 
       event.preventDefault();
       node.focus();
       gestureBase.current = state.doc;
 
+      const myGesture = ++gestureId.current;
+      const pointerId = event.pointerId;
+
       if (wantsPan) {
+        if (touchPan && !additive) state.clearSelection();
         state.setInteraction({
           kind: 'pan',
           startScreen: { x: event.clientX, y: event.clientY },
@@ -208,6 +278,7 @@ export function useCanvasGestures({
       }
 
       const apply = (moveEvent: PointerEvent) => {
+        if (gestureId.current !== myGesture) return;
         const live = store.getState();
         const interaction = live.interaction;
         const point = pointOf(moveEvent);
@@ -271,6 +342,8 @@ export function useCanvasGestures({
       };
 
       const onMove = (moveEvent: PointerEvent) => {
+        // Another finger's moves are the pinch's business.
+        if (moveEvent.pointerId !== pointerId) return;
         if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
         rafRef.current = requestAnimationFrame(() => {
           rafRef.current = null;
@@ -279,9 +352,18 @@ export function useCanvasGestures({
       };
 
       const onUp = (upEvent: PointerEvent) => {
+        if (upEvent.pointerId !== pointerId) return;
         if (rafRef.current !== null) {
           cancelAnimationFrame(rafRef.current);
           rafRef.current = null;
+        }
+
+        if (gestureId.current !== myGesture) {
+          // Abandoned for a pinch: nothing to commit.
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
+          return;
         }
 
         // Synchronously, before committing: moves are throttled to one per

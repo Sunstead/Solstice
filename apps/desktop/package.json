@@ -30,7 +30,7 @@
     "@milkdown/react": "^7.22.0",
     "@milkdown/theme-nord": "^7.22.0",
     "@prosemirror-adapter/react": "^0.5.5",
-    "@sunstead/ui": "github:Sunstead/sunstead-ui#v0.3.2",
+    "@sunstead/ui": "github:Sunstead/sunstead-ui#v0.3.4",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.18",
     "@tauri-apps/api": "^2",

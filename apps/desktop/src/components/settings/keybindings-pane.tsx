@@ -145,7 +145,7 @@ export function KeybindingsPane() {
                   </span>
                 )}
 
-                <div className='w-36 shrink-0'>
+                <div className='w-28 shrink-0 sm:w-36'>
                   <KeybindRecorder
                     commandId={command.id}
                     accelerator={command.accelerator}

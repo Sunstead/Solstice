@@ -4,7 +4,6 @@ import {
   Actions,
   BorderNode,
   Layout,
-  Model,
   TabNode,
   TabSetNode,
 } from 'flexlayout-react';
@@ -16,17 +15,11 @@ import {
   Minimize,
   Plus,
 } from 'lucide-react';
-import {
-  useLayout,
-  getActiveTabId,
-  modelHasNoTabs,
-  isReplacingBlankTab,
-} from '@/hooks/use-layout';
-import { useWorkspace } from '@/hooks/use-workspace';
+import { useLayout } from '@/hooks/use-layout';
 import { useFileTreeDragState } from '@/hooks/use-file-tree-drag-state';
 import { useFileTreeExternalDropZone } from '@/hooks/use-file-tree-dnd';
-import { FileView } from '@/components/file-view';
-import { BlankTab } from '@/components/blank-tab';
+import { TabContent } from '@/components/tab-content';
+import { useLayoutSession } from '@/hooks/use-layout-session';
 import { WindowControls } from './window-controls';
 import { useIsMac } from '@/hooks/use-platform';
 import {
@@ -38,8 +31,6 @@ import { HeaderControlsSpacer } from './header-controls';
 import { getFileIcon } from '@/assets/icons';
 import { getFileExtension } from '@/lib/utils';
 import { Button } from '@sunstead/ui/components/button';
-import { useNavigationHistory } from '@/lib/stores/navigation-history';
-import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { stripPresetExtension } from '@/lib/stores/entry-input';
 import { useSetting } from '@/lib/settings/store';
 import { TabCloseIcon } from './tab-close-icon';
@@ -61,27 +52,10 @@ function makeDraggedTabId(): string {
     : `dragged-tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-const factory = (node: TabNode) => {
-  const component = node.getComponent();
-  if (component === 'editor') {
-    const config = node.getConfig() as { path?: string } | undefined;
-    // Not necessarily an editor: FileView picks a viewer for non-markdown
-    // files, which the tab component name predates.
-    return <FileView path={config?.path ?? ''} />;
-  }
-  if (component === 'blank') {
-    return <BlankTab tabId={node.getId()} />;
-  }
-  return <div className='p-4'>{node.getName()}</div>;
-};
+const factory = (node: TabNode) => <TabContent node={node} />;
 
 export default function FlexLayoutRoot() {
   const model = useLayout((s) => s.model);
-  const loadForWorkspace = useLayout((s) => s.loadForWorkspace);
-  const persistCurrent = useLayout((s) => s.persistCurrent);
-  const setActiveTabId = useLayout((s) => s.setActiveTabId);
-  const normalizeTabsetDeletion = useLayout((s) => s.normalizeTabsetDeletion);
-  const workspacePath = useWorkspace((s) => s.path);
   const containerRef = useRef<HTMLDivElement>(null);
   const isMac = useIsMac();
   // Subscribed here so flipping the setting re-renders <Layout>, which is what
@@ -118,20 +92,6 @@ export default function FlexLayoutRoot() {
     }),
     [],
   );
-
-  const { visit } = useNavigationHistory();
-
-  const modelRef = useRef<Model | null>(null);
-  useEffect(() => {
-    modelRef.current = model;
-  }, [model]);
-
-  useEffect(() => {
-    if (workspacePath) {
-      loadForWorkspace(workspacePath);
-      useNavigationHistory.getState().reset();
-    }
-  }, [workspacePath, loadForWorkspace]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -205,89 +165,10 @@ export default function FlexLayoutRoot() {
     return undefined;
   };
 
-  const navigateTo = useCallback((direction: 'back' | 'forward') => {
-    const m = modelRef.current;
-    if (!m) return;
-    const isOpenTab = (id: string) => m.getNodeById(id) instanceof TabNode;
-    const store = useNavigationHistory.getState();
-    const id =
-      direction === 'back' ? store.back(isOpenTab) : store.forward(isOpenTab);
-    if (id) m.doAction(Actions.selectTab(id));
-  }, []);
-
-  const goBack = useCallback(() => navigateTo('back'), [navigateTo]);
-  const goForward = useCallback(() => navigateTo('forward'), [navigateTo]);
-
-  useEffect(() => {
-    registerCommand(
-      'navigation.back',
-      goBack,
-      () => useNavigationHistory.getState().past.length > 0,
-    );
-    registerCommand(
-      'navigation.forward',
-      goForward,
-      () => useNavigationHistory.getState().future.length > 0,
-    );
-    registerCommand(
-      'file.new_tab',
-      () => {
-        const m = modelRef.current;
-        if (!m) return;
-        const activeTabset =
-          m.getActiveTabset() ?? findCornerTabset(m, 'top-left');
-        if (!activeTabset) return;
-        useLayout.getState().newBlankTab(activeTabset.getId());
-      },
-      () => modelRef.current != null,
-    );
-    registerCommand(
-      'file.close_tab',
-      () => {
-        const m = modelRef.current;
-        if (!m) return;
-        const activeTabId = getActiveTabId(m);
-        if (!activeTabId) return;
-        const node = m.getNodeById(activeTabId);
-        if (!(node instanceof TabNode) || !node.isEnableClose()) return;
-        closeTab(m, activeTabId, { pointer: false });
-      },
-      () => {
-        const m = modelRef.current;
-        if (!m) return false;
-        const activeTabId = getActiveTabId(m);
-        if (!activeTabId) return false;
-        const node = m.getNodeById(activeTabId);
-        return node instanceof TabNode && node.isEnableClose();
-      },
-    );
-    return () => {
-      unregisterCommand('navigation.back');
-      unregisterCommand('navigation.forward');
-      unregisterCommand('file.new_tab');
-      unregisterCommand('file.close_tab');
-    };
-  }, [goBack, goForward]);
-
-  const handleModelChange = (changedModel: Model) => {
-    const activeTabId = getActiveTabId(changedModel);
-    setActiveTabId(activeTabId);
-    if (activeTabId) visit(activeTabId);
-
-    useNavigationHistory
-      .getState()
-      .prune((id) => changedModel.getNodeById(id) instanceof TabNode);
-
-    persistCurrent();
+  const handleModelChange = useLayoutSession(() => {
     syncDrag();
     requestAnimationFrame(applyDragRegions);
-
-    normalizeTabsetDeletion();
-
-    if (modelHasNoTabs(changedModel) && !isReplacingBlankTab()) {
-      useLayout.getState().newBlankTab();
-    }
-  };
+  });
 
   // Lets a file dragged from the explorer be dropped directly onto a
   // specific tabset/position in the editor area. FlexLayout owns the drag

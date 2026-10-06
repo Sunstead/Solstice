@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { getCurrentWindow } from '@/lib/backend/window';
+import { useIsFullscreen } from '@/hooks/use-fullscreen';
 import SolsticeIcon from '@/assets/icons/app/icon.svg?react';
 import { isDesktop } from '@/lib/backend';
 import { useIsMac } from '@/hooks/use-platform';
@@ -8,27 +7,7 @@ import { cn } from '@/lib/utils';
 import { HeaderControls } from './header-controls';
 
 export default function TitleBar() {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  useEffect(() => {
-    if (!isDesktop) return;
-
-    const appWindow = getCurrentWindow();
-    let unlisten: (() => void) | null = null;
-
-    const init = async () => {
-      setIsFullscreen(await appWindow.isFullscreen());
-      unlisten = await appWindow.onResized(async () => {
-        setIsFullscreen(await appWindow.isFullscreen());
-      });
-    };
-    init();
-
-    return () => {
-      unlisten?.();
-    };
-  }, []);
-
+  const isFullscreen = useIsFullscreen();
   const isMac = useIsMac();
 
   return (

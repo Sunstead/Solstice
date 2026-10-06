@@ -4,6 +4,8 @@ import { ImageOff, Minus, Plus } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
 import { useAssetUrl } from '@/lib/viewer/asset';
 import { basename } from '@/lib/wikilink/target';
+import { pinchView, type Viewport } from '@/lib/canvas/viewport';
+import type { Point } from '@/lib/canvas/types';
 import { CanvasGrid } from './canvas-grid';
 import { ViewerFrame } from './viewer-frame';
 import {
@@ -188,6 +190,64 @@ export function ImageViewer({ path }: { path: string }) {
     return () => node.removeEventListener('wheel', onWheel);
   }, [zoomAbout]);
 
+  // Touch: one finger pans, two pinch (zoom with the spread, pan with the
+  // midpoint). The mouse keeps its own handlers below.
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    const fingers = new Map<number, Point>();
+    let start: { view: Viewport; from: Point[] } | null = null;
+    const paneOf = (e: PointerEvent): Point => {
+      const box = node.getBoundingClientRect();
+      return { x: e.clientX - box.left, y: e.clientY - box.top };
+    };
+    const begin = () => {
+      start = {
+        view: { scale: scaleRef.current, offset: { ...offsetRef.current } },
+        from: [...fingers.values()],
+      };
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      fingers.set(e.pointerId, paneOf(e));
+      begin();
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!fingers.has(e.pointerId) || !start) return;
+      fingers.set(e.pointerId, paneOf(e));
+      const now = [...fingers.values()];
+      if (now.length >= 2 && start.from.length >= 2) {
+        const view = pinchView(start.view, [start.from[0], start.from[1]], [now[0], now[1]], {
+          min: MIN_SCALE,
+          max: MAX_SCALE,
+        });
+        setScale(view.scale);
+        setOffset(view.offset);
+      } else if (now.length === 1 && start.from.length === 1) {
+        setOffset({
+          x: start.view.offset.x + now[0].x - start.from[0].x,
+          y: start.view.offset.y + now[0].y - start.from[0].y,
+        });
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!fingers.delete(e.pointerId)) return;
+      // Whatever fingers are left carry on from here.
+      if (fingers.size > 0) begin();
+      else start = null;
+    };
+    node.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      node.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, []);
+
   const stepZoom = useCallback(
     (direction: 1 | -1) => {
       const node = containerRef.current;
@@ -317,7 +377,7 @@ export function ImageViewer({ path }: { path: string }) {
       <div
         ref={containerRef}
         tabIndex={0}
-        className='solstice-canvas absolute inset-0 cursor-default overflow-hidden outline-none active:cursor-grabbing'
+        className='solstice-canvas absolute inset-0 cursor-default touch-none overflow-hidden outline-none active:cursor-grabbing'
         onMouseDown={onMouseDown}
         // Right-drag pans, so the OS menu must not open on top of the gesture.
         onContextMenu={(event) => event.preventDefault()}

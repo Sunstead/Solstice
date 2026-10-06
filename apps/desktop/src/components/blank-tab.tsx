@@ -56,7 +56,8 @@ export function BlankTab(_props: { tabId: string }) {
                   <action.icon />
                   {action.label}
                 </Button>
-                <div>
+                {/* No keyboard to press them on a touch screen. */}
+                <div className='pointer-coarse:invisible'>
                   <Keybind
                     accelerator={
                       commands.find((c) => c.id === action.commandId)

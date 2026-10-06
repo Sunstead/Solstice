@@ -92,6 +92,30 @@ export function zoomAbout(
   };
 }
 
+/**
+ * Two fingers, pinching and moving: the view that keeps the content under
+ * the fingers' first midpoint under their current one, scaled by how far
+ * apart they've moved. Points are in the pane's pixel space.
+ */
+export function pinchView(
+  start: Viewport,
+  [a0, b0]: [Point, Point],
+  [a, b]: [Point, Point],
+  limits = { min: MIN_SCALE, max: MAX_SCALE },
+): Viewport {
+  const mid0 = { x: (a0.x + b0.x) / 2, y: (a0.y + b0.y) / 2 };
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const span0 = Math.hypot(b0.x - a0.x, b0.y - a0.y);
+  const span = Math.hypot(b.x - a.x, b.y - a.y);
+  const wanted = span0 > 0 ? (start.scale * span) / span0 : start.scale;
+  const scale = Math.min(Math.max(wanted, limits.min), limits.max);
+  const anchor = toCanvas(start, mid0.x, mid0.y);
+  return {
+    scale,
+    offset: { x: mid.x - anchor.x * scale, y: mid.y - anchor.y * scale },
+  };
+}
+
 /** The next stop above or below the current scale. */
 export function stepScale(scale: number, direction: 1 | -1): number {
   // A tolerance, so landing on a stop does not make the next press a no-op.
