@@ -335,6 +335,7 @@ export function CanvasBoard({ path }: { path: string }) {
               ref={containerRef}
               tabIndex={0}
               data-command-surface='true'
+              data-canvas-board=''
               data-editor-id={scopeId}
               // What the pointer is doing, so the stylesheet can put one
               // cursor on the whole surface for the duration -- the pointer is

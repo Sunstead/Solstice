@@ -99,6 +99,16 @@ command_id! {
     CanvasToggleMinimap => "canvas.toggle_minimap",
 }
 
+impl CommandId {
+    /// Canvas commands act on the focused board, and their keys work only
+    /// while a board has focus, so they can be plain letters. The frontend
+    /// dispatches them on every platform; the native menu never registers
+    /// their accelerators, or macOS would claim `N` everywhere.
+    pub fn is_canvas(self) -> bool {
+        self.as_str().starts_with("canvas.")
+    }
+}
+
 impl std::fmt::Display for CommandId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
@@ -441,54 +451,52 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             is_overridden: false,
         },
         // -- Canvas --
-        // No default accelerators. These act on whatever the focused tab has
-        // open, so the useful ones are per-user; an empty default keeps them
-        // bindable from the keybindings pane without spending a keystroke
-        // everyone has to live with. The reflexive keys on a board -- Delete,
-        // the arrows, 0 and 1 -- are handled by the surface's own keydown,
-        // exactly as the image viewer handles 0 and 1.
+        // These work only while a board has focus (see `is_canvas`), so
+        // they can be single keys without stealing typing anywhere else. The
+        // board's own keys -- Delete, Enter, the arrows, 0 and 1 -- stay in
+        // its keydown handler, as the image viewer's 0 and 1 do.
         CommandMeta {
             id: CommandId::CanvasNewText,
             label: "New Card".into(),
-            accelerator: None,
+            accelerator: Some("N".into()),
             is_overridden: false,
         },
         CommandMeta {
             id: CommandId::CanvasNewFile,
             label: "New File Card...".into(),
-            accelerator: None,
+            accelerator: Some("F".into()),
             is_overridden: false,
         },
         CommandMeta {
             id: CommandId::CanvasNewGroup,
             label: "New Group".into(),
-            accelerator: None,
+            accelerator: Some("CmdOrCtrl+G".into()),
             is_overridden: false,
         },
         CommandMeta {
             id: CommandId::CanvasZoomToFit,
             label: "Zoom to Fit".into(),
-            accelerator: None,
+            accelerator: Some("Shift+1".into()),
             is_overridden: false,
         },
         CommandMeta {
             id: CommandId::CanvasZoomToSelection,
             label: "Zoom to Selection".into(),
-            accelerator: None,
+            accelerator: Some("Shift+2".into()),
             is_overridden: false,
         },
         CommandMeta {
             id: CommandId::CanvasToggleSnap,
             label: "Snap to Grid".into(),
-            accelerator: None,
+            accelerator: Some("CmdOrCtrl+'".into()),
             is_overridden: false,
         },
         CommandMeta {
             id: CommandId::CanvasToggleMinimap,
             label: "Show Minimap".into(),
-            accelerator: None,
+            accelerator: Some("M".into()),
             is_overridden: false,
-        }
+        },
     ]
 }
 #[cfg(test)]
@@ -509,6 +517,28 @@ mod web_tests {
         for c in &web {
             let a = c.accelerator.as_deref().unwrap_or_default();
             assert!(!["CmdOrCtrl+N", "CmdOrCtrl+T", "CmdOrCtrl+W"].contains(&a), "{} uses {a}", c.id);
+        }
+    }
+}
+
+#[cfg(test)]
+mod canvas_tests {
+    use super::*;
+
+    #[test]
+    fn every_canvas_command_has_a_key_of_its_own() {
+        let commands = default_commands();
+        let canvas: Vec<_> = commands.iter().filter(|c| c.id.is_canvas()).collect();
+        assert_eq!(canvas.len(), 7);
+        for c in &canvas {
+            let key = c.accelerator.as_deref().unwrap_or_else(|| panic!("{} has no key", c.id));
+            // A board key never shadows a global one, so either can be
+            // rebound without the other changing meaning.
+            assert!(
+                commands.iter().all(|o| o.id == c.id || o.accelerator.as_deref() != Some(key)),
+                "{} shares {key}",
+                c.id
+            );
         }
     }
 }

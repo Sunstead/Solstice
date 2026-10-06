@@ -328,7 +328,8 @@ pub fn menu_layout_without(commands: &[CommandMeta], macos: bool, ids: &[Command
 fn collect_accelerated_commands(entries: &[ResolvedMenuEntry], out: &mut Vec<CommandId>) {
     for entry in entries {
         match entry {
-            ResolvedMenuEntry::Command(c) if c.accelerator.is_some() => out.push(c.id),
+            ResolvedMenuEntry::Command(c) if c.accelerator.is_some() && !c.id.is_canvas() =>
+                out.push(c.id),
             ResolvedMenuEntry::Submenu { entries, .. } =>
                 collect_accelerated_commands(entries, out),
             _ => {}
@@ -360,4 +361,19 @@ pub fn get_native_menu_command_ids(app: AppHandle) -> Vec<CommandId> {
         collect_accelerated_commands(&menu.entries, &mut ids);
     }
     ids
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::command_registry::default_commands;
+
+    #[test]
+    fn the_native_menu_never_claims_a_canvas_key() {
+        let mut claimed = Vec::new();
+        for menu in menu_layout_on(&default_commands(), true) {
+            collect_accelerated_commands(&menu.entries, &mut claimed);
+        }
+        assert!(claimed.contains(&CommandId::FileNewNote));
+        assert!(claimed.iter().all(|id| !id.is_canvas()), "{claimed:?}");
+    }
 }
