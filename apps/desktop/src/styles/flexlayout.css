@@ -238,15 +238,17 @@
 }
 
 /*
- * Room for the + button beside the tabs (2rem, plus its 2px padding): the
- * tabs shrink to leave it rather than pushing it out. Otherwise flexlayout
- * docks it in the toolbar whenever the tabs only just don't fit, and back
- * again, which a tab growing in or out crosses mid-animation.
+ * Room for the + button beside the tabs (2rem, plus its 2px padding, plus
+ * 2px slack): the tabs shrink to leave it rather than pushing it out.
+ * Otherwise flexlayout docks it in the toolbar whenever the tabs only just
+ * don't fit, and back again, which a tab growing in or out crosses
+ * mid-animation. The slack is for flexlayout's check, which sums rounded
+ * widths and would call an exact fit an overflow.
  */
 .flexlayout-custom
   .flexlayout__tabset_tabbar_inner:has(> .flexlayout__tab_toolbar_sticky_buttons_container)
   > .flexlayout__tabset_tabbar_inner_tab_container {
-  max-width: calc(100% - 2rem - 2px);
+  max-width: calc(100% - 2rem - 4px);
 }
 
 /* spacers/dividers: fixed size, never grow or shrink */
