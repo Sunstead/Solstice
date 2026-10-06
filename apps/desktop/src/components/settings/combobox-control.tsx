@@ -55,7 +55,7 @@ function Combobox({
           <Button
             id={id}
             variant='outline'
-            className='h-8 w-52 justify-between px-3 text-sm font-normal'
+            className='h-8 w-full justify-between px-3 text-sm font-normal sm:w-52'
           />
         }
       >

@@ -116,3 +116,10 @@
 .solstice-image-open:focus-visible {
   opacity: 1;
 }
+
+/* Nothing hovers on a touch screen: a tapped (selected) image shows it. */
+@media (hover: none) {
+  .solstice-image.is-selected .solstice-image-open {
+    opacity: 1;
+  }
+}

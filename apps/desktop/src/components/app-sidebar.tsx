@@ -22,9 +22,10 @@ import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { WorkspaceSwitcher } from './workspace-switcher';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { AccountButton } from './account-button';
+import { cn } from '@/lib/utils';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { open, setOpen, toggleSidebar } = useSidebar();
+  const { open, setOpen, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
 
   const activePrimaryView = useWorkspaceUIStore((s) => s.activePrimaryView);
   const setActivePrimaryView = useWorkspaceUIStore(
@@ -38,6 +39,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const ActiveSidebarContent = activeView?.sidebarComponent;
 
   function handleSelect(id: string) {
+    // In the drawer the panel is always showing: the rail only switches views.
+    if (isMobile) {
+      setActivePrimaryView(id);
+      return;
+    }
     if (id === activePrimaryView) {
       const next = !open;
       setOpen(next);
@@ -56,8 +62,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar
-      collapsible='icon'
-      className='overflow-hidden *:data-[sidebar=sidebar]:flex-row'
+      // `rail`, not `icon`: the panel beside the rail keeps its layout while
+      // the edge closes over it, instead of its rows switching to icon mode.
+      collapsible='rail'
+      mobileWidth='min(85vw, 20rem)'
+      className={cn(
+        'overflow-hidden *:data-[sidebar=sidebar]:flex-row',
+        isMobile && 'data-[side=left]:w-(--sidebar-width) data-[side=left]:max-w-none',
+      )}
       {...props}
     >
       <Sidebar
@@ -72,7 +84,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <SidebarMenuItem key={view.id}>
                     <button
                       type='button'
-                      data-active={view.id === activePrimaryView && open}
+                      data-active={view.id === activePrimaryView && (open || isMobile)}
                       onClick={() => handleSelect(view.id)}
                       className='data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)] flex flex-col items-center gap-0.5 w-full h-full px-2 py-3 text-xs font-medium text-muted-foreground hover:text-foreground data-[active=true]:text-foreground'
                     >
@@ -98,7 +110,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     variant='ghost'
                     size='icon'
                     className='size-10'
-                    onClick={() => openSettings()}
+                    onClick={() => {
+                      setOpenMobile(false);
+                      openSettings();
+                    }}
                   >
                     <Settings className='size-5' />
                     <span className='sr-only'>Settings</span>
@@ -112,7 +127,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <Sidebar
         collapsible='none'
-        className='hidden flex-1 md:flex w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]! min-w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]'
+        // Hidden from the keyboard and screen readers while the edge covers it.
+        inert={!isMobile && !open}
+        className='flex flex-1 w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]! min-w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]'
       >
         {ActiveSidebarContent && <ActiveSidebarContent />}
         <SidebarFooter className='border-t'>

@@ -1,11 +1,7 @@
 // src/routes/index.tsx
-import FlexLayoutRoot from '@/components/flex-layout-root';
+import { EditorArea } from '@/components/editor-area';
 import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/')({
-  component: () => (
-    <div className='h-full w-full'>
-      <FlexLayoutRoot />
-    </div>
-  ),
+  component: EditorArea,
 });

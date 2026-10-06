@@ -19,7 +19,8 @@ export function ViewerToolbar({
   return (
     <div
       className={cn(
-        'pointer-events-auto flex w-max max-w-full items-center gap-0.5 rounded-xl border bg-popover p-1 shadow-lg backdrop-blur-xl backdrop-saturate-150 animate-in fade-in-0 slide-in-from-bottom-1',
+        // Scrolls sideways rather than spilling off a phone-width pane.
+        'pointer-events-auto flex w-max max-w-full items-center gap-0.5 overflow-x-auto [scrollbar-width:none] rounded-xl border bg-popover p-1 shadow-lg backdrop-blur-xl backdrop-saturate-150 animate-in fade-in-0 slide-in-from-bottom-1',
         className,
       )}
       {...props}

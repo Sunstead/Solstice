@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createRootRoute, Outlet } from '@tanstack/react-router';
-import {
-  SidebarInset,
-  SidebarProvider,
-} from '@sunstead/ui/components/resizable-sidebar';
-import { AppSidebar } from '@/components/app-sidebar';
-import { TitleBarShell } from '@/components/title-bar';
+import { SidebarProvider } from '@sunstead/ui/components/resizable-sidebar';
+import { AppShell } from '@/components/app-shell';
 import { QuickOpenDialog } from '@/components/quick-open-dialog';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useWorkspace } from '@/hooks/use-workspace';
@@ -127,7 +123,7 @@ export const Route = createRootRoute({
 
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className='h-screen bg-sidebar text-foreground flex flex-col overflow-hidden'>
+        <div className='h-dvh bg-sidebar text-foreground flex flex-col overflow-hidden'>
           <SidebarProvider
             key={hydrated ? 'hydrated' : 'initial'}
             open={!sidebarCollapsed}
@@ -136,18 +132,9 @@ export const Route = createRootRoute({
             onWidthChange={setSidebarWidth}
             className='flex-col'
           >
-            <div className='flex flex-1 min-h-0 relative w-full max-w-full'>
-              <div className='h-full flex flex-col'>
-                <TitleBarShell />
-
-                <div className='relative flex-1 min-h-0'>
-                  <AppSidebar />
-                </div>
-              </div>
-              <SidebarInset>
-                <Outlet />
-              </SidebarInset>
-            </div>
+            <AppShell>
+              <Outlet />
+            </AppShell>
           </SidebarProvider>
         </div>
 

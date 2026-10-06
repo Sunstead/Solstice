@@ -344,7 +344,8 @@ export function CanvasBoard({ path }: { path: string }) {
               data-canvas-resize={
                 interaction.kind === 'resize' ? interaction.handle : undefined
               }
-              className='absolute inset-0 cursor-default outline-none'
+              // No browser panning or zooming: the board does both itself.
+              className='absolute inset-0 cursor-default touch-none outline-none'
               onFocus={claimSeat}
               onPointerDown={onPointerDown}
               onKeyDown={onKeyDown}

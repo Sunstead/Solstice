@@ -53,7 +53,7 @@ export function FindBar({ onClose }: FindBarProps) {
           autoFocus
           placeholder='Find in file'
           aria-label='Find in file'
-          className={cn('h-8 w-64 pr-30', empty && 'text-destructive')}
+          className={cn('h-8 w-52 pr-30 sm:w-64', empty && 'text-destructive')}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {

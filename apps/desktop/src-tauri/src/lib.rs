@@ -133,7 +133,9 @@ pub fn run() {
 
             let win_builder = WebviewWindowBuilder::from_config(app, &config)?
                 .title("Solstice")
-                .inner_size(1200.0, 800.0);
+                .inner_size(1200.0, 800.0)
+                // Narrow windows get the phone layout; below this it can't help.
+                .min_inner_size(400.0, 500.0);
 
             #[cfg(target_os = "macos")]
             let win_builder = {
