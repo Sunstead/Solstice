@@ -135,44 +135,8 @@
   overflow: visible;
   border-bottom: none;
   gap: 8px;
-  /* transition:
-    width var(--tab-motion-duration) var(--tab-motion-ease),
-    min-width var(--tab-motion-duration) var(--tab-motion-ease),
-    max-width var(--tab-motion-duration) var(--tab-motion-ease),
-    padding-left var(--tab-motion-duration) var(--tab-motion-ease),
-    padding-right var(--tab-motion-duration) var(--tab-motion-ease),
-    margin-left var(--tab-motion-duration) var(--tab-motion-ease),
-    margin-right var(--tab-motion-duration) var(--tab-motion-ease); */
-  /* animation: flexlayout-tab-enter var(--tab-motion-duration)
-    var(--tab-motion-ease); */
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .flexlayout-custom .flexlayout__tab_button {
-    transition: none;
-    animation: none;
-  }
-}
-
-@keyframes flexlayout-tab-enter {
-  from {
-    width: 0;
-    min-width: 0;
-    max-width: 0;
-    padding-left: 0;
-    padding-right: 0;
-  }
-}
-
-.flexlayout-custom .flexlayout__tab_button--closing {
-  width: 0 !important;
-  min-width: 0 !important;
-  max-width: 0 !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  pointer-events: none;
+  /* Opening and closing motion is lib/tab-motion.ts, never a transition
+     here: those replay on every mount and animate selection changes. */
 }
 
 .flexlayout-custom
@@ -270,8 +234,6 @@
 .flexlayout-custom {
   /* The selected tab's corners and flares; they must stay equal. */
   --tab-curve-r: min(var(--radius-lg), 12px);
-  --tab-motion-duration: 180ms;
-  --tab-motion-ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
 .flexlayout-custom .flexlayout__tab_button--selected::before,
