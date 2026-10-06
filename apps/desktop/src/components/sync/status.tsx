@@ -1,39 +1,45 @@
-import { AlertCircle, Cloud, CloudOff, Loader2, LogIn, RefreshCw } from 'lucide-react';
+import { AlertCircle, Cloud, CloudOff, Loader2, LogIn, RefreshCw, type LucideIcon } from 'lucide-react';
 
 import type { SyncInfo } from '@/bindings';
 import { Button } from '@sunstead/ui/components/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@sunstead/ui/components/tooltip';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { useSync } from '@/lib/stores/sync';
+import { cn } from '@/lib/utils';
+import { describe, needsAttention } from './describe';
 
-function describe(info: SyncInfo): string {
-  switch (info.state) {
-    case 'synced':
-      return 'Up to date';
-    case 'syncing':
-      return 'Syncing';
-    case 'connecting':
-      return 'Connecting';
-    case 'offline':
-      return info.message ? `Offline: ${info.message}. Changes sync when it reconnects.` : 'Offline';
-    case 'signed_out':
-      return 'Signed out of the sync server';
-    case 'relink':
-      return 'Needs linking again';
-    case 'deleted':
-      return 'The vault was deleted on the server';
-    default:
-      return info.state;
-  }
+const ICONS: Record<string, LucideIcon> = {
+  synced: Cloud,
+  syncing: RefreshCw,
+  connecting: Loader2,
+  signed_out: LogIn,
+  relink: AlertCircle,
+  deleted: AlertCircle,
+};
+
+function SyncIcon({ info, className }: { info: SyncInfo; className?: string }) {
+  const Icon = ICONS[info.state] ?? CloudOff;
+  return <Icon className={cn(className, info.state === 'connecting' && 'animate-spin')} />;
 }
 
-/** One line of status, for the Sync settings pane. */
-export function SyncStatusText({ info }: { info: SyncInfo }) {
+function reviewsText(reviews: number) {
+  return `${reviews} merge${reviews === 1 ? '' : 's'} to review`;
+}
+
+/** The state as an icon and a line, for the settings panes. */
+export function SyncStatusLine({ info }: { info: SyncInfo }) {
+  const attention = needsAttention(info);
   return (
-    <p className='text-muted-foreground'>
-      {describe(info)}
-      {info.reviews > 0 && `, ${info.reviews} merge${info.reviews === 1 ? '' : 's'} to review`}.
-    </p>
+    <div className='flex flex-col gap-0.5'>
+      <p className={cn('flex items-center gap-1.5 text-sm', attention ? 'text-warning' : 'text-muted-foreground')}>
+        <SyncIcon info={info} className='size-4 shrink-0' />
+        {describe(info)}
+        {info.reviews > 0 && <span>· {reviewsText(info.reviews)}</span>}
+      </p>
+      {info.state === 'offline' && info.message && (
+        <p className='pl-5.5 text-xs text-muted-foreground'>{info.message}</p>
+      )}
+    </div>
   );
 }
 
@@ -43,20 +49,7 @@ export function SyncIndicator() {
   const openSettings = useSettingsDialog((s) => s.openSettings);
   if (!info) return null;
 
-  const Icon =
-    info.state === 'synced'
-      ? Cloud
-      : info.state === 'syncing' || info.state === 'connecting'
-        ? info.state === 'syncing'
-          ? RefreshCw
-          : Loader2
-        : info.state === 'signed_out'
-          ? LogIn
-          : info.state === 'relink' || info.state === 'deleted'
-            ? AlertCircle
-            : CloudOff;
-  const attention =
-    info.state === 'signed_out' || info.state === 'relink' || info.state === 'deleted' || info.reviews > 0;
+  const label = `${describe(info)}${info.reviews > 0 ? ` (${reviewsText(info.reviews)})` : ''}`;
 
   return (
     <Tooltip>
@@ -65,18 +58,15 @@ export function SyncIndicator() {
           <Button
             variant='ghost'
             size='icon-sm'
-            aria-label={`Sync: ${describe(info)}`}
+            aria-label={`Sync: ${label}`}
             onClick={() => openSettings('sync')}
-            className={attention ? 'text-amber-600 dark:text-amber-400' : undefined}
+            className={needsAttention(info) ? 'text-warning' : undefined}
           />
         }
       >
-        <Icon className={info.state === 'connecting' ? 'animate-spin' : undefined} />
+        <SyncIcon info={info} />
       </TooltipTrigger>
-      <TooltipContent>
-        Sync: {describe(info)}
-        {info.reviews > 0 && ` (${info.reviews} to review)`}
-      </TooltipContent>
+      <TooltipContent>Sync: {label}</TooltipContent>
     </Tooltip>
   );
 }

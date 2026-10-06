@@ -2,14 +2,12 @@ import { useEffect, useState } from 'react';
 import { Button } from '@sunstead/ui/components/button';
 import { me, signOut } from '@/lib/backend/web/account';
 import { useSync } from '@/lib/stores/sync';
-import { SyncStatusText } from '@/components/sync/status';
-
-function Heading({ children }: { children: React.ReactNode }) {
-  return <h3 className='pb-1 text-xs font-medium text-muted-foreground'>{children}</h3>;
-}
+import { SyncStatusLine } from '@/components/sync/status';
+import { UserAvatar } from '@/components/user-avatar';
+import { Card, Heading } from './pane-parts';
 
 /**
- * The Sync section in the browser: the web app is the server, so there's
+ * The Account section in the browser: the web app is the server, so there's
  * nothing to link, only who's signed in and the open vault's state.
  */
 export function WebAccountPane() {
@@ -24,41 +22,45 @@ export function WebAccountPane() {
   }, []);
 
   return (
-    <div className='flex flex-col gap-6'>
+    <div className='flex flex-col gap-7'>
       <section>
         <Heading>Account</Heading>
-        <div className='flex items-center justify-between gap-4'>
-          <p className='text-sm'>
-            {username ? (
-              <>
-                Signed in as <span className='font-medium'>{username}</span> on {location.host}
-              </>
-            ) : (
-              'Signed in'
-            )}
-          </p>
-          <Button
-            variant='outline'
-            size='sm'
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              void signOut().finally(() => setBusy(false));
-            }}
-          >
-            Sign out
-          </Button>
-        </div>
+        <Card>
+          <div className='flex items-center gap-3'>
+            <UserAvatar username={username} size='lg' />
+            <div className='min-w-0 flex-1'>
+              <p>
+                Signed in as <span className='font-medium'>{username ?? '…'}</span>
+              </p>
+              <p className='truncate text-muted-foreground'>{location.host}</p>
+            </div>
+            <Button
+              variant='outline'
+              size='sm'
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                void signOut().finally(() => setBusy(false));
+              }}
+            >
+              Sign out
+            </Button>
+          </div>
+        </Card>
       </section>
       {info && (
         <section>
-          <Heading>{info.vault_name}</Heading>
-          <SyncStatusText info={info} />
+          <Heading>This vault</Heading>
+          <Card>
+            <div className='flex flex-col gap-1'>
+              <p className='font-medium'>{info.vault_name}</p>
+              <SyncStatusLine info={info} />
+            </div>
+          </Card>
         </section>
       )}
       <p className='text-xs text-muted-foreground'>
-        Your notes here are the vaults on this server. To sync a folder on a computer, use the Solstice desktop
-        app.
+        Your vaults on Solstice Sync open here. To sync a folder on your computer, use the Solstice desktop app.
       </p>
     </div>
   );
