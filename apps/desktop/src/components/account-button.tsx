@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CircleUser, LogIn, LogOut, Settings2 } from 'lucide-react';
+import { LogIn, LogOut, Settings2 } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import {
@@ -14,6 +14,9 @@ import {
 import { commands, events, isDesktop } from '@/lib/backend';
 import { signOut } from '@/lib/backend/web/account';
 import { useAccount } from '@/lib/stores/account';
+import { useSync } from '@/lib/stores/sync';
+import { needsAttention } from '@/components/sync/describe';
+import { UserAvatar } from '@/components/user-avatar';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { useSetting } from '@/lib/settings/store';
 
@@ -35,6 +38,7 @@ export function AccountButton() {
   const server = isDesktop ? configured : location.origin;
   const { username, error, loaded, refresh } = useAccount();
   const openSettings = useSettingsDialog((s) => s.openSettings);
+  const attention = useSync((s) => needsAttention(s.info));
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -85,21 +89,24 @@ export function AccountButton() {
       <DropdownMenuTrigger
         render={<Button variant='ghost' size='icon' className='size-10' />}
       >
-        <CircleUser className='size-5' />
-        <span className='sr-only'>Account</span>
+        <UserAvatar username={username} attention={attention} className='size-7' />
+        <span className='sr-only'>{username ? `Account: ${username}` : 'Account'}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent side='right' align='end' sideOffset={8} className='min-w-56'>
         <DropdownMenuGroup>
-          <DropdownMenuLabel className='flex flex-col gap-0.5 font-normal'>
-            {username ? (
-              <span className='text-sm'>
-                Signed in as <span className='font-medium'>{username}</span>
-              </span>
-            ) : (
-              <span className='text-sm'>{status}</span>
-            )}
-            {server && <span className='text-xs text-muted-foreground'>{host(server)}</span>}
-            {failure && <span className='text-xs text-destructive'>{failure}</span>}
+          <DropdownMenuLabel className='flex items-center gap-2.5 font-normal'>
+            <UserAvatar username={username} />
+            <span className='flex min-w-0 flex-col gap-0.5'>
+              {username ? (
+                <span className='truncate text-sm text-foreground'>
+                  Signed in as <span className='font-medium'>{username}</span>
+                </span>
+              ) : (
+                <span className='text-sm text-foreground'>{status}</span>
+              )}
+              {server && <span className='truncate text-xs text-muted-foreground'>{host(server)}</span>}
+              {failure && <span className='text-xs text-destructive'>{failure}</span>}
+            </span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
@@ -118,7 +125,7 @@ export function AccountButton() {
         )}
         <DropdownMenuItem onClick={() => openSettings('sync')}>
           <Settings2 />
-          {isDesktop ? 'Sync settings…' : 'Account…'}
+          {isDesktop ? 'Sync settings…' : 'Account settings…'}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

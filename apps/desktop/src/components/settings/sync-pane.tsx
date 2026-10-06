@@ -1,318 +1,283 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, RefreshCw } from 'lucide-react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 
 import { commands } from '@/lib/backend';
-import { type SyncLinkReport, type SyncServerInfo, type SyncVault } from '@/bindings';
+import { type SyncServerInfo } from '@/bindings';
 import { Button } from '@sunstead/ui/components/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@sunstead/ui/components/collapsible';
 import { Input } from '@sunstead/ui/components/input';
+import { Label } from '@sunstead/ui/components/label';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { setSetting, useSetting } from '@/lib/settings/store';
+import { useAccount } from '@/lib/stores/account';
 import { useSync } from '@/lib/stores/sync';
-import { SyncStatusText } from '@/components/sync/status';
-import { VaultPicker } from '@/components/sync/vault-picker';
-import { useServerVaults } from '@/hooks/use-server-vaults';
+import { SyncStatusLine } from '@/components/sync/status';
+import { StartSyncingDialog } from '@/components/sync/start-syncing-dialog';
+import { UserAvatar } from '@/components/user-avatar';
+import { host } from '@/components/workspace-dialogs/helpers';
+import { Card, Heading } from './pane-parts';
 
-function Heading({ children }: { children: React.ReactNode }) {
-  return <h3 className='pb-1 text-xs font-medium text-muted-foreground'>{children}</h3>;
-}
+type Outcome = { status: 'ok' } | { status: 'error'; error: string };
 
 function folderName(path: string) {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? 'Notes';
 }
 
 /**
- * Solstice Sync: the server and sign-in, linking the open folder to a vault,
- * and a token for Atlas. The sync itself runs in the Rust side; see
- * `docs/sync.md`.
+ * Solstice Sync on desktop: who's signed in, whether the open workspace
+ * syncs, and (tucked away) which server. The sync itself runs in the Rust
+ * side; see `docs/sync.md`.
  */
 export function SyncPane() {
   const server = useSetting('sync.server');
-  const [draft, setDraft] = useState(server);
   const [info, setInfo] = useState<SyncServerInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const username = useAccount((s) => s.username);
   const linked = useSync((s) => s.info);
   const workspace = useWorkspace((s) => s.path);
 
-  const show = useCallback(
-    (result: { status: 'ok'; data: SyncServerInfo } | { status: 'error'; error: string }) => {
-      setInfo(result.status === 'ok' ? result.data : null);
-      setError(result.status === 'ok' ? null : result.error);
-    },
-    [],
-  );
-  const probe = useCallback(async () => show(await commands.syncServerInfo(server)), [server, show]);
+  const show = useCallback((result: { status: 'ok'; data: SyncServerInfo } | { status: 'error'; error: string }) => {
+    setInfo(result.status === 'ok' ? result.data : null);
+    setError(result.status === 'ok' ? null : result.error);
+  }, []);
+  const probe = useCallback(async () => {
+    if (!server) return show({ status: 'error', error: 'No server is set.' });
+    show(await commands.syncServerInfo(server));
+    void useAccount.getState().refresh(server);
+  }, [server, show]);
 
   useEffect(() => {
     let live = true;
-    void commands.syncServerInfo(server).then((r) => live && show(r));
+    void Promise.resolve().then(() => {
+      if (live) void probe();
+    });
     return () => {
       live = false;
     };
-  }, [server, show]);
+  }, [probe]);
 
-  const run = async (action: () => Promise<{ status: 'ok' } | { status: 'error'; error: string }>) => {
+  const run = async (action: () => Promise<Outcome>) => {
     setBusy(true);
     setError(null);
     const result = await action();
     setBusy(false);
-    if (result.status === 'error') setError(result.error);
     await probe();
+    if (result.status === 'error') setError(result.error);
     void useSync.getState().refresh();
   };
 
+  const signedIn = !!info && (info.signed_in || info.auth === 'dev');
+
   return (
     <div className='flex flex-col gap-7'>
-      <section className='flex flex-col gap-2'>
-        <Heading>Server</Heading>
+      <section>
+        <Heading>Account</Heading>
+        <Card>
+          <div className='flex items-center gap-3'>
+            <UserAvatar username={signedIn ? username : null} size='lg' />
+            <div className='min-w-0 flex-1'>
+              {signedIn ? (
+                <>
+                  <p>
+                    Signed in as <span className='font-medium'>{username ?? '…'}</span>
+                  </p>
+                  <p className='truncate text-muted-foreground'>{host(server)}</p>
+                </>
+              ) : info ? (
+                <p className='text-muted-foreground'>
+                  Sign in to Solstice Sync to keep your notes up to date on all your devices and in your browser.
+                </p>
+              ) : error ? (
+                <p className='text-muted-foreground'>
+                  Can't reach {server ? host(server) : 'the server'}. Check your connection, or the server address
+                  below.
+                </p>
+              ) : (
+                <p className='text-muted-foreground'>Checking {host(server)}…</p>
+              )}
+            </div>
+            {info?.auth === 'oidc' &&
+              (info.signed_in ? (
+                <Button variant='outline' size='sm' disabled={busy} onClick={() => void run(() => commands.syncSignOut(server))}>
+                  Sign out
+                </Button>
+              ) : (
+                <Button size='sm' disabled={busy} onClick={() => void run(() => commands.syncSignIn(server))}>
+                  {busy ? 'Signing in…' : 'Sign in'}
+                </Button>
+              ))}
+            {!info && error && (
+              <Button variant='outline' size='sm' onClick={() => void probe()}>
+                Try again
+              </Button>
+            )}
+          </div>
+          {info && error && <p className='text-destructive'>{error}</p>}
+        </Card>
+      </section>
+
+      {workspace && (linked || signedIn) && (
+        <section>
+          <Heading>This workspace</Heading>
+          {linked ? (
+            <SyncedWorkspace workspace={folderName(workspace)} busy={busy} run={run} />
+          ) : (
+            <LocalWorkspace server={server} workspace={folderName(workspace)} />
+          )}
+        </section>
+      )}
+
+      <ServerSettings server={server} info={info} locked={linked !== null} unreachable={!info && !!error} />
+    </div>
+  );
+}
+
+function LocalWorkspace({ server, workspace }: { server: string; workspace: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card>
+      <div className='flex items-center gap-3'>
+        <p className='min-w-0 flex-1'>
+          <span className='font-medium'>{workspace}</span> is only on this computer.
+        </p>
+        <Button size='sm' onClick={() => setOpen(true)}>
+          Start syncing…
+        </Button>
+      </div>
+      <StartSyncingDialog open={open} onOpenChange={setOpen} server={server} workspace={workspace} />
+    </Card>
+  );
+}
+
+function SyncedWorkspace({
+  workspace,
+  busy,
+  run,
+}: {
+  workspace: string;
+  busy: boolean;
+  run: (action: () => Promise<Outcome>) => Promise<void>;
+}) {
+  const info = useSync((s) => s.info)!;
+  const [confirm, setConfirm] = useState(false);
+  const broken = info.state === 'deleted' || info.state === 'relink';
+
+  const stop = (
+    <Button
+      size='sm'
+      variant={confirm ? 'destructive' : broken ? 'default' : 'outline'}
+      disabled={busy}
+      onClick={() => (confirm || broken ? void run(() => commands.syncUnlink()) : setConfirm(true))}
+    >
+      {confirm ? 'Stop syncing' : broken ? 'Stop syncing' : 'Stop syncing…'}
+    </Button>
+  );
+
+  return (
+    <Card>
+      <div className='flex flex-col gap-1'>
+        <p>
+          {broken ? 'Linked to' : 'Syncing with'} the vault <span className='font-medium'>{info.vault_name}</span>
+        </p>
+        <SyncStatusLine info={info} />
+      </div>
+
+      {info.state === 'deleted' && (
+        <p className='text-muted-foreground'>
+          Your files are still here. Stop syncing to keep them as a local workspace; you can then sync it again
+          with a new vault.
+        </p>
+      )}
+      {info.state === 'relink' && (
+        <p className='text-muted-foreground'>
+          The vault was rebuilt on the server. Stop syncing, then start again; your files stay here.
+        </p>
+      )}
+
+      {confirm ? (
+        <div className='flex flex-col gap-2 rounded-md bg-muted/50 p-3'>
+          <p>
+            Stop syncing {workspace}? Its files stay on this computer, and the vault stays on the server.
+          </p>
+          <div className='flex gap-2'>
+            {stop}
+            <Button size='sm' variant='ghost' onClick={() => setConfirm(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className='flex flex-wrap items-center gap-2'>
+          {!broken && (
+            <Button size='sm' variant='outline' disabled={busy} onClick={() => void run(() => commands.syncReconnect())}>
+              <RefreshCw />
+              Sync now
+            </Button>
+          )}
+          {stop}
+          <span className='ml-auto text-xs text-muted-foreground'>This computer appears as {info.device}</span>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ServerSettings({
+  server,
+  info,
+  locked,
+  unreachable,
+}: {
+  server: string;
+  info: SyncServerInfo | null;
+  locked: boolean;
+  unreachable: boolean;
+}) {
+  const [draft, setDraft] = useState(server);
+  const [open, setOpen] = useState(!server || unreachable);
+  const [prevUnreachable, setPrevUnreachable] = useState(unreachable);
+  if (unreachable !== prevUnreachable) {
+    setPrevUnreachable(unreachable);
+    if (unreachable) setOpen(true);
+  }
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className='group flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground'>
+        <ChevronRight className='size-3.5 transition-transform group-data-[panel-open]:rotate-90' />
+        Server settings
+      </CollapsibleTrigger>
+      <CollapsibleContent>
         <form
-          className='flex gap-2'
+          className='flex flex-col gap-2 pt-3 text-sm'
           onSubmit={(e) => {
             e.preventDefault();
             setSetting('sync.server', draft.trim());
           }}
         >
-          <Input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder='https://solstice.jupiter.sunstead.net'
-            disabled={linked !== null}
-          />
-          {draft.trim() !== server && (
-            <Button type='submit' variant='outline'>
-              Use
-            </Button>
-          )}
-        </form>
-        {linked && (
-          <p className='text-xs text-muted-foreground'>
-            This folder syncs with {linked.server}. Unlink it to use another server.
-          </p>
-        )}
-        <div className='flex flex-wrap items-center gap-2 text-sm'>
-          {info ? (
-            <>
-              <span className='text-muted-foreground'>
-                Solstice Sync {info.version}
-                {info.auth === 'dev' ? ', a development server (no sign-in).' : '.'}
-              </span>
-              {info.auth === 'oidc' &&
-                (info.signed_in ? (
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    disabled={busy}
-                    onClick={() => void run(() => commands.syncSignOut(server))}
-                  >
-                    Sign out
-                  </Button>
-                ) : (
-                  <Button size='sm' disabled={busy} onClick={() => void run(() => commands.syncSignIn(server))}>
-                    Sign in
-                  </Button>
-                ))}
-            </>
-          ) : (
-            !error && <span className='text-muted-foreground'>Checking the server...</span>
-          )}
-        </div>
-        {error && <p className='text-sm text-destructive'>{error}</p>}
-      </section>
-
-      <section className='flex flex-col gap-2'>
-        <Heading>This folder</Heading>
-        {!workspace ? (
-          <p className='text-sm text-muted-foreground'>Open a folder to sync it.</p>
-        ) : linked ? (
-          <LinkedFolder busy={busy} run={run} />
-        ) : info && info.signed_in ? (
-          <LinkForm server={server} folder={folderName(workspace)} onLinked={() => void probe()} />
-        ) : (
-          <p className='text-sm text-muted-foreground'>Sign in to the server to link this folder.</p>
-        )}
-      </section>
-
-      {info?.signed_in && <AtlasToken server={server} />}
-    </div>
-  );
-}
-
-function LinkedFolder({
-  busy,
-  run,
-}: {
-  busy: boolean;
-  run: (action: () => Promise<{ status: 'ok' } | { status: 'error'; error: string }>) => Promise<void>;
-}) {
-  const info = useSync((s) => s.info)!;
-  const [confirm, setConfirm] = useState(false);
-
-  return (
-    <div className='flex flex-col gap-2 text-sm'>
-      <p>
-        Synced with the vault <span className='font-medium'>{info.vault_name}</span> as{' '}
-        <span className='font-medium'>{info.device}</span>.
-      </p>
-      <SyncStatusText info={info} />
-      {info.state === 'deleted' && (
-        <p className='text-muted-foreground'>
-          The vault was deleted on the server, so this folder stopped syncing. Its files are still here: unlink it to
-          keep it as a local workspace, or unlink it and link it to another vault.
-        </p>
-      )}
-      {info.state === 'relink' && (
-        <p className='text-muted-foreground'>
-          The vault was rebuilt on the server. Unlink this folder, then link it again; its files stay.
-        </p>
-      )}
-      <div className='flex flex-wrap gap-2'>
-        <Button size='sm' variant='outline' disabled={busy} onClick={() => void run(() => commands.syncReconnect())}>
-          <RefreshCw />
-          Sync now
-        </Button>
-        {confirm ? (
-          <>
-            <Button size='sm' variant='destructive' disabled={busy} onClick={() => void run(() => commands.syncUnlink())}>
-              Unlink: files stay here
-            </Button>
-            <Button size='sm' variant='ghost' onClick={() => setConfirm(false)}>
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <Button size='sm' variant='ghost' onClick={() => setConfirm(true)}>
-            Unlink...
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function LinkForm({ server, folder, onLinked }: { server: string; folder: string; onLinked: () => void }) {
-  const { vaults, error: loadError } = useServerVaults(server);
-  const [choice, setChoice] = useState<string>('new');
-  const [name, setName] = useState(folder);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [report, setReport] = useState<SyncLinkReport | null>(null);
-
-  // A vault with the folder's name is most likely the one it belongs to.
-  const [guessed, setGuessed] = useState(false);
-  if (vaults && !guessed) {
-    setGuessed(true);
-    const same = vaults.find((v) => v.name.toLowerCase() === folder.toLowerCase());
-    if (same) setChoice(same.id);
-  }
-
-  const link = async () => {
-    setBusy(true);
-    setError(null);
-    let vault: SyncVault | undefined = vaults?.find((v) => v.id === choice);
-    if (choice === 'new') {
-      const created = await commands.syncCreateVault(server, name.trim());
-      if (created.status === 'error') {
-        setBusy(false);
-        return setError(created.error);
-      }
-      vault = created.data;
-    }
-    if (!vault) {
-      setBusy(false);
-      return;
-    }
-    const result = await commands.syncLink(server, vault.id, vault.name);
-    setBusy(false);
-    if (result.status === 'error') return setError(result.error);
-    setReport(result.data);
-    onLinked();
-    void useSync.getState().refresh();
-  };
-
-  if (report) {
-    return (
-      <div className='flex flex-col gap-1 text-sm'>
-        <p className='flex items-center gap-1.5'>
-          <Check className='size-4 text-emerald-600' /> Linked.
-        </p>
-        <p className='text-muted-foreground'>
-          {report.same} already matched, {report.downloaded} copied here, {report.uploaded} added to the vault.
-        </p>
-        {report.kept_both.length > 0 && (
-          <p className='text-muted-foreground'>
-            Some files differed, so this folder's versions were kept beside the vault's:{' '}
-            {report.kept_both.join(', ')}.
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className='flex flex-col gap-2 text-sm'>
-      <p className='text-muted-foreground'>
-        Link this folder to a vault on the server. Files on one side are copied to the other; where both
-        have a file that differs, this folder's version is kept beside the vault's.
-      </p>
-      {vaults === null && !error && !loadError && <p className='text-muted-foreground'>Loading vaults...</p>}
-      {vaults && <VaultPicker vaults={vaults} choice={choice} onChoice={setChoice} name={name} onName={setName} />}
-      <div>
-        <Button size='sm' disabled={busy || !vaults || (choice === 'new' && !name.trim())} onClick={() => void link()}>
-          {busy ? 'Linking...' : 'Link this folder'}
-        </Button>
-      </div>
-      {(error ?? loadError) && <p className='text-destructive'>{error ?? loadError}</p>}
-    </div>
-  );
-}
-
-function AtlasToken({ server }: { server: string }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const create = async () => {
-    setError(null);
-    const result = await commands.syncCreateToken(server, 'Atlas');
-    if (result.status === 'ok') setToken(result.data);
-    else setError(result.error);
-  };
-
-  return (
-    <section className='flex flex-col gap-2 text-sm'>
-      <Heading>Atlas</Heading>
-      <p className='text-muted-foreground'>
-        Atlas can search these notes, and save new ones into a vault, with a token from here. A token can only
-        list vaults and create notes.
-      </p>
-      {token ? (
-        <div className='flex flex-col gap-1'>
+          <Label htmlFor='sync-server'>Server address</Label>
           <div className='flex gap-2'>
-            <Input readOnly value={token} className='font-mono text-xs' />
-            <Button
-              size='sm'
-              variant='outline'
-              onClick={() => {
-                void navigator.clipboard.writeText(token);
-                setCopied(true);
-              }}
-            >
-              {copied ? <Check /> : <Copy />}
-              {copied ? 'Copied' : 'Copy'}
+            <Input
+              id='sync-server'
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder='https://solstice.jupiter.sunstead.net'
+              disabled={locked}
+            />
+            <Button type='submit' variant='outline' disabled={locked || !draft.trim() || draft.trim() === server}>
+              Save
             </Button>
           </div>
           <p className='text-xs text-muted-foreground'>
-            Paste it into Atlas's Solstice connection now: it isn't shown again.
+            {locked
+              ? 'Stop syncing this workspace to change servers.'
+              : info
+                ? `Solstice Sync ${info.version}${info.auth === 'dev' ? ', a development server (no sign-in)' : ''}.`
+                : 'The Solstice Sync server your notes sync with.'}
           </p>
-        </div>
-      ) : (
-        <div>
-          <Button size='sm' variant='outline' onClick={() => void create()}>
-            Create a token for Atlas
-          </Button>
-        </div>
-      )}
-      {error && <p className='text-destructive'>{error}</p>}
-    </section>
+        </form>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
