@@ -5,6 +5,7 @@ import { Button } from '@sunstead/ui/components/button';
 import { cn } from '@/lib/utils';
 import { commands } from '@/lib/backend';
 import { type CommandMeta } from '@/bindings';
+import { findConflicts } from '@/lib/command-scope';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { KeybindRecorder } from './keybind-recorder';
 
@@ -43,38 +44,10 @@ function useReservedAccelerators() {
   return reserved;
 }
 
-/** For each command, what else answers to its accelerator. */
-function findConflicts(
-  registry: CommandMeta[],
-  reserved: Map<string, string>,
-): Map<string, string> {
-  const owners = new Map<string, string[]>();
-  for (const command of registry) {
-    if (!command.accelerator) continue;
-    owners.set(command.accelerator, [
-      ...(owners.get(command.accelerator) ?? []),
-      command.label,
-    ]);
-  }
-
-  const conflicts = new Map<string, string>();
-  for (const command of registry) {
-    const accelerator = command.accelerator;
-    if (!accelerator) continue;
-    const others = (owners.get(accelerator) ?? []).filter(
-      (label) => label !== command.label,
-    );
-    const reservedBy = reserved.get(accelerator);
-    if (reservedBy) others.push(`${reservedBy} (system)`);
-    if (others.length > 0) conflicts.set(command.id, others.join(', '));
-  }
-  return conflicts;
-}
-
 /**
  * Section headings, keyed by the command id prefix. An unlisted prefix falls
- * back to itself, so a new command family shows up under a heading without
- * needing an entry here.
+ * back to itself, capitalised, so a new command family shows up under a
+ * heading without needing an entry here.
  */
 const GROUP_LABELS: Record<string, string> = {
   app: 'Application',
@@ -82,6 +55,12 @@ const GROUP_LABELS: Record<string, string> = {
   edit: 'Editing',
   view: 'View',
   navigation: 'Navigation',
+  canvas: 'Canvas',
+};
+
+/** A line under a heading, for families whose keys only work somewhere. */
+const GROUP_NOTES: Record<string, string> = {
+  canvas: 'These work while a canvas is focused.',
 };
 
 function groupByFamily(registry: CommandMeta[]) {
@@ -92,7 +71,8 @@ function groupByFamily(registry: CommandMeta[]) {
   }
   return [...groups].map(([family, commands]) => ({
     family,
-    label: GROUP_LABELS[family] ?? family,
+    label: GROUP_LABELS[family] ?? family.charAt(0).toUpperCase() + family.slice(1),
+    note: GROUP_NOTES[family],
     commands,
   }));
 }
@@ -145,6 +125,9 @@ export function KeybindingsPane() {
           <h3 className='pb-1 text-xs font-medium text-muted-foreground'>
             {group.label}
           </h3>
+          {group.note && (
+            <p className='pb-1 text-xs text-muted-foreground'>{group.note}</p>
+          )}
           {group.commands.map((command) => {
             const conflict = conflicts.get(command.id);
             return (

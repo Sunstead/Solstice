@@ -20,7 +20,9 @@ fn command_item(
         return Ok(None);
     };
     let mut item = MenuItemBuilder::new(&c.label).id(&c.id);
-    if let (true, Some(a)) = (accelerators, &c.accelerator) {
+    // Canvas keys are plain letters that only mean something on a board; as
+    // native accelerators they would fire everywhere.
+    if let (true, Some(a)) = (accelerators && !c.id.is_canvas(), &c.accelerator) {
         item = item.accelerator(a);
     }
     Ok(Some(item.build(app)?))

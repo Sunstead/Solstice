@@ -235,43 +235,43 @@
       "label": "Go Forward"
     },
     {
-      "accelerator": null,
+      "accelerator": "N",
       "id": "canvas.new_text",
       "is_overridden": false,
       "label": "New Card"
     },
     {
-      "accelerator": null,
+      "accelerator": "F",
       "id": "canvas.new_file",
       "is_overridden": false,
       "label": "New File Card..."
     },
     {
-      "accelerator": null,
+      "accelerator": "CmdOrCtrl+G",
       "id": "canvas.new_group",
       "is_overridden": false,
       "label": "New Group"
     },
     {
-      "accelerator": null,
+      "accelerator": "Shift+1",
       "id": "canvas.zoom_to_fit",
       "is_overridden": false,
       "label": "Zoom to Fit"
     },
     {
-      "accelerator": null,
+      "accelerator": "Shift+2",
       "id": "canvas.zoom_to_selection",
       "is_overridden": false,
       "label": "Zoom to Selection"
     },
     {
-      "accelerator": null,
+      "accelerator": "CmdOrCtrl+'",
       "id": "canvas.toggle_snap",
       "is_overridden": false,
       "label": "Snap to Grid"
     },
     {
-      "accelerator": null,
+      "accelerator": "M",
       "id": "canvas.toggle_minimap",
       "is_overridden": false,
       "label": "Show Minimap"
@@ -514,7 +514,7 @@
             "entries": [
               {
                 "Command": {
-                  "accelerator": null,
+                  "accelerator": "N",
                   "id": "canvas.new_text",
                   "is_overridden": false,
                   "label": "New Card"
@@ -522,7 +522,7 @@
               },
               {
                 "Command": {
-                  "accelerator": null,
+                  "accelerator": "F",
                   "id": "canvas.new_file",
                   "is_overridden": false,
                   "label": "New File Card..."
@@ -530,7 +530,7 @@
               },
               {
                 "Command": {
-                  "accelerator": null,
+                  "accelerator": "CmdOrCtrl+G",
                   "id": "canvas.new_group",
                   "is_overridden": false,
                   "label": "New Group"
@@ -539,7 +539,7 @@
               "Separator",
               {
                 "Command": {
-                  "accelerator": null,
+                  "accelerator": "Shift+1",
                   "id": "canvas.zoom_to_fit",
                   "is_overridden": false,
                   "label": "Zoom to Fit"
@@ -547,7 +547,7 @@
               },
               {
                 "Command": {
-                  "accelerator": null,
+                  "accelerator": "Shift+2",
                   "id": "canvas.zoom_to_selection",
                   "is_overridden": false,
                   "label": "Zoom to Selection"
@@ -556,7 +556,7 @@
               "Separator",
               {
                 "Command": {
-                  "accelerator": null,
+                  "accelerator": "CmdOrCtrl+'",
                   "id": "canvas.toggle_snap",
                   "is_overridden": false,
                   "label": "Snap to Grid"
@@ -564,7 +564,7 @@
               },
               {
                 "Command": {
-                  "accelerator": null,
+                  "accelerator": "M",
                   "id": "canvas.toggle_minimap",
                   "is_overridden": false,
                   "label": "Show Minimap"

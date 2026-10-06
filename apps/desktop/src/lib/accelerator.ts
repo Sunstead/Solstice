@@ -23,9 +23,24 @@ function convert(
   return [...parts, key].join(separator);
 }
 
-/** "CmdOrCtrl+Shift+B" -> "$mod+Shift+b" */
+/**
+ * "CmdOrCtrl+Shift+B" -> "$mod+Shift+b", "Shift+1" -> "Shift+Digit1".
+ *
+ * tinykeys matches a key against `event.key` or `event.code`. Digits and
+ * punctuation are written as their code, because the key they report changes
+ * with Shift ("!" for Shift+1), with Alt on macOS, and between layouts, while
+ * the code is what the keybindings recorder saved in the first place.
+ */
 export function toTinykeysFormat(accelerator: string): string {
-  return convert(accelerator, '$mod', '+');
+  const parts = convert(accelerator, '$mod', '+').split('+');
+  const key = parts.pop()!;
+  return [...parts, keyToCode(key)].join('+');
+}
+
+function keyToCode(key: string): string {
+  if (/^[0-9]$/.test(key)) return `Digit${key}`;
+  const code = Object.entries(CODE_SYMBOLS).find(([, symbol]) => symbol === key);
+  return code ? code[0] : key;
 }
 
 /** "CmdOrCtrl+Shift+B" -> "Mod-Shift-b" (prosemirror-keymap style) */
