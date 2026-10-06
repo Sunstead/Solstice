@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { isDesktop } from '@/lib/backend';
 import {
   Actions,
@@ -8,7 +8,7 @@ import {
   TabNode,
   TabSetNode,
 } from 'flexlayout-react';
-import type { ILayoutApi } from 'flexlayout-react';
+import type { Action, ILayoutApi } from 'flexlayout-react';
 import 'flexlayout-react/style/alpha_dark.css';
 import {
   ChevronDown,
@@ -43,6 +43,17 @@ import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { stripPresetExtension } from '@/lib/stores/entry-input';
 import { useSetting } from '@/lib/settings/store';
 import { TabCloseIcon } from './tab-close-icon';
+import { closeTab, playEnter } from '@/lib/tab-motion';
+
+/** A tab's name; on mount, it grows its button in if the tab was just opened. */
+function TabLabel({ id, children }: { id: string; children: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const button = ref.current?.closest<HTMLElement>('.flexlayout__tab_button');
+    if (button) playEnter(id, button);
+  }, [id]);
+  return <span ref={ref}>{children}</span>;
+}
 
 function makeDraggedTabId(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -166,8 +177,32 @@ export default function FlexLayoutRoot() {
   ) => {
     if (event.button !== 1) return;
     if (!(node instanceof TabNode)) return;
-    if (!node.isEnableClose()) return;
-    model?.doAction(Actions.deleteTab(node.getId()));
+    if (!node.isEnableClose() || !model) return;
+    closeTab(model, node.getId(), { pointer: true });
+  };
+
+  // flexlayout's own close button (and its keyboard close) come through
+  // here; the tab's motion decides when it really leaves the model. Its
+  // pointerdown is seen first, so a close from the mouse holds tab widths.
+  const closePressedAt = useRef(-Infinity);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if ((event.target as Element | null)?.closest('.flexlayout__tab_button_trailing')) {
+        closePressedAt.current = event.timeStamp;
+      }
+    };
+    container.addEventListener('pointerdown', onPointerDown, { capture: true });
+    return () => container.removeEventListener('pointerdown', onPointerDown, { capture: true });
+  }, []);
+
+  const handleAction = (action: Action): Action | undefined => {
+    if (action.type !== Actions.DELETE_TAB || !model) return action;
+    const pointer = performance.now() - closePressedAt.current < 2000;
+    closePressedAt.current = -Infinity;
+    closeTab(model, action.data.node as string, { pointer });
+    return undefined;
   };
 
   const navigateTo = useCallback((direction: 'back' | 'forward') => {
@@ -215,7 +250,7 @@ export default function FlexLayoutRoot() {
         if (!activeTabId) return;
         const node = m.getNodeById(activeTabId);
         if (!(node instanceof TabNode) || !node.isEnableClose()) return;
-        m.doAction(Actions.deleteTab(activeTabId));
+        closeTab(m, activeTabId, { pointer: false });
       },
       () => {
         const m = modelRef.current;
@@ -309,6 +344,7 @@ export default function FlexLayoutRoot() {
         realtimeResize
         factory={factory}
         onModelChange={handleModelChange}
+        onAction={handleAction}
         onAuxMouseClick={handleAuxMouseClick}
         onExternalDrag={handleExternalDrag}
         icons={layoutIcons}
@@ -355,9 +391,11 @@ export default function FlexLayoutRoot() {
             );
           }
 
-          renderValues.content = showExtensions
-            ? node.getName()
-            : stripPresetExtension(node.getName()).name;
+          renderValues.content = (
+            <TabLabel id={node.getId()}>
+              {showExtensions ? node.getName() : stripPresetExtension(node.getName()).name}
+            </TabLabel>
+          );
         }}
       />
     </div>

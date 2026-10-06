@@ -12,6 +12,7 @@ import {
   setStoredLayout,
 } from '@/lib/stores/workspace-layout';
 import { getFileNameFromPath, normalizePath } from '@/lib/path-utils';
+import { markEntering } from '@/lib/tab-motion';
 
 const defaultLayoutJson: IJsonModel = {
   global: {
@@ -248,6 +249,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
     const activeTabset = model.getActiveTabset() ?? findFirstTabset(model);
     if (!activeTabset) return;
 
+    markEntering(id);
     model.doAction(
       Actions.addNode(
         { type: 'tab', id, name, component: 'editor', config: { path } },
@@ -270,11 +272,14 @@ export const useLayout = create<LayoutState>((set, get) => ({
     const activeTabset = model.getActiveTabset() ?? findFirstTabset(model);
     if (!activeTabset) return;
 
+    const id = makeUniqueTabId();
+    // Docked to the right it starts a tabset of its own: nothing to grow into.
+    if (location === 'center') markEntering(id);
     model.doAction(
       Actions.addNode(
         // Never the path: `openFile` already uses that as the id, so a second
         // tab on the same file would collide and `addNode` would throw.
-        { type: 'tab', id: makeUniqueTabId(), name, component: 'editor', config: { path } },
+        { type: 'tab', id, name, component: 'editor', config: { path } },
         activeTabset.getId(),
         location === 'right' ? DockLocation.RIGHT : DockLocation.CENTER,
         -1,
@@ -291,11 +296,13 @@ export const useLayout = create<LayoutState>((set, get) => ({
       : (model.getActiveTabset() ?? findFirstTabset(model));
     if (!targetTabset) return;
 
+    const id = makeUniqueTabId();
+    markEntering(id);
     model.doAction(
       Actions.addNode(
         {
           type: 'tab',
-          id: makeUniqueTabId(),
+          id,
           name: nextBlankTabName(model),
           component: 'blank',
         },
