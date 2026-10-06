@@ -41,65 +41,102 @@ const px = (n: number) => `${n}px`;
 
 const entering = new Set<string>();
 
+/** Widths just before a tab was added: each tab's room (margins included), and each strip's. */
+let before = new WeakMap<Element, number>();
+
+function roomOf(el: Element): number {
+  const style = getComputedStyle(el);
+  return el.getBoundingClientRect().width + parseFloat(style.marginLeft) + parseFloat(style.marginRight);
+}
+
 /** Call before adding a tab the user asked for, so it grows in. */
 export function markEntering(id: string) {
   settle();
-  if (motionEnabled()) entering.add(id);
+  if (!motionEnabled()) return;
+  entering.add(id);
+  // Where everything stands now; playEnter eases each from here.
+  before = new WeakMap();
+  for (const el of document.querySelectorAll(
+    '.flexlayout__tabset_tabbar_inner_tab_container, .flexlayout__tabset_tabbar_inner_tab_container > .flexlayout__tab_button',
+  )) {
+    before.set(el, roomOf(el));
+  }
 }
 
 /**
- * Grows a newly mounted tab button from nothing, if it was marked. Runs in
- * a layout effect, so nothing paints in between.
+ * Grows a newly mounted tab button from nothing, if it was marked, and eases
+ * the rest of its strip from where it was to where it now is. Runs in a
+ * layout effect, so nothing paints in between.
  */
 export function playEnter(id: string, button: HTMLElement) {
   if (!entering.delete(id)) return;
   // After the commit, not in it: flexlayout measures the strip for overflow
   // in its own layout effect, which runs after ours, and must see the tab at
-  // full size or it misjudges the overflow. A microtask still runs before
-  // the frame paints.
+  // full size. A microtask still runs before the frame paints.
   queueMicrotask(() => {
-    if (!button.isConnected) return;
-    // The strip's tab container keeps its final width while the tab grows.
-    // flexlayout's overflow check (on every strip resize) then never sees
-    // the tab small and undocks the + button mid-animation, and in a
-    // squeezed strip the other tabs shrink smoothly from where they were.
     const container = button.parentElement;
-    const token = Symbol();
-    if (container) {
-      const room = container.parentElement?.clientWidth ?? Infinity;
-      container.style.minWidth = px(Math.min(container.getBoundingClientRect().width, room));
-      holds.set(container, token);
-    }
-    // One keyframe, at the start: the end is whatever the stylesheet says,
-    // so the tab grows until the strip's flex share stops it and never
-    // overshoots a width measured too early.
-    const animation = button.animate(
-      [
-        {
-          minWidth: '0px',
-          maxWidth: '0px',
-          paddingLeft: '0px',
-          paddingRight: '0px',
-          marginLeft: '0px',
-          marginRight: '0px',
-          opacity: 0,
-          offset: 0,
-        },
-      ],
-      { duration: OPEN_MS, easing: EASE },
-    );
-    const release = () => {
-      if (container && holds.get(container) === token) {
-        container.style.minWidth = '';
-        holds.delete(container);
+    if (!button.isConnected || !container) return;
+
+    // Every width is set explicitly, from before to after, on one curve:
+    // the tabs already there move one way only (not at all with room to
+    // spare, shrinking together in a squeezed strip), never drifting on how
+    // flexbox happens to share the space mid-way. All measured before any
+    // animation starts, since a running one changes what the next sees.
+    const tabs = buttonsIn(container);
+    const after = tabs.map((b) => {
+      const style = getComputedStyle(b);
+      return {
+        width: b.getBoundingClientRect().width,
+        marginLeft: parseFloat(style.marginLeft),
+        marginRight: parseFloat(style.marginRight),
+        paddingLeft: style.paddingLeft,
+        paddingRight: style.paddingRight,
+      };
+    });
+    const strip = { from: before.get(container), to: container.getBoundingClientRect().width };
+    const timing = { duration: OPEN_MS, easing: EASE };
+    const size = (w: number) => ({ minWidth: px(w), maxWidth: px(w) });
+
+    if (strip.from !== undefined) container.animate([size(strip.from), size(strip.to)], timing);
+
+    tabs.forEach((b, i) => {
+      const end = after[i];
+      if (b === button) {
+        b.animate(
+          [
+            {
+              ...size(0),
+              paddingLeft: '0px',
+              paddingRight: '0px',
+              // A new tab brings a 1px divider with it; starting 1px under
+              // nothing means the strip doesn't step when it lands.
+              marginLeft: '-1px',
+              marginRight: '0px',
+              opacity: 0,
+            },
+            {
+              ...size(end.width),
+              paddingLeft: end.paddingLeft,
+              paddingRight: end.paddingRight,
+              marginLeft: px(end.marginLeft),
+              marginRight: px(end.marginRight),
+              opacity: 1,
+            },
+          ],
+          timing,
+        );
+        return;
       }
-    };
-    animation.finished.then(release, release);
+      const room = before.get(b);
+      if (room === undefined) return;
+      // The room it took, in its margins now: a tab that just stopped being
+      // selected has gained margins, not width.
+      const from = room - end.marginLeft - end.marginRight;
+      if (Math.abs(from - end.width) < 0.1) return;
+      b.animate([size(from), size(end.width)], timing);
+    });
   });
 }
-
-/** The latest open animation holding each tab container's width. */
-const holds = new WeakMap<HTMLElement, symbol>();
 
 // -- Closing --
 
@@ -164,7 +201,9 @@ export function closeTab(model: Model, id: string, { pointer }: { pointer: boole
         paddingLeft: '0px',
         paddingRight: '0px',
         marginLeft: '0px',
-        marginRight: '0px',
+        // Its 1px divider goes when it leaves the model; ending 1px short
+        // means nothing steps when it does.
+        marginRight: '-1px',
         opacity: 0,
       },
     ],
@@ -204,10 +243,12 @@ function freeze(strip: HTMLElement) {
   );
   if (!squeezed) return;
 
-  const widths = buttons.map((b) => b.getBoundingClientRect().width);
+  // The room each tab takes, margins included: held that way (see
+  // flexlayout.css), a tab keeps its place when it becomes selected or stops
+  // being, as the closed tab's neighbour does.
+  const room = buttons.map(roomOf);
   buttons.forEach((b, i) => {
-    b.style.minWidth = px(widths[i]);
-    b.style.maxWidth = px(widths[i]);
+    b.style.setProperty('--tab-held', px(room[i]));
     b.dataset.tabFrozen = '';
   });
 
@@ -234,8 +275,7 @@ export function settle() {
   const buttons = buttonsIn(strip).filter((b) => b.dataset.tabFrozen !== undefined);
   const before = buttons.map((b) => b.getBoundingClientRect().width);
   for (const b of buttons) {
-    b.style.minWidth = '';
-    b.style.maxWidth = '';
+    b.style.removeProperty('--tab-held');
     delete b.dataset.tabFrozen;
   }
   if (!motionEnabled()) return;

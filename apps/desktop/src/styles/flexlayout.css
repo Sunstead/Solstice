@@ -121,11 +121,22 @@
 }
 
 /* tab button */
+/*
+ * Every tab takes the same room whether or not it is selected, so selecting
+ * one never nudges the others: an unselected tab is 12rem plus 2px margins
+ * (0.125rem, so the sums hold at any root size), the selected one 12.25rem
+ * with none. Its padding is the margins' worth larger, so the content boxes
+ * match, and flexbox shrinks by content box: a squeezed strip takes the same
+ * off both, and the labels sit at the same offset. The basis is the width:
+ * tabs sit at exactly 12rem whenever there is room, and only shrink,
+ * together, when there isn't.
+ */
 .flexlayout-custom .flexlayout__tab_button {
   position: relative;
-  flex: 1 1 0%;
+  flex: 0 1 12rem;
   height: 100%;
   min-width: 68px;
+  /* The width too: the strip sizes itself from it (fit-content). */
   width: 12rem;
   max-width: 12rem;
   padding-top: 0;
@@ -142,8 +153,8 @@
 .flexlayout-custom
   .flexlayout__tab_button:not(.flexlayout__tab_button--selected) {
   margin-bottom: 3px;
-  margin-left: 2px;
-  margin-right: 2px;
+  margin-left: 0.125rem;
+  margin-right: 0.125rem;
   height: 30px;
 }
 
@@ -156,10 +167,12 @@
 
 .flexlayout-custom .flexlayout__tab_button--selected {
   padding-bottom: 3px !important;
-  min-width: 70px;
-  max-width: calc(12rem + 4px);
-  padding-left: 10px;
-  padding-right: 6px;
+  flex: 0 1 12.25rem;
+  min-width: calc(68px + 0.25rem);
+  width: 12.25rem;
+  max-width: 12.25rem;
+  padding-left: calc(8px + 0.125rem);
+  padding-right: calc(4px + 0.125rem);
   gap: 8px;
 
   position: relative;
@@ -168,6 +181,22 @@
     -1px 0 0 0 var(--color-tab-outline),
     1px 0 0 0 var(--color-tab-outline),
     0 -1px 0 0 var(--color-tab-outline);
+}
+
+/*
+ * A tab held at its width while tabs close under the pointer
+ * (lib/tab-motion.ts). The hold is on the room it takes, margins included,
+ * so it survives the tab becoming selected or not.
+ */
+.flexlayout-custom .flexlayout__tab_button[data-tab-frozen] {
+  flex: none;
+  min-width: calc(var(--tab-held) - 0.25rem);
+  max-width: calc(var(--tab-held) - 0.25rem);
+}
+
+.flexlayout-custom .flexlayout__tab_button--selected[data-tab-frozen] {
+  min-width: var(--tab-held);
+  max-width: var(--tab-held);
 }
 
 .flexlayout-custom .flexlayout__tab_button_content {
@@ -206,6 +235,18 @@
   max-width: 100%;
   padding-left: calc(var(--tab-curve-r) + 2px);
   padding-right: calc(var(--tab-curve-r) + 2px);
+}
+
+/*
+ * Room for the + button beside the tabs (2rem, plus its 2px padding): the
+ * tabs shrink to leave it rather than pushing it out. Otherwise flexlayout
+ * docks it in the toolbar whenever the tabs only just don't fit, and back
+ * again, which a tab growing in or out crosses mid-animation.
+ */
+.flexlayout-custom
+  .flexlayout__tabset_tabbar_inner:has(> .flexlayout__tab_toolbar_sticky_buttons_container)
+  > .flexlayout__tabset_tabbar_inner_tab_container {
+  max-width: calc(100% - 2rem - 2px);
 }
 
 /* spacers/dividers: fixed size, never grow or shrink */
