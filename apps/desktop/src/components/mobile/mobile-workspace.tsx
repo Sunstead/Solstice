@@ -1,8 +1,9 @@
 import { useEffect, useReducer, useState } from 'react';
-import { ArrowLeft, Ellipsis, Menu } from 'lucide-react';
+import { ArrowLeft, CloudDownload, Ellipsis, FolderOpen, Menu, Plus } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { useSidebar } from '@sunstead/ui/components/resizable-sidebar';
+import { BlankTab } from '@/components/blank-tab';
 import { TabContent } from '@/components/tab-content';
 import { SyncIndicator } from '@/components/sync/status';
 import { WindowControls } from '@/components/window-controls';
@@ -15,6 +16,8 @@ import { runCommand } from '@/lib/commands';
 import { useSetting } from '@/lib/settings/store';
 import { useEntryInput } from '@/lib/stores/entry-input';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
+import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
+import { useWorkspace } from '@/hooks/use-workspace';
 import { MobileMenu } from './mobile-menu';
 import { TabSwitcher } from './tab-switcher';
 import { allTabs, shownTab, tabTitle } from './tabs';
@@ -55,12 +58,15 @@ export function MobileWorkspace() {
     if (creating) setOpenMobile(true);
   }, [creating, setOpenMobile]);
 
-  if (!model) return null;
+  if (!model) return <NoWorkspace />;
 
   return (
     <div className='flex h-full w-full flex-col'>
       <MobileTopBar />
-      <div className='relative min-h-0 flex-1 bg-background'>{shown && <TabContent key={shownId} node={shown} />}</div>
+      <div className='relative min-h-0 flex-1 bg-background'>
+        {/* No tabs: what an empty tab offers (new note, open one). */}
+        {shown ? <TabContent key={shownId} node={shown} /> : <BlankTab tabId='' />}
+      </div>
     </div>
   );
 }
@@ -115,5 +121,47 @@ function MobileTopBar() {
       <TabSwitcher model={model} shown={shown} open={tabsOpen} onOpenChange={setTabsOpen} />
       <MobileMenu open={menuOpen} onOpenChange={setMenuOpen} />
     </header>
+  );
+}
+
+/**
+ * Nothing open yet (a first launch on a phone): the drawer is closed and there
+ * are no tabs, so say so and offer the ways in.
+ */
+function NoWorkspace() {
+  const { setOpenMobile } = useSidebar();
+  const show = useWorkspaceDialogs((s) => s.show);
+  const openFolder = useWorkspace((s) => s.openFolder);
+
+  return (
+    <div className='flex h-full w-full flex-col'>
+      <header className='flex h-12 shrink-0 items-center gap-1 border-b bg-sidebar px-1.5'>
+        <Button variant='ghost' size='icon' onClick={() => setOpenMobile(true)}>
+          <Menu />
+          <span className='sr-only'>Open sidebar</span>
+        </Button>
+      </header>
+      <div className='flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-background p-6 text-center'>
+        <p className='text-sm text-muted-foreground'>No workspace open</p>
+        <div className='flex w-full max-w-64 flex-col gap-2'>
+          <Button onClick={() => show('new')}>
+            <Plus />
+            New workspace…
+          </Button>
+          {can.localFolders && (
+            <Button variant='outline' onClick={() => show('import')}>
+              <CloudDownload />
+              Import from sync…
+            </Button>
+          )}
+          {can.pickFolders && (
+            <Button variant='outline' onClick={() => void openFolder()}>
+              <FolderOpen />
+              Open folder…
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

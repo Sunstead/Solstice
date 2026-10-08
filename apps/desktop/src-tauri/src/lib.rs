@@ -81,7 +81,8 @@ pub fn run() {
 
     // Regenerates bindings.ts on every `tauri dev` build so the frontend
     // types can never drift from the Rust command/event definitions.
-    #[cfg(debug_assertions)]
+    // A phone's app runs in its sandbox, nowhere near the source tree.
+    #[cfg(all(debug_assertions, desktop))]
     {
         export_bindings(std::path::Path::new("../src/bindings.ts"));
         export_registry(std::path::Path::new(REGISTRY_PATH));
