@@ -19,6 +19,9 @@ import { MathBlockView } from '@/components/editor/math-block-view';
 import { math, mathBlockSchema } from '@/lib/math';
 import { autoPair } from '@/lib/autopair';
 import { callout } from '@/lib/callout';
+import { highlight, highlightSchema } from '@/lib/highlight';
+import { commentDecorations } from '@/lib/comment';
+import { blockIdDecorations } from '@/lib/blockid';
 import { frontmatter, frontmatterView } from '@/lib/frontmatter';
 import { footnote } from '@/lib/footnote';
 import { table } from '@/lib/table';
@@ -34,6 +37,16 @@ export interface EditorFeatureOptions {
   /** Absolute path of the note, for resolving and writing relative links. */
   notePath: string;
   nodeViewFactory: NodeViewFactory;
+}
+
+/**
+ * Marks that have to rank above commonmark's, so `.use()` before it. A mark's
+ * rank decides which of two nests outside the other when they're written
+ * back: ranked after `strong`, `==**a** b==` would come back as
+ * `**==a==** ==b==`.
+ */
+export function editorOuterMarks(): MilkdownPlugin[] {
+  return [highlightSchema].flat();
 }
 
 /**
@@ -60,6 +73,9 @@ export function editorSchemaPlugins(): MilkdownPlugin[] {
     math,
 
     link,
+    highlight,
+    commentDecorations,
+    blockIdDecorations,
     callout,
     taskList,
     table,

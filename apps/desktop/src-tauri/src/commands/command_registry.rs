@@ -68,6 +68,7 @@ command_id! {
     EditItalic => "edit.italic",
     EditInlineCode => "edit.inline_code",
     EditStrikethrough => "edit.strikethrough",
+    EditHighlight => "edit.highlight",
     EditFind => "edit.find",
 
     EditHeading1 => "edit.heading1",
@@ -88,6 +89,7 @@ command_id! {
     EditParagraph => "edit.paragraph",
     EditInsertImage => "edit.insert_image",
     EditInsertWikilink => "edit.insert_wikilink",
+    EditCopyBlockLink => "edit.copy_block_link",
 
     ViewToggleSidebar => "view.toggle_sidebar",
 
@@ -345,6 +347,12 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             accelerator: Some("CmdOrCtrl+Alt+X".into()),
             is_overridden: false,
         },
+        CommandMeta {
+            id: CommandId::EditHighlight,
+            label: "Highlight".into(),
+            accelerator: Some("CmdOrCtrl+Shift+H".into()),
+            is_overridden: false,
+        },
         // -- Editor --
         CommandMeta {
             id: CommandId::EditFind,
@@ -458,6 +466,12 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             id: CommandId::EditInsertWikilink,
             label: "Insert link to note...".into(),
             accelerator: Some("CmdOrCtrl+Shift+K".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::EditCopyBlockLink,
+            label: "Copy link to block".into(),
+            accelerator: None,
             is_overridden: false,
         },
         // -- View --

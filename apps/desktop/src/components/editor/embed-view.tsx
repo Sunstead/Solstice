@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useNodeViewContext } from '@prosemirror-adapter/react';
 import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
+import { stripComments } from '@/lib/comment';
 import type { Ctx } from '@milkdown/kit/ctx';
 import { DOMSerializer } from '@milkdown/kit/prose/model';
 import { openPath } from '@/lib/backend/shell';
@@ -21,6 +22,7 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { embedKind } from '@/lib/embed/kind';
 import {
   loadEmbedSource,
+  sliceBlock,
   sliceSection,
   subscribeToEmbedSources,
 } from '@/lib/embed/source';
@@ -127,6 +129,7 @@ export function createEmbedView(ctx: Ctx): React.FC {
               ctx={ctx}
               absolutePath={absolutePath}
               heading={parts.heading}
+              block={parts.block}
               workspaceRoot={workspaceRoot}
             />
           </EmbedChainContext.Provider>
@@ -173,11 +176,13 @@ function Transclusion({
   ctx,
   absolutePath,
   heading,
+  block,
   workspaceRoot,
 }: {
   ctx: Ctx;
   absolutePath: string;
   heading: string | null;
+  block: string | null;
   workspaceRoot: string | null;
 }) {
   const [markdown, setMarkdown] = useState<string | null>(null);
@@ -210,14 +215,18 @@ function Transclusion({
       return;
     }
 
-    const body = heading === null ? markdown : sliceSection(markdown, heading);
+    const body =
+      heading !== null ? sliceSection(markdown, heading) : block !== null ? sliceBlock(markdown, block) : markdown;
 
     if (body === null) {
-      host.textContent = `No section "${heading}" in ${basename(absolutePath)}`;
+      host.textContent =
+        heading !== null
+          ? `No section "${heading}" in ${basename(absolutePath)}`
+          : `No block "^${block}" in ${basename(absolutePath)}`;
       return;
     }
 
-    const doc = ctx.get(parserCtx)(body);
+    const doc = ctx.get(parserCtx)(stripComments(body));
     if (!doc) return;
 
     const schema = ctx.get(editorViewCtx).state.schema;
@@ -228,7 +237,7 @@ function Transclusion({
     rewriteStaticFragment(fragment, absolutePath, workspaceRoot);
 
     host.replaceChildren(fragment);
-  }, [ctx, markdown, heading, absolutePath, workspaceRoot]);
+  }, [ctx, markdown, heading, block, absolutePath, workspaceRoot]);
 
   return <div ref={hostRef} className='solstice-embed-note' />;
 }

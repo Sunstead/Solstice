@@ -167,6 +167,7 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                 Command(EditItalic),
                 Command(EditInlineCode),
                 Command(EditStrikethrough),
+                Command(EditHighlight),
                 Separator,
                 Submenu(
                     "Turn into",
@@ -190,6 +191,7 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                 Command(EditOutdent),
                 Separator,
                 Command(EditInsertWikilink),
+                Command(EditCopyBlockLink),
                 Command(EditInsertImage),
                 Command(EditHardBreak)
             ],

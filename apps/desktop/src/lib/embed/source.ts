@@ -112,3 +112,39 @@ export function sliceSection(markdown: string, heading: string): string | null {
 
   return start === -1 ? null : lines.slice(start).join('\n');
 }
+
+const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s/;
+
+/**
+ * The block a `^id` marks, for `![[note#^id]]`, without the marker: the
+ * paragraph or list item it ends, or, when it stands on a line of its own, the
+ * block just before it (a list, a table, a quote).
+ */
+export function sliceBlock(markdown: string, id: string): string | null {
+  const lines = markdown.split('\n');
+  const marker = new RegExp(`(?:^|\\s)\\^${id.replace(/[^A-Za-z0-9-]/g, '')}\\s*$`);
+  const blank = (line: string) => line.trim() === '';
+  let fenced = false;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (FENCE.test(lines[index])) fenced = !fenced;
+    if (fenced || !marker.test(lines[index])) continue;
+
+    const strip = (line: string) => line.replace(marker, '');
+    const alone = strip(lines[index]).trim() === '';
+
+    let end = alone ? index - 1 : index;
+    while (alone && end >= 0 && blank(lines[end])) end -= 1;
+    if (end < 0) return null;
+    if (!alone && LIST_ITEM.test(lines[index])) return strip(lines[index]).trimEnd();
+
+    let start = end;
+    while (start > 0 && !blank(lines[start - 1])) start -= 1;
+    if (!alone) while (end + 1 < lines.length && !blank(lines[end + 1])) end += 1;
+    return lines
+      .slice(start, end + 1)
+      .map((line, i) => (start + i === index ? strip(line).trimEnd() : line))
+      .join('\n');
+  }
+  return null;
+}

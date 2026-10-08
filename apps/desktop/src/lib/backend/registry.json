@@ -133,6 +133,12 @@
       "label": "Strikethrough"
     },
     {
+      "accelerator": "CmdOrCtrl+Shift+H",
+      "id": "edit.highlight",
+      "is_overridden": false,
+      "label": "Highlight"
+    },
+    {
       "accelerator": "CmdOrCtrl+F",
       "id": "edit.find",
       "is_overridden": false,
@@ -239,6 +245,12 @@
       "id": "edit.insert_wikilink",
       "is_overridden": false,
       "label": "Insert link to note..."
+    },
+    {
+      "accelerator": null,
+      "id": "edit.copy_block_link",
+      "is_overridden": false,
+      "label": "Copy link to block"
     },
     {
       "accelerator": "CmdOrCtrl+Shift+E",
@@ -635,6 +647,14 @@
             "label": "Strikethrough"
           }
         },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+Shift+H",
+            "id": "edit.highlight",
+            "is_overridden": false,
+            "label": "Highlight"
+          }
+        },
         "Separator",
         {
           "Submenu": {
@@ -763,6 +783,14 @@
             "id": "edit.insert_wikilink",
             "is_overridden": false,
             "label": "Insert link to note..."
+          }
+        },
+        {
+          "Command": {
+            "accelerator": null,
+            "id": "edit.copy_block_link",
+            "is_overridden": false,
+            "label": "Copy link to block"
           }
         },
         {

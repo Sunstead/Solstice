@@ -72,6 +72,8 @@ export interface WikilinkParts {
   /** The file part, with no heading or suffix. May be empty for `[[#here]]`. */
   path: string;
   heading: string | null;
+  /** A block reference, `#^id`, without its `^`. Never with a heading. */
+  block: string | null;
   /** Text after `|`: a display alias on a link, a size on an embed. */
   suffix: string | null;
 }
@@ -89,10 +91,13 @@ export function parseWikilinkTarget(raw: string): WikilinkParts {
   const suffix = pipe === -1 ? null : raw.slice(pipe + 1);
 
   const hash = head.indexOf('#');
+  const anchor = hash === -1 ? '' : head.slice(hash + 1).trim();
+  const isBlock = anchor.startsWith('^');
 
   return {
     path: (hash === -1 ? head : head.slice(0, hash)).trim(),
-    heading: hash === -1 ? null : head.slice(hash + 1).trim() || null,
+    heading: !isBlock && anchor ? anchor : null,
+    block: isBlock ? anchor.slice(1) || null : null,
     suffix,
   };
 }

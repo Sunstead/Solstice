@@ -41,6 +41,9 @@ pub struct WikilinkParts {
     /// The file part, with no heading or suffix. Empty for `[[#here]]`.
     pub path: String,
     pub heading: Option<String>,
+    /// A block reference, `#^id`, without its `^`. A link has a heading or a
+    /// block, never both.
+    pub block: Option<String>,
     /// Text after `|`: a display alias on a link, a size on an embed.
     pub suffix: Option<String>,
 }
@@ -52,19 +55,24 @@ pub fn parse_target(raw: &str) -> WikilinkParts {
         Some(i) => (&raw[..i], Some(raw[i + 1..].to_string())),
         None => (raw, None),
     };
-    let (path, heading) = match head.find('#') {
+    let (path, anchor) = match head.find('#') {
         Some(i) => {
-            let heading = head[i + 1..].trim();
-            (
-                &head[..i],
-                (!heading.is_empty()).then(|| heading.to_string()),
-            )
+            let anchor = head[i + 1..].trim();
+            (&head[..i], (!anchor.is_empty()).then_some(anchor))
         }
         None => (head, None),
+    };
+    let (heading, block) = match anchor {
+        Some(a) => match a.strip_prefix('^') {
+            Some(id) => (None, (!id.is_empty()).then(|| id.to_string())),
+            None => (Some(a.to_string()), None),
+        },
+        None => (None, None),
     };
     WikilinkParts {
         path: path.trim().to_string(),
         heading,
+        block,
         suffix,
     }
 }
@@ -250,9 +258,16 @@ mod tests {
             WikilinkParts {
                 path: String::new(),
                 heading: Some("here".into()),
+                block: None,
                 suffix: None
             }
         );
+        let p = parse_target("notes/spec#^a1b2|Alias");
+        assert_eq!(
+            (p.path.as_str(), p.heading, p.block.as_deref(), p.suffix.as_deref()),
+            ("notes/spec", None, Some("a1b2"), Some("Alias"))
+        );
+        assert_eq!(parse_target("todo#^").block, None);
         assert_eq!(
             parse_target("todo|the list").suffix.as_deref(),
             Some("the list")

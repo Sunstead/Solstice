@@ -7,7 +7,8 @@ import { resolveAsset } from '@/lib/image/resolve';
 import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { wikilink } from '@/lib/wikilink';
 import { parseWikilinkTarget, wikilinkLabel } from '@/lib/wikilink/target';
-import { editorSchemaPlugins } from './plugins';
+import { stripComments } from '@/lib/comment';
+import { editorOuterMarks, editorSchemaPlugins } from './plugins';
 
 /**
  * Markdown rendered to DOM, with no editor attached to anything.
@@ -39,6 +40,7 @@ function getRenderer(): Promise<Editor> {
       // the document for the parser and the schema to exist.
       ctx.set(rootCtx, document.createElement('div'));
     })
+    .use(editorOuterMarks())
     .use(commonmark)
     .use(gfm)
     .use(wikilink)
@@ -128,7 +130,7 @@ export async function renderMarkdownFragment(
   let rendered: DocumentFragment | null = null;
 
   editor.action((ctx) => {
-    const doc = ctx.get(parserCtx)(markdown);
+    const doc = ctx.get(parserCtx)(stripComments(markdown));
     if (!doc) return;
 
     const schema = ctx.get(editorViewCtx).state.schema;

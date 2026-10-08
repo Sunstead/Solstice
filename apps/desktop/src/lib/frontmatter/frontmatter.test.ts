@@ -46,9 +46,10 @@ describe('the editor', () => {
     const { commonmark } = await import('@milkdown/kit/preset/commonmark');
     const { gfm } = await import('@milkdown/kit/preset/gfm');
     const { wikilink } = await import('@/lib/wikilink');
-    const { editorSchemaPlugins } = await import('@/lib/editor/plugins');
+    const { editorOuterMarks, editorSchemaPlugins } = await import('@/lib/editor/plugins');
     editor = await Editor.make()
       .config((ctx) => ctx.set(rootCtx, document.createElement('div')))
+      .use(editorOuterMarks())
       .use(commonmark)
       .use(gfm)
       .use(wikilink)
