@@ -2,14 +2,14 @@ import { useRef, useState } from 'react';
 import { ChevronLeft, ChevronsUpDown, LogIn, LogOut } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
-import { useAccountActions } from '@/components/account-button';
+import { useAccountActions } from '@/hooks/use-account-actions';
 import { customPanes } from '@/components/settings/panes';
 import { SettingsPane } from '@/components/settings/settings-pane';
 import { SettingsSearch } from '@/components/settings/settings-search';
 import { SettingsSearchResults } from '@/components/settings/settings-search-results';
 import { SyncStatusLine } from '@/components/sync/status';
 import { UserAvatar } from '@/components/user-avatar';
-import { useWorkspaceChoices } from '@/components/workspace-switcher';
+import { useWorkspaceChoices } from '@/hooks/use-workspace-choices';
 import { can } from '@/lib/backend/platform';
 import { getSection, settingsSections, type SectionId } from '@/lib/settings/sections';
 import { usePhoneNav } from '@/lib/stores/phone-nav';

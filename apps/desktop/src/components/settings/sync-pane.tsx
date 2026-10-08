@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, RefreshCw } from 'lucide-react';
 
 import { commands } from '@/lib/backend';
+import { deviceNoun } from '@/lib/backend/platform';
 import { type SyncServerInfo } from '@/bindings';
 import { Button } from '@sunstead/ui/components/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@sunstead/ui/components/collapsible';
@@ -139,7 +140,7 @@ function LocalWorkspace({ server, workspace }: { server: string; workspace: stri
     <Card>
       <div className='flex items-center gap-3'>
         <p className='min-w-0 flex-1'>
-          <span className='font-medium'>{workspace}</span> is only on this computer.
+          <span className='font-medium'>{workspace}</span> is only on this {deviceNoun}.
         </p>
         <Button size='sm' onClick={() => setOpen(true)}>
           Start syncing…
@@ -198,7 +199,7 @@ function SyncedWorkspace({
       {confirm ? (
         <div className='flex flex-col gap-2 rounded-md bg-muted/50 p-3'>
           <p>
-            Stop syncing {workspace}? Its files stay on this computer, and the vault stays on the server.
+            Stop syncing {workspace}? Its files stay on this {deviceNoun}, and the vault stays on the server.
           </p>
           <div className='flex gap-2'>
             {stop}
@@ -216,7 +217,7 @@ function SyncedWorkspace({
             </Button>
           )}
           {stop}
-          <span className='ml-auto text-xs text-muted-foreground'>This computer appears as {info.device}</span>
+          <span className='ml-auto text-xs text-muted-foreground'>This {deviceNoun} appears as {info.device}</span>
         </div>
       )}
     </Card>

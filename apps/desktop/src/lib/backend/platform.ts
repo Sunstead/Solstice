@@ -35,3 +35,6 @@ export const can = {
   /** Linking folders to a sync server; the web app is the server's own. */
   syncSettings: shell !== 'web',
 } as const;
+
+/** What to call the machine the app is on, in sentences ("on this computer"). */
+export const deviceNoun = shell === 'mobile' ? 'device' : 'computer';

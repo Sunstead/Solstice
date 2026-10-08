@@ -19,7 +19,7 @@ import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { useSync } from '@/lib/stores/sync';
 import { cn } from '@/lib/utils';
 import { host, useSyncAccount, useWorkspaceParent } from './helpers';
-import { can } from '@/lib/backend/platform';
+import { can, deviceNoun } from '@/lib/backend/platform';
 import { LocationField, SyncSignIn } from './shared';
 
 /**
@@ -99,8 +99,8 @@ export function ImportFromSyncForm({ onDone }: { onDone: () => void }) {
       <DialogHeader>
         <DialogTitle>Import from sync</DialogTitle>
         <DialogDescription>
-          Download a vault from {account.server ? host(account.server) : 'the sync server'} into a new folder on this
-          computer. It stays linked, so changes sync both ways.
+          Download a vault from {account.server ? host(account.server) : 'the sync server'} into a new folder on this{' '}
+          {deviceNoun}. It stays linked, so changes sync both ways.
         </DialogDescription>
       </DialogHeader>
 

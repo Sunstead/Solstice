@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef } from 'react';
 import { Files, Search } from 'lucide-react';
 
-import { useAccountActions } from '@/components/account-button';
+import { useAccountActions } from '@/hooks/use-account-actions';
 import { BlankTab } from '@/components/blank-tab';
 import { TabContent } from '@/components/tab-content';
 import { UserAvatar } from '@/components/user-avatar';
@@ -16,7 +16,8 @@ import { useRevealTarget } from '@/lib/stores/reveal-target';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { cn } from '@/lib/utils';
 import { FilesPage } from './files-page';
-import { NoteHeader, tabPath } from './note-pane';
+import { NoteHeader } from './note-pane';
+import { tabPath } from './phone-history';
 import { HEADER_HEIGHT } from './phone-parts';
 import { PushPane } from './push-pane';
 import { SearchPage } from './search-page';

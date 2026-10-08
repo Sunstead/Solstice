@@ -11,6 +11,7 @@ import { bumpResync } from '@/lib/stores/external-changes';
 import { isSamePath } from '@/lib/path-utils';
 import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
+import { useSync } from '@/lib/stores/sync';
 
 /**
  * Bridges the Rust filesystem watcher to `applyFsChanges`, and re-reads the
@@ -26,6 +27,7 @@ let unlistenChanges: (() => void) | null = null;
 let unlistenFocus: (() => void) | null = null;
 let unsubscribeSetting: (() => void) | null = null;
 let unsubscribeWorkspace: (() => void) | null = null;
+let unsubscribeSync: (() => void) | null = null;
 let starting: Promise<void> | null = null;
 
 // Rust already debounced these. This only merges flushes that land in the same
@@ -87,6 +89,13 @@ export function startFsWatch(): Promise<void> {
       if (state.path !== prev.path) applyWatchSetting();
     });
 
+    // What sync downloads lands on disk behind the app's back. The watcher
+    // usually reports it, but a phone has no watcher and an import's first
+    // download can outrun one; once sync settles, read the folder again.
+    unsubscribeSync = useSync.subscribe((state, prev) => {
+      if (state.info?.state === 'synced' && prev.info?.state !== 'synced') void resyncFromDisk(true);
+    });
+
     applyWatchSetting();
   })();
 
@@ -115,10 +124,12 @@ export function stopFsWatch(): void {
   unlistenFocus?.();
   unsubscribeSetting?.();
   unsubscribeWorkspace?.();
+  unsubscribeSync?.();
   unlistenChanges = null;
   unlistenFocus = null;
   unsubscribeSetting = null;
   unsubscribeWorkspace = null;
+  unsubscribeSync = null;
 
   if (flushTimer !== null) {
     clearTimeout(flushTimer);

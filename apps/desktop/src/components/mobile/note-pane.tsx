@@ -5,27 +5,15 @@ import { ArrowLeft, ArrowRight, ChevronLeft, Ellipsis } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@sunstead/ui/components/sheet';
 import { SyncIndicator } from '@/components/sync/status';
-import { useLayout } from '@/hooks/use-layout';
 import { targetFromPath } from '@/lib/entry-actions';
 import { useEntryMenuItems, type EntryMenuItem } from '@/lib/entry-menu-items';
 import { getFileNameFromPath } from '@/lib/path-utils';
+import { stepHistory, tabPath } from './phone-history';
 import { useSetting } from '@/lib/settings/store';
 import { usePhoneNav } from '@/lib/stores/phone-nav';
 import { PhoneHeader, PhoneTitle, Row, RowGroup } from './phone-parts';
 import { TabSwitcher } from './tab-switcher';
 import { allTabs, tabTitle } from './tabs';
-
-/** The path the shown tab has open, if it's a file. */
-export function tabPath(tab: TabNode | null): string | null {
-  const path = (tab?.getConfig() as { path?: string } | undefined)?.path;
-  return tab?.getComponent() === 'editor' && path ? path : null;
-}
-
-/** Steps through the notes this phone has shown, opening each in place. */
-export function stepHistory(direction: 'back' | 'forward', current: string | null) {
-  const path = usePhoneNav.getState().step(direction, current);
-  if (path) useLayout.getState().openFile(path, getFileNameFromPath(path));
-}
 
 /** The note's top bar: back to the files, its name, sync, its tabs, and what can be done with it. */
 export function NoteHeader({ model, shown }: { model: Model; shown: TabNode | null }) {
@@ -89,7 +77,7 @@ function NoteActions({
         className='max-h-[85dvh] gap-0 rounded-t-xl pb-[env(safe-area-inset-bottom)]'
       >
         <SheetHeader className='pb-2'>
-          <SheetTitle className='truncate'>{path ? getFileNameFromPath(path) : 'Tab'}</SheetTitle>
+          <SheetTitle className='truncate'>{path ? getFileNameFromPath(path).replace(/\.md$/i, '') : 'Tab'}</SheetTitle>
           <SheetDescription className='sr-only'>Actions for this note</SheetDescription>
         </SheetHeader>
         <div className='flex min-h-0 flex-col gap-5 overflow-y-auto px-4 pb-4'>

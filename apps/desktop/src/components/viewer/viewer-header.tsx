@@ -4,6 +4,7 @@ import { FindBar } from '@/components/find-bar';
 import { revealInExplorer } from '@/lib/entry-actions';
 import { useFindStore } from '@/lib/stores/find';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 
 type ViewerHeaderProps = {
   path: string;
@@ -38,6 +39,21 @@ export function ViewerHeader({
   leading,
 }: ViewerHeaderProps) {
   const findOpen = useFindStore((s) => s.openPath === path);
+  // A phone's note pane has its own header with the name and the actions; only
+  // the find bar is left to hang here.
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <div className={cn('z-10 h-0', sticky ? 'sticky top-0' : 'relative')}>
+        {find && findOpen && (
+          <div className='absolute top-2 right-3 left-3 z-20 flex justify-end'>
+            <FindBar onClose={() => useFindStore.getState().close()} />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div

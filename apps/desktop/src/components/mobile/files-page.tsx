@@ -3,8 +3,9 @@ import { Check, ChevronDown, CloudDownload, FolderOpen, Plus } from 'lucide-reac
 
 import { Button } from '@sunstead/ui/components/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sunstead/ui/components/sheet';
-import { ExplorerTree, useCreateActions } from '@/components/explorer-sidebar';
-import { useWorkspaceChoices } from '@/components/workspace-switcher';
+import { ExplorerTree } from '@/components/explorer-sidebar';
+import { useCreateActions } from '@/hooks/use-create-actions';
+import { useWorkspaceChoices } from '@/hooks/use-workspace-choices';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { can } from '@/lib/backend/platform';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';

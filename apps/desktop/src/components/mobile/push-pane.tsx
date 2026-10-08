@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/immutability -- moving DOM nodes (its own and the page behind) is this component's whole job */
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 
 import { motionEnabled } from '@/lib/tab-motion';
 import { cn } from '@/lib/utils';
@@ -110,10 +110,8 @@ export function PushPane({
     );
   };
 
-  // The owner opened or closed it.
-  useEffect(() => {
-    if (open) setPresent(true);
-  }, [open]);
+  // Opening mounts it; closing unmounts it once it's slid away (`finish`).
+  if (open && !present) setPresent(true);
   const mounted = present || keepMounted;
   const first = useRef(true);
   useLayoutEffect(() => {

@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { LogIn, LogOut, Settings2 } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
@@ -11,93 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@sunstead/ui/components/dropdown-menu';
-import { commands, events } from '@/lib/backend';
 import { can } from '@/lib/backend/platform';
-import { signOut } from '@/lib/backend/web/account';
-import { useAccount } from '@/lib/stores/account';
-import { useSync } from '@/lib/stores/sync';
-import { needsAttention } from '@/components/sync/describe';
 import { UserAvatar } from '@/components/user-avatar';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
-import { useSetting } from '@/lib/settings/store';
-
-function host(server: string) {
-  try {
-    return new URL(server).host;
-  } catch {
-    return server;
-  }
-}
-
-/**
- * Who's signed in to the sync server, and signing in or out: the rail's
- * account button and the phone's You page.
- */
-export function useAccountActions() {
-  const configured = useSetting('sync.server');
-  // The web app's server is the page's own origin.
-  const server = can.syncSettings ? configured : location.origin;
-  const { username, error, loaded, refresh } = useAccount();
-  const openSettings = useSettingsDialog((s) => s.openSettings);
-  const attention = useSync((s) => needsAttention(s.info));
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
-
-  useEffect(() => {
-    void refresh(server);
-    const unlisten = events.syncChanged.listen(() => void refresh(server));
-    return () => void unlisten.then((stop) => stop());
-  }, [server, refresh]);
-
-  const signIn = async () => {
-    if (!server) {
-      openSettings('sync');
-      return;
-    }
-    setBusy(true);
-    setFailure(null);
-    const result = await commands.syncSignIn(server);
-    if (result.status === 'error') setFailure(result.error);
-    await refresh(server);
-    setBusy(false);
-  };
-
-  const leave = async () => {
-    setBusy(true);
-    setFailure(null);
-    if (can.syncSettings) {
-      const result = await commands.syncSignOut(server);
-      if (result.status === 'error') setFailure(result.error);
-      await refresh(server);
-    } else {
-      await signOut();
-    }
-    setBusy(false);
-  };
-
-  const status = username
-    ? null
-    : !server
-      ? 'No sync server set'
-      : error
-        ? `Can't reach ${host(server)}`
-        : loaded
-          ? 'Not signed in'
-          : 'Checking…';
-
-  return {
-    server,
-    host: server ? host(server) : null,
-    username,
-    status,
-    attention,
-    busy,
-    failure,
-    signIn,
-    signOut: leave,
-    refresh: () => void refresh(server),
-  };
-}
+import { useAccountActions } from '@/hooks/use-account-actions';
 
 /**
  * The rail's account button: who's signed in to the sync server, and signing
@@ -105,7 +21,7 @@ export function useAccountActions() {
  */
 export function AccountButton() {
   const openSettings = useSettingsDialog((s) => s.openSettings);
-  const { server, username, status, attention, busy, failure, signIn, signOut: leave, refresh } = useAccountActions();
+  const { host, username, status, attention, busy, failure, signIn, signOut: leave, refresh } = useAccountActions();
 
   return (
     <DropdownMenu onOpenChange={(open) => open && refresh()}>
@@ -127,7 +43,7 @@ export function AccountButton() {
               ) : (
                 <span className='text-sm text-foreground'>{status}</span>
               )}
-              {server && <span className='truncate text-xs text-muted-foreground'>{host(server)}</span>}
+              {host && <span className='truncate text-xs text-muted-foreground'>{host}</span>}
               {failure && <span className='text-xs text-destructive'>{failure}</span>}
             </span>
           </DropdownMenuLabel>
