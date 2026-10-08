@@ -78,12 +78,16 @@
       -webkit-user-select: none;
       user-select: none;
     }
-    /* iOS zooms into any field under 16px when it's focused. */
-    input,
-    textarea,
-    select {
-      font-size: max(16px, 1em);
-    }
+  }
+}
+
+/* iOS zooms into any field under 16px when it's focused. Unlayered, so it
+   beats the text-sm the fields carry. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
   }
 }
 
