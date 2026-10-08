@@ -19,6 +19,7 @@ import { MathBlockView } from '@/components/editor/math-block-view';
 import { math, mathBlockSchema } from '@/lib/math';
 import { autoPair } from '@/lib/autopair';
 import { callout } from '@/lib/callout';
+import { frontmatter, frontmatterView } from '@/lib/frontmatter';
 import { footnote } from '@/lib/footnote';
 import { table } from '@/lib/table';
 import { taskList } from '@/lib/tasklist';
@@ -47,6 +48,8 @@ export interface EditorFeatureOptions {
  */
 export function editorSchemaPlugins(): MilkdownPlugin[] {
   return [
+    frontmatter,
+
     imageWithSize,
     insertImageWithSizeInputRule,
 
@@ -80,6 +83,8 @@ export function createEditorFeatures({
 }: EditorFeatureOptions): MilkdownPlugin[] {
   return [
     ...editorSchemaPlugins(),
+
+    frontmatterView,
 
     $view(imageWithSize.node, () => nodeViewFactory({ component: ImageView })),
 

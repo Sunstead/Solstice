@@ -3,6 +3,7 @@ import { FileWarning } from 'lucide-react';
 
 import { commands } from '@/lib/backend';
 import { ExternalChangeBar } from '@/components/external-change-bar';
+import { SaveFailedBar } from '@/components/save-failed-bar';
 import { Button } from '@sunstead/ui/components/button';
 import { ViewerFrame } from '@/components/viewer/viewer-frame';
 import { useExternalFileChanges } from '@/hooks/use-external-file-changes';
@@ -13,6 +14,7 @@ import { serializeCanvas } from '@/lib/canvas/serialize';
 import { createCanvasStore, type CanvasStore } from '@/lib/canvas/store';
 import { CanvasStoreProvider } from '@/lib/canvas/use-canvas-store';
 import { abandonPendingWrites, clearAbandoned } from '@/lib/stores/external-changes';
+import { useSaveFailure } from '@/lib/stores/save-status';
 import { CanvasBoard } from './canvas-board';
 import '@/styles/canvas.css';
 
@@ -93,9 +95,7 @@ function LoadedCanvas({
     // Serialized rather than the raw bytes, so `getLastWritten()` compares
     // like with like even when the file arrived with a different key order.
     const initialText = serializeCanvas(parsed.doc, parsed.indent);
-    const saver = createAutosaver(path, initialText, (message) =>
-      console.error(`[canvas] write to "${path}" failed:`, message),
-    );
+    const saver = createAutosaver(path, initialText);
     autosaver.current = saver;
 
     return createCanvasStore(parsed.doc, (next) => {
@@ -121,14 +121,8 @@ function LoadedCanvas({
 
   useEffect(() => {
     const saver = autosaver.current;
-    // A tab closed mid-edit still has to land its last write.
-    const flush = () => saver?.flush();
-    window.addEventListener('beforeunload', flush);
-
-    return () => {
-      window.removeEventListener('beforeunload', flush);
-      saver?.dispose();
-    };
+    // A tab closed mid-edit still has to land its last write; dispose flushes.
+    return () => saver?.dispose();
   }, []);
 
   /** Semantic comparison: whitespace and key order are not a conflict. */
@@ -186,6 +180,8 @@ function LoadedCanvas({
     autosaver.current?.flush();
   }, [keepMine, path, store]);
 
+  const saveFailure = useSaveFailure(path);
+
   const handleCloseTab = useCallback(() => {
     abandonPendingWrites(path);
     dismiss();
@@ -194,14 +190,19 @@ function LoadedCanvas({
 
   return (
     <ViewerFrame path={path}>
-      {status.kind !== 'none' && (
+      {(status.kind !== 'none' || saveFailure) && (
         <div className='absolute inset-x-0 top-0 z-30'>
-          <ExternalChangeBar
-            variant={status.kind}
-            onReload={reload}
-            onKeepMine={handleKeepMine}
-            onClose={handleCloseTab}
-          />
+          {status.kind !== 'none' && (
+            <ExternalChangeBar
+              variant={status.kind}
+              onReload={reload}
+              onKeepMine={handleKeepMine}
+              onClose={handleCloseTab}
+            />
+          )}
+          {saveFailure && (
+            <SaveFailedBar message={saveFailure} onRetry={() => autosaver.current?.retry()} />
+          )}
         </div>
       )}
 

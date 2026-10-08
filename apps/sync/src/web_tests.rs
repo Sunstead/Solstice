@@ -111,6 +111,19 @@ async fn a_vault_read_and_changed_from_the_web() {
     let second = json_of(save("one\ntwo\nthree\n", &base).await.unwrap()).await;
     assert_eq!(second["text"], "ONE\ntwo\nthree\n");
 
+    // A save sent again (its reply was lost) lands once.
+    let from = second["base"].as_str().unwrap().to_owned();
+    let resend = || {
+        web(&c, reqwest::Method::PUT, format!("{v}/notes/plans/Plan.md"))
+            .json(&json!({ "text": "ONE\ntwo\nthree\nX\n", "base": from, "save_id": "s1" }))
+            .send()
+    };
+    let once = json_of(resend().await.unwrap()).await;
+    assert_eq!(once["text"], "ONE\ntwo\nthree\nX\n");
+    let twice = json_of(resend().await.unwrap()).await;
+    assert_eq!(twice["text"], "ONE\ntwo\nthree\nX\n");
+    let second = twice;
+
     // A base that isn't one: refused, not guessed at.
     let res = save("x", "garbage").await.unwrap();
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);

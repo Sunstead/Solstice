@@ -1,0 +1,50 @@
+/*
+ * A note's front matter, read-only: collapsed to its keys, opening onto the
+ * YAML as written.
+ */
+
+.solstice-frontmatter {
+  margin-block: 0 1.25em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 0.5rem);
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 0.875em;
+}
+
+.solstice-frontmatter > summary {
+  display: flex;
+  gap: 0.75em;
+  align-items: baseline;
+  padding: 0.375em 0.75em;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.solstice-frontmatter > summary > :first-child {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.solstice-frontmatter-keys {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typeset .solstice-frontmatter > pre {
+  margin: 0;
+  padding: 0.5em 0.75em 0.625em;
+  border: 0;
+  border-top: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+  border-radius: 0;
+  background: none;
+  font-family: var(--editor-font-mono, var(--font-mono));
+  white-space: pre-wrap;
+}
+
+/* An embedded note shows its content, as Obsidian does. */
+.solstice-embed .solstice-frontmatter {
+  display: none;
+}

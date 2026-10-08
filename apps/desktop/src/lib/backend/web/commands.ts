@@ -16,15 +16,15 @@ import type {
 } from '@/bindings';
 import type { Commands } from '../index';
 import registry from '../registry.json';
-import { api, apiJson, ApiError, messageOf } from './api';
+import { api, apiJson, messageOf } from './api';
 import { Emitter } from './emitter';
+import { forgetBase, moved, readNote, saveFile } from './notes';
 import { attachmentName } from './shell';
 import {
   createVault,
   currentSocketState,
   currentVault,
   exists,
-  fsChanged,
   listDirectory,
   listRecursive,
   open,
@@ -49,45 +49,6 @@ const desktopOnly = (what: string) =>
   Promise.resolve<Result<never>>({ status: 'error', error: `${what} is only in the desktop app.` });
 
 const isNote = (path: string) => path.toLowerCase().endsWith('.md');
-
-/** Where each open note's text was when it was read: its saves go against it. */
-const bases = new Map<string, string>();
-
-interface NoteReply {
-  path: string;
-  text: string;
-  base: string;
-}
-
-async function readNote(path: string): Promise<string> {
-  const { vault, rel } = await resolve(path);
-  const note = await apiJson<NoteReply>(vaultUrl(vault, 'notes', rel));
-  bases.set(path, note.base);
-  return note.text;
-}
-
-async function writeNote(path: string, text: string): Promise<void> {
-  const { vault, rel } = await resolve(path);
-  try {
-    const note = await apiJson<NoteReply>(vaultUrl(vault, 'notes', rel), {
-      method: 'PUT',
-      json: { text, base: bases.get(path) ?? null },
-    });
-    bases.set(path, note.base);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 409) {
-      // Its history moved on in a way this save can't merge into: read it
-      // again, and let the editor pick up what's there now.
-      bases.delete(path);
-      await readNote(path).catch(() => {});
-      fsChanged.emit({
-        root: rootOf(vault),
-        changes: [{ kind: 'Modified', path, from: null, entry: null }],
-      });
-    }
-    throw error;
-  }
-}
 
 async function writeBytes(path: string, body: BodyInit, fresh: boolean): Promise<string> {
   const { vault, rel } = await resolve(path);
@@ -173,8 +134,7 @@ export const webCommands: Commands = {
     }),
   writeFile: (path, contents) =>
     attempt(async () => {
-      if (isNote(path)) await writeNote(path, contents);
-      else await writeBytes(path, contents, false);
+      await saveFile(path, contents, isNote(path));
       return null;
     }),
   createFile: (path) =>
@@ -192,8 +152,7 @@ export const webCommands: Commands = {
   renamePath: (oldPath, newPath) =>
     attempt(async () => {
       await op(oldPath, { op: 'rename', ...(await sameVault(oldPath, newPath)) });
-      const base = bases.get(oldPath);
-      if (base) bases.set(newPath, base);
+      await moved(oldPath, newPath);
       return null;
     }),
   deleteFile: (path) =>
@@ -314,7 +273,7 @@ export const webCommands: Commands = {
       const vault = currentVault();
       if (!vault) throw new Error('No vault is open.');
       await apiJson(vaultUrl(vault, 'reviews', id), { method: 'POST', json: { text } });
-      bases.delete(`${rootOf(vault)}/${id}`);
+      forgetBase(`${rootOf(vault)}/${id}`);
       return null;
     }),
   // Saves carry the base read with the note; nothing to record up front.
