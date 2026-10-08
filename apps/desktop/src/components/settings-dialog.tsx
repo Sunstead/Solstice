@@ -94,8 +94,9 @@ export function SettingsDialog() {
         ref={panelRef}
         initialFocus={panelRef}
         showCloseButton={false}
-        // Full screen on a phone: a dialog inset from its edges wastes the width.
-        className='flex h-[min(92svh,860px)] w-[calc(100%-2rem)] flex-col overflow-hidden bg-background p-0 max-sm:h-dvh max-sm:w-full max-sm:max-w-none max-sm:rounded-none max-sm:border-0 max-sm:ring-0 sm:max-w-6xl'
+        // Full screen on a phone: a dialog inset from its edges wastes the
+        // width. Full screen, it also pads for the status bar and home indicator.
+        className='flex h-[min(92svh,860px)] w-[calc(100%-2rem)] flex-col overflow-hidden bg-background p-0 max-sm:h-dvh max-sm:w-full max-sm:max-w-none max-sm:rounded-none max-sm:border-0 max-sm:ring-0 max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[env(safe-area-inset-bottom)] sm:max-w-6xl'
       >
         <DialogTitle className='sr-only'>Settings</DialogTitle>
         <DialogDescription className='sr-only'>
