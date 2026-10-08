@@ -259,6 +259,12 @@
       "label": "Toggle sidebar"
     },
     {
+      "accelerator": "Alt+/",
+      "id": "view.toggle_source_mode",
+      "is_overridden": false,
+      "label": "Source mode"
+    },
+    {
       "accelerator": "Alt+ArrowLeft",
       "id": "navigation.back",
       "is_overridden": false,
@@ -542,6 +548,14 @@
             "id": "view.toggle_sidebar",
             "is_overridden": false,
             "label": "Toggle sidebar"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "Alt+/",
+            "id": "view.toggle_source_mode",
+            "is_overridden": false,
+            "label": "Source mode"
           }
         },
         "Separator",

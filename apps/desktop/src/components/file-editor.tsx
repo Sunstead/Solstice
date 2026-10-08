@@ -3,23 +3,29 @@ import { commands, unwrap } from '@/lib/backend';
 
 import { ScrollArea } from '@sunstead/ui/components/scroll-area';
 import { MilkdownEditorWrapper } from './milkdown-editor';
+import { SourceEditor } from './source-editor';
+import { takeHandoff } from '@/lib/stores/editor-text';
 import { ViewerHeader } from './viewer/viewer-header';
 import { LinkEditor } from './link-editor';
 import { TableTools } from './table-tools';
 
 type FileEditorProps = {
   path: string;
+  /** Raw markdown in CodeMirror rather than the rich editor. */
+  source?: boolean;
 };
 
-export function FileEditor({ path }: FileEditorProps) {
-  const [content, setContent] = useState<string | null>(null);
+export function FileEditor({ path, source = false }: FileEditorProps) {
+  // Switching modes hands over the other editor's text, which is newer than
+  // the file while its last save is on the way.
+  const [handed] = useState(() => takeHandoff(path));
+  const [content, setContent] = useState<string | null>(handed);
   const [error, setError] = useState<string | null>(null);
 
-  // Load file content
+  // Load file content. FileView keys this by path, so it runs once.
   useEffect(() => {
     let cancelled = false;
-    setContent(null); // reset so a stale doc from the previous file never flashes
-    if (!path) return;
+    if (!path || handed !== null) return;
 
     unwrap(commands.readFile(path))
       .then((text) => {
@@ -32,7 +38,7 @@ export function FileEditor({ path }: FileEditorProps) {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [path, handed]);
 
   if (error) {
     return (
@@ -52,10 +58,11 @@ export function FileEditor({ path }: FileEditorProps) {
       <div className='flex flex-col min-h-full pb-[env(safe-area-inset-bottom)]'>
         <ViewerHeader path={path} sticky find />
         <div className='typeset w-full flex-1 flex flex-col relative'>
-          <MilkdownEditorWrapper
-            path={path}
-            initialContent={content}
-          />
+          {source ? (
+            <SourceEditor path={path} initialContent={content} />
+          ) : (
+            <MilkdownEditorWrapper path={path} initialContent={content} />
+          )}
           {/* Positions itself against the viewport, so it can live anywhere. */}
           <LinkEditor />
           <TableTools />

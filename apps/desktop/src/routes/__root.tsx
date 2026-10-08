@@ -27,6 +27,7 @@ import { WorkspaceDialogs } from '@/components/workspace-dialogs';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
 import { answerPick, useNotePicker } from '@/lib/stores/note-picker';
 import { useVisualViewport } from '@/hooks/use-visual-viewport';
+import { useSourceModeCommand } from '@/hooks/use-source-mode';
 import { KeyboardBar } from '@/components/mobile/keyboard-bar';
 import { SlashMenu } from '@/components/editor/slash-menu';
 
@@ -57,6 +58,7 @@ export const Route = createRootRoute({
 
     useDevicePixelRatio();
     useVisualViewport();
+    useSourceModeCommand();
     useFileCommands();
     useThemeEffect();
     useSettingsDomBindings();

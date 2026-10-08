@@ -14,14 +14,15 @@ import { embedKind } from '@/lib/embed/kind';
  * showing the image. Classification reuses the embed table, so a file type
  * that can be embedded in a note can also be opened on its own.
  */
-export const FileView: React.FC<{ path: string }> = ({ path }) => {
+export const FileView: React.FC<{ path: string; source?: boolean }> = ({ path, source = false }) => {
   // An empty config path is a tab pointing at nothing; `embedKind` calls that
   // a note (extensionless targets are notes) and would boot an editor over it.
   if (!path) return <UnsupportedViewer path='' />;
 
   switch (embedKind(path)) {
     case 'markdown':
-      return <FileEditor path={path} />;
+      // Keyed, so another file or mode starts afresh.
+      return <FileEditor key={`${source ? 'source' : 'rich'}:${path}`} path={path} source={source} />;
     case 'image':
       return <ImageViewer path={path} />;
     case 'video':
