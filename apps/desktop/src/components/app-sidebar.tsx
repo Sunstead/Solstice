@@ -68,7 +68,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       mobileWidth='min(85vw, 20rem)'
       className={cn(
         'overflow-hidden *:data-[sidebar=sidebar]:flex-row',
-        isMobile && 'data-[side=left]:w-(--sidebar-width) data-[side=left]:max-w-none',
+        isMobile &&
+          'data-[side=left]:w-(--sidebar-width) data-[side=left]:max-w-none pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]',
       )}
       {...props}
     >

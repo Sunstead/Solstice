@@ -48,7 +48,8 @@ export function FileEditor({ path }: FileEditorProps) {
 
   return (
     <ScrollArea className='h-full'>
-      <div className='flex flex-col min-h-full'>
+      {/* Its end scrolls clear of the home indicator. */}
+      <div className='flex flex-col min-h-full pb-[env(safe-area-inset-bottom)]'>
         <ViewerHeader path={path} sticky find />
         <div className='typeset w-full flex-1 flex flex-col relative'>
           <MilkdownEditorWrapper

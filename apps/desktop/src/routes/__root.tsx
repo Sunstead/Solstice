@@ -25,6 +25,10 @@ import { useDeepLinks } from '@/hooks/use-deep-links';
 import { useSyncStatus } from '@/lib/stores/sync';
 import { WorkspaceDialogs } from '@/components/workspace-dialogs';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
+import { answerPick, useNotePicker } from '@/lib/stores/note-picker';
+import { useVisualViewport } from '@/hooks/use-visual-viewport';
+import { KeyboardBar } from '@/components/mobile/keyboard-bar';
+import { SlashMenu } from '@/components/editor/slash-menu';
 
 export const Route = createRootRoute({
   // Named, so the hooks linter knows it's a component.
@@ -46,11 +50,13 @@ export const Route = createRootRoute({
     const hydrated = uiHydrated && settingsLoaded;
 
     const [quickOpenOpen, setQuickOpenOpen] = useState(false);
+    const picking = useNotePicker((s) => s.resolve !== null);
     const openFile = useLayout((s) => s.openFile);
 
     const openFolder = useWorkspace((s) => s.openFolder);
 
     useDevicePixelRatio();
+    useVisualViewport();
     useFileCommands();
     useThemeEffect();
     useSettingsDomBindings();
@@ -123,19 +129,24 @@ export const Route = createRootRoute({
 
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className='h-dvh bg-sidebar text-foreground flex flex-col overflow-hidden'>
+        {/* Insets: a home-screen app draws under the status bar and, in
+            landscape, beside the notch. The bottom one is left to what
+            scrolls, so content runs under the home indicator. */}
+        <div className='h-[var(--app-height,100dvh)] bg-sidebar text-foreground flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]'>
           <SidebarProvider
             key={hydrated ? 'hydrated' : 'initial'}
             open={!sidebarCollapsed}
             onOpenChange={(open) => setSidebarCollapsed(!open)}
             defaultWidth={`${sidebarWidth}px`}
             onWidthChange={setSidebarWidth}
-            className='flex-col'
+            // Shrinks, so the keyboard bar below it stays on screen.
+            className='flex-col flex-1 min-h-0'
           >
             <AppShell>
               <Outlet />
             </AppShell>
           </SidebarProvider>
+          <KeyboardBar />
         </div>
 
         <QuickOpenDialog
@@ -145,6 +156,16 @@ export const Route = createRootRoute({
             openFile(path, getFileNameFromPath(path));
           }}
         />
+
+        {/* Insert link to note: the same list, choosing rather than opening. */}
+        <QuickOpenDialog
+          open={picking}
+          onOpenChange={(open) => !open && answerPick(null)}
+          onOpenFile={answerPick}
+          placeholder='Link to...'
+        />
+
+        <SlashMenu />
 
         <WorkspaceDialogs />
 

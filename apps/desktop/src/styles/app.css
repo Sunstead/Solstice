@@ -65,6 +65,30 @@
       overscroll-behavior: none;
     }
   }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    /* No double-tap zoom, so taps land at once. Pinch still zooms. */
+    touch-action: manipulation;
+  }
+  @media (pointer: coarse) {
+    /* A long press opens the row's or tab's menu, not iOS's text callout. */
+    [data-sidebar='menu-button'],
+    .flexlayout__tab_button {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+  }
+}
+
+/* iOS zooms into any field under 16px when it's focused. Unlayered, so it
+   beats the text-sm the fields carry. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
 }
 
 ::-webkit-scrollbar {

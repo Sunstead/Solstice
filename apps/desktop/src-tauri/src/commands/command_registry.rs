@@ -80,10 +80,14 @@ command_id! {
     EditBlockquote => "edit.blockquote",
     EditBulletList => "edit.bullet_list",
     EditOrderedList => "edit.ordered_list",
+    EditTaskList => "edit.task_list",
+    EditIndent => "edit.indent",
+    EditOutdent => "edit.outdent",
     EditCodeBlock => "edit.code_block",
     EditHardBreak => "edit.hard_break",
     EditParagraph => "edit.paragraph",
     EditInsertImage => "edit.insert_image",
+    EditInsertWikilink => "edit.insert_wikilink",
 
     ViewToggleSidebar => "view.toggle_sidebar",
 
@@ -405,6 +409,26 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             is_overridden: false,
         },
         CommandMeta {
+            id: CommandId::EditTaskList,
+            label: "Task list".into(),
+            accelerator: Some("CmdOrCtrl+Alt+9".into()),
+            is_overridden: false,
+        },
+        // Tab and Shift+Tab indent in a list too; these work anywhere, and on
+        // the phone's keyboard bar, which has no Tab.
+        CommandMeta {
+            id: CommandId::EditIndent,
+            label: "Indent".into(),
+            accelerator: Some("CmdOrCtrl+]".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::EditOutdent,
+            label: "Outdent".into(),
+            accelerator: Some("CmdOrCtrl+[".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
             id: CommandId::EditCodeBlock,
             label: "Code block".into(),
             accelerator: Some("CmdOrCtrl+Alt+C".into()),
@@ -428,6 +452,12 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             id: CommandId::EditInsertImage,
             label: "Insert image...".into(),
             accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::EditInsertWikilink,
+            label: "Insert link to note...".into(),
+            accelerator: Some("CmdOrCtrl+Shift+K".into()),
             is_overridden: false,
         },
         // -- View --

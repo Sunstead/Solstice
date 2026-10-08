@@ -39,7 +39,7 @@ export function ViewerFrame({
         {toolbar && (
           // `pointer-events-none` on the rail so the strip of empty space
           // beside the toolbar does not eat drags aimed at the content.
-          <div className='pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4'>
+          <div className='pointer-events-none absolute inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-20 flex justify-center px-4'>
             {toolbar}
           </div>
         )}

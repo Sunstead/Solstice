@@ -193,6 +193,24 @@
       "label": "Ordered list"
     },
     {
+      "accelerator": "CmdOrCtrl+Alt+9",
+      "id": "edit.task_list",
+      "is_overridden": false,
+      "label": "Task list"
+    },
+    {
+      "accelerator": "CmdOrCtrl+]",
+      "id": "edit.indent",
+      "is_overridden": false,
+      "label": "Indent"
+    },
+    {
+      "accelerator": "CmdOrCtrl+[",
+      "id": "edit.outdent",
+      "is_overridden": false,
+      "label": "Outdent"
+    },
+    {
       "accelerator": "CmdOrCtrl+Alt+C",
       "id": "edit.code_block",
       "is_overridden": false,
@@ -215,6 +233,12 @@
       "id": "edit.insert_image",
       "is_overridden": false,
       "label": "Insert image..."
+    },
+    {
+      "accelerator": "CmdOrCtrl+Shift+K",
+      "id": "edit.insert_wikilink",
+      "is_overridden": false,
+      "label": "Insert link to note..."
     },
     {
       "accelerator": "CmdOrCtrl+Shift+E",
@@ -698,6 +722,14 @@
               },
               {
                 "Command": {
+                  "accelerator": "CmdOrCtrl+Alt+9",
+                  "id": "edit.task_list",
+                  "is_overridden": false,
+                  "label": "Task list"
+                }
+              },
+              {
+                "Command": {
                   "accelerator": "CmdOrCtrl+Alt+C",
                   "id": "edit.code_block",
                   "is_overridden": false,
@@ -708,7 +740,31 @@
             "title": "Turn into"
           }
         },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+]",
+            "id": "edit.indent",
+            "is_overridden": false,
+            "label": "Indent"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+[",
+            "id": "edit.outdent",
+            "is_overridden": false,
+            "label": "Outdent"
+          }
+        },
         "Separator",
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+Shift+K",
+            "id": "edit.insert_wikilink",
+            "is_overridden": false,
+            "label": "Insert link to note..."
+          }
+        },
         {
           "Command": {
             "accelerator": null,
