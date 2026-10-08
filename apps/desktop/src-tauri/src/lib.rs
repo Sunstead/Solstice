@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use tauri::{ Emitter, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder };
 use tauri::utils::config::WindowConfig;
+// For the menu's events, which only a computer has.
+#[cfg(desktop)]
 use tauri_specta::Event as _;
 
 mod workspace;
@@ -10,6 +12,7 @@ mod commands;
 mod watcher;
 mod sync;
 
+#[cfg(desktop)]
 use commands::command_registry::CommandId;
 use commands::keymap::KeymapChanged;
 use commands::menu_layout::MenuCommand;
