@@ -6,6 +6,8 @@ type SettingsDialogState = {
   activeSection: SectionId;
   /** Search spans every section, so it lives beside the active one, not in it. */
   query: string;
+  /** The section the last `openSettings` asked for, if it named one. */
+  requested: SectionId | null;
   openSettings: (section?: SectionId) => void;
   setActiveSection: (section: SectionId) => void;
   setQuery: (query: string) => void;
@@ -24,13 +26,14 @@ export const useSettingsDialog = create<SettingsDialogState>((set) => ({
   open: false,
   activeSection: 'appearance',
   query: '',
+  requested: null,
   openSettings: (section) =>
     set((state) =>
       state.open
         ? { open: false, query: '' }
         : section
-          ? { open: true, activeSection: section, query: '' }
-          : { open: true, query: '' },
+          ? { open: true, activeSection: section, query: '', requested: section }
+          : { open: true, query: '', requested: null },
     ),
   setActiveSection: (activeSection) => set({ activeSection, query: '' }),
   setQuery: (query) => set({ query }),

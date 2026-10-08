@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import type { CommandId } from '@/bindings';
+
 interface ActiveEditorState {
   activeEditorId: string | null;
   setActiveEditor: (id: string | null) => void;
@@ -14,6 +16,9 @@ interface ActiveEditorState {
    */
   commandStateVersion: number;
   bumpCommandVersion: () => void;
+  /** Format commands in effect at the active editor's selection (`activeFormats`). */
+  activeFormats: ReadonlySet<string>;
+  setActiveFormats: (formats: ReadonlySet<CommandId>) => void;
 }
 
 export const useActiveEditorStore = create<ActiveEditorState>((set) => ({
@@ -22,4 +27,6 @@ export const useActiveEditorStore = create<ActiveEditorState>((set) => ({
   commandStateVersion: 0,
   bumpCommandVersion: () =>
     set((s) => ({ commandStateVersion: s.commandStateVersion + 1 })),
+  activeFormats: new Set(),
+  setActiveFormats: (formats) => set({ activeFormats: formats }),
 }));

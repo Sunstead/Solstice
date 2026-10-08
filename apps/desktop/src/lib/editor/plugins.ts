@@ -26,6 +26,7 @@ import { frontmatter, frontmatterView } from '@/lib/frontmatter';
 import { footnote } from '@/lib/footnote';
 import { table } from '@/lib/table';
 import { taskList } from '@/lib/tasklist';
+import { listEditing } from './list-keymap';
 import { link } from '@/lib/link';
 import { imageWithSize, insertImageWithSizeInputRule } from '@/lib/image/schema';
 import { attachmentPasteDrop } from './paste-drop';
@@ -78,6 +79,7 @@ export function editorSchemaPlugins(): MilkdownPlugin[] {
     blockIdDecorations,
     callout,
     taskList,
+    listEditing,
     table,
     footnote,
   ].flat();

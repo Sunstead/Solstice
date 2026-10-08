@@ -26,7 +26,9 @@ import {
 } from 'lucide-react';
 
 import { useViewport } from '@/hooks/use-visual-viewport';
-import { runCommand, type ScopedCommandId } from '@/lib/commands';
+import { isCommandEnabled, runCommand, type ScopedCommandId } from '@/lib/commands';
+import { useActiveEditorStore } from '@/lib/stores/active-editor';
+import { cn } from '@/lib/utils';
 
 type Item = { icon: ComponentType<{ className?: string }>; label: string; id: ScopedCommandId };
 
@@ -88,17 +90,32 @@ export function KeyboardBar() {
   const touch = useSyncExternalStore(subscribeCoarse, () => !!coarse?.matches, () => false);
   const focused = useEditorFocused();
   const [headings, setHeadings] = useState(false);
+  // Re-render as the selection moves, for the pressed and disabled states.
+  useActiveEditorStore((s) => s.commandStateVersion);
+  const formats = useActiveEditorStore((s) => s.activeFormats);
 
   if (!keyboard || !touch || !focused) return null;
 
   // Taps mustn't take focus from the editor, or the keyboard drops.
   const keep = (e: React.SyntheticEvent) => e.preventDefault();
-  const button = (key: string, label: string, Icon: Item['icon'], onPress: () => void) => (
+  const button = (
+    key: string,
+    label: string,
+    Icon: Item['icon'],
+    onPress: () => void,
+    state: { pressed?: boolean; disabled?: boolean } = {},
+  ) => (
     <button
       key={key}
       type='button'
       aria-label={label}
-      className='flex size-11 shrink-0 items-center justify-center rounded-md text-foreground/80 active:bg-accent'
+      aria-pressed={state.pressed}
+      aria-disabled={state.disabled}
+      className={cn(
+        'flex size-11 shrink-0 items-center justify-center rounded-md text-foreground/80 active:bg-accent',
+        state.pressed && 'bg-accent text-foreground',
+        state.disabled && 'text-foreground/30 active:bg-transparent',
+      )}
       onPointerDown={keep}
       onMouseDown={keep}
       onClick={onPress}
@@ -107,32 +124,46 @@ export function KeyboardBar() {
     </button>
   );
   const run = (item: Item) =>
-    button(item.id, item.label, item.icon, () => {
-      setHeadings(false);
-      void runCommand(item.id);
-    });
+    button(
+      item.id,
+      item.label,
+      item.icon,
+      () => {
+        setHeadings(false);
+        void runCommand(item.id);
+      },
+      { pressed: formats.has(item.id), disabled: !isCommandEnabled(item.id) },
+    );
 
   return (
-    <div
-      // Remounted per row, so each starts scrolled to its beginning.
-      key={headings ? 'headings' : 'main'}
-      role='toolbar'
-      aria-label='Formatting'
-      className='flex h-11 shrink-0 items-center overflow-x-auto overscroll-x-contain border-t bg-sidebar px-1 select-none [scrollbar-width:none]'
-    >
-      {headings ? (
-        <>
-          {button('back', 'Back', ChevronLeft, () => setHeadings(false))}
-          {HEADINGS.map(run)}
-        </>
-      ) : (
-        <>
-          {button('headings', 'Headings', Heading, () => setHeadings(true))}
-          {MAIN.map(run)}
-        </>
-      )}
-      <div className='flex-1' />
-      {button('hide', 'Hide keyboard', KeyboardOff, () => (document.activeElement as HTMLElement | null)?.blur())}
+    // A box exactly as tall as its buttons, scrolling sideways only: anything
+    // taller rubber-bands up and down under a thumb.
+    <div className='flex shrink-0 box-content h-11 items-center border-t bg-sidebar select-none'>
+      <div
+        // Remounted per row, so each starts scrolled to its beginning.
+        key={headings ? 'headings' : 'main'}
+        role='toolbar'
+        aria-label='Formatting'
+        className='flex h-full min-w-0 flex-1 items-center overflow-x-auto overflow-y-hidden overscroll-contain px-1 touch-pan-x [scrollbar-width:none]'
+      >
+        {headings ? (
+          <>
+            {button('back', 'Back', ChevronLeft, () => setHeadings(false))}
+            {HEADINGS.map(run)}
+          </>
+        ) : (
+          <>
+            {button('headings', 'Headings', Heading, () => setHeadings(true), {
+              pressed: [...formats].some((id) => id.startsWith('edit.heading')),
+            })}
+            {MAIN.map(run)}
+          </>
+        )}
+      </div>
+      <div className='h-6 w-px shrink-0 bg-border' />
+      <div className='px-1'>
+        {button('hide', 'Hide keyboard', KeyboardOff, () => (document.activeElement as HTMLElement | null)?.blur())}
+      </div>
     </div>
   );
 }

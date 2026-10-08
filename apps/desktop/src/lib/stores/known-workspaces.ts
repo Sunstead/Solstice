@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { commands } from '@/lib/backend';
+import { shell } from '@/lib/backend/platform';
 import { load } from '@/lib/backend/store';
 
 export interface KnownWorkspace {
@@ -20,6 +22,17 @@ function nameFromPath(path: string) {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
+/**
+ * The path `path` has now, on a phone. iOS moves an app's container (its
+ * path names a new id) when it's reinstalled or updated, so a workspace
+ * saved under the old Documents is looked for under the current one.
+ */
+export function rerooted(path: string, documents: string | null): string {
+  const at = path.lastIndexOf('/Documents/');
+  if (!documents || at === -1) return path;
+  return documents.replace(/\/$/, '') + path.slice(at + '/Documents'.length);
+}
+
 interface KnownWorkspacesState {
   workspaces: KnownWorkspace[];
   load: () => Promise<void>;
@@ -35,7 +48,15 @@ export const useKnownWorkspaces = create<KnownWorkspacesState>((set) => ({
 
   load: async () => {
     const store = await getStore();
-    const workspaces = (await store.get<KnownWorkspace[]>(STORE_KEY)) ?? [];
+    let workspaces = (await store.get<KnownWorkspace[]>(STORE_KEY)) ?? [];
+    if (shell === 'mobile') {
+      const documents = await commands.defaultWorkspaceParent();
+      const moved = workspaces.map((w) => ({ ...w, path: rerooted(w.path, documents) }));
+      if (moved.some((w, i) => w.path !== workspaces[i].path)) {
+        workspaces = moved;
+        await store.set(STORE_KEY, workspaces);
+      }
+    }
     set({ workspaces });
   },
 

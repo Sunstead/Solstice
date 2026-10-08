@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { commands } from '@/lib/backend';
 import { open } from '@/lib/backend/shell';
-import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
+import { rerooted, useKnownWorkspaces } from '@/lib/stores/known-workspaces';
+import { shell } from '@/lib/backend/platform';
 import { resetScopedStoreCache } from '@/lib/stores/scoped-storage';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { loadWorkspaceSettings } from '@/lib/settings/store';
@@ -56,6 +57,16 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     await useKnownWorkspaces.getState().load();
 
     let path = await commands.getWorkspace();
+
+    // The shell's own idea of the workspace can predate a move of the app's
+    // container too (a reload after a reinstall).
+    if (path && shell === 'mobile') {
+      const moved = rerooted(path, await commands.defaultWorkspaceParent());
+      if (moved !== path) {
+        path = moved;
+        await commands.setWorkspace(path);
+      }
+    }
 
     if (!path) {
       const lastOpened =

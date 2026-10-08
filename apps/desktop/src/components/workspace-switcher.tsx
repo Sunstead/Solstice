@@ -1,5 +1,4 @@
-import { Check, ChevronsUpDown, CloudDownload, FolderOpen, Plus, Settings2 } from 'lucide-react';
-import { can } from '@/lib/backend/platform';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -14,21 +13,10 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@sunstead/ui/components/resizable-sidebar';
-import { useWorkspace } from '@/hooks/use-workspace';
-import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
-import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
+import { useWorkspaceChoices } from '@/hooks/use-workspace-choices';
 
 export function WorkspaceSwitcher() {
-  const activePath = useWorkspace((s) => s.path);
-  const setWorkspace = useWorkspace((s) => s.setWorkspace);
-  const openFolder = useWorkspace((s) => s.openFolder);
-  const workspaces = useKnownWorkspaces((s) => s.workspaces);
-  const showDialog = useWorkspaceDialogs((s) => s.show);
-
-  const active = workspaces.find((w) => w.path === activePath);
-  const activeName =
-    active?.name ??
-    (activePath ? activePath.split(/[\\/]/).pop() : 'No workspace open');
+  const { activePath, activeName, workspaces, switchTo, actions, manage } = useWorkspaceChoices();
 
   return (
     <SidebarMenu>
@@ -41,7 +29,7 @@ export function WorkspaceSwitcher() {
                 className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
               >
                 <div className='grid flex-1 text-left text-sm leading-tight'>
-                  <span className='truncate font-medium'>{activeName}</span>
+                  <span className='truncate font-medium'>{activeName ?? 'No workspace open'}</span>
                 </div>
                 <ChevronsUpDown className='ml-auto size-4' />
               </SidebarMenuButton>
@@ -62,7 +50,7 @@ export function WorkspaceSwitcher() {
                   {workspaces.map((workspace) => (
                     <DropdownMenuItem
                       key={workspace.path}
-                      onClick={() => setWorkspace(workspace.path)}
+                      onClick={() => switchTo(workspace.path)}
                     >
                       <span className='flex-1 truncate'>{workspace.name}</span>
                       {workspace.path === activePath && (
@@ -74,27 +62,16 @@ export function WorkspaceSwitcher() {
                 <DropdownMenuSeparator />
               </>
             )}
-            <DropdownMenuItem onClick={() => showDialog('new')}>
-              <Plus />
-              New workspace…
-            </DropdownMenuItem>
-            {/* On the web, workspaces are the vaults on the server. */}
-            {can.localFolders && (
-              <DropdownMenuItem onClick={() => showDialog('import')}>
-                <CloudDownload />
-                Import from sync…
+            {actions.map((action) => (
+              <DropdownMenuItem key={action.id} onClick={action.run}>
+                <action.icon />
+                {action.label}
               </DropdownMenuItem>
-            )}
-            {can.pickFolders && (
-              <DropdownMenuItem onClick={() => openFolder()}>
-                <FolderOpen />
-                Open folder as workspace…
-              </DropdownMenuItem>
-            )}
+            ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => showDialog('manage')}>
-              <Settings2 />
-              Manage workspaces…
+            <DropdownMenuItem onClick={manage.run}>
+              <manage.icon />
+              {manage.label}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

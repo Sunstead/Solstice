@@ -10,7 +10,7 @@ import { fileOperations } from '@/lib/file-operations';
 import { isSamePath, parentOf } from '@/lib/path-utils';
 import { useFileTreeDrag, useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { useDragHoverStore } from '@/hooks/use-drag-hover';
-import { EntryInput } from './entry-input';
+import { EntryInput, type EntryResult } from './entry-input';
 import {
   Collapsible,
   CollapsibleContent,
@@ -70,14 +70,14 @@ export function FileTree({ path }: FileTreeProps) {
       {showCreateInput && (
         <EntryInput
           kind={operation.kind}
-          onSubmit={(finalName) => {
-            if (operation.kind.type === 'folder') {
-              fileOperations.createFolder(path, finalName);
-            } else {
-              fileOperations.createFile(path, finalName);
-            }
-            cancel();
-          }}
+          onSubmit={(finalName) =>
+            settle(
+              operation.kind.type === 'folder'
+                ? fileOperations.createFolder(path, finalName)
+                : fileOperations.createFile(path, finalName),
+              cancel,
+            )
+          }
           onCancel={cancel}
         />
       )}
@@ -192,10 +192,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
         <EntryInput
           kind={operation.kind}
           initialValue={operation.initialName}
-          onSubmit={(finalName) => {
-            fileOperations.rename(node.path, finalName);
-            cancel();
-          }}
+          onSubmit={(finalName) => settle(fileOperations.rename(node.path, finalName), cancel)}
           onCancel={cancel}
         />
       );
@@ -243,10 +240,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
           <EntryInput
             kind={operation.kind}
             initialValue={operation.initialName}
-            onSubmit={(finalName) => {
-              fileOperations.rename(node.path, finalName);
-              cancel();
-            }}
+            onSubmit={(finalName) => settle(fileOperations.rename(node.path, finalName), cancel)}
             onCancel={cancel}
             expanded={node.expanded}
           />
@@ -286,14 +280,14 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
             {showCreateInput && (
               <EntryInput
                 kind={operation.kind}
-                onSubmit={(finalName) => {
-                  if (operation.kind.type === 'folder') {
-                    fileOperations.createFolder(node.path, finalName);
-                  } else {
-                    fileOperations.createFile(node.path, finalName);
-                  }
-                  cancel();
-                }}
+                onSubmit={(finalName) =>
+                  settle(
+                    operation.kind.type === 'folder'
+                      ? fileOperations.createFolder(node.path, finalName)
+                      : fileOperations.createFile(node.path, finalName),
+                    cancel,
+                  )
+                }
                 onCancel={cancel}
               />
             )}
@@ -302,6 +296,17 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
       </Collapsible>
     </SidebarMenuItem>
   );
+}
+
+/** Closes the name field once `pending` succeeds; a failure keeps it open, saying why. */
+async function settle(
+  pending: Promise<{ status: 'ok' } | { status: 'error'; error: string }>,
+  close: () => void,
+): Promise<EntryResult> {
+  const result = await pending;
+  if (result.status === 'error') return { status: 'error', error: result.error };
+  close();
+  return { status: 'ok' };
 }
 
 export function FormattedFileName({ name }: { name: string }) {

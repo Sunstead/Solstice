@@ -32,6 +32,7 @@ import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { Button } from '@sunstead/ui/components/button';
 import { X } from 'lucide-react';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 
 /**
  * Section nav for widths below the sidebar breakpoint. The sidebar is hidden
@@ -79,6 +80,8 @@ export function SettingsDialog() {
   const setActiveSection = useSettingsDialog((s) => s.setActiveSection);
   const query = useSettingsDialog((s) => s.query.trim());
   const workspacePath = useWorkspace((s) => s.path);
+  // A phone has settings as pages on You instead (`YouPage`).
+  const isMobile = useIsMobile();
 
   const section = getSection(activeSection);
   const CustomPane = customPanes[activeSection];
@@ -87,6 +90,8 @@ export function SettingsDialog() {
   // field. Focusing the panel keeps the dialog announced without capturing the
   // first keystroke into search.
   const panelRef = useRef<HTMLDivElement>(null);
+
+  if (isMobile) return null;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>

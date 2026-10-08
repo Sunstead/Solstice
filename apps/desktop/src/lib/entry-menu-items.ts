@@ -5,7 +5,9 @@ import {
   Clipboard,
   Columns2,
   Copy,
+  FileCode,
   FileSearch,
+  FileText,
   FolderInput,
   FolderTree,
   HardDrive,
@@ -21,6 +23,16 @@ import { useFiles } from '@/hooks/use-files';
 import * as entryActions from '@/lib/entry-actions';
 import type { EntryTarget } from '@/lib/entry-actions';
 import { FILE_TYPE_PRESETS, useEntryInput } from '@/lib/stores/entry-input';
+import { runCommand } from '@/lib/commands';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
+import { useLayout } from '@/hooks/use-layout';
+
+/** Whether the focused tab shows its note as source (`view.toggle_source_mode`). */
+function inSourceMode(): boolean {
+  const node = useLayout.getState().model?.getActiveTabset()?.getSelectedNode();
+  const config = (node as { getConfig?: () => { mode?: string } } | undefined)?.getConfig?.();
+  return config?.mode === 'source';
+}
 
 /**
  * One description of the file/folder menus, rendered by whichever primitive
@@ -90,7 +102,7 @@ const separator = (id: string): EntryMenuItem => ({ kind: 'separator', id });
 
 /**
  * Opening a dialog or the inline rename input has to wait for the menu to
- * finish closing. `EntryInput` cancels on blur, so an input mounted while the
+ * finish closing. `EntryInput` settles on blur, so an input mounted while the
  * menu is still tearing down would dismiss itself as focus moves.
  */
 function deferred(run: () => void) {
@@ -107,6 +119,7 @@ export function useEntryMenuItems(
   }: EntryMenuOptions,
 ): EntryMenuItem[] {
   const revealInSystemLabel = useRevealInSystemLabel();
+  const isMobile = useIsMobile();
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
   const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
@@ -156,6 +169,16 @@ export function useEntryMenuItems(
       icon: FileSearch,
       run: () => entryActions.find(path),
     });
+    if (path.toLowerCase().endsWith('.md')) {
+      const source = inSourceMode();
+      items.push({
+        kind: 'item',
+        id: 'source-mode',
+        label: source ? 'Show Rich Text' : 'Show Source',
+        icon: source ? FileText : FileCode,
+        run: () => void runCommand('view.toggle_source_mode'),
+      });
+    }
     items.push(separator('after-find'));
   }
 
@@ -169,13 +192,16 @@ export function useEntryMenuItems(
       icon: SquarePlus,
       run: () => entryActions.openInNewTab(path),
     });
-    items.push({
-      kind: 'item',
-      id: 'open-to-side',
-      label: 'Open to the Side',
-      icon: Columns2,
-      run: () => entryActions.openToTheSide(path),
-    });
+    // A phone shows one tab at a time: there's no side.
+    if (!isMobile) {
+      items.push({
+        kind: 'item',
+        id: 'open-to-side',
+        label: 'Open to the Side',
+        icon: Columns2,
+        run: () => entryActions.openToTheSide(path),
+      });
+    }
     items.push(separator('after-open'));
   }
 

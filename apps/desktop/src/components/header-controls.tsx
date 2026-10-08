@@ -44,7 +44,7 @@ export function HeaderControls() {
     <div ref={ref} className='no-drag relative z-30 flex h-10 items-center'>
       {/* macOS has a native menu bar; a browser tab never does. */}
       {/* macOS has the native menu bar; everywhere else draws its own. */}
-      {!(can.windowChrome && isMac) && <AppMenubar />}
+      {can.appMenu && !(can.windowChrome && isMac) && <AppMenubar />}
       <div className='ml-1 flex items-center gap-x-1'>
         <Button variant='ghost' size='icon-sm' disabled={!canGoBack} onClick={() => runCommand('navigation.back')}>
           <ArrowLeft />

@@ -14,7 +14,8 @@ function normalizeBaseKey(key: string): string {
 
 const isMac = (() => {
   try {
-    return platform() === 'macos';
+    // An iPad's keyboard is a Mac's.
+    return platform() === 'macos' || platform() === 'ios';
   } catch {
     return false;
   }

@@ -65,6 +65,11 @@
       overscroll-behavior: none;
     }
   }
+  html,
+  body {
+    /* The app is a fixed frame: only what's inside it scrolls. */
+    overscroll-behavior: none;
+  }
   html {
     -webkit-tap-highlight-color: transparent;
     /* No double-tap zoom, so taps land at once. Pinch still zooms. */
@@ -78,6 +83,16 @@
       -webkit-user-select: none;
       user-select: none;
     }
+  }
+}
+
+/* The phone's Files page: rows a thumb can hit. Unlayered, to beat the
+   rows' own h-8. */
+@media (pointer: coarse) {
+  [data-phone='true'] [data-sidebar='menu-button'],
+  [data-phone='true'] [data-sidebar='menu-sub-button'] {
+    height: 2.75rem;
+    font-size: 15px;
   }
 }
 

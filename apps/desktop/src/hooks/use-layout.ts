@@ -13,6 +13,9 @@ import {
 } from '@/lib/stores/workspace-layout';
 import { getFileNameFromPath, normalizePath } from '@/lib/path-utils';
 import { markEntering } from '@/lib/tab-motion';
+import { useRecentFiles } from '@/lib/stores/recent-files';
+import { rerooted } from '@/lib/stores/known-workspaces';
+import { shell } from '@/lib/backend/platform';
 
 const defaultLayoutJson: IJsonModel = {
   global: {
@@ -40,6 +43,17 @@ type LayoutState = {
   loadForWorkspace: (path: string) => Promise<void>;
   persistCurrent: () => void;
   openFile: (path: string, name: string) => void;
+  /**
+   * Whether `openFile` replaces the shown tab rather than adding one: on a
+   * phone, where one note shows at a time and tabs pile up unseen.
+   */
+  openInPlace: boolean;
+  setOpenInPlace: (inPlace: boolean) => void;
+  /**
+   * Bumped by every `openFile`, even one that only reselects the tab already
+   * showing: the phone shows the note then, though the layout didn't change.
+   */
+  opened: number;
   openFileInNewTab: (path: string, name: string, location?: 'center' | 'right') => void;
   newBlankTab: (tabsetId?: string) => void;
   normalizeTabsetDeletion: () => void;
@@ -159,6 +173,24 @@ function makeUniqueTabId(): string {
     : `blank-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * Points a phone's saved tabs at its Documents now: iOS moves the app's
+ * container on a reinstall or update (see `rerooted`).
+ */
+function rerootTabs(model: Model, workspace: string) {
+  const at = workspace.lastIndexOf('/Documents/');
+  if (at === -1) return;
+  const documents = workspace.slice(0, at + '/Documents'.length);
+  model.visitNodes((node) => {
+    if (!(node instanceof TabNode)) return;
+    const config = node.getConfig() as { path?: string } | undefined;
+    const path = config?.path && rerooted(config.path, documents);
+    if (path && path !== config.path) {
+      model.doAction(Actions.updateNodeAttributes(node.getId(), { config: { ...config, path } }));
+    }
+  });
+}
+
 let saveTimeout: ReturnType<typeof setTimeout> | undefined;
 let replacingBlankTab = false;
 
@@ -171,6 +203,10 @@ export const useLayout = create<LayoutState>((set, get) => ({
   workspacePath: null,
   activeTabId: null,
   redrawTabContent: null,
+  openInPlace: false,
+  opened: 0,
+
+  setOpenInPlace: (inPlace) => set({ openInPlace: inPlace }),
 
   setActiveTabId: (id) => set({ activeTabId: id }),
 
@@ -185,6 +221,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
     }
 
     syncTabsetDeletion(model);
+    if (shell === 'mobile') rerootTabs(model, path);
 
     set({
       model,
@@ -206,6 +243,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
   openFile: (path, name) => {
     const { model } = get();
     if (!model) return;
+    set((s) => ({ opened: s.opened + 1 }));
 
     const existing = findTabForPath(model, path);
     if (existing) {
@@ -220,14 +258,16 @@ export const useLayout = create<LayoutState>((set, get) => ({
     // is the real identity either way.
     const id = model.getNodeById(path) ? makeUniqueTabId() : path;
 
-    const blankTab = findBlankTab(model);
-    const blankTabParent = blankTab?.getParent();
+    const activeTabset = model.getActiveTabset() ?? findFirstTabset(model);
+    const shown = get().openInPlace ? activeTabset?.getSelectedNode() : undefined;
+    const replaced = shown instanceof TabNode ? shown : findBlankTab(model);
+    const replacedParent = replaced?.getParent();
 
-    if (blankTab && blankTabParent instanceof TabSetNode) {
-      const index = blankTabParent.getChildren().indexOf(blankTab);
+    if (replaced && replacedParent instanceof TabSetNode) {
+      const index = replacedParent.getChildren().indexOf(replaced);
 
       replacingBlankTab = true;
-      model.doAction(Actions.deleteTab(blankTab.getId()));
+      model.doAction(Actions.deleteTab(replaced.getId()));
       model.doAction(
         Actions.addNode(
           {
@@ -237,7 +277,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
             component: 'editor',
             config: { path },
           },
-          blankTabParent.getId(),
+          replacedParent.getId(),
           DockLocation.CENTER,
           index,
         ),
@@ -246,7 +286,6 @@ export const useLayout = create<LayoutState>((set, get) => ({
       return;
     }
 
-    const activeTabset = model.getActiveTabset() ?? findFirstTabset(model);
     if (!activeTabset) return;
 
     markEntering(id);
@@ -320,6 +359,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
   },
 
   closeFileTab: (path) => {
+    useRecentFiles.getState().forget(path);
     const { model } = get();
     if (!model) return;
 
@@ -341,6 +381,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
   },
 
   closeFolderTabs: (path) => {
+    useRecentFiles.getState().forget(path);
     const { model } = get();
     if (!model) return;
 
@@ -371,6 +412,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
    * keys on them, and `config.path` is what actually identifies the file.
    */
   retargetTabs: (from, to) => {
+    useRecentFiles.getState().retarget(from, to);
     const { model } = get();
     if (!model) return;
 

@@ -91,7 +91,8 @@ function Row({
         <Icon className='size-4 shrink-0 text-muted-foreground' />
         <div className='grid min-w-0 flex-1'>
           <span className='truncate font-medium'>{workspace.name}</span>
-          {can.localFolders && (
+          {/* Only where the folder was picked: a phone's are all in its Documents. */}
+          {can.pickFolders && (
             <span className='truncate text-xs text-muted-foreground' title={workspace.path}>
               {workspace.path}
             </span>
