@@ -14,6 +14,8 @@ import {
 import { getFileNameFromPath, normalizePath } from '@/lib/path-utils';
 import { markEntering } from '@/lib/tab-motion';
 import { useRecentFiles } from '@/lib/stores/recent-files';
+import { rerooted } from '@/lib/stores/known-workspaces';
+import { shell } from '@/lib/backend/platform';
 
 const defaultLayoutJson: IJsonModel = {
   global: {
@@ -47,6 +49,11 @@ type LayoutState = {
    */
   openInPlace: boolean;
   setOpenInPlace: (inPlace: boolean) => void;
+  /**
+   * Bumped by every `openFile`, even one that only reselects the tab already
+   * showing: the phone shows the note then, though the layout didn't change.
+   */
+  opened: number;
   openFileInNewTab: (path: string, name: string, location?: 'center' | 'right') => void;
   newBlankTab: (tabsetId?: string) => void;
   normalizeTabsetDeletion: () => void;
@@ -166,6 +173,24 @@ function makeUniqueTabId(): string {
     : `blank-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * Points a phone's saved tabs at its Documents now: iOS moves the app's
+ * container on a reinstall or update (see `rerooted`).
+ */
+function rerootTabs(model: Model, workspace: string) {
+  const at = workspace.lastIndexOf('/Documents/');
+  if (at === -1) return;
+  const documents = workspace.slice(0, at + '/Documents'.length);
+  model.visitNodes((node) => {
+    if (!(node instanceof TabNode)) return;
+    const config = node.getConfig() as { path?: string } | undefined;
+    const path = config?.path && rerooted(config.path, documents);
+    if (path && path !== config.path) {
+      model.doAction(Actions.updateNodeAttributes(node.getId(), { config: { ...config, path } }));
+    }
+  });
+}
+
 let saveTimeout: ReturnType<typeof setTimeout> | undefined;
 let replacingBlankTab = false;
 
@@ -179,6 +204,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
   activeTabId: null,
   redrawTabContent: null,
   openInPlace: false,
+  opened: 0,
 
   setOpenInPlace: (inPlace) => set({ openInPlace: inPlace }),
 
@@ -195,6 +221,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
     }
 
     syncTabsetDeletion(model);
+    if (shell === 'mobile') rerootTabs(model, path);
 
     set({
       model,
@@ -216,6 +243,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
   openFile: (path, name) => {
     const { model } = get();
     if (!model) return;
+    set((s) => ({ opened: s.opened + 1 }));
 
     const existing = findTabForPath(model, path);
     if (existing) {

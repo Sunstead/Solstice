@@ -40,7 +40,16 @@ export function SearchPage() {
       </PhoneHeader>
       {root ? (
         <Command className='min-h-0 flex-1 rounded-none! bg-transparent p-2'>
-          <CommandInput placeholder='Search files' value={query} onValueChange={setQuery} autoFocus />
+          <CommandInput
+            placeholder='Search files'
+            value={query}
+            onValueChange={setQuery}
+            autoFocus
+            autoCapitalize='off'
+            autoCorrect='off'
+            spellCheck={false}
+            enterKeyHint='search'
+          />
           <CommandList className='max-h-none flex-1 pt-2'>
             {query ? (
               <>

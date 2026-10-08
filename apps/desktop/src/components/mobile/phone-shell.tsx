@@ -76,6 +76,13 @@ export function PhoneShell() {
     seen.current = shownId;
   }, [shownId]);
 
+  // Opening the note already showing changes nothing in the layout: this does.
+  const opened = useLayout((s) => s.opened);
+  const openedAtMount = useRef(opened);
+  useEffect(() => {
+    if (opened !== openedAtMount.current) usePhoneNav.getState().showNote();
+  }, [opened]);
+
   // Leaving a note for another is a step to go back through.
   const lastPath = useRef<string | null>(null);
   useEffect(() => {
