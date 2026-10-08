@@ -122,6 +122,9 @@ struct SaveNote {
     text: String,
     /// The `base` the note was read with; absent for a new note.
     base: Option<String>,
+    /// Names this save, so sending it again (its reply was lost) is a no-op.
+    #[serde(default)]
+    save_id: Option<String>,
 }
 
 async fn save_note(
@@ -134,6 +137,7 @@ async fn save_note(
         path,
         text: body.text,
         base: body.base,
+        save_id: body.save_id,
     };
     Ok(json_reply(run(&state, &who, &id, op).await?))
 }

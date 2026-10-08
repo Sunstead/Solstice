@@ -29,6 +29,8 @@ export type SocketState = 'connecting' | 'synced' | 'offline';
 
 export const fsChanged = new Emitter<FileSystemChanged>();
 export const syncChanged = new Emitter<SyncChanged>();
+/** The open vault's socket connected: the server's reachable again. */
+export const connected = new Emitter<Vault>();
 
 let vaultList: Vault[] | null = null;
 let current: Vault | null = null;
@@ -197,6 +199,7 @@ function connect() {
   ws.onopen = () => {
     backoff = 1000;
     setSocketState('synced');
+    connected.emit(vault);
     // Whatever changed while it was away.
     void applyTreeChange([]);
   };

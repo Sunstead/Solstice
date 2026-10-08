@@ -169,8 +169,14 @@ devices get web changes as ordinary sync:
 - A note is read with its text and a `base` (its snapshot, opaque), and saved
   with both: `NoteDoc::apply_save` carries the edit onto whatever arrived
   since, so a stale editor never reverts another device's edit. A base from
-  another epoch, or naming changes the server hasn't seen, is refused (409),
-  and the app reloads.
+  another epoch, or naming changes the server hasn't seen, is refused (409);
+  the app keeps its text beside the note as `name (web).md` and reloads.
+- The app journals each save in IndexedDB before sending it, so a lost
+  signal or a closed page loses nothing, and sends a note's saves one at a
+  time. A save carries a `save_id`, and the vault's task applies an id once
+  (it remembers the last few hundred): a save whose reply was lost is sent
+  again as it was, before anything newer, which would otherwise carry its
+  edit a second time.
 - Web saves never flag reviews, like a desktop editor's saves; the web app
   shows and resolves reviews devices flagged.
 - Folders aren't in the manifest, so an empty one made on the web exists
@@ -216,7 +222,7 @@ devices get web changes as ordinary sync:
 | `GET /auth/login?return_to=`, `GET /auth/callback`, `POST /auth/logout` | browsers | Web sign-in and out. |
 | `GET /v1/me` | apps, web | Who's signed in. |
 | `GET /v1/vaults/{id}/tree` | apps, web | `{files: [{path, kind, size, modified}], folders}`. |
-| `GET`/`PUT /v1/vaults/{id}/notes/{*path}` | apps, web | `{path, text, base}`; a save sends `{text, base}` and gets the merged note back. |
+| `GET`/`PUT /v1/vaults/{id}/notes/{*path}` | apps, web | `{path, text, base}`; a save sends `{text, base, save_id?}` and gets the merged note back. |
 | `GET`/`PUT /v1/vaults/{id}/files/{*path}` | apps, web | Any file's bytes; a PUT writes a file that isn't a note (`?new=1`: under a free name). |
 | `POST /v1/vaults/{id}/ops` | apps, web | `{op: create_note | create_folder | rename | trash | duplicate, ...}`. |
 | `GET /v1/vaults/{id}/reviews`, `GET`/`POST .../reviews/{*path}` | apps, web | Flagged merges, their versions, and resolving one (`{text?}`). |

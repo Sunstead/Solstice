@@ -31,3 +31,25 @@ export function setSaving(path: string, active: boolean) {
 export function useIsSaving(path: string | undefined) {
   return useSaveStatus((s) => (path ? (s.saving[path] ?? 0) > 0 : false));
 }
+
+/**
+ * Files whose last write failed, with why. The edit is still in the editor and
+ * the autosaver keeps retrying; this is only what the user is told.
+ */
+export const useSaveFailures = create<{ failed: Record<string, string> }>(() => ({
+  failed: {},
+}));
+
+export function setSaveFailed(path: string, message: string | null) {
+  useSaveFailures.setState((state) => {
+    if ((state.failed[path] ?? null) === message) return state;
+    const failed = { ...state.failed };
+    if (message === null) delete failed[path];
+    else failed[path] = message;
+    return { failed };
+  });
+}
+
+export function useSaveFailure(path: string | undefined) {
+  return useSaveFailures((s) => (path ? (s.failed[path] ?? null) : null));
+}

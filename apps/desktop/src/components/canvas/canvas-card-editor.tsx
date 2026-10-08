@@ -98,7 +98,6 @@ function FileCardEditor({ id, file }: { id: string; file: string }) {
         <MilkdownEditorWrapper
           path={absolutePath}
           initialContent={content}
-          onError={setError}
           flushRef={flushRef}
         />
       </div>

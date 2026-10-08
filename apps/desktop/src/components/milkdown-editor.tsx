@@ -63,8 +63,10 @@ import { createEditorFeatures } from '@/lib/editor/plugins';
 import { insertImagesFromDialog } from '@/lib/editor/insert-image';
 import { EditorNotePathContext } from '@/components/editor/editor-file-context';
 import { ExternalChangeBar } from '@/components/external-change-bar';
+import { SaveFailedBar } from '@/components/save-failed-bar';
 import { ReviewBar } from '@/components/sync/review-bar';
 import { useReviewFor } from '@/lib/stores/sync';
+import { useSaveFailure } from '@/lib/stores/save-status';
 import { findPlugin, getFindState, setFindQuery, stepFindMatch } from '@/lib/find/plugin';
 import { useFindStore } from '@/lib/stores/find';
 import { useExternalFileChanges } from '@/hooks/use-external-file-changes';
@@ -80,6 +82,7 @@ import '@/styles/embed.css';
 import '@/styles/code-block.css';
 import '@/styles/math.css';
 import '@/styles/callout.css';
+import '@/styles/frontmatter.css';
 import '@/styles/task-list.css';
 import '@/styles/table.css';
 
@@ -117,7 +120,6 @@ function findScrollParent(from: HTMLElement): HTMLElement | null {
 type MilkdownEditorProps = {
   path: string;
   initialContent: string;
-  onError: (message: string) => void;
   /**
    * Populated with a "commit and write right now" callback once the editor is
    * ready, and cleared back to `null` on unmount. Plain prop rather than a
@@ -242,7 +244,6 @@ const PRESET_BINDINGS_BY_KEYMAP = PRESET_BINDINGS.reduce((map, binding) => {
 const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
   path,
   initialContent,
-  onError,
   flushRef,
 }) => {
   const instanceId = useId();
@@ -256,7 +257,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     (root) => {
       if (!loaded) return undefined;
 
-      const saver = createAutosaver(path, initialContent, onError);
+      const saver = createAutosaver(path, initialContent);
       autosaver.current = saver;
 
       // Marks the file dirty synchronously with the transaction. Milkdown's
@@ -374,16 +375,11 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     [path, loaded, nodeViewFactory],
   );
 
-  // A debounced write must not outlive the editor that scheduled it: flush on
-  // a path change and when the window is going away, and dispose on unmount so
-  // a closed tab leaves no saving indicator behind.
+  // A debounced write must not outlive the editor that scheduled it: dispose
+  // (which flushes) on a path change and on unmount, so a closed tab leaves no
+  // saving indicator behind. The autosaver flushes when the page hides.
   useEffect(() => {
-    const flushPending = () => autosaver.current?.flush();
-    window.addEventListener('pagehide', flushPending);
-    return () => {
-      window.removeEventListener('pagehide', flushPending);
-      autosaver.current?.dispose();
-    };
+    return () => autosaver.current?.dispose();
   }, [path]);
 
   /**
@@ -767,6 +763,8 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     wasFindOpen.current = findOpen;
   }, [findOpen, withView]);
 
+  const saveFailure = useSaveFailure(path);
+
   if (!loaded) {
     return <div className='p-4 text-muted-foreground'>Loading editor…</div>;
   }
@@ -780,6 +778,9 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
           onKeepMine={handleKeepMine}
           onClose={handleCloseTab}
         />
+      )}
+      {saveFailure && (
+        <SaveFailedBar message={saveFailure} onRetry={() => autosaver.current?.retry()} />
       )}
       {review && <ReviewBar review={review} />}
       <Milkdown />

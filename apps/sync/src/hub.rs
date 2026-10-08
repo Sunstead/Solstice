@@ -272,6 +272,7 @@ struct VaultTask {
     sessions: HashMap<ConnId, (Session, mpsc::UnboundedSender<Outgoing>)>,
     watchers: Vec<mpsc::UnboundedSender<String>>,
     dirty: BTreeSet<DocKey>,
+    recent_saves: web::RecentSaves,
 }
 
 impl VaultTask {
@@ -341,6 +342,7 @@ impl VaultTask {
             sessions: HashMap::new(),
             watchers: Vec::new(),
             dirty,
+            recent_saves: Default::default(),
         };
         task.save().await;
         Ok(task)

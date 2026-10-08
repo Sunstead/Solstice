@@ -6,7 +6,7 @@
 //! it, so a save from a stale editor keeps other devices' edits instead of
 //! reverting them ([`NoteDoc::apply_save`]).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 use std::path::Path;
 
 use base64::Engine;
@@ -26,6 +26,7 @@ pub enum WebOp {
         path: String,
         text: String,
         base: Option<String>,
+        save_id: Option<String>,
     },
     ReadFile {
         path: String,
@@ -91,6 +92,35 @@ struct Base {
     epoch: u32,
     /// The encoded snapshot.
     s: String,
+}
+
+/// The web saves a vault applied lately, by the id the app gave each. Only
+/// a resend after a lost reply needs this, so a few hundred is plenty, and
+/// losing them in a restart costs at most a duplicated edit.
+#[derive(Default)]
+pub struct RecentSaves {
+    order: VecDeque<String>,
+    ids: HashSet<String>,
+}
+
+impl RecentSaves {
+    const CAP: usize = 256;
+
+    fn contains(&self, id: &str) -> bool {
+        self.ids.contains(id)
+    }
+
+    fn insert(&mut self, id: String) {
+        if !self.ids.insert(id.clone()) {
+            return;
+        }
+        self.order.push_back(id);
+        if self.order.len() > Self::CAP {
+            if let Some(old) = self.order.pop_front() {
+                self.ids.remove(&old);
+            }
+        }
+    }
 }
 
 fn b64() -> base64::engine::GeneralPurpose {
@@ -164,9 +194,12 @@ impl VaultTask {
                 let id = self.note_at(&path)?;
                 Ok(WebReply::Json(self.note_json(&id, &path)?))
             }
-            WebOp::SaveNote { path, text, base } => {
-                self.save_from_web(&path, &text, base.as_deref())
-            }
+            WebOp::SaveNote {
+                path,
+                text,
+                base,
+                save_id,
+            } => self.save_from_web(&path, &text, base.as_deref(), save_id),
             WebOp::ReadFile { path } => {
                 let path = checked(&path)?;
                 let id = self.vault.id_at(&path).ok_or_else(AppError::not_found)?;
@@ -379,6 +412,7 @@ impl VaultTask {
         path: &str,
         text: &str,
         base: Option<&str>,
+        save_id: Option<String>,
     ) -> Result<WebReply, AppError> {
         let path = checked(path)?;
         if !is_note_path(&path) {
@@ -398,6 +432,11 @@ impl VaultTask {
             }
             (Some(_), _) => return Err(AppError::not_found()),
         };
+        // Applying a save twice would insert its text twice.
+        if save_id.as_ref().is_some_and(|s| self.recent_saves.contains(s)) {
+            let path = self.path_of(&id).unwrap_or(path);
+            return Ok(WebReply::Json(self.note_json(&id, &path)?));
+        }
         let note = self.vault.note(&id).ok_or_else(AppError::not_found)?;
         let snapshot = match &base {
             Some(b) => {
@@ -415,6 +454,9 @@ impl VaultTask {
         };
         let msgs = self.vault.save_note(&id, text, snapshot.as_ref())?;
         self.changed(None, msgs);
+        if let Some(s) = save_id {
+            self.recent_saves.insert(s);
+        }
         let path = self.path_of(&id).unwrap_or(path);
         Ok(WebReply::Json(self.note_json(&id, &path)?))
     }

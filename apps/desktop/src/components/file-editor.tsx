@@ -54,7 +54,6 @@ export function FileEditor({ path }: FileEditorProps) {
           <MilkdownEditorWrapper
             path={path}
             initialContent={content}
-            onError={setError}
           />
           {/* Positions itself against the viewport, so it can live anywhere. */}
           <LinkEditor />
