@@ -5,14 +5,14 @@
  */
 import { mkdir as tauriMkdir } from '@tauri-apps/plugin-fs';
 import { load as tauriLoad, type Store } from '@tauri-apps/plugin-store';
-import { isDesktop } from './index';
+import { inTauri } from './index';
 import { WebStore } from './web/store';
 
 export type { Store };
 
-export const load: typeof tauriLoad = isDesktop
+export const load: typeof tauriLoad = inTauri
   ? tauriLoad
   : (path) => WebStore.load(path) as unknown as Promise<Store>;
 
 /** The server keeps no folders for settings. */
-export const mkdir: typeof tauriMkdir = isDesktop ? tauriMkdir : async () => {};
+export const mkdir: typeof tauriMkdir = inTauri ? tauriMkdir : async () => {};

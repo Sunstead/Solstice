@@ -53,6 +53,15 @@ fn client_for(app: &AppHandle, window: &tauri::Window) -> Result<Option<Client>,
     Ok(state(app).clients.lock().unwrap().get(&root).cloned())
 }
 
+/// Every client tries its connection again now: a phone's app was in the
+/// background, where the OS dropped its sockets.
+#[cfg(mobile)]
+pub fn reconnect_all(app: &AppHandle) {
+    for client in state(app).clients.lock().unwrap().values() {
+        client.reconnect();
+    }
+}
+
 /// The client whose folder holds `path`, and `path` relative to it.
 fn client_for_path(app: &AppHandle, path: &Path) -> Option<(Client, String)> {
     let path = key(path);

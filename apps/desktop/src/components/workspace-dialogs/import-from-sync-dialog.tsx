@@ -19,6 +19,7 @@ import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { useSync } from '@/lib/stores/sync';
 import { cn } from '@/lib/utils';
 import { host, useSyncAccount, useWorkspaceParent } from './helpers';
+import { can } from '@/lib/backend/platform';
 import { LocationField, SyncSignIn } from './shared';
 
 /**
@@ -57,7 +58,7 @@ export function ImportFromSyncForm({ onDone }: { onDone: () => void }) {
       setBusy(false);
       return setError(made.error);
     }
-    await useKnownWorkspaces.getState().rememberParent(parent);
+    if (can.pickFolders) await useKnownWorkspaces.getState().rememberParent(parent);
     await setWorkspace(made.data);
     const linked = await commands.syncLink(account.server, vault.id, vault.name);
     setBusy(false);
@@ -144,7 +145,7 @@ export function ImportFromSyncForm({ onDone }: { onDone: () => void }) {
               <Label htmlFor='import-folder'>Folder name</Label>
               <Input id='import-folder' value={folder} onChange={(e) => setFolder(e.target.value)} />
             </div>
-            <LocationField parent={parent} onParent={setParent} name={trimmed} />
+            {can.pickFolders && <LocationField parent={parent} onParent={setParent} name={trimmed} />}
           </>
         )}
 

@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { isDesktop } from '@/lib/backend';
+import { can, shell } from '@/lib/backend/platform';
 import {
   ArrowUpRight,
   Clipboard,
@@ -189,8 +189,8 @@ export function useEntryMenuItems(
     });
   }
 
-  // The web app has no file manager to show it in.
-  if (isDesktop) {
+  // Only a computer has a file manager to show it in.
+  if (can.fileManager) {
     items.push({
       kind: 'item',
       id: 'reveal-in-system',
@@ -202,11 +202,12 @@ export function useEntryMenuItems(
 
   // Handing a folder to the OS just opens the file manager again, which is
   // what the item above already does.
-  if (!isDir) {
+  // A phone has neither default apps for files nor browser tabs.
+  if (!isDir && shell !== 'mobile') {
     items.push({
       kind: 'item',
       id: 'open-in-default-app',
-      label: isDesktop ? 'Open in Default App' : 'Open in New Tab',
+      label: can.fileManager ? 'Open in Default App' : 'Open in New Tab',
       icon: ArrowUpRight,
       run: () => void entryActions.openInDefaultApp(path),
     });

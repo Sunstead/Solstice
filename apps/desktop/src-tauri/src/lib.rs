@@ -97,7 +97,7 @@ pub fn run() {
         }
     }));
 
-    app
+    let app = app
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
@@ -131,7 +131,11 @@ pub fn run() {
                 ..Default::default()
             };
 
-            let win_builder = WebviewWindowBuilder::from_config(app, &config)?
+            let win_builder = WebviewWindowBuilder::from_config(app, &config)?;
+
+            // A phone's window is the screen; these are a computer's.
+            #[cfg(desktop)]
+            let win_builder = win_builder
                 .title("Solstice")
                 .inner_size(1200.0, 800.0)
                 // Narrow windows get the phone layout; below this it can't help.
@@ -146,7 +150,7 @@ pub fn run() {
                     .traffic_light_position(LogicalPosition::new(16.0, 22.0))
             };
 
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(all(desktop, not(target_os = "macos")))]
             let win_builder = win_builder.decorations(false);
 
             win_builder.build()?;
@@ -168,8 +172,11 @@ pub fn run() {
                 watcher::unwatch(window.label(), &window.state::<watcher::FsWatcherState>());
                 sync::window_closed(window.app_handle(), window.label());
             }
-        })
-        .on_menu_event(|app, event| {
+        });
+
+    // Menus are a computer's; a phone has none to click.
+    #[cfg(desktop)]
+    let app = app.on_menu_event(|app, event| {
             #[cfg(debug_assertions)]
             {
                 match event.id().0.as_str() {
@@ -194,9 +201,16 @@ pub fn run() {
             if let Ok(id) = event.id().0.parse::<CommandId>() {
                 MenuCommand(id).emit(app).ok();
             }
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        });
+
+    app.build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            #[cfg(mobile)]
+            if let tauri::RunEvent::Resumed = _event {
+                sync::reconnect_all(_app);
+            }
+        });
 }
 /// Writes the frontend's command and event bindings (`src/bindings.ts`).
 /// Debug runs do it on startup; `solstice --export-bindings` does it alone.

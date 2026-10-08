@@ -4,7 +4,7 @@ import { Cloud, Folder } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@sunstead/ui/components/dialog';
 import { Input } from '@sunstead/ui/components/input';
-import { isDesktop } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import { deleteVault, resolve } from '@/lib/backend/web/vault';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { type KnownWorkspace, useKnownWorkspaces } from '@/lib/stores/known-workspaces';
@@ -25,7 +25,7 @@ export function ManageWorkspacesForm({ onDone }: { onDone: () => void }) {
       <DialogHeader>
         <DialogTitle>Workspaces</DialogTitle>
         <DialogDescription>
-          {isDesktop
+          {can.localFolders
             ? 'Removing a workspace takes it off this list. Its folder and files stay where they are.'
             : "Each workspace is a vault on this server. Deleting one moves its notes to the server's trash."}
         </DialogDescription>
@@ -68,13 +68,13 @@ function Row({
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const Icon = isDesktop ? Folder : Cloud;
+  const Icon = can.localFolders ? Folder : Cloud;
 
   const remove = async () => {
     setBusy(true);
     setError(null);
     try {
-      if (!isDesktop) {
+      if (!can.localFolders) {
         const { vault } = await resolve(workspace.path);
         await deleteVault(vault.id);
       }
@@ -91,7 +91,7 @@ function Row({
         <Icon className='size-4 shrink-0 text-muted-foreground' />
         <div className='grid min-w-0 flex-1'>
           <span className='truncate font-medium'>{workspace.name}</span>
-          {isDesktop && (
+          {can.localFolders && (
             <span className='truncate text-xs text-muted-foreground' title={workspace.path}>
               {workspace.path}
             </span>
@@ -102,13 +102,13 @@ function Row({
         ) : (
           !confirming && (
             <Button type='button' variant='ghost' size='sm' onClick={() => onConfirm(true)}>
-              {isDesktop ? 'Remove' : 'Delete…'}
+              {can.localFolders ? 'Remove' : 'Delete…'}
             </Button>
           )
         )}
       </div>
 
-      {confirming && isDesktop && (
+      {confirming && can.localFolders && (
         <div className='flex items-center justify-end gap-2'>
           <span className='mr-auto text-xs text-muted-foreground'>Remove from the list? The folder stays.</span>
           <Button type='button' variant='outline' size='sm' onClick={() => onConfirm(false)}>
@@ -120,7 +120,7 @@ function Row({
         </div>
       )}
 
-      {confirming && !isDesktop && (
+      {confirming && !can.localFolders && (
         <form
           className='grid gap-2'
           onSubmit={(e) => {

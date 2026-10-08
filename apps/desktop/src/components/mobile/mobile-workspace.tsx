@@ -10,7 +10,7 @@ import { useLayout } from '@/hooks/use-layout';
 import { useLayoutSession } from '@/hooks/use-layout-session';
 import { useIsFullscreen } from '@/hooks/use-fullscreen';
 import { useIsMac } from '@/hooks/use-platform';
-import { isDesktop } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import { runCommand } from '@/lib/commands';
 import { useSetting } from '@/lib/settings/store';
 import { useEntryInput } from '@/lib/stores/entry-input';
@@ -84,7 +84,7 @@ function MobileTopBar() {
       className='flex h-12 shrink-0 items-center gap-1 border-b bg-sidebar px-1.5'
     >
       {/* The traffic lights sit over the top-left corner on macOS. */}
-      {isDesktop && isMac && !isFullscreen && <span data-tauri-drag-region className='w-16 shrink-0' />}
+      {can.windowChrome && isMac && !isFullscreen && <span data-tauri-drag-region className='w-16 shrink-0' />}
       <Button variant='ghost' size='icon' className='no-drag' onClick={() => setOpenMobile(true)}>
         <Menu />
         <span className='sr-only'>Open sidebar</span>
@@ -110,7 +110,7 @@ function MobileTopBar() {
           <Ellipsis />
           <span className='sr-only'>Menu</span>
         </Button>
-        {isDesktop && !isMac && <WindowControls />}
+        {can.windowChrome && !isMac && <WindowControls />}
       </div>
       <TabSwitcher model={model} shown={shown} open={tabsOpen} onOpenChange={setTabsOpen} />
       <MobileMenu open={menuOpen} onOpenChange={setMenuOpen} />

@@ -164,10 +164,41 @@ pub fn exists(path: String) -> bool {
 #[tauri::command]
 #[specta::specta]
 pub fn trash_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    #[cfg(desktop)]
     trash::delete(&path).map_err(|e| e.to_string())?;
+    #[cfg(mobile)]
+    move_to_workspace_trash(&app, Path::new(&path))?;
     note_self_write(&app, Path::new(&path));
 
     Ok(())
+}
+
+/// A phone has no system trash, so the entry goes to its workspace's
+/// `.solstice/trash/`, named for when it went, and stays recoverable.
+#[cfg(mobile)]
+fn move_to_workspace_trash(app: &tauri::AppHandle, path: &Path) -> Result<(), String> {
+    use tauri::Manager;
+    let roots: Vec<String> = app
+        .state::<crate::workspace::WorkspaceState>()
+        .0
+        .lock()
+        .map_err(|e| e.to_string())?
+        .values()
+        .cloned()
+        .collect();
+    let root = roots
+        .iter()
+        .map(Path::new)
+        .find(|root| path.starts_with(root))
+        .ok_or("That isn't in an open workspace")?;
+    let dir = root.join(".solstice").join("trash");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let name = path.file_name().ok_or("That has no name")?.to_string_lossy();
+    let when = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    fs::rename(path, dir.join(format!("{when} {name}"))).map_err(|e| e.to_string())
 }
 
 /// Copies an entry alongside itself under a free name, returning the path it

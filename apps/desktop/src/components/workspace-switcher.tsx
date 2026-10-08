@@ -1,5 +1,5 @@
 import { Check, ChevronsUpDown, CloudDownload, FolderOpen, Plus, Settings2 } from 'lucide-react';
-import { isDesktop } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -79,17 +79,17 @@ export function WorkspaceSwitcher() {
               New workspace…
             </DropdownMenuItem>
             {/* On the web, workspaces are the vaults on the server. */}
-            {isDesktop && (
-              <>
-                <DropdownMenuItem onClick={() => showDialog('import')}>
-                  <CloudDownload />
-                  Import from sync…
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openFolder()}>
-                  <FolderOpen />
-                  Open folder as workspace…
-                </DropdownMenuItem>
-              </>
+            {can.localFolders && (
+              <DropdownMenuItem onClick={() => showDialog('import')}>
+                <CloudDownload />
+                Import from sync…
+              </DropdownMenuItem>
+            )}
+            {can.pickFolders && (
+              <DropdownMenuItem onClick={() => openFolder()}>
+                <FolderOpen />
+                Open folder as workspace…
+              </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => showDialog('manage')}>

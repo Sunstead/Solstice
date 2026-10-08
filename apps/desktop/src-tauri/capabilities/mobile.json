@@ -1,11 +1,10 @@
 {
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "Capability for the main window, on a computer",
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Capability for the main window, on a phone or tablet: no window to manage",
   "platforms": [
-    "macOS",
-    "windows",
-    "linux"
+    "iOS",
+    "android"
   ],
   "windows": [
     "main"
@@ -13,22 +12,6 @@
   "permissions": [
     "core:default",
     "opener:default",
-    {
-      "identifier": "opener:allow-open-path",
-      "allow": [
-        {
-          "path": "**"
-        }
-      ]
-    },
-    "core:window:default",
-    "core:window:allow-start-dragging",
-    "core:window:allow-set-decorations",
-    "core:window:allow-set-title-bar-style",
-    "core:window:allow-toggle-maximize",
-    "core:window:allow-is-maximized",
-    "core:window:allow-minimize",
-    "core:window:allow-close",
     "os:default",
     "deep-link:default",
     "fs:default",

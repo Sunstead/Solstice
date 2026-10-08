@@ -3,11 +3,11 @@
  * page (`web/window.ts`). See `index.ts`.
  */
 import { getCurrentWindow as tauriWindow, type Window } from '@tauri-apps/api/window';
-import { isDesktop } from './index';
+import { inTauri } from './index';
 import { browserWindow } from './web/window';
 
 export type { Window };
 
-export const getCurrentWindow: typeof tauriWindow = isDesktop
+export const getCurrentWindow: typeof tauriWindow = inTauri
   ? tauriWindow
   : () => browserWindow as unknown as Window;

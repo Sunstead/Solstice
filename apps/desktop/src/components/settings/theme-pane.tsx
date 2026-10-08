@@ -4,7 +4,8 @@ import { revealItemInDir } from '@/lib/backend/shell';
 
 import { Button } from '@sunstead/ui/components/button';
 import { cn } from '@/lib/utils';
-import { commands, isDesktop } from '@/lib/backend';
+import { commands } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import { setSetting, useSetting } from '@/lib/settings/store';
 import { hasOpenWorkspace } from '@/lib/stores/scoped-storage';
 import { DEFAULT_LIGHT_THEME_ID, DEFAULT_THEME_ID } from '@/lib/theme/builtin';
@@ -203,8 +204,8 @@ export function ThemePane() {
         </section>
       )}
 
-      {/* Theme folders are on a computer; the web app has the built-ins. */}
-      {isDesktop && (
+      {/* Theme folders are on a computer; elsewhere there are the built-ins. */}
+      {can.themeFolders && (
       <section>
         <h3 className='pb-1 text-xs font-medium text-muted-foreground'>
           Custom themes
