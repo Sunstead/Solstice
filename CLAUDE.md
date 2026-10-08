@@ -116,6 +116,8 @@ The Markdown editor is [Milkdown](https://milkdown.dev) (a ProseMirror wrapper) 
 - `crates/solstice-core` ports target normalization, parsing and resolution to Rust for Sync and Atlas. The two must agree: `wikilink-index.test.ts` and `solstice-core/src/wikilink.rs` test the same cases, so change both together.
 - A target's `#heading` or `#^block` (a block id, Obsidian's `^id` at the end of a block) opens the note there: `openWikilink` leaves an anchor request (`lib/stores/anchor.ts`) that the note's editor takes once loaded. `![[note#^id]]` embeds the block (`sliceBlock`).
 
+**Source mode** (`view.toggle_source_mode`, Cmd+/; Alt+/ on the web, where Safari has Cmd+/) shows a note as raw markdown in CodeMirror (`source-editor.tsx`), with the same autosaver, sync and external-change handling as the rich editor. The mode is the tab's (`config.mode`), so it persists with the layout; `FileView` keys `FileEditor` by path and mode, and switching hands the outgoing editor's text to the incoming one (`lib/stores/editor-text.ts`) rather than rereading a file whose last save may still be on its way.
+
 Obsidian's other syntax: `==highlight==` is a mark (`lib/highlight/`), paired over the parsed tree, and registered before commonmark (`editorOuterMarks`) so it nests outside `strong` when written back. `%%comments%%` and `^ids` stay plain text with decorations (`lib/comment/`, `lib/blockid/`); read-only views drop comments (`stripComments`). Front matter is one atom node holding the block verbatim (`lib/frontmatter/`), by `split_front_matter`'s rule.
 
 ### Layout

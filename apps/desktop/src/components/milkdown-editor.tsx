@@ -70,6 +70,7 @@ import { toggleTaskList } from '@/lib/editor/list-commands';
 import { toggleHighlightCommand } from '@/lib/highlight';
 import { blockIdOf, findAnchor, newBlockId } from '@/lib/blockid';
 import { clearAnchor, useAnchorRequest } from '@/lib/stores/anchor';
+import { registerTextSource } from '@/lib/stores/editor-text';
 import { wikilinkFor } from '@/lib/entry-actions';
 import { pickFile } from '@/lib/stores/note-picker';
 import { EditorNotePathContext } from '@/components/editor/editor-file-context';
@@ -481,6 +482,9 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       ctx.get(serializerCtx)(ctx.get(editorViewCtx).state.doc),
     );
   }, [get]);
+
+  // What switching to source mode starts from.
+  useEffect(() => registerTextSource(path, getMarkdown), [path, getMarkdown]);
 
   // Populates the caller's flush handle, when it asked for one. Reads the
   // *live* document via `getMarkdown()` rather than waiting on

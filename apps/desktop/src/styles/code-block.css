@@ -68,3 +68,8 @@
   font-variant-ligatures: var(--editor-mono-ligatures, normal);
   line-height: 1.6;
 }
+
+/* Source mode: the whole note in CodeMirror, at the note's measure. */
+.solstice-source .cm-editor {
+  height: 100%;
+}

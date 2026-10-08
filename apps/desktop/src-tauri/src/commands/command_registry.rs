@@ -92,6 +92,7 @@ command_id! {
     EditCopyBlockLink => "edit.copy_block_link",
 
     ViewToggleSidebar => "view.toggle_sidebar",
+    ViewToggleSourceMode => "view.toggle_source_mode",
 
     NavigationBack => "navigation.back",
     NavigationForward => "navigation.forward",
@@ -160,6 +161,8 @@ fn web_accelerator(id: CommandId) -> Option<&'static str> {
         CommandId::FileNewFolder => Some("Alt+Shift+N"),
         CommandId::FileNewTab => Some("Alt+T"),
         CommandId::FileCloseTab => Some("Alt+W"),
+        // Safari's own: Cmd+/ shows its status bar.
+        CommandId::ViewToggleSourceMode => Some("Alt+/"),
         _ => None,
     }
 }
@@ -479,6 +482,12 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             id: CommandId::ViewToggleSidebar,
             label: "Toggle sidebar".into(),
             accelerator: Some("CmdOrCtrl+Shift+E".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::ViewToggleSourceMode,
+            label: "Source mode".into(),
+            accelerator: Some("CmdOrCtrl+/".into()),
             is_overridden: false,
         },
         // -- Navigation --
