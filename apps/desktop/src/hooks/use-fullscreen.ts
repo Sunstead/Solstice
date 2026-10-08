@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { isDesktop } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import { getCurrentWindow } from '@/lib/backend/window';
 
 /** Whether the desktop window is fullscreen (macOS hides the traffic lights then). */
@@ -7,7 +7,7 @@ export function useIsFullscreen() {
   const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
-    if (!isDesktop) return;
+    if (!can.windowChrome) return;
     const appWindow = getCurrentWindow();
     let unlisten: (() => void) | null = null;
     let live = true;

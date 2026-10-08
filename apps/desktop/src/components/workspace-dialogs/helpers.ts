@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { commands } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import { useAccount } from '@/lib/stores/account';
 import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { useSetting } from '@/lib/settings/store';
@@ -18,13 +19,16 @@ export function joinPath(parent: string, name: string) {
   return parent.endsWith(sep) ? `${parent}${name}` : `${parent}${sep}${name}`;
 }
 
-/** Where a new workspace goes: the last place one went, else Documents. */
+/**
+ * Where a new workspace goes: the last place one went, else Documents. Where
+ * there's no folder picker (a phone), always the app's Documents.
+ */
 export function useWorkspaceParent() {
   const [parent, setParent] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
     void (async () => {
-      const remembered = await useKnownWorkspaces.getState().lastParent();
+      const remembered = can.pickFolders ? await useKnownWorkspaces.getState().lastParent() : null;
       const found = remembered ?? (await commands.defaultWorkspaceParent());
       if (live) setParent(found);
     })();

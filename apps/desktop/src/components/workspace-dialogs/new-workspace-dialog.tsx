@@ -11,7 +11,8 @@ import {
 import { Input } from '@sunstead/ui/components/input';
 import { Label } from '@sunstead/ui/components/label';
 import { Switch } from '@sunstead/ui/components/switch';
-import { commands, isDesktop } from '@/lib/backend';
+import { commands } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { useSync } from '@/lib/stores/sync';
@@ -39,7 +40,7 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
   // only thing left is to say so.
   const [linkFailed, setLinkFailed] = useState(false);
 
-  const signedIn = isDesktop && !!account.server && !!account.username;
+  const signedIn = can.localFolders && !!account.server && !!account.username;
   // Sync is on by default once there's someone signed in to sync as.
   const [syncDefaulted, setSyncDefaulted] = useState(false);
   if (signedIn && !syncDefaulted) {
@@ -48,8 +49,8 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
   }
 
   const trimmed = name.trim();
-  const syncing = isDesktop && sync && signedIn;
-  const ready = !!trimmed && !busy && (!isDesktop || !!parent);
+  const syncing = can.localFolders && sync && signedIn;
+  const ready = !!trimmed && !busy && (!can.localFolders || !!parent);
 
   const failLink = (message: string) => {
     setBusy(false);
@@ -67,7 +68,7 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
       setBusy(false);
       return setError(made.error);
     }
-    if (isDesktop && parent) await useKnownWorkspaces.getState().rememberParent(parent);
+    if (can.pickFolders && parent) await useKnownWorkspaces.getState().rememberParent(parent);
     await setWorkspace(made.data);
 
     if (syncing) {
@@ -92,7 +93,7 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
       <DialogHeader>
         <DialogTitle>New workspace</DialogTitle>
         <DialogDescription>
-          {isDesktop ? (
+          {can.localFolders ? (
             <>
               An empty folder for new notes. To work on a vault that's already on the sync server,{' '}
               <button type='button' className='underline underline-offset-2' onClick={() => showDialog('import')}>
@@ -119,9 +120,9 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
           />
         </div>
 
-        {isDesktop && <LocationField parent={parent} onParent={setParent} name={trimmed} disabled={linkFailed} />}
+        {can.pickFolders && <LocationField parent={parent} onParent={setParent} name={trimmed} disabled={linkFailed} />}
 
-        {isDesktop && (
+        {can.localFolders && (
           <div className='grid gap-2'>
             <div className='flex items-center justify-between gap-4'>
               <div className='grid gap-0.5'>

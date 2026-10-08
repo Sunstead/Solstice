@@ -22,8 +22,11 @@ import { keymapChanged, webCommands } from './web/commands';
 import { Emitter } from './web/emitter';
 import { fsChanged, syncChanged } from './web/vault';
 
-/** Whether the app is running in the desktop shell. */
-export const isDesktop = isTauri();
+/**
+ * Whether the app runs in Tauri: the desktop app, or the mobile one. What
+ * that allows is in `platform.ts`.
+ */
+export const inTauri = isTauri();
 
 /** Every backend command, with the generated bindings' signatures. */
 export type Commands = typeof tauriCommands;
@@ -40,8 +43,8 @@ export interface Events {
   syncChanged: EventSource<SyncChanged>;
 }
 
-export const commands: Commands = isDesktop ? tauriCommands : webCommands;
-export const events: Events = isDesktop
+export const commands: Commands = inTauri ? tauriCommands : webCommands;
+export const events: Events = inTauri
   ? tauriEvents
   : {
       fileSystemChanged: fsChanged,

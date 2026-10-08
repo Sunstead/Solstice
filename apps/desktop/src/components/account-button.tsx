@@ -11,7 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@sunstead/ui/components/dropdown-menu';
-import { commands, events, isDesktop } from '@/lib/backend';
+import { commands, events } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import { signOut } from '@/lib/backend/web/account';
 import { useAccount } from '@/lib/stores/account';
 import { useSync } from '@/lib/stores/sync';
@@ -35,7 +36,7 @@ function host(server: string) {
 export function AccountButton() {
   const configured = useSetting('sync.server');
   // The web app's server is the page's own origin.
-  const server = isDesktop ? configured : location.origin;
+  const server = can.syncSettings ? configured : location.origin;
   const { username, error, loaded, refresh } = useAccount();
   const openSettings = useSettingsDialog((s) => s.openSettings);
   const attention = useSync((s) => needsAttention(s.info));
@@ -64,7 +65,7 @@ export function AccountButton() {
   const leave = async () => {
     setBusy(true);
     setFailure(null);
-    if (isDesktop) {
+    if (can.syncSettings) {
       const result = await commands.syncSignOut(server);
       if (result.status === 'error') setFailure(result.error);
       await refresh(server);
@@ -116,7 +117,7 @@ export function AccountButton() {
             Sign out
           </DropdownMenuItem>
         ) : (
-          isDesktop && (
+          can.syncSettings && (
             <DropdownMenuItem disabled={busy} closeOnClick={false} onClick={() => void signIn()}>
               <LogIn />
               Sign in
@@ -125,7 +126,7 @@ export function AccountButton() {
         )}
         <DropdownMenuItem onClick={() => openSettings('sync')}>
           <Settings2 />
-          {isDesktop ? 'Sync settings…' : 'Account settings…'}
+          {can.syncSettings ? 'Sync settings…' : 'Account settings…'}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

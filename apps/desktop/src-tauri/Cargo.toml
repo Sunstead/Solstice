@@ -36,7 +36,6 @@ specta-typescript = "=0.0.12"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 anyhow = "1"
 notify-debouncer-full = "0.7.0"
-trash = "5"
 # Enumerates installed font families for the typography settings' font picker.
 font-kit = "0.14"
 # `solstice://` links (Atlas opens notes with them). Single instance forwards
@@ -56,6 +55,8 @@ futures-util = "0.3"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+# The OS trash; iOS and Android have none (see `trash_path`).
+trash = "5"
 
 [dev-dependencies]
 tempfile = "3"

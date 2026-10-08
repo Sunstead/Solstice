@@ -12,15 +12,15 @@ import {
   revealItemInDir as tauriReveal,
 } from '@tauri-apps/plugin-opener';
 import { platform as tauriPlatform } from '@tauri-apps/plugin-os';
-import { isDesktop } from './index';
+import { inTauri } from './index';
 import * as web from './web/shell';
 
-export const openUrl: typeof tauriOpenUrl = isDesktop ? tauriOpenUrl : web.openUrl;
-export const openPath: typeof tauriOpenPath = isDesktop ? tauriOpenPath : web.openPath;
-export const revealItemInDir: typeof tauriReveal = isDesktop ? tauriReveal : web.revealItemInDir;
-export const message: typeof tauriMessage = isDesktop ? tauriMessage : web.message;
-export const open: typeof tauriOpen = isDesktop ? tauriOpen : (web.open as typeof tauriOpen);
-export const platform: typeof tauriPlatform = isDesktop ? tauriPlatform : web.platform;
-export const getCurrent: typeof tauriGetCurrent = isDesktop ? tauriGetCurrent : web.getCurrent;
-export const onOpenUrl: typeof tauriOnOpenUrl = isDesktop ? tauriOnOpenUrl : web.onOpenUrl;
-export const assetUrl: typeof convertFileSrc = isDesktop ? convertFileSrc : web.assetUrl;
+export const openUrl: typeof tauriOpenUrl = inTauri ? tauriOpenUrl : web.openUrl;
+export const openPath: typeof tauriOpenPath = inTauri ? tauriOpenPath : web.openPath;
+export const revealItemInDir: typeof tauriReveal = inTauri ? tauriReveal : web.revealItemInDir;
+export const message: typeof tauriMessage = inTauri ? tauriMessage : web.message;
+export const open: typeof tauriOpen = inTauri ? tauriOpen : (web.open as typeof tauriOpen);
+export const platform: typeof tauriPlatform = inTauri ? tauriPlatform : web.platform;
+export const getCurrent: typeof tauriGetCurrent = inTauri ? tauriGetCurrent : web.getCurrent;
+export const onOpenUrl: typeof tauriOnOpenUrl = inTauri ? tauriOnOpenUrl : web.onOpenUrl;
+export const assetUrl: typeof convertFileSrc = inTauri ? convertFileSrc : web.assetUrl;

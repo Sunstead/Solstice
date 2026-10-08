@@ -9,7 +9,7 @@ import {
   type LucideIcon,
   PersonStanding,
 } from 'lucide-react';
-import { isDesktop } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 
 /**
  * The nav down the left of the settings dialog, shaped like `primaryViews` in
@@ -50,8 +50,8 @@ export const settingsSections = [
   {
     id: 'sync',
     // The web app is the server, so there's only the account to show.
-    label: isDesktop ? 'Sync' : 'Account',
-    icon: isDesktop ? RefreshCw : CircleUser,
+    label: can.syncSettings ? 'Sync' : 'Account',
+    icon: can.syncSettings ? RefreshCw : CircleUser,
   },
   {
     id: 'keybindings',

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { isDesktop } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import {
   Actions,
   BorderNode,
@@ -253,7 +253,7 @@ export default function FlexLayoutRoot() {
           }
 
           // A browser tab has its own window controls.
-          if (isDesktop && !isMac && node === topRightTabset) {
+          if (can.windowChrome && !isMac && node === topRightTabset) {
             renderValues.buttons.push(<WindowControls key='win-controls' />);
           }
         }}

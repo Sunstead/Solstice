@@ -19,7 +19,7 @@ fn command_item(
     let ResolvedMenuEntry::Command(c) = entry else {
         return Ok(None);
     };
-    let mut item = MenuItemBuilder::new(&c.label).id(&c.id);
+    let mut item = MenuItemBuilder::new(&c.label).id(c.id);
     // Canvas keys are plain letters that only mean something on a board; as
     // native accelerators they would fire everywhere.
     if let (true, Some(a)) = (accelerators && !c.id.is_canvas(), &c.accelerator) {

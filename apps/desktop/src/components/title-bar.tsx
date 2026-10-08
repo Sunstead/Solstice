@@ -1,6 +1,6 @@
 import { useIsFullscreen } from '@/hooks/use-fullscreen';
 import SolsticeIcon from '@/assets/icons/app/icon.svg?react';
-import { isDesktop } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import { useIsMac } from '@/hooks/use-platform';
 import { useSidebar } from '@sunstead/ui/components/resizable-sidebar';
 import { cn } from '@/lib/utils';
@@ -17,7 +17,7 @@ export default function TitleBar() {
       <div className='flex items-center w-max h-max'>
         <div data-tauri-drag-region className='flex items-center select-none'>
           <div className='min-w-12 flex items-center justify-center'>
-            {isDesktop && isMac ? (
+            {can.windowChrome && isMac ? (
               !isFullscreen && <span className='w-20' />
             ) : (
               <SolsticeIcon className='mx-2 size-5 pointer-events-none select-none [-webkit-user-drag:none]' />

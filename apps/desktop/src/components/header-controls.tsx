@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { create } from 'zustand';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
-import { isDesktop } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
 import { useIsMac } from '@/hooks/use-platform';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { runCommand } from '@/lib/commands';
@@ -43,7 +43,8 @@ export function HeaderControls() {
   return (
     <div ref={ref} className='no-drag relative z-30 flex h-10 items-center'>
       {/* macOS has a native menu bar; a browser tab never does. */}
-      {(!isDesktop || !isMac) && <AppMenubar />}
+      {/* macOS has the native menu bar; everywhere else draws its own. */}
+      {!(can.windowChrome && isMac) && <AppMenubar />}
       <div className='ml-1 flex items-center gap-x-1'>
         <Button variant='ghost' size='icon-sm' disabled={!canGoBack} onClick={() => runCommand('navigation.back')}>
           <ArrowLeft />
