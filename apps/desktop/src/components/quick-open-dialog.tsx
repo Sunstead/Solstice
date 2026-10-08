@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { FileSearchDialog } from '@/components/file-search-dialog';
 import { selectAllFiles, useFileIndex } from '@/lib/stores/use-file-index';
 import { FormattedFileName } from './file-tree';
+import type { FileEntry } from '@/bindings';
 import { getFileIcon } from '@/assets/icons';
 import { getFileExtension } from '@/lib/utils';
 import { getWorkspaceRelativeSegments } from '@/lib/path-utils';
@@ -34,21 +35,23 @@ export function QuickOpenDialog({
       heading='Files'
       entries={files}
       onSelect={(entry) => onOpenFile(entry.path)}
-      renderItem={(entry) => {
-        const Icon = getFileIcon(getFileExtension(entry.name));
-
-        const { relative } = getWorkspaceRelativeSegments(entry.path, workspacePath);
-
-        return (
-          <div className='w-full'>
-            <div className='flex w-full items-center justify-between gap-2'>
-              <Icon />
-              <FormattedFileName name={entry.name} />
-            </div>
-            <p className='text-xs text-muted-foreground truncate max-w-full'>{relative}</p>
-          </div>
-        );
-      }}
+      renderItem={(entry) => <QuickOpenItem entry={entry} root={workspacePath} />}
     />
+  );
+}
+
+/** A file as quick open lists it: its icon and name, and its folder below. */
+export function QuickOpenItem({ entry, root }: { entry: Pick<FileEntry, 'name' | 'path'>; root: string }) {
+  const Icon = getFileIcon(getFileExtension(entry.name));
+  const { relative } = getWorkspaceRelativeSegments(entry.path, root);
+
+  return (
+    <div className='w-full'>
+      <div className='flex w-full items-center justify-between gap-2'>
+        <Icon />
+        <FormattedFileName name={entry.name} />
+      </div>
+      <p className='text-xs text-muted-foreground truncate max-w-full'>{relative}</p>
+    </div>
   );
 }

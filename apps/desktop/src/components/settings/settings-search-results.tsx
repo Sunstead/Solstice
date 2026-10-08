@@ -9,9 +9,17 @@ import { SettingList } from './setting-list';
  * pane holds it. Each group keeps its section heading, which is what tells you
  * where the setting lives once you have found it.
  */
-export function SettingsSearchResults({ query }: { query: string }) {
+export function SettingsSearchResults({
+  query,
+  onOpenSection,
+}: {
+  query: string;
+  /** Opens a section that matched; the dialog's own nav by default. */
+  onOpenSection?: (id: SectionId) => void;
+}) {
   const read = useSettingReader();
   const setActiveSection = useSettingsDialog((s) => s.setActiveSection);
+  const open = onOpenSection ?? setActiveSection;
   const { sections, groups, total } = searchSettings(query, read);
 
   if (total === 0 && sections.length === 0) {
@@ -36,7 +44,7 @@ export function SettingsSearchResults({ query }: { query: string }) {
                 <button
                   key={id}
                   type='button'
-                  onClick={() => setActiveSection(id)}
+                  onClick={() => open(id)}
                   className='flex items-center gap-1.5 rounded-md bg-foreground/8 px-2.5 py-1.5 text-sm select-none hover:bg-foreground/12'
                 >
                   <section.icon className='size-4' />

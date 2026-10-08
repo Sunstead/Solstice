@@ -1,12 +1,12 @@
 import FlexLayoutRoot from '@/components/flex-layout-root';
-import { MobileWorkspace } from '@/components/mobile/mobile-workspace';
+import { PhoneShell } from '@/components/mobile/phone-shell';
 import { useSidebar } from '@sunstead/ui/components/resizable-sidebar';
 
 /**
- * Tabs and splits, or below the sidebar's breakpoint (where the sidebar is a
- * drawer and the tabs would not fit) one tab at a time; see MobileWorkspace.
+ * Tabs and splits, or below the sidebar's breakpoint (where neither the
+ * sidebar nor the tabs would fit) the phone layout; see PhoneShell.
  */
 export function EditorArea() {
   const { isMobile } = useSidebar();
-  return <div className='h-full w-full'>{isMobile ? <MobileWorkspace /> : <FlexLayoutRoot />}</div>;
+  return <div className='h-full w-full'>{isMobile ? <PhoneShell /> : <FlexLayoutRoot />}</div>;
 }

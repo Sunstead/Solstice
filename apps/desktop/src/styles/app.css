@@ -65,6 +65,11 @@
       overscroll-behavior: none;
     }
   }
+  html,
+  body {
+    /* The app is a fixed frame: only what's inside it scrolls. */
+    overscroll-behavior: none;
+  }
   html {
     -webkit-tap-highlight-color: transparent;
     /* No double-tap zoom, so taps land at once. Pinch still zooms. */

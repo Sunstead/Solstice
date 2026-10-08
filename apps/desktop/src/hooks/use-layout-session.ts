@@ -6,6 +6,7 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { findCornerTabset } from '@/lib/flexlayout-utils';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
+import { useRecentFiles } from '@/lib/stores/recent-files';
 import { closeTab } from '@/lib/tab-motion';
 
 /**
@@ -29,6 +30,7 @@ export function useLayoutSession(afterChange?: () => void) {
     if (workspacePath) {
       void loadForWorkspace(workspacePath);
       useNavigationHistory.getState().reset();
+      useRecentFiles.getState().reset();
     }
   }, [workspacePath, loadForWorkspace]);
 
@@ -94,7 +96,11 @@ export function useLayoutSession(afterChange?: () => void) {
     const layout = useLayout.getState();
     const activeTabId = getActiveTabId(changed);
     layout.setActiveTabId(activeTabId);
-    if (activeTabId) useNavigationHistory.getState().visit(activeTabId);
+    if (activeTabId) {
+      useNavigationHistory.getState().visit(activeTabId);
+      const path = (changed.getNodeById(activeTabId) as TabNode | undefined)?.getConfig()?.path;
+      if (typeof path === 'string') useRecentFiles.getState().visit(path);
+    }
     useNavigationHistory.getState().prune((id) => changed.getNodeById(id) instanceof TabNode);
 
     layout.persistCurrent();

@@ -22,8 +22,6 @@ import {
   toggleInlineCodeCommand,
   wrapInHeadingCommand,
   wrapInBlockquoteCommand,
-  wrapInBulletListCommand,
-  wrapInOrderedListCommand,
   createCodeBlockCommand,
   insertHardbreakCommand,
   turnIntoTextCommand,
@@ -38,6 +36,7 @@ import {
   hardbreakKeymap,
   paragraphKeymap,
   bulletListSchema,
+  orderedListSchema,
   listItemKeymap,
   listItemSchema,
   liftListItemCommand,
@@ -66,7 +65,8 @@ import { useKeymapStore } from '@/lib/stores/keymap';
 import { wikilink, useWikilinkIndexSync } from '@/lib/wikilink';
 import { createEditorFeatures, editorOuterMarks } from '@/lib/editor/plugins';
 import { insertImagesFromDialog } from '@/lib/editor/insert-image';
-import { toggleTaskList } from '@/lib/editor/list-commands';
+import { activeFormats } from '@/lib/editor/active-formats';
+import { toggleList, type ListKind, type ListTypes } from '@/lib/editor/list-commands';
 import { toggleHighlightCommand } from '@/lib/highlight';
 import { blockIdOf, findAnchor, newBlockId } from '@/lib/blockid';
 import { clearAnchor, useAnchorRequest } from '@/lib/stores/anchor';
@@ -191,18 +191,6 @@ const PRESET_BINDINGS: PresetBinding[] = [
     command: wrapInBlockquoteCommand,
   },
   {
-    id: 'edit.bullet_list',
-    keymapKey: bulletListKeymap.key,
-    action: 'WrapInBulletList',
-    command: wrapInBulletListCommand,
-  },
-  {
-    id: 'edit.ordered_list',
-    keymapKey: orderedListKeymap.key,
-    action: 'WrapInOrderedList',
-    command: wrapInOrderedListCommand,
-  },
-  {
     id: 'edit.code_block',
     keymapKey: codeBlockKeymap.key,
     action: 'CreateCodeBlock',
@@ -315,10 +303,10 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
                 ) {
                   return;
                 }
-                if (
-                  useActiveEditorStore.getState().activeEditorId === instanceId
-                ) {
-                  useActiveEditorStore.getState().bumpCommandVersion();
+                const active = useActiveEditorStore.getState();
+                if (active.activeEditorId === instanceId) {
+                  active.bumpCommandVersion();
+                  active.setActiveFormats(activeFormats(view.state));
                 }
               },
             }),
@@ -378,6 +366,9 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
             SinkListItem: { ...keys.SinkListItem, shortcuts: ['Tab'] },
             LiftListItem: { ...keys.LiftListItem, shortcuts: ['Shift-Tab'] },
           }));
+          // The list toggles (`toggleList`) are app commands, with app keys.
+          ctx.update(bulletListKeymap.key, (keys) => ({ ...keys, WrapInBulletList: { shortcuts: [] } }));
+          ctx.update(orderedListKeymap.key, (keys) => ({ ...keys, WrapInOrderedList: { shortcuts: [] } }));
         })
         .use(listener)
         .use(editorOuterMarks())
@@ -693,20 +684,30 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       () => editor.action(canRun(liftListItemCommand.key)),
     );
 
-    const taskCommand = (ctx: Ctx) =>
-      toggleTaskList(listItemSchema.type(ctx), bulletListSchema.type(ctx));
-    registerScopedCommand(
-      instanceId,
-      'edit.task_list',
-      () => {
-        focusView();
-        editor.action((ctx) => {
-          const view = ctx.get(editorViewCtx);
-          taskCommand(ctx)(view.state, view.dispatch);
-        });
-      },
-      () => editor.action((ctx) => taskCommand(ctx)(ctx.get(editorViewCtx).state)),
-    );
+    const listTypes = (ctx: Ctx): ListTypes => ({
+      listItem: listItemSchema.type(ctx),
+      bulletList: bulletListSchema.type(ctx),
+      orderedList: orderedListSchema.type(ctx),
+    });
+    const listCommands: [CommandId, ListKind][] = [
+      ['edit.bullet_list', 'bullet'],
+      ['edit.ordered_list', 'ordered'],
+      ['edit.task_list', 'task'],
+    ];
+    for (const [id, kind] of listCommands) {
+      registerScopedCommand(
+        instanceId,
+        id,
+        () => {
+          focusView();
+          editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            toggleList(kind, listTypes(ctx))(view.state, view.dispatch);
+          });
+        },
+        () => editor.action((ctx) => toggleList(kind, listTypes(ctx))(ctx.get(editorViewCtx).state)),
+      );
+    }
 
     registerScopedCommand(instanceId, 'edit.copy_block_link', () => {
       editor.action((ctx) => {
@@ -745,8 +746,11 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     });
 
     let dom: HTMLElement | null = null;
-    const handleFocus = () =>
-      useActiveEditorStore.getState().setActiveEditor(instanceId);
+    const handleFocus = () => {
+      const active = useActiveEditorStore.getState();
+      active.setActiveEditor(instanceId);
+      editor.action((ctx) => active.setActiveFormats(activeFormats(ctx.get(editorViewCtx).state)));
+    };
 
     editor.action((ctx) => {
       dom = ctx.get(editorViewCtx).dom;

@@ -30,10 +30,10 @@ function host(server: string) {
 }
 
 /**
- * The rail's account button: who's signed in to the sync server, and signing
- * in or out. The details live in Settings > Sync (Account on the web).
+ * Who's signed in to the sync server, and signing in or out: the rail's
+ * account button and the phone's You page.
  */
-export function AccountButton() {
+export function useAccountActions() {
   const configured = useSetting('sync.server');
   // The web app's server is the page's own origin.
   const server = can.syncSettings ? configured : location.origin;
@@ -85,8 +85,30 @@ export function AccountButton() {
           ? 'Not signed in'
           : 'Checking…';
 
+  return {
+    server,
+    host: server ? host(server) : null,
+    username,
+    status,
+    attention,
+    busy,
+    failure,
+    signIn,
+    signOut: leave,
+    refresh: () => void refresh(server),
+  };
+}
+
+/**
+ * The rail's account button: who's signed in to the sync server, and signing
+ * in or out. The details live in Settings > Sync (Account on the web).
+ */
+export function AccountButton() {
+  const openSettings = useSettingsDialog((s) => s.openSettings);
+  const { server, username, status, attention, busy, failure, signIn, signOut: leave, refresh } = useAccountActions();
+
   return (
-    <DropdownMenu onOpenChange={(open) => open && void refresh(server)}>
+    <DropdownMenu onOpenChange={(open) => open && refresh()}>
       <DropdownMenuTrigger
         render={<Button variant='ghost' size='icon' className='size-10' />}
       >

@@ -27,6 +27,11 @@ export const can = {
   /** Installed fonts, and folders of user themes. */
   systemFonts: shell === 'desktop',
   themeFolders: shell === 'desktop',
+  /**
+   * A File/Edit/View menu. iOS has none: everything is in the app's own UI
+   * (the tab's file actions, the sidebar, the keyboard bar).
+   */
+  appMenu: shell !== 'mobile',
   /** Linking folders to a sync server; the web app is the server's own. */
   syncSettings: shell !== 'web',
 } as const;

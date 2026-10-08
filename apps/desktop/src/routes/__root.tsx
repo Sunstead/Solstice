@@ -30,6 +30,7 @@ import { useVisualViewport } from '@/hooks/use-visual-viewport';
 import { useSourceModeCommand } from '@/hooks/use-source-mode';
 import { KeyboardBar } from '@/components/mobile/keyboard-bar';
 import { SlashMenu } from '@/components/editor/slash-menu';
+import { can } from '@/lib/backend/platform';
 
 export const Route = createRootRoute({
   // Named, so the hooks linter knows it's a component.
@@ -80,7 +81,7 @@ export const Route = createRootRoute({
       registerCommand('view.toggle_sidebar', () =>
         console.log('view.toggle_sidebar'),
       );
-      registerCommand('file.open_folder', () => openFolder());
+      if (can.pickFolders) registerCommand('file.open_folder', () => openFolder());
       registerCommand('file.new_workspace', () => useWorkspaceDialogs.getState().show('new'));
       registerCommand('file.import_from_sync', () => useWorkspaceDialogs.getState().show('import'));
       registerCommand('file.manage_workspaces', () => useWorkspaceDialogs.getState().show('manage'));
