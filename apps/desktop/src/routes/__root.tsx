@@ -31,6 +31,7 @@ import { useSourceModeCommand } from '@/hooks/use-source-mode';
 import { KeyboardBar } from '@/components/mobile/keyboard-bar';
 import { SlashMenu } from '@/components/editor/slash-menu';
 import { can } from '@/lib/backend/platform';
+import { usePhoneNav } from '@/lib/stores/phone-nav';
 
 export const Route = createRootRoute({
   // Named, so the hooks linter knows it's a component.
@@ -85,7 +86,13 @@ export const Route = createRootRoute({
       registerCommand('file.new_workspace', () => useWorkspaceDialogs.getState().show('new'));
       registerCommand('file.import_from_sync', () => useWorkspaceDialogs.getState().show('import'));
       registerCommand('file.manage_workspaces', () => useWorkspaceDialogs.getState().show('manage'));
-      registerCommand('file.open_file', () => setQuickOpenOpen(true));
+      registerCommand('file.open_file', () => {
+        // A phone has quick open as its Search page.
+        if (useLayout.getState().openInPlace) {
+          usePhoneNav.getState().goHome();
+          usePhoneNav.getState().showPage('search');
+        } else setQuickOpenOpen(true);
+      });
       registerCommand('app.settings', () =>
         useSettingsDialog.getState().openSettings(),
       );
