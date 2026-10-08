@@ -26,6 +26,7 @@ import { taskList } from '@/lib/tasklist';
 import { link } from '@/lib/link';
 import { imageWithSize, insertImageWithSizeInputRule } from '@/lib/image/schema';
 import { attachmentPasteDrop } from './paste-drop';
+import { slashMenu } from '@/lib/slash';
 
 type NodeViewFactory = ReturnType<typeof useNodeViewFactory>;
 
@@ -154,5 +155,7 @@ export function createEditorFeatures({
     autoPair,
 
     attachmentPasteDrop(notePath),
+
+    slashMenu,
   ].flat();
 }

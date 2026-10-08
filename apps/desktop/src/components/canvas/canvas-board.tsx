@@ -430,7 +430,7 @@ export function CanvasBoard({ path }: { path: string }) {
         onSubmit={(url) => addCard('link', { url })}
       />
 
-      <div className='pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4'>
+      <div className='pointer-events-none absolute inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-20 flex justify-center px-4'>
         <ViewerToolbar>
           {/* The context menu's icons, so a card's type reads the same way
               whichever surface added it. */}

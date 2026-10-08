@@ -1,7 +1,9 @@
 {
+  "id": "/",
   "name": "Solstice",
   "short_name": "Solstice",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#301109",
   "theme_color": "#301109",

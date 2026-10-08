@@ -11,12 +11,14 @@ type QuickOpenDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenFile: (path: string) => void;
+  placeholder?: string;
 };
 
 export function QuickOpenDialog({
   open,
   onOpenChange,
   onOpenFile,
+  placeholder = 'Open file...',
 }: QuickOpenDialogProps) {
   const files = useFileIndex(useShallow(selectAllFiles));
   const workspacePath = useWorkspace((s) => s.path);
@@ -27,7 +29,7 @@ export function QuickOpenDialog({
     <FileSearchDialog
       open={open}
       onOpenChange={onOpenChange}
-      placeholder='Open file...'
+      placeholder={placeholder}
       emptyMessage='No matching files.'
       heading='Files'
       entries={files}

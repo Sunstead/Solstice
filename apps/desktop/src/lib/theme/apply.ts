@@ -49,12 +49,32 @@ export function applyTheme(theme: Theme) {
   }
   for (const [name, value] of vars) root.style.setProperty(name, value);
 
+  syncThemeColor();
+
   rememberForFirstPaint({
     theme: builtin.id,
     style: builtin.style,
     appearance: theme.appearance,
     vars,
   });
+}
+
+/**
+ * The browser's own chrome (Safari's bars, a home-screen app's status bar)
+ * takes the sidebar's colour, the colour of the app's top edge.
+ */
+function syncThemeColor() {
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.append(meta);
+  }
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;visibility:hidden;background:var(--sidebar)';
+  document.body.append(probe);
+  meta.content = getComputedStyle(probe).backgroundColor;
+  probe.remove();
 }
 
 /**

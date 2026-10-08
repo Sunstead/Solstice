@@ -81,7 +81,7 @@ function MobileTopBar() {
   return (
     <header
       data-tauri-drag-region
-      className='flex h-12 shrink-0 items-center gap-1 border-b bg-sidebar px-1.5 pt-[env(safe-area-inset-top)]'
+      className='flex h-12 shrink-0 items-center gap-1 border-b bg-sidebar px-1.5'
     >
       {/* The traffic lights sit over the top-left corner on macOS. */}
       {isDesktop && isMac && !isFullscreen && <span data-tauri-drag-region className='w-16 shrink-0' />}

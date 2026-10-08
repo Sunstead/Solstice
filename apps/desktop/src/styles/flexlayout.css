@@ -354,6 +354,17 @@
   padding-left: 2px;
 }
 
+/* Touch has no hover to find these with: every tab can close, and the
+   splitters take a finger. */
+@media (pointer: coarse) {
+  .flexlayout-custom .flexlayout__tab_button_trailing {
+    display: flex;
+  }
+  .flexlayout-custom .flexlayout__layout {
+    --splitter-active-size: 24px;
+  }
+}
+
 /*
  * Tab close button, while the file has an unwritten edit.
  *

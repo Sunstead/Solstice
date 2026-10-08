@@ -509,7 +509,7 @@ export function MediaPlayer({
         className='max-h-full max-w-full'
         onClick={togglePlay}
       />
-      <div className='pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center px-3'>
+      <div className='pointer-events-none absolute inset-x-0 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-10 flex justify-center px-3'>
         {transport}
       </div>
     </div>

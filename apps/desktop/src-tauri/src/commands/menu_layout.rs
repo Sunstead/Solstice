@@ -182,10 +182,14 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                         Command(EditBlockquote),
                         Command(EditBulletList),
                         Command(EditOrderedList),
+                        Command(EditTaskList),
                         Command(EditCodeBlock)
                     ]
                 ),
+                Command(EditIndent),
+                Command(EditOutdent),
                 Separator,
+                Command(EditInsertWikilink),
                 Command(EditInsertImage),
                 Command(EditHardBreak)
             ],

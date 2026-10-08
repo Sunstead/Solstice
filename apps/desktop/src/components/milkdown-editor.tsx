@@ -37,6 +37,11 @@ import {
   codeBlockKeymap,
   hardbreakKeymap,
   paragraphKeymap,
+  bulletListSchema,
+  listItemKeymap,
+  listItemSchema,
+  liftListItemCommand,
+  sinkListItemCommand,
 } from '@milkdown/kit/preset/commonmark';
 import {
   gfm,
@@ -61,6 +66,9 @@ import { useKeymapStore } from '@/lib/stores/keymap';
 import { wikilink, useWikilinkIndexSync } from '@/lib/wikilink';
 import { createEditorFeatures } from '@/lib/editor/plugins';
 import { insertImagesFromDialog } from '@/lib/editor/insert-image';
+import { toggleTaskList } from '@/lib/editor/list-commands';
+import { wikilinkFor } from '@/lib/entry-actions';
+import { pickFile } from '@/lib/stores/note-picker';
 import { EditorNotePathContext } from '@/components/editor/editor-file-context';
 import { ExternalChangeBar } from '@/components/external-change-bar';
 import { SaveFailedBar } from '@/components/save-failed-bar';
@@ -359,6 +367,12 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
             }
             ctx.set(keymapKey, patch);
           }
+          // Mod-] and Mod-[ are `edit.indent`/`edit.outdent` now; Tab stays.
+          ctx.update(listItemKeymap.key, (keys) => ({
+            ...keys,
+            SinkListItem: { ...keys.SinkListItem, shortcuts: ['Tab'] },
+            LiftListItem: { ...keys.LiftListItem, shortcuts: ['Shift-Tab'] },
+          }));
         })
         .use(listener)
         .use(commonmark)
@@ -642,6 +656,50 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       void insertImagesFromDialog((fn) => editor.action(fn), path);
     });
 
+    registerScopedCommand(
+      instanceId,
+      'edit.indent',
+      () => {
+        focusView();
+        editor.action(callCommand(sinkListItemCommand.key));
+      },
+      () => editor.action(canRun(sinkListItemCommand.key)),
+    );
+    registerScopedCommand(
+      instanceId,
+      'edit.outdent',
+      () => {
+        focusView();
+        editor.action(callCommand(liftListItemCommand.key));
+      },
+      () => editor.action(canRun(liftListItemCommand.key)),
+    );
+
+    const taskCommand = (ctx: Ctx) =>
+      toggleTaskList(listItemSchema.type(ctx), bulletListSchema.type(ctx));
+    registerScopedCommand(
+      instanceId,
+      'edit.task_list',
+      () => {
+        focusView();
+        editor.action((ctx) => {
+          const view = ctx.get(editorViewCtx);
+          taskCommand(ctx)(view.state, view.dispatch);
+        });
+      },
+      () => editor.action((ctx) => taskCommand(ctx)(ctx.get(editorViewCtx).state)),
+    );
+
+    registerScopedCommand(instanceId, 'edit.insert_wikilink', async () => {
+      const picked = await pickFile();
+      focusView();
+      if (!picked) return;
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        view.dispatch(view.state.tr.insertText(wikilinkFor(picked)).scrollIntoView());
+      });
+    });
+
     registerScopedCommand(instanceId, 'native.select_all', () => {
       editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
@@ -675,6 +733,10 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
 
       unregisterScopedCommand(instanceId, 'edit.find');
       unregisterScopedCommand(instanceId, 'edit.insert_image');
+      unregisterScopedCommand(instanceId, 'edit.indent');
+      unregisterScopedCommand(instanceId, 'edit.outdent');
+      unregisterScopedCommand(instanceId, 'edit.task_list');
+      unregisterScopedCommand(instanceId, 'edit.insert_wikilink');
       unregisterScopedCommand(instanceId, 'native.undo');
       unregisterScopedCommand(instanceId, 'native.redo');
       unregisterScopedCommand(instanceId, 'native.cut');
