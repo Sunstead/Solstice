@@ -36,11 +36,20 @@ describe('wikilink targets', () => {
     expect(parseWikilinkTarget('notes/spec#Design|400')).toEqual({
       path: 'notes/spec',
       heading: 'Design',
+      block: null,
       suffix: '400',
     });
-    expect(parseWikilinkTarget('#here')).toEqual({ path: '', heading: 'here', suffix: null });
-    expect(parseWikilinkTarget('todo|the list')).toEqual({ path: 'todo', heading: null, suffix: 'the list' });
-    expect(parseWikilinkTarget('todo#')).toEqual({ path: 'todo', heading: null, suffix: null });
+    expect(parseWikilinkTarget('#here')).toEqual({ path: '', heading: 'here', block: null, suffix: null });
+    expect(parseWikilinkTarget('todo|the list')).toEqual({ path: 'todo', heading: null, block: null, suffix: 'the list' });
+    expect(parseWikilinkTarget('todo#')).toEqual({ path: 'todo', heading: null, block: null, suffix: null });
+    // The same cases as solstice-core's `parse_target`.
+    expect(parseWikilinkTarget('notes/spec#^a1b2|Alias')).toEqual({
+      path: 'notes/spec',
+      heading: null,
+      block: 'a1b2',
+      suffix: 'Alias',
+    });
+    expect(parseWikilinkTarget('todo#^').block).toBeNull();
   });
 
   it('tells links from embeds', () => {

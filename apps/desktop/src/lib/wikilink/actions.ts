@@ -1,6 +1,7 @@
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useLayout } from '@/hooks/use-layout';
 import { resolveWikilink, useWikilinkIndex } from '@/lib/stores/wikilink-index';
+import { requestAnchor } from '@/lib/stores/anchor';
 import { joinWorkspacePath, parseWikilinkTarget, wikilinkLabel } from './target';
 
 /**
@@ -13,18 +14,16 @@ export function openWikilink(target: string): boolean {
   if (!root) return false;
 
   // A target may carry `#heading` and `|alias`; only the path part resolves.
-  const { path } = parseWikilinkTarget(target);
+  const { path, heading, block } = parseWikilinkTarget(target);
   if (!path) return false;
 
   const resolution = resolveWikilink(path, useWikilinkIndex.getState());
   if (resolution.status !== 'resolved') return false;
 
-  useLayout
-    .getState()
-    .openFile(
-      joinWorkspacePath(root, resolution.path),
-      wikilinkLabel(resolution.path),
-    );
+  const absolute = joinWorkspacePath(root, resolution.path);
+  // The editor takes it once the note is open, or at once if it already is.
+  if (heading || block) requestAnchor(absolute, heading, block);
+  useLayout.getState().openFile(absolute, wikilinkLabel(resolution.path));
 
   return true;
 }

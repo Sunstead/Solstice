@@ -16,7 +16,7 @@ import { Milkdown, MilkdownProvider, useEditor, useInstance } from '@milkdown/re
 import { setNodeText } from '@/lib/canvas/doc';
 import type { TextNode } from '@/lib/canvas/types';
 import { useCanvasStoreApi } from '@/lib/canvas/use-canvas-store';
-import { editorSchemaPlugins } from '@/lib/editor/plugins';
+import { editorOuterMarks, editorSchemaPlugins } from '@/lib/editor/plugins';
 import { wikilink } from '@/lib/wikilink';
 
 /**
@@ -54,6 +54,7 @@ function TextEditorCore({ node }: { node: TextNode }) {
           });
         })
         .use(listener)
+        .use(editorOuterMarks())
         .use(commonmark)
         .use(gfm)
         // Its own undo stack, so Cmd+Z in a card steps back through typing

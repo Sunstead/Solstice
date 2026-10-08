@@ -114,6 +114,9 @@ The Markdown editor is [Milkdown](https://milkdown.dev) (a ProseMirror wrapper) 
 - A decoration plugin collapses each link to its filename unless the selection is inside it, in which case the raw source is revealed for editing.
 - Link resolution status (does the target exist, is it ambiguous) comes from a workspace-wide file index (`useWikilinkIndex` / `useFileIndex`), rebuilt on workspace switch and invalidated on file create/rename/delete.
 - `crates/solstice-core` ports target normalization, parsing and resolution to Rust for Sync and Atlas. The two must agree: `wikilink-index.test.ts` and `solstice-core/src/wikilink.rs` test the same cases, so change both together.
+- A target's `#heading` or `#^block` (a block id, Obsidian's `^id` at the end of a block) opens the note there: `openWikilink` leaves an anchor request (`lib/stores/anchor.ts`) that the note's editor takes once loaded. `![[note#^id]]` embeds the block (`sliceBlock`).
+
+Obsidian's other syntax: `==highlight==` is a mark (`lib/highlight/`), paired over the parsed tree, and registered before commonmark (`editorOuterMarks`) so it nests outside `strong` when written back. `%%comments%%` and `^ids` stay plain text with decorations (`lib/comment/`, `lib/blockid/`); read-only views drop comments (`stripComments`). Front matter is one atom node holding the block verbatim (`lib/frontmatter/`), by `split_front_matter`'s rule.
 
 ### Layout
 

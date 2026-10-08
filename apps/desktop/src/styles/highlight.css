@@ -1,0 +1,39 @@
+/* `==highlight==`: a highlighter's yellow, translucent so it reads on light and dark. */
+mark.solstice-highlight {
+  background-color: oklch(0.86 0.17 95 / 0.38);
+  color: inherit;
+  border-radius: 0.2em;
+  padding-inline: 0.1em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* `%%comments%%`: kept in the note, quiet in the editor, gone when read elsewhere. */
+.solstice-comment,
+.solstice-comment-block {
+  color: var(--muted-foreground);
+  opacity: 0.7;
+  font-style: italic;
+}
+
+/* A block's `^id`: there for links, not for reading. */
+.solstice-block-id {
+  color: var(--muted-foreground);
+  opacity: 0.6;
+  font-size: 0.8em;
+}
+
+/* Where a link's `#heading` or `#^block` landed, for a moment. */
+.solstice-anchor-flash {
+  border-radius: 0.25em;
+  animation: solstice-anchor-flash 1.2s ease-out;
+}
+
+@keyframes solstice-anchor-flash {
+  from {
+    background-color: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}

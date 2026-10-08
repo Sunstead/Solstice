@@ -64,9 +64,12 @@ import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useKeymapStore } from '@/lib/stores/keymap';
 import { wikilink, useWikilinkIndexSync } from '@/lib/wikilink';
-import { createEditorFeatures } from '@/lib/editor/plugins';
+import { createEditorFeatures, editorOuterMarks } from '@/lib/editor/plugins';
 import { insertImagesFromDialog } from '@/lib/editor/insert-image';
 import { toggleTaskList } from '@/lib/editor/list-commands';
+import { toggleHighlightCommand } from '@/lib/highlight';
+import { blockIdOf, findAnchor, newBlockId } from '@/lib/blockid';
+import { clearAnchor, useAnchorRequest } from '@/lib/stores/anchor';
 import { wikilinkFor } from '@/lib/entry-actions';
 import { pickFile } from '@/lib/stores/note-picker';
 import { EditorNotePathContext } from '@/components/editor/editor-file-context';
@@ -91,6 +94,7 @@ import '@/styles/code-block.css';
 import '@/styles/math.css';
 import '@/styles/callout.css';
 import '@/styles/frontmatter.css';
+import '@/styles/highlight.css';
 import '@/styles/task-list.css';
 import '@/styles/table.css';
 
@@ -375,6 +379,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
           }));
         })
         .use(listener)
+        .use(editorOuterMarks())
         .use(commonmark)
         .use(gfm)
         .use(history)
@@ -658,6 +663,15 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
 
     registerScopedCommand(
       instanceId,
+      'edit.highlight',
+      () => {
+        focusView();
+        editor.action(callCommand(toggleHighlightCommand.key));
+      },
+      () => editor.action(canRun(toggleHighlightCommand.key)),
+    );
+    registerScopedCommand(
+      instanceId,
       'edit.indent',
       () => {
         focusView();
@@ -689,6 +703,22 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       },
       () => editor.action((ctx) => taskCommand(ctx)(ctx.get(editorViewCtx).state)),
     );
+
+    registerScopedCommand(instanceId, 'edit.copy_block_link', () => {
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { $from } = view.state.selection;
+        if (!$from.parent.isTextblock) return;
+        let id = blockIdOf($from.parent);
+        if (!id) {
+          id = newBlockId();
+          view.dispatch(view.state.tr.insertText(` ^${id}`, $from.end()));
+        }
+        void navigator.clipboard
+          .writeText(wikilinkFor(path).replace(/]]$/, `#^${id}]]`))
+          .catch((error) => console.error('Copy link to block failed', error));
+      });
+    });
 
     registerScopedCommand(instanceId, 'edit.insert_wikilink', async () => {
       const picked = await pickFile();
@@ -733,10 +763,12 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
 
       unregisterScopedCommand(instanceId, 'edit.find');
       unregisterScopedCommand(instanceId, 'edit.insert_image');
+      unregisterScopedCommand(instanceId, 'edit.highlight');
       unregisterScopedCommand(instanceId, 'edit.indent');
       unregisterScopedCommand(instanceId, 'edit.outdent');
       unregisterScopedCommand(instanceId, 'edit.task_list');
       unregisterScopedCommand(instanceId, 'edit.insert_wikilink');
+      unregisterScopedCommand(instanceId, 'edit.copy_block_link');
       unregisterScopedCommand(instanceId, 'native.undo');
       unregisterScopedCommand(instanceId, 'native.redo');
       unregisterScopedCommand(instanceId, 'native.cut');
@@ -799,6 +831,31 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
     if (loading || !findOpen || !findStepRequest) return;
     withView((view) => stepFindMatch(view, findStepRequest.direction));
   }, [loading, withView, findOpen, findStepRequest]);
+
+  // A link's `#heading` or `#^block`: shown once this note has loaded.
+  const anchor = useAnchorRequest((s) => (s.path === path ? s : null));
+  useEffect(() => {
+    if (loading || !anchor) return;
+    clearAnchor();
+    withView((view) => {
+      const pos = findAnchor(view.state.doc, anchor);
+      if (pos === null) return;
+      view.dispatch(
+        view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(pos + 1))),
+      );
+      const dom = view.nodeDOM(pos);
+      if (!(dom instanceof HTMLElement)) return;
+      // A note just opened is still being laid out (and its tab eased in);
+      // scrolled any sooner, it lands short.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          dom.scrollIntoView({ block: 'start' });
+          dom.classList.add('solstice-anchor-flash');
+          setTimeout(() => dom.classList.remove('solstice-anchor-flash'), 1200);
+        }),
+      );
+    });
+  }, [loading, anchor, withView]);
 
   // Opening over a selection searches for it, the way every editor does.
   // Owned here rather than by the bar because only the editor can read the
