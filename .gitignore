@@ -24,7 +24,7 @@ dist-ssr
 *.sw?
 
 # Rust workspace output
-/target/
+target/
 
 # Local settings and Sync server data for development.
 .env
