@@ -1,5 +1,6 @@
 import {
   CircleUser,
+  Info,
   Files,
   RefreshCw,
   Keyboard,
@@ -9,6 +10,7 @@ import {
   type LucideIcon,
   PersonStanding,
 } from 'lucide-react';
+import { inTauri } from '@/lib/backend';
 import { can } from '@/lib/backend/platform';
 
 /**
@@ -62,7 +64,10 @@ export const settingsSections = [
     id: 'accessibility',
     label: 'Accessibility',
     icon: PersonStanding
-  }
+  },
+  // The app's version, and its updates on a computer. The web app's version
+  // is its server's.
+  ...(inTauri ? [{ id: 'about', label: 'About', icon: Info }] as const : []),
 ] as const satisfies readonly SettingsSection[];
 
 export type SectionId = (typeof settingsSections)[number]['id'];

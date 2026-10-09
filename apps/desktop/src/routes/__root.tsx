@@ -32,6 +32,8 @@ import { KeyboardBar } from '@/components/mobile/keyboard-bar';
 import { SlashMenu } from '@/components/editor/slash-menu';
 import { can } from '@/lib/backend/platform';
 import { usePhoneNav } from '@/lib/stores/phone-nav';
+import { startBackgroundChecks, useUpdates } from '@/lib/stores/updates';
+import { UpdateDialog } from '@/components/updates/update-dialog';
 
 export const Route = createRootRoute({
   // Named, so the hooks linter knows it's a component.
@@ -96,6 +98,11 @@ export const Route = createRootRoute({
       registerCommand('app.settings', () =>
         useSettingsDialog.getState().openSettings(),
       );
+      if (can.updates) {
+        registerCommand('app.check_for_updates', () =>
+          useUpdates.getState().check({ manual: true }),
+        );
+      }
 
       // Fetch the resolved registry + subscribe to keymap-changed.
       void useKeymapStore.getState().init();
@@ -120,7 +127,10 @@ export const Route = createRootRoute({
       document.addEventListener('contextmenu', preventDefault);
       document.addEventListener('mousedown', handleMouseDown);
 
+      const stopUpdateChecks = startBackgroundChecks();
+
       return () => {
+        stopUpdateChecks();
         document.removeEventListener('mousedown', handleMouseDown);
         document.removeEventListener('contextmenu', preventDefault);
       };
@@ -181,6 +191,8 @@ export const Route = createRootRoute({
 
         {/* One app-wide instance; opened through useSettingsDialog. */}
         <SettingsDialog />
+
+        {can.updates && <UpdateDialog />}
       </DndProvider>
     );
   },

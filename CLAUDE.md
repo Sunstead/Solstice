@@ -161,6 +161,7 @@ The menu, Back, Forward and sync buttons ([header-controls.tsx](apps/desktop/src
 
 - **Icons:** `src/assets/icons/app/icon_square.svg` is the flat icon (Windows, Linux, mobile, the web's favicon, touch icon and manifest; `npm run icons -w @solstice/desktop`, `scripts/build-icons.mjs`). `mac.icon` is the same design as an Icon Composer document, compiled to `src-tauri/icons/Assets.car` (Liquid Glass, `CFBundleIconName` in `src-tauri/Info.plist`) and the fallback `icon.icns` by `scripts/build-mac-icon.sh`, which needs Xcode 26. The **App icons** workflow runs both on a Mac and uploads the results; outputs are committed. The glass icon only shows in a bundled build.
 - **Releases:** the desktop app's version is `apps/desktop/package.json` (`tauri.conf.json` reads it). `npm run release:app -- <version> --push` bumps it and the app crate, commits and tags `app-v<version>`; **App release** builds a universal macOS `.dmg` and Windows installers into a draft GitHub release. The sync server is versioned apart (`sync-v*`). See [RELEASING.md](RELEASING.md).
+- **Updates:** the desktop app updates itself with `tauri-plugin-updater` from the newest published release's `latest.json`, signed on tag builds (`tauri.updater.conf.json`, the `TAURI_SIGNING_*` secrets). The frontend is `lib/backend/updater.ts` and `lib/stores/updates.ts` (`can.updates`): a title-bar indicator, `UpdateDialog`, `app.check_for_updates` and Settings > About. Installing flushes every autosaver first (`flushAllAutosavers`).
 
 ## Conventions
 

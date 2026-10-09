@@ -38,6 +38,29 @@ Pull requests that touch `apps/desktop/src-tauri/` build both platforms
 without releasing, and upload the installers as workflow artifacts for 7
 days, so a change can be tried before it merges.
 
+### Updates
+
+Installed copies check for updates at launch and every six hours
+(Settings > About, or **Check for Updates...**), and install one when the user
+says so. They read `latest.json` from the newest published release
+(`plugins.updater` in `tauri.conf.json`), so **pressing Publish ships the
+release to everyone**; a draft or a pre-release never reaches them.
+
+Tag builds sign the update bundles (`tauri.updater.conf.json` turns them on)
+with the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; the public half is the `pubkey` in
+`tauri.conf.json`. Keep the private key and its password backed up outside
+GitHub: without them no installed copy can ever be updated again, and a new
+key means everyone reinstalls by hand. To make one:
+
+```bash
+npm run tauri -w @solstice/desktop -- signer generate -w ~/.tauri/solstice-updater.key
+```
+
+`releases/latest` is whichever GitHub Release is newest, so the sync server
+must never publish GitHub Releases of its own (its tags are image-only), or
+the app would look for `latest.json` there.
+
 ## The sync server and web app
 
 1. Bump `version` in `apps/sync/Cargo.toml` (and its `Cargo.lock` entry) in a

@@ -63,7 +63,10 @@ enum MenuEntrySpec {
 /// form as `menu_spec` so `get_native_menu_command_ids` can see them -- an
 /// accelerator the OS claims here must not also be bound in the frontend.
 fn app_menu_spec() -> Vec<MenuEntrySpec> {
-    vec![MenuEntrySpec::Command(CommandId::AppSettings)]
+    vec![
+        MenuEntrySpec::Command(CommandId::AppCheckForUpdates),
+        MenuEntrySpec::Command(CommandId::AppSettings),
+    ]
 }
 
 /// The menus as laid out on macOS (`true`, Settings in the application
@@ -116,6 +119,7 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                 // everywhere else it belongs at the bottom of File.
                 if !macos {
                     items.push(Separator);
+                    items.push(Command(AppCheckForUpdates));
                     items.push(Command(AppSettings));
                 }
                 items
