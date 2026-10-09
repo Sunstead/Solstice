@@ -47,6 +47,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check tag matches app version
+        id: version
         if: startsWith(github.ref, 'refs/tags/app-v')
         shell: bash
         run: |
@@ -55,6 +56,10 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match apps/desktop/package.json version $app_version. Use npm run release:app."
             exit 1
           fi
+          # A suffix (0.3.0-beta.1) is a pre-release. Read off the version, not
+          # the tag, whose own "app-" has a dash in it.
+          if [[ "$app_version" == *-* ]]; then pre=true; else pre=false; fi
+          echo "prerelease=$pre" >> "$GITHUB_OUTPUT"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -96,7 +101,9 @@ jobs:
             **macOS:** Solstice_*_universal.dmg (Apple Silicon and Intel). The app is not notarised yet: on first launch use right-click > Open, or System Settings > Privacy & Security > Open Anyway.
             **Windows:** the -setup.exe or .msi installer. SmartScreen may warn about an unrecognised app: More info > Run anyway.
           releaseDraft: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          # The updater only reads the latest full release, so this decides
+          # whether installs see it.
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
 
       # The one retry. Nothing was uploaded by the failed attempt: tauri-action
       # attaches installers only after they have all been built.
@@ -121,7 +128,9 @@ jobs:
             **macOS:** Solstice_*_universal.dmg (Apple Silicon and Intel). The app is not notarised yet: on first launch use right-click > Open, or System Settings > Privacy & Security > Open Anyway.
             **Windows:** the -setup.exe or .msi installer. SmartScreen may warn about an unrecognised app: More info > Run anyway.
           releaseDraft: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          # The updater only reads the latest full release, so this decides
+          # whether installs see it.
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
 
       - name: Upload installers
         if: ${{ !startsWith(github.ref, 'refs/tags/app-v') }}
