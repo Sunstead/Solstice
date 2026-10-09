@@ -41,6 +41,7 @@ macro_rules! command_id {
 
 command_id! {
     AppSettings => "app.settings",
+    AppCheckForUpdates => "app.check_for_updates",
 
     FileNewNote => "file.new_note",
     FileNewCanvas => "file.new_canvas",
@@ -146,8 +147,10 @@ fn reveal_in_system_label() -> &'static str {
 }
 
 /// Commands the web app leaves out: it has no folder to open as a workspace
-/// or import a vault into, and no file manager to show a file in.
-pub const NOT_ON_WEB: [CommandId; 3] = [
+/// or import a vault into, no file manager to show a file in, and updates
+/// with its server.
+pub const NOT_ON_WEB: [CommandId; 4] = [
+    CommandId::AppCheckForUpdates,
     CommandId::FileOpenFolder,
     CommandId::FileImportFromSync,
     CommandId::FileRevealInSystem,
@@ -195,6 +198,12 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             id: CommandId::AppSettings,
             label: "Settings...".into(),
             accelerator: Some("CmdOrCtrl+,".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::AppCheckForUpdates,
+            label: "Check for Updates...".into(),
+            accelerator: None,
             is_overridden: false,
         },
         // -- File --

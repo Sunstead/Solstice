@@ -57,6 +57,9 @@ futures-util = "0.3"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 # The OS trash; iOS and Android have none (see `trash_path`).
 trash = "5"
+# In-app updates from GitHub releases, and the relaunch after one.
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [dev-dependencies]
 tempfile = "3"

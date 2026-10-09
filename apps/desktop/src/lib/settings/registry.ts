@@ -1,6 +1,7 @@
 import type { SectionId } from './sections';
 import { themeOptions } from '@/lib/theme/store';
 import { fontStack } from '@/lib/theme/fonts';
+import { can } from '@/lib/backend/platform';
 import {
   defineBoolean,
   defineEnum,
@@ -529,6 +530,17 @@ export const settingsRegistry = {
     scope: 'workspace',
     label: 'Sort folders first',
     default: true,
+  }),
+
+  // -- About / Updates ------------------------------------------------
+  'updates.autoCheck': defineBoolean({
+    section: 'about',
+    group: 'Updates',
+    scope: 'global',
+    // At launch and every few hours; nothing installs until the user says so.
+    label: 'Check for updates automatically',
+    default: true,
+    visibleWhen: () => can.updates,
   }),
 } satisfies Record<string, AnySettingDef>;
 

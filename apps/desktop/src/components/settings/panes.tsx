@@ -1,5 +1,6 @@
 import type * as React from 'react';
 import type { SectionId } from '@/lib/settings/sections';
+import { AboutPane } from './about-pane';
 import { KeybindingsPane } from './keybindings-pane';
 import { can } from '@/lib/backend/platform';
 import { SyncPane } from './sync-pane';
@@ -18,4 +19,5 @@ export const customPanes: Partial<Record<SectionId, React.ComponentType>> = {
   keybindings: KeybindingsPane,
   // In the browser the app is the server: the account, not a link.
   sync: can.syncSettings ? SyncPane : WebAccountPane,
+  about: AboutPane,
 };

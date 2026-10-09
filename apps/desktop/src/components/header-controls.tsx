@@ -8,6 +8,7 @@ import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { runCommand } from '@/lib/commands';
 import { AppMenubar } from './app-menu-dropdown';
 import { SyncIndicator } from './sync/status';
+import { UpdateIndicator } from './updates/update-indicator';
 
 /** Where the controls end, from the window's left edge; the tab strip's spacer reads it. */
 const useControlsEnd = create<{ end: number }>(() => ({ end: 0 }));
@@ -60,6 +61,7 @@ export function HeaderControls() {
           <span className='sr-only'>Forward</span>
         </Button>
         <SyncIndicator />
+        <UpdateIndicator />
       </div>
     </div>
   );

@@ -25,6 +25,21 @@ import { noteEmbedSourceWritten } from '@/lib/embed/source';
 const RETRY_MIN_MS = 1000;
 const RETRY_MAX_MS = 30_000;
 
+/** Every open editor's autosaver, and the writes on their way to disk. */
+const live = new Set<Autosaver>();
+const inFlight = new Set<Promise<unknown>>();
+
+/**
+ * Write every pending edit now and wait for the writes to land, before the
+ * app quits under them (installing an update). False when an edit is still
+ * unsaved: a failed write, or one held by a conflict.
+ */
+export async function flushAllAutosavers(): Promise<boolean> {
+  for (const saver of live) saver.flush();
+  await Promise.allSettled([...inFlight]);
+  return [...live].every((saver) => !saver.isDirty());
+}
+
 export function createAutosaver(path: string, initialContent: string) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: { markdown: string; seq: number } | null = null;
@@ -125,7 +140,7 @@ export function createAutosaver(path: string, initialContent: string) {
 
   const write = (markdown: string, seq: number) => {
     latestSeq = Math.max(latestSeq, seq);
-    commands
+    const written = commands
       .writeFile(path, markdown)
       .then((result) => {
         // `typedError` resolves command failures rather than rejecting, so a
@@ -148,9 +163,11 @@ export function createAutosaver(path: string, initialContent: string) {
       })
       .catch((err) => failed(markdown, seq, String(err)))
       .finally(() => {
+        inFlight.delete(written);
         publish();
         publishDirty();
       });
+    inFlight.add(written);
   };
 
   const flush = () => {
@@ -215,6 +232,7 @@ export function createAutosaver(path: string, initialContent: string) {
     flush();
     unsubscribe();
     disposed = true;
+    live.delete(saver);
     // A closed editor stops retrying: a late write could land over edits made
     // since in another tab. On the web the journal brings it back.
     stopRetrying();
@@ -235,7 +253,7 @@ export function createAutosaver(path: string, initialContent: string) {
     }
   };
 
-  return {
+  const saver = {
     schedule,
     markDirty,
     flush,
@@ -281,6 +299,8 @@ export function createAutosaver(path: string, initialContent: string) {
       held = false;
     },
   };
+  live.add(saver);
+  return saver;
 }
 
 export type Autosaver = ReturnType<typeof createAutosaver>;

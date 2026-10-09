@@ -34,6 +34,11 @@ export const can = {
   appMenu: shell !== 'mobile',
   /** Linking folders to a sync server; the web app is the server's own. */
   syncSettings: shell !== 'web',
+  /**
+   * Updating itself from GitHub releases. A phone updates through its store,
+   * the web app with its server.
+   */
+  updates: shell === 'desktop',
 } as const;
 
 /** What to call the machine the app is on, in sentences ("on this computer"). */

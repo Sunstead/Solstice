@@ -24,6 +24,13 @@
       "desktop": {
         "schemes": ["solstice"]
       }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkzMkMxNkEyQTE4MEVGQjgKUldTNDc0Q2hvaFlzazBVaUIwWmUxUzl3a3dMcEJsdVFNOEFuLzk5ZldIM3RWNXovcnVLSnMraEIK",
+      "endpoints": ["https://github.com/Sunstead/Solstice/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   },
   "bundle": {

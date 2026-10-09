@@ -7,6 +7,8 @@ name: App release
 #           pushes tag app-v0.2.0, which runs this workflow.
 # Check:    pull requests touching the Tauri shell build without releasing,
 #           and upload the installers as workflow artifacts.
+# Updates:  tag builds sign update bundles with TAURI_SIGNING_PRIVATE_KEY and
+#           attach latest.json; publishing the draft ships it to every install.
 
 on:
   push:
@@ -77,10 +79,14 @@ jobs:
         continue-on-error: ${{ runner.os == 'macOS' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/desktop
           tauriScript: npm run tauri
-          args: ${{ matrix.args }}
+          # Tag builds also make the signed update bundles and latest.json the
+          # app's updater reads; other builds have no key to sign them with.
+          args: ${{ matrix.args }} ${{ startsWith(github.ref, 'refs/tags/app-v') && '--config src-tauri/tauri.updater.conf.json' || '' }}
           # Only tag builds publish; everything else just builds.
           tagName: ${{ startsWith(github.ref, 'refs/tags/app-v') && github.ref_name || '' }}
           releaseName: Solstice __VERSION__
@@ -98,10 +104,14 @@ jobs:
         if: steps.tauri.outcome == 'failure'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/desktop
           tauriScript: npm run tauri
-          args: ${{ matrix.args }}
+          # Tag builds also make the signed update bundles and latest.json the
+          # app's updater reads; other builds have no key to sign them with.
+          args: ${{ matrix.args }} ${{ startsWith(github.ref, 'refs/tags/app-v') && '--config src-tauri/tauri.updater.conf.json' || '' }}
           # Only tag builds publish; everything else just builds.
           tagName: ${{ startsWith(github.ref, 'refs/tags/app-v') && github.ref_name || '' }}
           releaseName: Solstice __VERSION__
