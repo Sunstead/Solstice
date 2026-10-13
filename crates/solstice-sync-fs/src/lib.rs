@@ -223,6 +223,12 @@ impl VaultDir {
         Ok(hash)
     }
 
+    /// Whether an attachment's bytes are here, without reading them.
+    pub fn has_blob(&self, hash: &str) -> bool {
+        is_content_hash(hash)
+            && (self.blob_path(hash).exists() || self.seen.values().any(|f| f.hash == hash))
+    }
+
     /// An attachment's bytes: from the cache, or any file that has them.
     /// `None` for anything that isn't a hash (they come from peers, and
     /// name a file here).
@@ -272,20 +278,26 @@ impl VaultDir {
         }
 
         for (path, (id, content)) in &target {
-            let bytes = match content {
-                Content::Note(text) => text.clone().into_bytes(),
-                Content::Blob(hash) => match self.get_blob(hash) {
-                    Some(bytes) => bytes,
-                    None => continue,
-                },
+            // An attachment's hash is in the manifest: its bytes are only
+            // read when the file has to be written. Reading every one on
+            // every change made a vault of PDFs slow to sync.
+            let hash = match content {
+                Content::Note(text) => content_hash(text.as_bytes()),
+                Content::Blob(hash) => hash.clone(),
             };
-            let hash = content_hash(&bytes);
             if let Some((old, _)) = placed.get(id).cloned() {
                 if old != *path && self.abs(&old).exists() && !self.abs(path).exists() {
                     self.rename(&old, path)?;
                 }
             }
             if self.seen.get(path).map(|f| &f.hash) != Some(&hash) || !self.abs(path).exists() {
+                let bytes = match content {
+                    Content::Note(text) => text.clone().into_bytes(),
+                    Content::Blob(hash) => match self.get_blob(hash) {
+                        Some(bytes) => bytes,
+                        None => continue,
+                    },
+                };
                 self.write(path, &bytes)?;
             }
             placed.insert(id.clone(), (path.clone(), hash));
@@ -556,6 +568,25 @@ mod tests {
         let mut vault = Vault::new("server");
         vd.absorb(&mut vault).unwrap();
         assert!(matches!(&vault.files()["Existing.md"].1, Content::Note(t) if t == "from before"));
+    }
+
+    #[test]
+    fn an_attachment_in_place_needs_no_reading() {
+        let (_tmp, mut vd) = dir();
+        std::fs::write(vd.root().join("doc.pdf"), b"%PDF one").unwrap();
+        let mut vault = Vault::new("server");
+        vd.absorb(&mut vault).unwrap();
+        let hash = content_hash(b"%PDF one");
+        assert!(vd.has_blob(&hash));
+        assert!(!vd.has_blob(&content_hash(b"never")));
+        assert!(!vd.has_blob("../../state.db"));
+
+        // Without its cached copy, the file in place still counts, and
+        // writing the vault out leaves it be.
+        let _ = std::fs::remove_file(vd.blob_path(&hash));
+        assert!(vd.has_blob(&hash));
+        vd.materialize(&vault).unwrap();
+        assert_eq!(std::fs::read(vd.root().join("doc.pdf")).unwrap(), b"%PDF one");
     }
 
     #[test]

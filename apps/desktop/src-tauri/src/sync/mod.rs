@@ -187,6 +187,14 @@ pub fn saved(app: &AppHandle, path: &str, contents: &str) {
     }
 }
 
+/// A file in a synced folder was written outside the editors' saves (the iOS
+/// app's PDF and drawing editors): sync it now.
+pub fn changed(app: &AppHandle, path: &str) {
+    if let Some((client, _)) = client_for_path(app, Path::new(path)) {
+        client.folder_changed();
+    }
+}
+
 // ---------------------------------------------------------------- commands
 
 #[derive(Debug, Clone, Serialize, Type)]
