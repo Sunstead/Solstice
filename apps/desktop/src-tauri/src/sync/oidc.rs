@@ -3,7 +3,8 @@
 //! (`app/src-tauri/src/oidc.rs`).
 //!
 //! We listen on 127.0.0.1 on a random port, open the system browser at the
-//! provider, and catch the redirect back. The provider allows any port on
+//! provider (on iOS, the sign-in sheet: see `in_sheet`), and catch the
+//! redirect back. The provider allows any port on
 //! `http://127.0.0.1/callback` for the Solstice client. The code exchange and
 //! every refresh happen here, and the tokens never reach the webview: the
 //! sync client asks for access tokens itself.
@@ -14,6 +15,7 @@ use serde::Deserialize;
 use sha2::{ Digest, Sha256 };
 use std::time::Duration;
 use tauri::{ AppHandle, Manager, Runtime };
+#[cfg(not(target_os = "ios"))]
 use tauri_plugin_opener::OpenerExt;
 use tokio::{ io::{ AsyncReadExt, AsyncWriteExt }, net::TcpListener };
 
@@ -158,20 +160,26 @@ pub async fn sign_in<R: Runtime>(
         .append_pair("code_challenge", &challenge(&verifier))
         .append_pair("code_challenge_method", "S256");
 
-    app.opener()
-        .open_url(url.as_str(), None::<&str>)
-        .map_err(|e| format!("Could not open the browser: {e}"))?;
-
-    let query = tokio::time
-        ::timeout(SIGN_IN_TIMEOUT, async {
-            loop {
-                let (mut stream, _) = listener.accept().await.map_err(|e| e.to_string())?;
-                if let Some(q) = serve_one(&mut stream).await {
-                    return Ok::<_, String>(q);
-                }
+    let callback = tokio::time::timeout(SIGN_IN_TIMEOUT, async {
+        loop {
+            let (mut stream, _) = listener.accept().await.map_err(|e| e.to_string())?;
+            if let Some(q) = serve_one(&mut stream).await {
+                return Ok::<_, String>(q);
             }
-        }).await
-        .map_err(|_| "Sign-in timed out. Try again.".to_string())??;
+        }
+    });
+
+    #[cfg(not(target_os = "ios"))]
+    let callback = {
+        app.opener()
+            .open_url(url.as_str(), None::<&str>)
+            .map_err(|e| format!("Could not open the browser: {e}"))?;
+        callback.await
+    };
+    #[cfg(target_os = "ios")]
+    let callback = in_sheet(app, url.as_str(), callback).await?;
+
+    let query = callback.map_err(|_| "Sign-in timed out. Try again.".to_string())??;
     drop(listener);
 
     // Back to the app, not left behind the browser.
@@ -213,6 +221,29 @@ pub async fn sign_in<R: Runtime>(
         None => return Err("The sign-in provider gave no refresh token (is offline_access allowed?)".into()),
     }
     Ok(())
+}
+
+/// iOS suspends an app behind Safari, and with it the loopback listener, so
+/// the provider opens in the sign-in sheet instead, which keeps the app
+/// running. The redirect still lands on the listener; the sheet is closed
+/// once `wait` has it, and closing it first cancels.
+#[cfg(target_os = "ios")]
+async fn in_sheet<R: Runtime, T>(
+    app: &AppHandle<R>,
+    url: &str,
+    wait: impl std::future::Future<Output = T>
+) -> Result<T, String> {
+    use tauri_plugin_solstice_native::NativeExt;
+    let handle = app.clone();
+    let url = url.to_string();
+    let sheet = tauri::async_runtime::spawn_blocking(move || handle.native().authenticate(&url));
+    let result = tokio::select! {
+        done = wait => done,
+        _ = sheet => return Err("Sign-in was cancelled.".into()),
+    };
+    let handle = app.clone();
+    let _ = tauri::async_runtime::spawn_blocking(move || handle.native().dismiss_authentication()).await;
+    Ok(result)
 }
 
 /// True if a sign-in is stored (it may still turn out to be revoked).

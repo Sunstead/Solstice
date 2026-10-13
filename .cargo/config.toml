@@ -1,0 +1,5 @@
+[env]
+# The iOS app's minimum (bundle.iOS.minimumSystemVersion in tauri.conf.json),
+# for what cargo builds outside Xcode: the Swift plugins and C dependencies.
+# Xcode's builds set their own, which wins.
+IPHONEOS_DEPLOYMENT_TARGET = "27.0"

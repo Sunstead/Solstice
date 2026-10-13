@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-surface"
+description = "Enables the surface command without any pre-configured scope."
+commands.allow = ["surface"]
+
+[[permission]]
+identifier = "deny-surface"
+description = "Denies the surface command without any pre-configured scope."
+commands.deny = ["surface"]

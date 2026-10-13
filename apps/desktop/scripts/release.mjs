@@ -9,7 +9,7 @@
  *
  * The version lives in apps/desktop/package.json (tauri.conf.json reads it
  * from there) and the app's crate, apps/desktop/src-tauri/Cargo.toml, kept in
- * step here. The sync server (`sync-v*`) and the library crates have their
+ * step here, as is the iOS project's (gen/apple). The sync server (`sync-v*`) and the library crates have their
  * own versions.
  */
 import { execFileSync } from 'node:child_process';
@@ -24,6 +24,8 @@ const files = {
   lock: path.join(root, 'package-lock.json'),
   cargo: path.join(appDir, 'src-tauri/Cargo.toml'),
   cargoLock: path.join(root, 'Cargo.lock'),
+  iosPlist: path.join(appDir, 'src-tauri/gen/apple/solstice_iOS/Info.plist'),
+  iosProject: path.join(appDir, 'src-tauri/gen/apple/project.yml'),
 };
 /** The app's crate, as Cargo.lock names it. */
 const CRATE = 'solstice';
@@ -92,7 +94,25 @@ const entry = new RegExp(`(\\[\\[package\\]\\]\\r?\\nname = "${CRATE}"\\r?\\nver
 if (!entry.test(lock)) fail(`could not find ${CRATE} in Cargo.lock`);
 writeFileSync(files.cargoLock, lock.replace(entry, `$1${version}$2`));
 
-git('add', files.pkg, files.lock, files.cargo, files.cargoLock);
+// The iOS project, which keeps its own copy. iOS takes only numbers, so a
+// pre-release ships as its release's.
+const ios = version.split('-')[0];
+const plist = readFileSync(files.iosPlist, 'utf8');
+const plistBumped = plist.replace(
+  /(<key>(?:CFBundleShortVersionString|CFBundleVersion)<\/key>\s*<string>)[^<]*(<\/string>)/g,
+  `$1${ios}$2`,
+);
+if (plistBumped === plist && !plist.includes(`<string>${ios}</string>`)) fail('could not find the version in the iOS Info.plist');
+writeFileSync(files.iosPlist, plistBumped);
+const project = readFileSync(files.iosProject, 'utf8');
+writeFileSync(
+  files.iosProject,
+  project
+    .replace(/(CFBundleShortVersionString: ).*/, `$1${ios}`)
+    .replace(/(CFBundleVersion: ).*/, `$1"${ios}"`),
+);
+
+git('add', files.pkg, files.lock, files.cargo, files.cargoLock, files.iosPlist, files.iosProject);
 git('commit', '--quiet', '-m', `Release Solstice ${version}`);
 git('tag', '-a', tag, '-m', `Solstice ${version}`);
 console.log(`Bumped ${current} -> ${version}, committed and tagged ${tag}.`);

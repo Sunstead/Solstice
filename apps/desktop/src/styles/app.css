@@ -149,3 +149,12 @@ html[data-reduce-motion='true'] *::after {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * The iOS app draws PDFs natively under the webview (NativeSurface): what is
+ * painted beneath a surface is see-through, and the theme's background is
+ * painted natively behind it all.
+ */
+[data-native-under] {
+  background: transparent !important;
+}

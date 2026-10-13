@@ -1,0 +1,15 @@
+[package]
+name = "tauri-plugin-solstice-native"
+version = "0.1.0"
+description = "Solstice's native iOS pieces: the sign-in sheet, and native views under the webview"
+edition = "2021"
+license = "MIT"
+links = "tauri-plugin-solstice-native"
+
+[dependencies]
+tauri = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

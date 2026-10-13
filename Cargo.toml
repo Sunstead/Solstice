@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps/desktop/src-tauri", "apps/sync", "crates/*"]
+members = ["apps/desktop/src-tauri", "apps/desktop/src-tauri/plugins/*", "apps/sync", "crates/*"]
 
 # The server image's build: small and fast, without slowing desktop builds.
 [profile.server]

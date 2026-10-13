@@ -235,7 +235,15 @@ fn build_changes(
     let mut merged: HashMap<String, FsChange> = HashMap::new();
 
     for event in events {
-        if event.paths.is_empty() {
+        // Reading a file isn't changing it. kqueue (iOS) reports the access
+        // time a read updates as a metadata change; taking that for an edit
+        // reloaded a PDF forever, each load reading the file again.
+        if event.paths.is_empty()
+            || matches!(
+                event.kind,
+                EventKind::Access(_) | EventKind::Modify(ModifyKind::Metadata(_))
+            )
+        {
             continue;
         }
 
@@ -471,6 +479,26 @@ mod tests {
 
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].path, theirs.to_str().unwrap());
+    }
+
+    #[test]
+    fn reads_and_metadata_are_not_changes() {
+        use notify_debouncer_full::notify::event::{AccessKind, MetadataKind};
+        let root = temp_root("metadata");
+        let path = root.join("paper.pdf");
+        std::fs::write(&path, "a").unwrap();
+
+        let changes = build_changes(
+            &[
+                event(EventKind::Access(AccessKind::Any), &[&path]),
+                event(EventKind::Modify(ModifyKind::Metadata(MetadataKind::Any)), &[&path]),
+            ],
+            &root,
+            &root,
+            &empty_ledger(),
+        );
+
+        assert!(changes.is_empty());
     }
 
     #[test]

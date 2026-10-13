@@ -54,6 +54,7 @@
       ]
     },
     "store:default",
-    "dialog:default"
+    "dialog:default",
+    "solstice-native:default"
   ]
 }
