@@ -52,6 +52,10 @@ base64 = "0.22"
 getrandom = "0.3"
 url = "2"
 futures-util = "0.3"
+# The iOS app's native pieces: the sign-in sheet, and PDFs and drawings under
+# the webview. Registered on iOS only; a dependency everywhere so its
+# permissions are known to every build.
+tauri-plugin-solstice-native = { path = "plugins/native" }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

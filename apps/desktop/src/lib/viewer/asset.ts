@@ -4,6 +4,7 @@ import { assetUrl } from '@/lib/backend/shell';
 import { commands } from '@/lib/backend';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { isWithin } from '@/lib/path-utils';
+import { useFileVersion } from './file-version';
 
 /**
  * Paths already granted to the asset scope this session.
@@ -43,6 +44,15 @@ function immediate(path: string): AssetUrl {
  * grant first costs one IPC round trip on first open and nothing afterwards.
  */
 export function useAssetUrl(path: string): AssetUrl {
+  const state = useGrantedAssetUrl(path);
+  // A new URL once the file changes on disk, so a viewer loads it again (a
+  // PDF marked up on another device). The query is the asset scheme's to ignore.
+  const version = useFileVersion(path);
+  if (state.status !== 'ready' || version === 0) return state;
+  return { status: 'ready', url: `${state.url}${state.url.includes('?') ? '&' : '?'}v=${version}` };
+}
+
+function useGrantedAssetUrl(path: string): AssetUrl {
   const [state, setState] = useState<AssetUrl>(() => immediate(path));
 
   useEffect(() => {

@@ -43,6 +43,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "iOS": {
+      "minimumSystemVersion": "27.0"
+    },
     "macOS": {
       "files": {
         "Resources/Assets.car": "icons/Assets.car"

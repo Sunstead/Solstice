@@ -1,0 +1,116 @@
+import ObjectiveC
+import Tauri
+import UIKit
+import WebKit
+
+/// A native view in a tab: a PDF, a drawing. The webview leaves a see-through
+/// hole where it goes, and keeps its frame in step (`NativeSurface`).
+class SurfaceView: UIView {
+  let id: String
+  var path: String
+  weak var plugin: NativePlugin?
+
+  init(id: String, path: String, plugin: NativePlugin) {
+    self.id = id
+    self.path = path
+    self.plugin = plugin
+    super.init(frame: .zero)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { fatalError() }
+
+  /// The file changed under it (another device, another app).
+  func reload() {}
+
+  /// Writes what's unsaved now: the tab is closing, or the app is leaving.
+  func flush() {}
+
+  /// Highlights `query`'s matches and shows the first; how many there are.
+  func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) -> Int { 0 }
+
+  /// Shows the next (or previous) match; its index, or -1 for none.
+  func findStep(_ direction: Int) -> Int { -1 }
+
+  func send(_ type: String, message: String? = nil) {
+    var data: JSObject = ["id": id, "type": type, "path": path]
+    if let message { data["message"] = message }
+    plugin?.trigger("surface", data: data)
+  }
+}
+
+/// Holds the surfaces, under the webview, which is see-through. Touches over a
+/// surface fall through the webview to it (see `routeTouches`), unless a web
+/// menu or dialog is open, which takes them all so a tap outside it closes it
+/// as it would on the web.
+final class SurfaceHost: UIView {
+  static weak var current: SurfaceHost?
+
+  private(set) var surfaces: [String: SurfaceView] = [:]
+  var webModal = false
+  /// Web content over the surfaces that isn't modal (toasts), in host points.
+  var webRects: [CGRect] = []
+
+  func takesTouch(at point: CGPoint) -> Bool {
+    if webModal || webRects.contains(where: { $0.contains(point) }) { return false }
+    return surfaces.values.contains { !$0.isHidden && $0.frame.contains(point) }
+  }
+
+  func add(_ surface: SurfaceView) {
+    surfaces[surface.id]?.removeFromSuperview()
+    surfaces[surface.id] = surface
+    surface.isHidden = true
+    addSubview(surface)
+  }
+
+  func remove(_ id: String) {
+    guard let surface = surfaces.removeValue(forKey: id) else { return }
+    surface.flush()
+    surface.removeFromSuperview()
+  }
+
+  func flushAll() {
+    surfaces.values.forEach { $0.flush() }
+  }
+
+  /// Sits under `webview`, the same size, and makes it see-through.
+  static func install(under webview: WKWebView) -> SurfaceHost? {
+    guard let parent = webview.superview else { return nil }
+    let host = SurfaceHost(frame: webview.frame)
+    host.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    parent.insertSubview(host, belowSubview: webview)
+    webview.isOpaque = false
+    webview.backgroundColor = .clear
+    webview.scrollView.backgroundColor = .clear
+    current = host
+    routeTouches(of: webview)
+    return host
+  }
+
+  /// Gives the webview's own class (wry's) a subclass whose hit test answers
+  /// nothing over a surface, so UIKit goes on to the host underneath. A
+  /// subclass of the real class, made at runtime, keeps wry's overrides.
+  private static func routeTouches(of webview: WKWebView) {
+    guard let base = object_getClass(webview) else { return }
+    let name = "Solstice_" + NSStringFromClass(base)
+    let selector = #selector(UIView.hitTest(_:with:))
+    var made: AnyClass? = NSClassFromString(name)
+    if made == nil, let subclass = objc_allocateClassPair(base, name, 0),
+      let method = class_getInstanceMethod(base, selector)
+    {
+      typealias HitTest = @convention(c) (AnyObject, Selector, CGPoint, UIEvent?) -> UIView?
+      let original = unsafeBitCast(class_getMethodImplementation(base, selector), to: HitTest.self)
+      let block: @convention(block) (UIView, CGPoint, UIEvent?) -> UIView? = { view, point, event in
+        if let host = SurfaceHost.current, host.takesTouch(at: view.convert(point, to: host)) {
+          return nil
+        }
+        return original(view, selector, point, event)
+      }
+      class_addMethod(
+        subclass, selector, imp_implementationWithBlock(block), method_getTypeEncoding(method))
+      objc_registerClassPair(subclass)
+      made = subclass
+    }
+    if let made { object_setClass(webview, made) }
+  }
+}

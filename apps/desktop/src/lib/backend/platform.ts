@@ -39,6 +39,11 @@ export const can = {
    * the web app with its server.
    */
   updates: shell === 'desktop',
+  /**
+   * PDFs (and drawings) drawn by the system under the webview, in Apple's own
+   * views: the iOS app (`lib/backend/native.ts`).
+   */
+  nativeViews: shell === 'mobile' && platform() === 'ios',
 } as const;
 
 /**

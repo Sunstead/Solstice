@@ -108,6 +108,10 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init());
 
+    // The sign-in sheet, and native views under the webview.
+    #[cfg(target_os = "ios")]
+    let app = app.plugin(tauri_plugin_solstice_native::init());
+
     let app = app
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::new().build())

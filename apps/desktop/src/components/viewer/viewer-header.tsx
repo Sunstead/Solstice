@@ -1,6 +1,7 @@
 import FileBreadcrumb from '@/components/file-breadcrumb';
 import { FileActionsDropdown } from '@/components/file-actions-dropdown';
 import { FindBar } from '@/components/find-bar';
+import { useOverSurface } from '@/lib/native-surfaces';
 import { revealInExplorer } from '@/lib/entry-actions';
 import { useFindStore } from '@/lib/stores/find';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ export function ViewerHeader({
   leading,
 }: ViewerHeaderProps) {
   const findOpen = useFindStore((s) => s.openPath === path);
+  const overSurface = useOverSurface();
   // A phone's note pane has its own header with the name and the actions; only
   // the find bar is left to hang here.
   const isMobile = useIsMobile();
@@ -47,7 +49,7 @@ export function ViewerHeader({
     return (
       <div className={cn('z-10 h-0', sticky ? 'sticky top-0' : 'relative')}>
         {find && findOpen && (
-          <div className='absolute top-2 right-3 left-3 z-20 flex justify-end'>
+          <div ref={overSurface} className='absolute top-2 right-3 left-3 z-20 flex justify-end'>
             <FindBar onClose={() => useFindStore.getState().close()} />
           </div>
         )}
@@ -84,7 +86,7 @@ export function ViewerHeader({
         the actions button it would otherwise cover.
       */}
       {find && findOpen && (
-        <div className='absolute top-full right-3 z-20 mt-1'>
+        <div ref={overSurface} className='absolute top-full right-3 z-20 mt-1'>
           <FindBar onClose={() => useFindStore.getState().close()} />
         </div>
       )}
