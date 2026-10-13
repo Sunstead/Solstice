@@ -162,7 +162,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     send("dirty")
     saveTask?.cancel()
     saveTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .seconds(2))
+      try? await Task.sleep(for: .seconds(1))
       guard !Task.isCancelled else { return }
       await self?.save()
     }
