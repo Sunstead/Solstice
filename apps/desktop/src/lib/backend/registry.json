@@ -265,6 +265,18 @@
       "label": "Source mode"
     },
     {
+      "accelerator": "Alt+Shift+]",
+      "id": "view.next_tab",
+      "is_overridden": false,
+      "label": "Next Tab"
+    },
+    {
+      "accelerator": "Alt+Shift+[",
+      "id": "view.previous_tab",
+      "is_overridden": false,
+      "label": "Previous Tab"
+    },
+    {
       "accelerator": "Alt+ArrowLeft",
       "id": "navigation.back",
       "is_overridden": false,
@@ -556,6 +568,23 @@
             "id": "view.toggle_source_mode",
             "is_overridden": false,
             "label": "Source mode"
+          }
+        },
+        "Separator",
+        {
+          "Command": {
+            "accelerator": "Alt+Shift+]",
+            "id": "view.next_tab",
+            "is_overridden": false,
+            "label": "Next Tab"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "Alt+Shift+[",
+            "id": "view.previous_tab",
+            "is_overridden": false,
+            "label": "Previous Tab"
           }
         },
         "Separator",

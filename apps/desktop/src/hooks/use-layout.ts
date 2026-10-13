@@ -13,6 +13,7 @@ import {
 } from '@/lib/stores/workspace-layout';
 import { getFileNameFromPath, normalizePath } from '@/lib/path-utils';
 import { markEntering } from '@/lib/tab-motion';
+import { getSetting } from '@/lib/settings/store';
 import { useRecentFiles } from '@/lib/stores/recent-files';
 import { rerooted } from '@/lib/stores/known-workspaces';
 import { shell } from '@/lib/backend/platform';
@@ -313,14 +314,14 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
     const id = makeUniqueTabId();
     // Docked to the right it starts a tabset of its own: nothing to grow into.
-    if (location === 'center') markEntering(id);
+    if (location === 'center' || getSetting('layout.tabs') === 'single') markEntering(id);
     model.doAction(
       Actions.addNode(
         // Never the path: `openFile` already uses that as the id, so a second
         // tab on the same file would collide and `addNode` would throw.
         { type: 'tab', id, name, component: 'editor', config: { path } },
         activeTabset.getId(),
-        location === 'right' ? DockLocation.RIGHT : DockLocation.CENTER,
+        location === 'right' && getSetting('layout.tabs') !== 'single' ? DockLocation.RIGHT : DockLocation.CENTER,
         -1,
       ),
     );

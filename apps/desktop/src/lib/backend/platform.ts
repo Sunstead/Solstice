@@ -41,5 +41,14 @@ export const can = {
   updates: shell === 'desktop',
 } as const;
 
+/**
+ * Touch is how the app is mainly used: the iOS app, or a browser with no
+ * mouse or trackpad (an iPad without its keyboard, a phone). Decides
+ * defaults, not abilities: a trackpad can still be plugged in.
+ */
+export const touchFirst =
+  shell === 'mobile' ||
+  (typeof window !== 'undefined' && window.matchMedia?.('(any-pointer: fine)').matches === false);
+
 /** What to call the machine the app is on, in sentences ("on this computer"). */
 export const deviceNoun = shell === 'mobile' ? 'device' : 'computer';
