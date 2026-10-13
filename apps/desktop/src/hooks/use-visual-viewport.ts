@@ -12,7 +12,9 @@ const KEYBOARD_MIN_PX = 150;
  * `interactive-widget`: the layout viewport keeps its height when the keyboard
  * opens, and the page scrolls under it, top bar and all. This sets
  * `--app-height` to the visual viewport and undoes that scroll, so the editor
- * scrolls inside its own pane and ends at the keyboard.
+ * scrolls inside its own pane and ends at the keyboard. (The iOS app's
+ * webview is resized to end at a docked keyboard instead, natively:
+ * `WebviewFit`. This then only sees its effect.)
  */
 export function useVisualViewport() {
   useEffect(() => {
@@ -36,8 +38,11 @@ export function useVisualViewport() {
         }
         tallest = Math.max(tallest, vv.height);
         const covered = Math.max(window.innerHeight - vv.height - vv.offsetTop, tallest - vv.height);
-        root.style.setProperty('--app-height', `${vv.height}px`);
         const keyboard = covered > KEYBOARD_MIN_PX;
+        // The bar a hardware keyboard (or Scribble) brings up covers a strip
+        // of the bottom; the app keeps its height under it rather than being
+        // pushed up.
+        root.style.setProperty('--app-height', `${keyboard ? vv.height : window.innerHeight}px`);
         if (useViewport.getState().keyboard !== keyboard) useViewport.setState({ keyboard });
         if (window.scrollY !== 0) window.scrollTo(0, 0);
       });

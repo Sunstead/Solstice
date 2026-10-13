@@ -153,6 +153,10 @@ export const Route = createRootRoute({
             landscape, beside the notch. The bottom one is left to what
             scrolls, so content runs under the home indicator. */}
         <div className='h-[var(--app-height,100dvh)] bg-sidebar text-foreground flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]'>
+          {/* The strip under the status bar (the iPad's menu bar), in the
+              sidebar's colour: an element of its own, since the root goes
+              see-through while a PDF or drawing shows through it. */}
+          <div aria-hidden className='pointer-events-none fixed inset-x-0 top-0 h-[env(safe-area-inset-top)] bg-sidebar' />
           <SidebarProvider
             key={hydrated ? 'hydrated' : 'initial'}
             open={!sidebarCollapsed}
