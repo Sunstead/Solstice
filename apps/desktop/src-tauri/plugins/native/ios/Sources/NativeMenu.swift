@@ -95,9 +95,25 @@ enum NativeMenu {
     let standard: [String: UIMenu.Identifier] = [
       "File": .file, "Edit": .edit, "Format": .format, "View": .view, "Window": .window, "Help": .help,
     ]
+    // iPadOS's menus have shortcuts of their own (Find ⌘F, Bold ⌘B, Open ⌘O
+    // and so on), and a second command with the same keys is an exception
+    // that ends the app. Where ours does the same job, the system's goes.
+    var taken: [Shortcut: UIKeyCommand] = [:]
+    if let root = builder.menu(for: .root) { collect(root, into: &taken) }
+    var used = Set<Shortcut>()
+    let shortcut = { (command: UIKeyCommand) -> Bool in
+      guard let input = command.input else { return false }
+      let key = Shortcut(input: input, flags: command.modifierFlags)
+      if let system = taken.removeValue(forKey: key) {
+        guard let action = system.action else { return false }
+        builder.remove(command: action, propertyList: system.propertyList)
+      }
+      return used.insert(key).inserted
+    }
+
     var after: UIMenu.Identifier = .view
     for menu in menus {
-      let children = elements(menu.entries)
+      let children = elements(menu.entries, shortcut: shortcut)
       guard !children.isEmpty else { continue }
       if let id = standard[menu.title], builder.menu(for: id) != nil {
         // Ours first, then what iPadOS puts there itself.
@@ -113,15 +129,41 @@ enum NativeMenu {
     }
   }
 
-  /// Separators become inline groups, as iPadOS draws them.
-  private static func elements(_ entries: [Entry]) -> [UIMenuElement] {
+  /// A key and its modifiers, as UIKit compares them.
+  private struct Shortcut: Hashable {
+    let input: String
+    let flags: Int
+
+    init(input: String, flags: UIKeyModifierFlags) {
+      self.input = input.lowercased()
+      self.flags = flags.rawValue
+    }
+  }
+
+  private static func collect(_ menu: UIMenu, into shortcuts: inout [Shortcut: UIKeyCommand]) {
+    for child in menu.children {
+      if let command = child as? UIKeyCommand, let input = command.input {
+        shortcuts[Shortcut(input: input, flags: command.modifierFlags)] = command
+      } else if let submenu = child as? UIMenu {
+        collect(submenu, into: &shortcuts)
+      }
+    }
+  }
+
+  /// Separators become inline groups, as iPadOS draws them. `shortcut` says
+  /// whether a key command may keep its keys.
+  private static func elements(_ entries: [Entry], shortcut: (UIKeyCommand) -> Bool) -> [UIMenuElement] {
     var groups: [[UIMenuElement]] = [[]]
     for entry in entries {
       switch entry {
       case .command(let id, let label, let accelerator):
-        groups[groups.count - 1].append(command(id: id, label: label, accelerator: accelerator))
+        var element = command(id: id, label: label, accelerator: accelerator)
+        if let key = element as? UIKeyCommand, !shortcut(key) {
+          element = UICommand(title: label, action: action, propertyList: id)
+        }
+        groups[groups.count - 1].append(element)
       case .submenu(let title, let entries):
-        let children = elements(entries)
+        let children = elements(entries, shortcut: shortcut)
         if !children.isEmpty { groups[groups.count - 1].append(UIMenu(title: title, children: children)) }
       case .separator:
         if !groups[groups.count - 1].isEmpty { groups.append([]) }
