@@ -25,8 +25,17 @@ const SAVE_AFTER: Duration = Duration::from_secs(2);
 /// Quiet this long after connecting means synced.
 const SETTLE: Duration = Duration::from_millis(800);
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
-/// A download that failed is tried again after this.
+/// Attachments downloaded at once. Each is a connection, and a phone has
+/// few file descriptors to spare.
+const MAX_FETCHES: usize = 4;
+/// A download that failed is tried again after this, doubling up to the
+/// maximum while it keeps failing.
 const FETCH_RETRY: Duration = Duration::from_secs(5);
+const MAX_FETCH_RETRY: Duration = Duration::from_secs(5 * 60);
+/// Writing the folder out failed (out of file descriptors, say): try again
+/// after this, doubling up to the maximum.
+const WRITE_RETRY: Duration = Duration::from_secs(5);
+const MAX_WRITE_RETRY: Duration = Duration::from_secs(5 * 60);
 /// Access tokens are refreshed when older than this (Authentik's last 10
 /// minutes; the WebSocket only needs one at connect).
 const TOKEN_AGE: Duration = Duration::from_secs(4 * 60);
@@ -135,6 +144,9 @@ impl Client {
         let mut session = Session::device();
         session.import_seen(saved.seen)?;
         let mut dir = VaultDir::open(root.clone(), OWN).map_err(Error::io)?;
+        if let Err(e) = dir.clear_tmp() {
+            tracing::warn!(error = %e, "can't clear the folder's temporary files");
+        }
         if let Some(placed) = saved.placed {
             dir.set_placed(placed);
         }
@@ -155,6 +167,7 @@ impl Client {
             uploaded: saved.uploaded,
             new_uploads: Vec::new(),
             fetching: HashSet::new(),
+            fetch_failed: HashMap::new(),
             dirty: BTreeSet::new(),
             status: status_tx,
             reviews: reviews_tx,
@@ -165,6 +178,8 @@ impl Client {
             save_at: None,
             settle_at: None,
             fetch_at: None,
+            write_at: None,
+            write_backoff: WRITE_RETRY,
         };
         tokio::spawn(actor.run(rx));
         Ok(Client {
@@ -277,7 +292,10 @@ struct Actor {
     replicas: HashMap<String, NoteDoc>,
     uploaded: HashSet<String>,
     new_uploads: Vec<String>,
+    /// Downloads in flight.
     fetching: HashSet<String>,
+    /// Downloads that failed: when to try each again, and the wait after that.
+    fetch_failed: HashMap<String, (Instant, Duration)>,
     dirty: BTreeSet<DocKey>,
     status: watch::Sender<Status>,
     reviews: watch::Sender<u64>,
@@ -291,6 +309,9 @@ struct Actor {
     settle_at: Option<Instant>,
     /// Downloads that failed are tried again then.
     fetch_at: Option<Instant>,
+    /// Writing the folder out failed: it's tried again then.
+    write_at: Option<Instant>,
+    write_backoff: Duration,
 }
 
 async fn until(at: Option<Instant>) {
@@ -311,16 +332,25 @@ async fn next(
 
 impl Actor {
     async fn run(mut self, mut rx: mpsc::UnboundedReceiver<Cmd>) {
-        let tx = self.tx.clone();
-        let _watcher = solstice_sync_fs::watch(self.dir.root(), move || {
-            let _ = tx.send(Cmd::FolderChanged);
-        })
-        .map_err(|e| tracing::warn!(error = %e, "can't watch the folder"))
-        .ok();
+        // On iOS, notify watches with kqueue, which holds a file descriptor
+        // for every file and folder: a vault of any size runs the app out of
+        // them (os error 24). The app polls the folder there instead, and
+        // calls [`Client::folder_changed`].
+        #[cfg(not(target_os = "ios"))]
+        let _watcher = {
+            let tx = self.tx.clone();
+            solstice_sync_fs::watch(self.dir.root(), move || {
+                let _ = tx.send(Cmd::FolderChanged);
+            })
+            .map_err(|e| tracing::warn!(error = %e, "can't watch the folder"))
+            .ok()
+        };
 
         // Whatever changed in the folder while the app was closed.
         let mut socket: Option<Socket> = None;
         self.absorb(&mut socket).await;
+        // Cached attachments from before they were pruned as they synced.
+        self.prune_blobs();
 
         let stopped = loop {
             tokio::select! {
@@ -335,6 +365,10 @@ impl Actor {
                 _ = until(self.fetch_at) => {
                     self.fetch_at = None;
                     self.fetch_blobs();
+                }
+                _ = until(self.write_at) => {
+                    self.write_at = None;
+                    self.write_out();
                 }
                 _ = until(self.settle_at) => {
                     self.settle_at = None;
@@ -401,6 +435,11 @@ impl Actor {
                 *socket = Some(s);
                 self.connected_at = Some(Instant::now());
                 self.backoff = Duration::from_secs(1);
+                // Back online: downloads that failed meanwhile go again now.
+                let now = Instant::now();
+                for (at, _) in self.fetch_failed.values_mut() {
+                    *at = now;
+                }
                 self.set_status(Status::Syncing);
                 if !self.uploaded_or_retry(socket).await {
                     return;
@@ -631,12 +670,29 @@ impl Actor {
             Cmd::BlobFetched { hash, result } => {
                 self.fetching.remove(&hash);
                 match result.and_then(|bytes| self.dir.put_blob(&bytes).map_err(Error::io)) {
-                    Ok(_) => self.write_out(),
+                    Ok(_) => {
+                        self.fetch_failed.remove(&hash);
+                        // It came from the server, so it never needs uploading,
+                        // and its cached copy can go once it's in its file.
+                        if self.uploaded.insert(hash.clone()) {
+                            self.new_uploads.push(hash);
+                        }
+                        self.write_out();
+                        // Saved soon, with where the file was written: else a
+                        // restart would take it for a new file made here.
+                        self.schedule_save();
+                    }
                     Err(e) => {
                         tracing::warn!(error = %e, "can't download an attachment");
-                        self.fetch_at.get_or_insert(Instant::now() + FETCH_RETRY);
+                        let wait = self
+                            .fetch_failed
+                            .get(&hash)
+                            .map_or(FETCH_RETRY, |(_, wait)| (*wait * 2).min(MAX_FETCH_RETRY));
+                        self.fetch_failed
+                            .insert(hash, (Instant::now() + wait, wait));
                     }
                 }
+                self.fetch_blobs();
             }
             Cmd::Stop { .. } => unreachable!("handled by run"),
         }
@@ -649,7 +705,12 @@ impl Actor {
 
     async fn absorb(&mut self, socket: &mut Option<Socket>) {
         match self.dir.absorb(&mut self.vault) {
-            Ok(msgs) => self.local(socket, msgs).await,
+            Ok(msgs) => {
+                if self.dir.write_pending() {
+                    self.write_later();
+                }
+                self.local(socket, msgs).await
+            }
             Err(e) => tracing::warn!(error = %e, "can't read the folder"),
         }
     }
@@ -691,8 +752,23 @@ impl Actor {
     }
 
     fn write_out(&mut self) {
-        if let Err(e) = self.dir.materialize(&self.vault) {
-            tracing::warn!(error = %e, "can't write the folder");
+        match self.dir.materialize(&self.vault) {
+            Ok(()) => {
+                self.write_at = None;
+                self.write_backoff = WRITE_RETRY;
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "can't write the folder");
+                self.write_later();
+            }
+        }
+    }
+
+    /// Tries writing the folder out again later, waiting longer each time.
+    fn write_later(&mut self) {
+        if self.write_at.is_none() {
+            self.write_at = Some(Instant::now() + self.write_backoff);
+            self.write_backoff = (self.write_backoff * 2).min(MAX_WRITE_RETRY);
         }
     }
 
@@ -732,9 +808,18 @@ impl Actor {
         Ok(())
     }
 
-    /// Downloads attachments the vault names and this device doesn't have.
+    /// Downloads attachments the vault names and this device doesn't have, a
+    /// few at a time: each finished download starts the next. One that
+    /// failed waits its turn to be tried again.
     fn fetch_blobs(&mut self) {
-        let missing: Vec<String> = self
+        let room = MAX_FETCHES.saturating_sub(self.fetching.len());
+        if room == 0 {
+            return;
+        }
+        let now = Instant::now();
+        let mut retry_at: Option<Instant> = None;
+        let mut missing: Vec<String> = Vec::new();
+        let wanted: BTreeSet<String> = self
             .vault
             .files()
             .into_values()
@@ -744,6 +829,20 @@ impl Actor {
             })
             .filter(|h| !self.fetching.contains(h) && !self.dir.has_blob(h))
             .collect();
+        // Failures of blobs the vault no longer names are forgotten.
+        self.fetch_failed.retain(|h, _| wanted.contains(h));
+        for hash in wanted {
+            match self.fetch_failed.get(&hash) {
+                Some((at, _)) if *at > now => {
+                    retry_at = Some(retry_at.map_or(*at, |r| r.min(*at)));
+                }
+                _ if missing.len() < room => missing.push(hash),
+                _ => {}
+            }
+        }
+        if let Some(at) = retry_at {
+            self.fetch_at = Some(self.fetch_at.map_or(at, |f| f.min(at)));
+        }
         for hash in missing {
             self.fetching.insert(hash.clone());
             let (server, tokens, tx, vault) = (
@@ -786,9 +885,21 @@ impl Actor {
             tokio::task::spawn_blocking(move || store.save(docs, seen, uploaded, placed.as_ref()))
                 .await;
         match result {
-            Ok(Ok(())) => {}
+            Ok(Ok(())) => {
+                self.prune_blobs();
+            }
             Ok(Err(e)) => tracing::error!(error = %e, "can't save sync state"),
             Err(e) => tracing::error!(error = %e, "can't save sync state"),
+        }
+    }
+
+    /// Drops the cached copies of attachments that are in their files and
+    /// saved as on the server: they can be fetched again if ever needed.
+    fn prune_blobs(&self) {
+        let uploaded = &self.uploaded;
+        let pruned = self.dir.prune_blobs(&self.vault, |h| uploaded.contains(h));
+        if pruned > 0 {
+            tracing::debug!(pruned, "dropped cached attachments");
         }
     }
 

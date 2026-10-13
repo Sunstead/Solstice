@@ -39,7 +39,8 @@ pub fn set_workspace(
     // tabs still open from the previous workspace.
     app.asset_protocol_scope().allow_directory(&path, true).map_err(|e| e.to_string())?;
 
-    // Sync runs its own watcher, so it starts whatever the setting below says.
+    // Sync runs its own watcher (on iOS, this one's poll tells it), so it
+    // starts whatever the setting below says.
     crate::sync::workspace_opened(&app, &label, &path);
 
     watcher::watch_workspace(&app, &label, &path, &watchers)
@@ -80,6 +81,11 @@ pub fn set_watch_enabled(
     enabled: bool,
 ) -> Result<(), String> {
     let label = window.label().to_string();
+
+    // On iOS the poll also tells sync what changed: it keeps running, quiet.
+    if watcher::set_explorer_events(&label, &watchers, enabled) {
+        return Ok(());
+    }
 
     if !enabled {
         watcher::unwatch(&label, &watchers);

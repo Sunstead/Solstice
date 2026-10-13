@@ -1,4 +1,6 @@
 // src-tauri/src/watcher.rs
+// iOS polls (`poll`); notify's watcher and its event handling are the rest.
+#![cfg_attr(target_os = "ios", allow(unused_imports, dead_code))]
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -19,6 +21,10 @@ use tauri_specta::Event;
 
 use crate::types::FileEntry;
 
+// The iOS app's watcher. Built and tested everywhere, used only there.
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+mod poll;
+
 /// Long enough to collapse a truncate+write burst (which the OS reports as
 /// several events) and to sit above the ~100ms FSEvents latency floor, short
 /// enough that the sidebar still feels live.
@@ -27,9 +33,17 @@ const DEBOUNCE: Duration = Duration::from_millis(250);
 /// How long a path we wrote ourselves stays suppressed. Covers one debounce
 /// window plus slack, so a write is always still in the ledger by the time the
 /// events it caused are flushed.
+#[cfg(not(target_os = "ios"))]
 const SELF_WRITE_GRACE: Duration = Duration::from_millis(750);
+/// On iOS the folder is polled, so a write can wait a whole interval to be
+/// seen.
+#[cfg(target_os = "ios")]
+const SELF_WRITE_GRACE: Duration = Duration::from_millis(poll::INTERVAL.as_millis() as u64 + 1000);
 
+#[cfg(not(target_os = "ios"))]
 type FsDebouncer = Debouncer<RecommendedWatcher, RecommendedCache>;
+#[cfg(target_os = "ios")]
+type FsDebouncer = poll::Poller;
 type Ledger = Arc<Mutex<HashMap<PathBuf, Instant>>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -112,42 +126,111 @@ pub fn watch_workspace(
     // rather than per event.
     let root_canonical = std::fs::canonicalize(&root_given).unwrap_or_else(|_| root_given.clone());
 
-    let ledger = Arc::clone(&state.ledger);
-    let app = app.clone();
-    let given = root_given.clone();
-    let canonical = root_canonical.clone();
-    let root_label = root.to_string();
+    #[cfg(target_os = "ios")]
+    {
+        let _ = root_canonical;
+        let ledger = Arc::clone(&state.ledger);
+        let app = app.clone();
+        let root_label = root.to_string();
+        let poller = poll::Poller::start(root_given, move |changes, emit| {
+            // Sync hears of every change, ours included: it has no watcher
+            // of its own here, and creating, renaming or deleting in the app
+            // is only seen this way.
+            crate::sync::changed(&app, &root_label);
+            if !emit {
+                return;
+            }
+            let changes = polled_changes(changes, &ledger);
+            if !changes.is_empty() {
+                let _ = (FileSystemChanged { root: root_label.clone(), changes }).emit(&app);
+            }
+        });
+        lock(&state.watchers).insert(label.to_string(), poller);
+        return Ok(());
+    }
 
-    let mut debouncer = new_debouncer(DEBOUNCE, None, move |result: DebounceEventResult| {
-        match result {
-            Ok(events) => {
-                let changes = build_changes(&events, &given, &canonical, &ledger);
-                if !changes.is_empty() {
-                    let _ = (FileSystemChanged {
-                        root: root_label.clone(),
-                        changes,
-                    })
-                    .emit(&app);
+    #[cfg(not(target_os = "ios"))]
+    {
+        let ledger = Arc::clone(&state.ledger);
+        let app = app.clone();
+        let given = root_given.clone();
+        let canonical = root_canonical.clone();
+        let root_label = root.to_string();
+
+        let mut debouncer = new_debouncer(DEBOUNCE, None, move |result: DebounceEventResult| {
+            match result {
+                Ok(events) => {
+                    let changes = build_changes(&events, &given, &canonical, &ledger);
+                    if !changes.is_empty() {
+                        let _ = (FileSystemChanged {
+                            root: root_label.clone(),
+                            changes,
+                        })
+                        .emit(&app);
+                    }
+                }
+                // A watch error is not fatal -- one unreadable subtree shouldn't
+                // take the whole workspace's live updates down with it.
+                Err(errors) => {
+                    for error in errors {
+                        eprintln!("[watcher] {error:?}");
+                    }
                 }
             }
-            // A watch error is not fatal -- one unreadable subtree shouldn't
-            // take the whole workspace's live updates down with it.
-            Err(errors) => {
-                for error in errors {
-                    eprintln!("[watcher] {error:?}");
-                }
-            }
-        }
-    })
-    .map_err(|e| e.to_string())?;
-
-    debouncer
-        .watch(&root_given, RecursiveMode::Recursive)
+        })
         .map_err(|e| e.to_string())?;
 
-    lock(&state.watchers).insert(label.to_string(), debouncer);
+        debouncer
+            .watch(&root_given, RecursiveMode::Recursive)
+            .map_err(|e| e.to_string())?;
 
-    Ok(())
+        lock(&state.watchers).insert(label.to_string(), debouncer);
+
+        Ok(())
+    }
+}
+
+/// Turns the explorer's events on or off without stopping the watch, which
+/// on iOS also tells sync what changed. Returns false where turning them off
+/// should stop the watch itself (`unwatch`).
+pub fn set_explorer_events(label: &str, state: &FsWatcherState, enabled: bool) -> bool {
+    #[cfg(target_os = "ios")]
+    {
+        if let Some(poller) = lock(&state.watchers).get(label) {
+            poller.set_emit(enabled);
+        }
+        return true;
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        let _ = (label, state, enabled);
+        false
+    }
+}
+
+/// Looks at every watched folder now: the app is back in front, and its
+/// folders may have changed while it was away.
+#[cfg(target_os = "ios")]
+pub fn poll_now(state: &FsWatcherState) {
+    for poller in lock(&state.watchers).values() {
+        poller.poll_now();
+    }
+}
+
+/// What the poller found, as the frontend's changes: our own writes left
+/// out, each path statted for its entry.
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+fn polled_changes(changes: &[(PathBuf, FsChangeKind)], ledger: &Ledger) -> Vec<FsChange> {
+    let suppressed = recent_self_writes(ledger);
+    changes
+        .iter()
+        .filter(|(path, _)| !suppressed.contains(path))
+        .map(|(path, kind)| {
+            let path = path.to_string_lossy().into_owned();
+            let entry = describe(&path);
+            FsChange { kind: kind.clone(), path, from: None, entry }
+        })
+        .collect()
 }
 
 /// Stops watching for `label`. Safe to call when nothing is being watched.

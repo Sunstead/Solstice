@@ -1,5 +1,6 @@
 //! Linking a folder to a vault, and unlinking it.
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::time::Duration;
 
@@ -57,16 +58,8 @@ pub async fn link(
     exchange(&mut socket, vault_id, &mut vault, &mut session).await?;
 
     let mut dir = VaultDir::open(folder.to_path_buf(), OWN).map_err(Error::io)?;
-    for (_, content) in vault.files().into_values() {
-        if let Content::Blob(hash) = content {
-            if dir.get_blob(&hash).is_none() {
-                let bytes = server.get_blob(token.as_deref(), vault_id, &hash).await?;
-                dir.put_blob(&bytes).map_err(Error::io)?;
-            }
-        }
-    }
-
-    // What's here, compared.
+    // What's here, first: an attachment already in the folder isn't
+    // downloaded again.
     let local: Vec<LocalFile> = dir
         .scan()
         .map_err(Error::io)?
@@ -76,6 +69,24 @@ pub async fn link(
             hash: found.hash,
         })
         .collect();
+
+    // The vault's attachments, which the server has by definition.
+    let on_server: HashSet<String> = vault
+        .files()
+        .into_values()
+        .filter_map(|(_, content)| match content {
+            Content::Blob(hash) => Some(hash),
+            Content::Note(_) => None,
+        })
+        .collect();
+    for hash in &on_server {
+        if !dir.has_blob(hash) {
+            let bytes = server.get_blob(token.as_deref(), vault_id, hash).await?;
+            dir.put_blob(&bytes).map_err(Error::io)?;
+        }
+    }
+
+    // Compared.
     let mut report = LinkReport::default();
     let mut placed = Placed::new();
     for step in plan_link(&vault, &local) {
@@ -118,7 +129,9 @@ pub async fn link(
             entry.is_live() && entry.kind == solstice_sync::Kind::Blob,
             entry.hash,
         ) {
-            if let Some(bytes) = dir.get_blob(&hash) {
+            if on_server.contains(&hash) {
+                uploaded.push(hash);
+            } else if let Some(bytes) = dir.get_blob(&hash) {
                 server
                     .put_blob(token.as_deref(), vault_id, &hash, bytes)
                     .await?;

@@ -34,6 +34,8 @@ pub struct VaultDir {
     /// [`VaultDir::absorb`]). Save it with the vault's state and restore it
     /// with [`VaultDir::set_placed`].
     placed: Option<Placed>,
+    /// The last [`VaultDir::materialize`] couldn't write everything.
+    unwritten: bool,
 }
 
 fn rel_path(root: &Path, path: &Path) -> Option<String> {
@@ -56,6 +58,7 @@ impl VaultDir {
             own,
             seen: HashMap::new(),
             placed: None,
+            unwritten: false,
         })
     }
 
@@ -77,6 +80,27 @@ impl VaultDir {
     /// never having compared).
     pub fn set_placed(&mut self, placed: Placed) {
         self.placed = Some(placed);
+    }
+
+    /// Whether the last [`VaultDir::materialize`] (or the one inside
+    /// [`VaultDir::absorb`]) left files unwritten: try it again later.
+    pub fn write_pending(&self) -> bool {
+        self.unwritten
+    }
+
+    /// Clears the temporary files a failed write left behind. Call it before
+    /// anything writes.
+    pub fn clear_tmp(&self) -> std::io::Result<()> {
+        let tmp = self.own.join("tmp");
+        let result = match std::fs::symlink_metadata(&tmp) {
+            Ok(meta) if meta.is_dir() => std::fs::remove_dir_all(&tmp),
+            Ok(_) => std::fs::remove_file(&tmp),
+            Err(e) => Err(e),
+        };
+        match result {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        }
     }
 
     fn abs(&self, rel: &str) -> PathBuf {
@@ -247,6 +271,42 @@ impl VaultDir {
         self.read(&rel).ok().filter(|b| content_hash(b) == hash)
     }
 
+    /// Deletes cached attachments that are safe to fetch again: ones the
+    /// server has (`on_server`) and that are either no longer named by the
+    /// vault, or sit in a file at that hash untouched since it was hashed.
+    /// What's left is what this folder can't do without: bytes not yet
+    /// uploaded, or not yet written to their file. Returns how many went.
+    pub fn prune_blobs(&self, vault: &Vault, on_server: impl Fn(&str) -> bool) -> usize {
+        let Ok(entries) = std::fs::read_dir(self.own.join("blobs")) else {
+            return 0;
+        };
+        let mut named: HashMap<String, Vec<String>> = HashMap::new();
+        for (path, (_, content)) in vault.files() {
+            if let Content::Blob(hash) = content {
+                named.entry(hash).or_default().push(path);
+            }
+        }
+        let mut pruned = 0;
+        for entry in entries.flatten() {
+            let Some(hash) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            if !is_content_hash(&hash) || !on_server(&hash) {
+                continue;
+            }
+            let in_place = |paths: &Vec<String>| {
+                paths.iter().any(|p| {
+                    self.seen.get(p).is_some_and(|f| f.hash == hash) && !self.changed_on_disk(p)
+                })
+            };
+            let safe = named.get(&hash).is_none_or(in_place);
+            if safe && std::fs::remove_file(entry.path()).is_ok() {
+                pruned += 1;
+            }
+        }
+        pruned
+    }
+
     // ------------------------------------------------------------ syncing
 
     /// Writes the vault's files to disk: new and changed files, renames, and
@@ -256,10 +316,15 @@ impl VaultDir {
         let mut placed = self.placed.take().unwrap_or_default();
         let result = self.materialize_into(vault, &mut placed);
         self.placed = Some(placed);
+        self.unwritten = result.is_err();
         result
     }
 
+    /// Carries on past a file it can't write, and returns the first error.
+    /// `placed` only records what's really on disk, so a file left unwritten
+    /// never reads back as an edit made here.
     fn materialize_into(&mut self, vault: &Vault, placed: &mut Placed) -> std::io::Result<()> {
+        let mut first_error = None;
         let target = vault.files();
         let live: HashMap<&FileId, &str> = target
             .iter()
@@ -272,8 +337,16 @@ impl VaultDir {
             .cloned()
             .collect();
         for id in gone {
-            if let Some((path, _)) = placed.remove(&id) {
-                self.trash(&path)?;
+            let Some((path, _)) = placed.get(&id).cloned() else {
+                continue;
+            };
+            match self.trash(&path) {
+                Ok(()) => {
+                    placed.remove(&id);
+                }
+                Err(e) => {
+                    first_error.get_or_insert(e);
+                }
             }
         }
 
@@ -285,9 +358,17 @@ impl VaultDir {
                 Content::Note(text) => content_hash(text.as_bytes()),
                 Content::Blob(hash) => hash.clone(),
             };
-            if let Some((old, _)) = placed.get(id).cloned() {
+            if let Some((old, old_hash)) = placed.get(id).cloned() {
                 if old != *path && self.abs(&old).exists() && !self.abs(path).exists() {
-                    self.rename(&old, path)?;
+                    match self.rename(&old, path) {
+                        Ok(()) => {
+                            placed.insert(id.clone(), (path.clone(), old_hash));
+                        }
+                        Err(e) => {
+                            first_error.get_or_insert(e);
+                            continue;
+                        }
+                    }
                 }
             }
             if self.seen.get(path).map(|f| &f.hash) != Some(&hash) || !self.abs(path).exists() {
@@ -298,11 +379,23 @@ impl VaultDir {
                         None => continue,
                     },
                 };
-                self.write(path, &bytes)?;
+                if let Err(e) = self.write(path, &bytes) {
+                    first_error.get_or_insert(e);
+                    // What's on disk is what was last read there, not the
+                    // vault's version: the next write tries again, and the
+                    // next absorb doesn't take the old bytes for an edit.
+                    if let Some(found) = self.seen.get(path) {
+                        placed.insert(id.clone(), (path.clone(), found.hash.clone()));
+                    }
+                    continue;
+                }
             }
             placed.insert(id.clone(), (path.clone(), hash));
         }
-        Ok(())
+        match first_error {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 
     /// Turns what changed on disk since the last [`materialize`] into vault
@@ -382,7 +475,12 @@ impl VaultDir {
         }
 
         // Write back the vault's view: numbered clashes, normalized paths.
-        self.materialize(vault)?;
+        // The messages go out even if that fails: they're already in the
+        // vault, and dropping them would lose the edits they carry.
+        // [`VaultDir::write_pending`] says to try the write again.
+        if let Err(e) = self.materialize(vault) {
+            tracing::warn!(error = %e, "can't write the folder");
+        }
         Ok(msgs)
     }
 
@@ -587,6 +685,107 @@ mod tests {
         assert!(vd.has_blob(&hash));
         vd.materialize(&vault).unwrap();
         assert_eq!(std::fs::read(vd.root().join("doc.pdf")).unwrap(), b"%PDF one");
+    }
+
+    /// Makes every write fail, as running out of file descriptors does: the
+    /// temporary folder writes go through can't be made.
+    fn block_writes(vd: &VaultDir) {
+        let _ = std::fs::remove_dir_all(vd.own().join("tmp"));
+        std::fs::create_dir_all(vd.own()).unwrap();
+        std::fs::write(vd.own().join("tmp"), "not a folder").unwrap();
+    }
+
+    #[test]
+    fn a_failed_write_never_reads_back_as_an_edit() {
+        let (_tmp, mut vd) = dir();
+        let mut vault = Vault::new("server");
+        let (id, _) = vault.create_note("a.md", "one").unwrap();
+        vd.materialize(&vault).unwrap();
+
+        // An editor saves; sync merges a remote edit into it, and writing
+        // the merge out fails.
+        std::fs::write(vd.root().join("a.md"), "one, local").unwrap();
+        vd.refresh("a.md").unwrap();
+        vault.save_note(&id, "one, local, remote", None).unwrap();
+        block_writes(&vd);
+        assert!(vd.materialize(&vault).is_err());
+        assert!(vd.write_pending());
+
+        // The editor's text on disk isn't taken for an edit undoing the merge.
+        assert!(vd.absorb(&mut vault).unwrap().is_empty());
+        assert_eq!(vault.note(&id).unwrap().text(), "one, local, remote");
+
+        vd.clear_tmp().unwrap();
+        vd.materialize(&vault).unwrap();
+        assert!(!vd.write_pending());
+        assert_eq!(
+            std::fs::read_to_string(vd.root().join("a.md")).unwrap(),
+            "one, local, remote"
+        );
+    }
+
+    #[test]
+    fn absorbing_keeps_its_changes_when_the_write_out_fails() {
+        let (_tmp, mut vd) = dir();
+        let mut vault = Vault::new("server");
+        vault.create_note("a.md", "one").unwrap();
+        vd.materialize(&vault).unwrap();
+
+        // A note arrived from elsewhere and isn't on disk yet; meanwhile a
+        // file was edited here.
+        vault.create_note("remote.md", "from afar").unwrap();
+        std::fs::write(vd.root().join("a.md"), "one, edited").unwrap();
+        block_writes(&vd);
+        let msgs = vd.absorb(&mut vault).unwrap();
+        assert!(!msgs.is_empty());
+        assert!(vd.write_pending());
+        assert!(matches!(&vault.files()["a.md"].1, Content::Note(t) if t == "one, edited"));
+    }
+
+    #[test]
+    fn a_failed_trash_keeps_the_file_placed() {
+        let (_tmp, mut vd) = dir();
+        let mut vault = Vault::new("server");
+        let (id, _) = vault.create_note("a.md", "one").unwrap();
+        vd.materialize(&vault).unwrap();
+
+        vault.delete(&id);
+        // The trash can't be made.
+        std::fs::write(vd.own().join("trash"), "not a folder").unwrap();
+        assert!(vd.materialize(&vault).is_err());
+        assert!(vd.placed().unwrap().contains_key(&id));
+
+        std::fs::remove_file(vd.own().join("trash")).unwrap();
+        vd.materialize(&vault).unwrap();
+        assert!(!vd.root().join("a.md").exists());
+        assert!(!vd.placed().unwrap().contains_key(&id));
+    }
+
+    #[test]
+    fn prunes_only_blobs_it_can_fetch_again() {
+        let (_tmp, mut vd) = dir();
+        let root = vd.root().to_path_buf();
+        std::fs::write(root.join("kept.pdf"), b"%PDF in place").unwrap();
+        std::fs::write(root.join("edited.pdf"), b"%PDF before").unwrap();
+        let mut vault = Vault::new("server");
+        vd.absorb(&mut vault).unwrap();
+        let in_place = content_hash(b"%PDF in place");
+        let edited = content_hash(b"%PDF before");
+        let old = vd.put_blob(b"%PDF an old version").unwrap();
+        let unsent = vd.put_blob(b"%PDF not uploaded").unwrap();
+        // Edited since it was hashed: its cached bytes are the only copy of
+        // the version the vault names.
+        std::fs::write(root.join("edited.pdf"), b"%PDF after, longer").unwrap();
+
+        let on_server = |h: &str| h != unsent;
+        assert_eq!(vd.prune_blobs(&vault, on_server), 2);
+        assert!(!vd.blob_path(&in_place).exists());
+        assert!(!vd.blob_path(&old).exists());
+        assert!(vd.blob_path(&edited).exists());
+        assert!(vd.blob_path(&unsent).exists());
+        // The file in place still serves it.
+        assert_eq!(vd.get_blob(&in_place).unwrap(), b"%PDF in place");
+        assert_eq!(vd.prune_blobs(&vault, |_| false), 0);
     }
 
     #[test]

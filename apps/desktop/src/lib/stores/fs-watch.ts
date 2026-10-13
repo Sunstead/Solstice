@@ -90,8 +90,8 @@ export function startFsWatch(): Promise<void> {
     });
 
     // What sync downloads lands on disk behind the app's back. The watcher
-    // usually reports it, but a phone has no watcher and an import's first
-    // download can outrun one; once sync settles, read the folder again.
+    // usually reports it, but an import's first download can outrun one (and
+    // the iPad's only polls); once sync settles, read the folder again.
     unsubscribeSync = useSync.subscribe((state, prev) => {
       if (state.info?.state === 'synced' && prev.info?.state !== 'synced') void resyncFromDisk(true);
     });
@@ -163,7 +163,7 @@ export async function resyncFromDisk(force = false): Promise<void> {
     return;
   }
 
-  await useFileIndex.getState().loadIndex(root);
+  const indexed = await useFileIndex.getState().loadIndex(root);
 
   const loadedDirs = Object.values(useFiles.getState().entries)
     .filter((entry) => entry.is_dir && entry.childrenLoaded)
@@ -178,11 +178,14 @@ export async function resyncFromDisk(force = false): Promise<void> {
   void useWikilinkIndex.getState().rebuild(root);
 
   // Any tab whose file disappeared while the app was away is handled exactly
-  // as a live deletion would be.
-  const known = useFileIndex.getState().files;
-  for (const tabPath of useLayout.getState().listTabPaths()) {
-    const stillThere = known.some((file) => isSamePath(file.path, tabPath));
-    if (!stillThere) handleRemoval(tabPath);
+  // as a live deletion would be. Not when the walk failed: then nothing is
+  // known to be gone.
+  if (indexed) {
+    const known = useFileIndex.getState().files;
+    for (const tabPath of useLayout.getState().listTabPaths()) {
+      const stillThere = known.some((file) => isSamePath(file.path, tabPath));
+      if (!stillThere) handleRemoval(tabPath);
+    }
   }
 
   // Push, rather than have the reconciler reach for editor handles: every

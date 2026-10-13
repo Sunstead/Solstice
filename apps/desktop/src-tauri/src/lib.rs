@@ -76,8 +76,29 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .events(tauri_specta::collect_events![KeymapChanged, MenuCommand, FileSystemChanged, sync::SyncChanged])
 }
 
+/// iOS starts an app with room for 256 open files, which a synced vault's
+/// downloads and database can use up. Raise it to what the system allows,
+/// within reason.
+#[cfg(target_os = "ios")]
+fn raise_open_file_limit() {
+    let mut limit = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+    // SAFETY: plain syscalls on a local struct.
+    unsafe {
+        if libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) == 0 {
+            let want = limit.rlim_max.min(4096);
+            if limit.rlim_cur < want {
+                limit.rlim_cur = want;
+                libc::setrlimit(libc::RLIMIT_NOFILE, &limit);
+            }
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "ios")]
+    raise_open_file_limit();
+
     let builder = specta_builder();
 
     // Regenerates bindings.ts on every `tauri dev` build so the frontend
@@ -225,6 +246,10 @@ pub fn run() {
             #[cfg(mobile)]
             if let tauri::RunEvent::Resumed = _event {
                 sync::reconnect_all(_app);
+                // Files may have changed while the app was away (the Files
+                // app, another app): look now, not at the next poll.
+                #[cfg(target_os = "ios")]
+                watcher::poll_now(&_app.state::<watcher::FsWatcherState>());
             }
         });
 }
