@@ -18,8 +18,11 @@ export function SlashMenu() {
 
   if (!at || !choose || items.length === 0) return null;
 
+  // `fixed` is placed in the layout viewport, but what can be seen ends at
+  // the on-screen keyboard: the visual viewport.
   const room = document.documentElement.clientHeight;
-  const below = room - at.bottom - GAP;
+  const visible = Math.min(room, window.visualViewport?.height ?? room);
+  const below = visible - at.bottom - GAP;
   const above = at.top - GAP;
   const flip = below < Math.min(MAX_HEIGHT, 160) && above > below;
   const left = Math.max(8, Math.min(at.left, document.documentElement.clientWidth - WIDTH - 8));

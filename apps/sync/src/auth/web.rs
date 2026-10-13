@@ -72,7 +72,7 @@ impl CookieSpec {
 
     /// `Lax`, so following a link into the app carries the session;
     /// state-changing requests are guarded separately ([`csrf`]).
-    fn set(&self, token: &str, max_age: i64) -> HeaderValue {
+    pub fn set(&self, token: &str, max_age: i64) -> HeaderValue {
         let secure = if self.secure { "; Secure" } else { "" };
         HeaderValue::from_str(&format!(
             "{}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age}{secure}",

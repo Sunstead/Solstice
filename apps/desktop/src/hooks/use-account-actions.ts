@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { commands, events } from '@/lib/backend';
+import { commands } from '@/lib/backend';
 import { can } from '@/lib/backend/platform';
 import { signOut } from '@/lib/backend/web/account';
 import { needsAttention } from '@/components/sync/describe';
@@ -31,11 +31,15 @@ export function useAccountActions() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
+  // Asked again when sync's view of the sign-in may have changed, not on every
+  // sync event: each ask could refresh the token.
+  const reach = useSync((s) => {
+    const state = s.info?.state;
+    return state === 'signed_out' || state === 'synced' ? state : 'other';
+  });
   useEffect(() => {
     void refresh(server);
-    const unlisten = events.syncChanged.listen(() => void refresh(server));
-    return () => void unlisten.then((stop) => stop());
-  }, [server, refresh]);
+  }, [server, refresh, reach]);
 
   const signIn = async () => {
     if (!server) {

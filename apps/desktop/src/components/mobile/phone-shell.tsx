@@ -10,6 +10,7 @@ import { useLayout } from '@/hooks/use-layout';
 import { useLayoutSession } from '@/hooks/use-layout-session';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
+import { touchFirst } from '@/lib/backend/platform';
 import { useEntryInput } from '@/lib/stores/entry-input';
 import { usePhoneNav, type PhonePage } from '@/lib/stores/phone-nav';
 import { useRevealTarget } from '@/lib/stores/reveal-target';
@@ -90,8 +91,9 @@ export function PhoneShell() {
     if (shownPath) lastPath.current = shownPath;
   }, [shownPath]);
 
-  // Naming something new, or finding one in the tree, happens on the files.
-  const naming = useEntryInput((s) => s.operation !== null);
+  // Finding a file in the tree happens on the files. (Naming one is a
+  // dialog on a touch screen; a narrow desktop window names in the tree.)
+  const naming = useEntryInput((s) => !touchFirst && s.operation !== null);
   const revealing = useRevealTarget((s) => s.nonce);
   useEffect(() => {
     if (!naming && !revealing) return;

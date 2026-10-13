@@ -106,6 +106,14 @@ impl TokenSource for DesktopTokens {
             }
         })
     }
+
+    fn refused<'a>(&'a self, token: &'a str) -> BoxFuture<'a, ()> {
+        Box::pin(async move {
+            if let Ok(AuthInfo::Oidc { issuer, client_id, .. }) = self.auth().await {
+                oidc::refused(issuer, client_id, token).await;
+            }
+        })
+    }
 }
 
 async fn token(server: &str) -> Result<Option<String>, String> {
@@ -184,6 +192,14 @@ async fn forward_changes(app: AppHandle, root: PathBuf, client: Client) {
 pub fn saved(app: &AppHandle, path: &str, contents: &str) {
     if let Some((client, rel)) = client_for_path(app, Path::new(path)) {
         client.saved(&rel, contents);
+    }
+}
+
+/// A file in a synced folder was written outside the editors' saves (the iOS
+/// app's PDF and drawing editors): sync it now.
+pub fn changed(app: &AppHandle, path: &str) {
+    if let Some((client, _)) = client_for_path(app, Path::new(path)) {
+        client.folder_changed();
     }
 }
 
