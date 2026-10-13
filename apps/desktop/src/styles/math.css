@@ -38,7 +38,7 @@
   border-radius: 0.2em;
 }
 
-.math-inline-rendered:hover {
+:root:not([data-pointer='touch']) .math-inline-rendered:hover {
   background-color: color-mix(in oklch, var(--primary) 12%, transparent);
 }
 
@@ -59,7 +59,7 @@
   border-radius: calc(var(--radius) * 0.75);
 }
 
-.solstice-math-block-render:hover {
+:root:not([data-pointer='touch']) .solstice-math-block-render:hover {
   background-color: color-mix(in oklch, var(--muted) 60%, transparent);
 }
 

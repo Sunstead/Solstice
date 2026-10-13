@@ -278,7 +278,7 @@
     box-shadow 100ms ease;
 }
 
-.solstice-canvas-port:hover {
+:root:not([data-pointer='touch']) .solstice-canvas-port:hover {
   transform: scale(1.25);
   box-shadow:
     0 0 0 4px color-mix(in oklab, var(--ring) 35%, transparent),

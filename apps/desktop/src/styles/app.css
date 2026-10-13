@@ -15,6 +15,13 @@
 
 @source '../../../../node_modules/@sunstead/ui/src';
 
+/* Hover by the pointer in use, not by `(hover: hover)`, Tailwind's default:
+   that's false on an iPad, so nothing hovered under the Apple Pencil. A
+   finger's tap still leaves no highlight behind (`lib/pointer-kind.ts` sets
+   `data-pointer`). Covers @sunstead/ui's classes too, compiled here, and
+   `group-hover`/`peer-hover`, built from this. */
+@custom-variant hover (&:where(:root:not([data-pointer='touch']) *):hover);
+
 @theme inline {
   --font-sans: 'Geist Variable', sans-serif;
   /* Referenced by typeset.css and the code block theme, both of which fell
