@@ -106,6 +106,14 @@ impl TokenSource for DesktopTokens {
             }
         })
     }
+
+    fn refused<'a>(&'a self, token: &'a str) -> BoxFuture<'a, ()> {
+        Box::pin(async move {
+            if let Ok(AuthInfo::Oidc { issuer, client_id, .. }) = self.auth().await {
+                oidc::refused(issuer, client_id, token).await;
+            }
+        })
+    }
 }
 
 async fn token(server: &str) -> Result<Option<String>, String> {
