@@ -5,6 +5,7 @@
  * `can.nativeViews`.
  */
 import { addPluginListener, invoke } from '@tauri-apps/api/core';
+import type { CommandId, ResolvedMenu } from '@/bindings';
 
 export type SurfaceKind = 'pdf' | 'drawing';
 
@@ -54,4 +55,14 @@ export const nativeSurfaces = {
   background: (rgb: number[]) => host({ op: 'background', rgb }),
   listen: (handler: (event: SurfaceEvent) => void) =>
     addPluginListener('solstice-native', 'surface', handler),
+};
+
+/**
+ * The iPad's menu bar, built natively from the same menus as the Mac's
+ * (`get_menu_layout`); its items come back as commands to run.
+ */
+export const nativeMenu = {
+  set: (menus: ResolvedMenu[]) => host({ op: 'menu', menus }),
+  listen: (handler: (id: CommandId) => void) =>
+    addPluginListener<{ id: CommandId }>('solstice-native', 'menu', (event) => handler(event.id)),
 };
