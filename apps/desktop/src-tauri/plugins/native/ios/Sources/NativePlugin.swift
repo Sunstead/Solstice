@@ -97,11 +97,16 @@ class NativePlugin: Plugin {
       case "edit":
         host.surfaces[args.id]?.setEditing(args.on ?? false)
       case "find":
-        let count =
-          host.surfaces[args.id]?.find(
-            args.query ?? "", caseSensitive: args.caseSensitive ?? false,
-            wholeWord: args.wholeWord ?? false) ?? 0
-        return invoke.resolve(["count": count, "active": count > 0 ? 0 : -1])
+        // Reading handwriting takes a moment: answered when it's done.
+        let surface = host.surfaces[args.id]
+        Task { @MainActor in
+          let count =
+            await surface?.find(
+              args.query ?? "", caseSensitive: args.caseSensitive ?? false,
+              wholeWord: args.wholeWord ?? false) ?? 0
+          invoke.resolve(["count": count, "active": count > 0 ? 0 : -1])
+        }
+        return
       case "findStep":
         let active = host.surfaces[args.id]?.findStep(args.direction ?? 1) ?? -1
         return invoke.resolve(["active": active])

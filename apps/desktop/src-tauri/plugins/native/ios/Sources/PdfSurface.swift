@@ -282,27 +282,45 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   // -- Find ------------------------------------------------------------
 
-  private var matches: [PDFSelection] = []
+  /// A find match: in the page's text, or written by hand (page space).
+  private enum Match {
+    case text(PDFSelection)
+    case ink(PDFPage, CGRect)
+  }
+
+  private var matches: [Match] = []
   private var active = -1
 
-  override func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) -> Int {
+  override func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) async -> Int {
     matches = []
     active = -1
     defer { showMatches() }
     guard !query.isEmpty, let document = pdfView.document else { return 0 }
     var pattern = NSRegularExpression.escapedPattern(for: query)
     if wholeWord { pattern = "\\b\(pattern)\\b" }
-    guard
-      let regex = try? NSRegularExpression(
-        pattern: pattern, options: caseSensitive ? [] : [.caseInsensitive])
-    else { return 0 }
+    let regex = try? NSRegularExpression(
+      pattern: pattern, options: caseSensitive ? [] : [.caseInsensitive])
+    var found: [Match] = []
     for index in 0..<document.pageCount {
-      guard let page = document.page(at: index), let text = page.string else { continue }
-      let range = NSRange(text.startIndex..., in: text)
-      for match in regex.matches(in: text, range: range) {
-        if let selection = page.selection(for: match.range) { matches.append(selection) }
+      guard let page = document.page(at: index) else { continue }
+      if let regex, let text = page.string {
+        let range = NSRange(text.startIndex..., in: text)
+        for match in regex.matches(in: text, range: range) {
+          if let selection = page.selection(for: match.range) { found.append(.text(selection)) }
+        }
+      }
+      // Marks on screen are the canvas's; otherwise what the file holds.
+      let markup = canvases[ObjectIdentifier(page)]?.controller.markup ?? PdfMarkup.read(page)
+      if let markup {
+        let box = page.bounds(for: .cropBox)
+        for rect in await handwriting(query, in: markup, caseSensitive: caseSensitive, wholeWord: wholeWord) {
+          // Markup space is top-left; the page's bottom-left.
+          let onPage = CGRect(x: box.minX + rect.minX, y: box.maxY - rect.maxY, width: rect.width, height: rect.height)
+          found.append(.ink(page, onPage))
+        }
       }
     }
+    matches = found
     if !matches.isEmpty { active = 0 }
     return matches.count
   }
@@ -315,11 +333,25 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }
 
   private func showMatches() {
+    var selections: [PDFSelection] = []
     for (index, match) in matches.enumerated() {
-      match.color = index == active ? .systemOrange : .systemYellow.withAlphaComponent(0.5)
+      guard case .text(let selection) = match else { continue }
+      selection.color = index == active ? .systemOrange : .systemYellow.withAlphaComponent(0.5)
+      selections.append(selection)
     }
-    pdfView.highlightedSelections = matches.isEmpty ? nil : matches
-    if matches.indices.contains(active) { pdfView.go(to: matches[active]) }
+    pdfView.highlightedSelections = selections.isEmpty ? nil : selections
+    guard matches.indices.contains(active) else { return }
+    switch matches[active] {
+    case .text(let selection):
+      pdfView.go(to: selection)
+    case .ink(let page, let rect):
+      pdfView.go(to: rect, on: page)
+      DispatchQueue.main.async { [weak self] in
+        guard let self, let document = self.pdfView.documentView else { return }
+        let inView = self.pdfView.convert(rect, from: page)
+        flash(self.pdfView.convert(inView, to: document), in: document)
+      }
+    }
   }
 
   // -- Fitting ------------------------------------------------------------

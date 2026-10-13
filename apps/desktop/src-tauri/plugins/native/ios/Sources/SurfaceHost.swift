@@ -31,7 +31,7 @@ class SurfaceView: UIView {
   func setEditing(_ on: Bool) {}
 
   /// Highlights `query`'s matches and shows the first; how many there are.
-  func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) -> Int { 0 }
+  func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) async -> Int { 0 }
 
   /// Shows the next (or previous) match; its index, or -1 for none.
   func findStep(_ direction: Int) -> Int { -1 }
@@ -141,6 +141,39 @@ func observeMarkup(of controller: PaperMarkupViewController, _ changed: @escapin
       changed()
       observeMarkup(of: controller, changed)
     }
+  }
+}
+
+import PencilKit
+
+/// Where `query` is written by hand in `markup`, in the markup's coordinates.
+@MainActor
+func handwriting(
+  _ query: String, in markup: PaperMarkup, caseSensitive: Bool, wholeWord: Bool
+) async -> [CGRect] {
+  let strokes = markup.subelements.strokes
+  guard !query.isEmpty, !strokes.isEmpty else { return [] }
+  // Rebuilt from their parts: PKDrawing(strokes:) throws (an Objective-C
+  // exception, so a crash) on the strokes PaperKit hands out.
+  let fresh = strokes.map { PKStroke(ink: $0.ink, path: $0.path, transform: $0.transform, mask: $0.mask) }
+  let recognizer = PKStrokeRecognizer()
+  await recognizer.updateDrawing(PKDrawing(strokes: fresh))
+  let results = await recognizer.search(
+    query, fullWordsOnly: wholeWord, caseMatchingOnly: caseSensitive)
+  return results.map(\.bounds).sorted { ($0.minY, $0.minX) < ($1.minY, $1.minX) }
+}
+
+/// A moment's highlight over `rect`, in `view`'s coordinates: the find bar's
+/// current match when it's handwriting, which has no text selection to show.
+@MainActor
+func flash(_ rect: CGRect, in view: UIView) {
+  let mark = UIView(frame: rect.insetBy(dx: -4, dy: -4))
+  mark.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.35)
+  mark.layer.cornerRadius = 4
+  mark.isUserInteractionEnabled = false
+  view.addSubview(mark)
+  UIView.animate(withDuration: 0.4, delay: 1.6, options: []) { mark.alpha = 0 } completion: { _ in
+    mark.removeFromSuperview()
   }
 }
 

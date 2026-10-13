@@ -9,7 +9,8 @@ import { ViewerFrame } from './viewer-frame';
 
 /**
  * A drawing in the iOS app: an infinite PaperKit canvas. The Pencil starts
- * drawing by itself; the button is for a finger, and to finish.
+ * drawing by itself; the button is for a finger, and to finish. Find looks
+ * for the words written in it.
  */
 export function NativeDrawing({ path }: { path: string }) {
   const id = useId();
@@ -19,6 +20,7 @@ export function NativeDrawing({ path }: { path: string }) {
   return (
     <ViewerFrame
       path={path}
+      find
       leading={
         <Button
           variant={editing ? 'secondary' : 'ghost'}

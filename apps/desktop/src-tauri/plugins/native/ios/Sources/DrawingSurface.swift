@@ -168,6 +168,44 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     }
   }
 
+  // -- Find ------------------------------------------------------------
+
+  /// Handwriting matching the find bar's query, in markup space.
+  private var matches: [CGRect] = []
+  private var active = -1
+
+  override func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) async -> Int {
+    matches = []
+    active = -1
+    guard let markup = controller?.markup else { return 0 }
+    matches = await handwriting(query, in: markup, caseSensitive: caseSensitive, wholeWord: wholeWord)
+    if !matches.isEmpty {
+      active = 0
+      show(matches[0])
+    }
+    return matches.count
+  }
+
+  override func findStep(_ direction: Int) -> Int {
+    guard !matches.isEmpty else { return -1 }
+    active = (active + direction + matches.count) % matches.count
+    show(matches[active])
+    return active
+  }
+
+  private func show(_ rect: CGRect) {
+    guard let controller else { return }
+    let visible = controller.contentVisibleFrame
+    if !visible.contains(rect) {
+      controller.setContentVisibleFrame(
+        CGRect(x: rect.midX - visible.width / 2, y: rect.midY - visible.height / 2, width: visible.width, height: visible.height),
+        animated: true)
+    }
+    if let content = controller.contentView {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { flash(rect, in: content) }
+    }
+  }
+
   // -- Saving ------------------------------------------------------------
 
   override func flush(_ done: @escaping () -> Void = {}) {
