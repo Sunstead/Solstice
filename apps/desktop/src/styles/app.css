@@ -78,13 +78,21 @@
     touch-action: manipulation;
   }
   @media (pointer: coarse) {
-    /* A long press opens the row's or tab's menu, not iOS's text callout. */
-    [data-sidebar='menu-button'],
-    .flexlayout__tab_button {
+    /* A long press opens the row's menu, not iOS's text callout. */
+    [data-sidebar='menu-button'] {
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
     }
+  }
+
+  /* Nor a tab's, whatever the pointer: an iPad with a trackpad reports a
+     fine one, and the finger and Pencil still hold tabs. Nothing selects a
+     tab's name anyway. */
+  .flexlayout__tab_button {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 

@@ -46,7 +46,12 @@ function TabLabel({ id, children }: { id: string; children: string }) {
     const button = ref.current?.closest<HTMLElement>('.flexlayout__tab_button');
     if (button) playEnter(id, button);
   }, [id]);
-  return <span ref={ref}>{children}</span>;
+  // The tab's id, for its menu: flexlayout's button id mangles whitespace.
+  return (
+    <span ref={ref} data-tab-id={id}>
+      {children}
+    </span>
+  );
 }
 
 function makeDraggedTabId(): string {
