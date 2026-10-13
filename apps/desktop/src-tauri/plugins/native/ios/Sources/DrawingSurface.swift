@@ -19,7 +19,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }()
 
   private var controller: PaperMarkupViewController?
-  private let toolPicker = PKToolPicker()
+  private var toolPicker: PKToolPicker { Ink.shared.picker }
   private var editing = false
   private var unsaved = false
   private var saveTask: Task<Void, Never>?
@@ -27,9 +27,6 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   override init(id: String, path: String, plugin: NativePlugin) {
     super.init(id: id, path: path, plugin: plugin)
-    toolPicker.accessoryItem = UIBarButtonItem(
-      image: UIImage(systemName: "plus.circle"),
-      primaryAction: UIAction { [weak self] _ in self?.showInsertMenu() })
     pencilKitResponderState.activeToolPicker = toolPicker
     pencilKitResponderState.toolPickerVisibility = .hidden
 
@@ -134,6 +131,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     guard on != editing, let controller else { return }
     editing = on
     configure(controller)
+    if on { Ink.shared.accessory { [weak self] in self?.showInsertMenu() } }
     pencilKitResponderState.toolPickerVisibility = on ? .visible : .hidden
     if on {
       controller.becomeFirstResponder()
@@ -145,7 +143,10 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }
 
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
-    if gesture.state == .began, !editing { setEditing(true) }
+    if gesture.state == .began, !editing {
+      Ink.shared.penInHand()
+      setEditing(true)
+    }
   }
 
   private func showInsertMenu() {
