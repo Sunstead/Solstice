@@ -41,12 +41,14 @@ struct HostArgs: Decodable {
 class NativePlugin: Plugin {
   let auth = AuthenticationSheet()
   private var host: SurfaceHost?
+  private var fit: WebviewFit?
   private weak var webview: WKWebView?
 
   override func load(webview: WKWebView) {
     self.webview = webview
     DispatchQueue.main.async {
       self.host = SurfaceHost.install(under: webview)
+      self.fit = WebviewFit(webview)
     }
     let center = NotificationCenter.default
     center.addObserver(

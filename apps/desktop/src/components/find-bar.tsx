@@ -53,6 +53,12 @@ export function FindBar({ onClose }: FindBarProps) {
           autoFocus
           placeholder='Find in file'
           aria-label='Find in file'
+          // A search term, not a sentence: no capital first letter, no
+          // corrections swapped in as it's typed.
+          autoCapitalize='off'
+          autoCorrect='off'
+          spellCheck={false}
+          enterKeyHint='search'
           className={cn('h-8 w-52 pr-30 sm:w-64', empty && 'text-destructive')}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {

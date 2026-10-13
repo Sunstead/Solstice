@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { can } from '@/lib/backend/platform';
 import {
   Actions,
@@ -36,6 +36,8 @@ import { stripPresetExtension } from '@/lib/stores/entry-input';
 import { useSetting } from '@/lib/settings/store';
 import { TabCloseIcon } from './tab-close-icon';
 import { closeTab, playEnter } from '@/lib/tab-motion';
+import { TabMenu } from './tab-menu';
+import { useTabLongPress, type TabMenuRequest } from '@/lib/tab-long-press';
 
 /** A tab's name; on mount, it grows its button in if the tab was just opened. */
 function TabLabel({ id, children }: { id: string; children: string }) {
@@ -163,6 +165,16 @@ export default function FlexLayoutRoot() {
     return () => container.removeEventListener('pointerdown', onPointerDown, { capture: true });
   }, []);
 
+  // A tab's menu: right click, or holding it with a finger or the Pencil.
+  const [tabMenu, setTabMenu] = useState<TabMenuRequest | null>(null);
+  const closeTabMenu = useCallback(() => setTabMenu(null), []);
+  useTabLongPress(setTabMenu, closeTabMenu);
+  const handleContextMenu = (node: TabNode | TabSetNode | BorderNode, event: React.MouseEvent) => {
+    if (!(node instanceof TabNode)) return;
+    event.preventDefault();
+    setTabMenu({ tabId: node.getId(), x: event.clientX, y: event.clientY });
+  };
+
   const handleAction = (action: Action): Action | undefined => {
     if (action.type !== Actions.DELETE_TAB || !model) return action;
     const pointer = performance.now() - closePressedAt.current < 2000;
@@ -233,6 +245,7 @@ export default function FlexLayoutRoot() {
         onModelChange={handleModelChange}
         onAction={handleAction}
         onAuxMouseClick={handleAuxMouseClick}
+        onContextMenu={handleContextMenu}
         onExternalDrag={handleExternalDrag}
         icons={layoutIcons}
         tabDragSpeed={0.1}
@@ -285,6 +298,7 @@ export default function FlexLayoutRoot() {
           );
         }}
       />
+      <TabMenu request={tabMenu} onClose={closeTabMenu} />
     </div>
   );
 }

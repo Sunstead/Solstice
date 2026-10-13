@@ -56,7 +56,8 @@ type LayoutState = {
    */
   opened: number;
   openFileInNewTab: (path: string, name: string, location?: 'center' | 'right') => void;
-  newBlankTab: (tabsetId?: string) => void;
+  /** A blank tab in `tabsetId` (the active tabset), at `index` (the end). */
+  newBlankTab: (tabsetId?: string, index?: number) => void;
   normalizeTabsetDeletion: () => void;
   closeFileTab: (path: string) => void;
   closeFolderTabs: (path: string) => void;
@@ -327,7 +328,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
     );
   },
 
-  newBlankTab: (tabsetId) => {
+  newBlankTab: (tabsetId, index = -1) => {
     const { model } = get();
     if (!model) return;
 
@@ -348,7 +349,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
         },
         targetTabset.getId(),
         DockLocation.CENTER,
-        -1,
+        index,
       ),
     );
   },
