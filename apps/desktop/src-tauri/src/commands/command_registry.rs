@@ -94,6 +94,8 @@ command_id! {
 
     ViewToggleSidebar => "view.toggle_sidebar",
     ViewToggleSourceMode => "view.toggle_source_mode",
+    ViewNextTab => "view.next_tab",
+    ViewPreviousTab => "view.previous_tab",
 
     NavigationBack => "navigation.back",
     NavigationForward => "navigation.forward",
@@ -166,6 +168,9 @@ fn web_accelerator(id: CommandId) -> Option<&'static str> {
         CommandId::FileCloseTab => Some("Alt+W"),
         // Safari's own: Cmd+/ shows its status bar.
         CommandId::ViewToggleSourceMode => Some("Alt+/"),
+        // Safari's and Chrome's own tab switching.
+        CommandId::ViewNextTab => Some("Alt+Shift+]"),
+        CommandId::ViewPreviousTab => Some("Alt+Shift+["),
         _ => None,
     }
 }
@@ -497,6 +502,18 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             id: CommandId::ViewToggleSourceMode,
             label: "Source mode".into(),
             accelerator: Some("CmdOrCtrl+/".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::ViewNextTab,
+            label: "Next Tab".into(),
+            accelerator: Some("CmdOrCtrl+Shift+]".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::ViewPreviousTab,
+            label: "Previous Tab".into(),
+            accelerator: Some("CmdOrCtrl+Shift+[".into()),
             is_overridden: false,
         },
         // -- Navigation --

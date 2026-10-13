@@ -145,6 +145,9 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                 Command(ViewToggleSidebar),
                 Command(ViewToggleSourceMode),
                 Separator,
+                Command(ViewNextTab),
+                Command(ViewPreviousTab),
+                Separator,
                 // A submenu rather than a top-level "Canvas" menu. The `Format`
                 // precedent would allow one, but two top-level menus that are
                 // each greyed out most of the time reads worse than one

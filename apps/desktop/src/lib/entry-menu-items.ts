@@ -25,6 +25,7 @@ import type { EntryTarget } from '@/lib/entry-actions';
 import { FILE_TYPE_PRESETS, useEntryInput } from '@/lib/stores/entry-input';
 import { runCommand } from '@/lib/commands';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
+import { useSetting } from '@/lib/settings/store';
 import { useLayout } from '@/hooks/use-layout';
 
 /** Whether the focused tab shows its note as source (`view.toggle_source_mode`). */
@@ -120,6 +121,7 @@ export function useEntryMenuItems(
 ): EntryMenuItem[] {
   const revealInSystemLabel = useRevealInSystemLabel();
   const isMobile = useIsMobile();
+  const single = useSetting('layout.tabs') === 'single';
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
   const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
@@ -192,8 +194,8 @@ export function useEntryMenuItems(
       icon: SquarePlus,
       run: () => entryActions.openInNewTab(path),
     });
-    // A phone shows one tab at a time: there's no side.
-    if (!isMobile) {
+    // A phone, or one tab at a time, has no side.
+    if (!isMobile && !single) {
       items.push({
         kind: 'item',
         id: 'open-to-side',

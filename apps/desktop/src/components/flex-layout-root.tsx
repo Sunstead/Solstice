@@ -23,6 +23,7 @@ import { useLayoutSession } from '@/hooks/use-layout-session';
 import { WindowControls } from './window-controls';
 import { useIsMac } from '@/hooks/use-platform';
 import {
+  applyTabMode,
   applyTopEdgeDragRegions,
   findCornerTabset,
   syncTopEdgeTabsetDrag,
@@ -61,6 +62,11 @@ export default function FlexLayoutRoot() {
   // Subscribed here so flipping the setting re-renders <Layout>, which is what
   // makes onRenderTab below run again with the new value.
   const showExtensions = useSetting('explorer.showFileExtensions');
+  const single = useSetting('layout.tabs') === 'single';
+
+  useEffect(() => {
+    if (model) applyTabMode(model, single);
+  }, [model, single]);
 
   // Retargeting a tab after a rename mutates its config in place, which
   // FlexLayout's content memo cannot see. Hand the store the imperative

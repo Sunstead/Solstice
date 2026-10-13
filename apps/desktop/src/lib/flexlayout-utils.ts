@@ -1,8 +1,10 @@
 import {
   Actions,
+  DockLocation,
   Model,
   Orientation,
   RowNode,
+  TabNode,
   TabSetNode,
 } from 'flexlayout-react';
 
@@ -111,4 +113,39 @@ export function applyTopEdgeDragRegions(container: HTMLElement) {
       const isAtTopEdge = Math.abs(barRect.top - containerRect.top) <= TOLERANCE;
       tagDragRegionRecursive(bar, isAtTopEdge);
     });
+}
+
+/**
+ * Tabs and splits, or one tab at a time (`layout.tabs`). One at a time puts
+ * every tab in a single tabset, in layout order, and turns off what would
+ * split it again: dropping a tab on a tabset's edge or the layout's.
+ */
+export function applyTabMode(model: Model, single: boolean): void {
+  model.doAction(
+    Actions.updateModelAttributes({
+      tabSetEnableDivide: !single,
+      enableEdgeDock: !single,
+      tabSetEnableMaximize: !single,
+    }),
+  );
+  if (!single) return;
+
+  const tabsets: TabSetNode[] = [];
+  model.visitNodes((node) => {
+    if (node instanceof TabSetNode) tabsets.push(node);
+  });
+  const [first, ...rest] = tabsets;
+  if (!first || rest.length === 0) return;
+  const shown = (model.getActiveTabset() ?? first).getSelectedNode();
+  const active = shown instanceof TabNode ? shown.getId() : null;
+  const maximized = model.getMaximizedTabset();
+  if (maximized) model.doAction(Actions.maximizeToggle(maximized.getId()));
+  for (const tabset of rest) {
+    for (const tab of [...tabset.getChildren()]) {
+      model.doAction(Actions.moveNode(tab.getId(), first.getId(), DockLocation.CENTER, -1, false));
+    }
+    // Gone already if it deletes itself when empty, as several tabsets do.
+    if (model.getNodeById(tabset.getId())) model.doAction(Actions.deleteTabset(tabset.getId()));
+  }
+  if (active) model.doAction(Actions.selectTab(active));
 }

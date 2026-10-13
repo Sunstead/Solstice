@@ -1,7 +1,7 @@
 import type { SectionId } from './sections';
 import { themeOptions } from '@/lib/theme/store';
 import { fontStack } from '@/lib/theme/fonts';
-import { can } from '@/lib/backend/platform';
+import { can, touchFirst } from '@/lib/backend/platform';
 import {
   defineBoolean,
   defineEnum,
@@ -391,6 +391,20 @@ export const settingsRegistry = {
   }),
 
   // -- Editor ---------------------------------------------------------
+  'layout.tabs': defineEnum({
+    section: 'editor',
+    group: 'Tabs',
+    scope: 'global',
+    label: 'Layout',
+    options: [
+      { value: 'split', label: 'Tabs and splits' },
+      { value: 'single', label: 'One tab at a time' },
+    ],
+    // One document at a time suits a tablet, as GoodNotes and Safari do it;
+    // splits are for a mouse. A phone shows one note whichever this is.
+    default: touchFirst ? 'single' : 'split',
+  }),
+
   'editor.autosave': defineEnum({
     section: 'editor',
     group: 'Saving',

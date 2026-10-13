@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Actions, type Model, TabNode } from 'flexlayout-react';
+import { Actions, type Model, TabNode, TabSetNode } from 'flexlayout-react';
 
 import { getActiveTabId, isReplacingBlankTab, modelHasNoTabs, useLayout } from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
@@ -7,7 +7,7 @@ import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { findCornerTabset } from '@/lib/flexlayout-utils';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { useRecentFiles } from '@/lib/stores/recent-files';
-import { closeTab } from '@/lib/tab-motion';
+import { closeTab, isClosing } from '@/lib/tab-motion';
 
 /**
  * What the editor area does whichever way it's drawn (flexlayout's tabs, or
@@ -79,11 +79,26 @@ export function useLayoutSession(afterChange?: () => void) {
       },
       () => closable() !== null,
     );
+    // Through the shown tab's own strip, wrapping at either end.
+    const step = (by: 1 | -1) => {
+      const m = modelRef.current;
+      const id = getActiveTabId(m);
+      const tabset = id ? m?.getNodeById(id)?.getParent() : undefined;
+      if (!m || !(tabset instanceof TabSetNode)) return;
+      const tabs = tabset.getChildren().filter((t) => t.getId() === id || !isClosing(t.getId()));
+      if (tabs.length < 2) return;
+      const at = tabs.findIndex((t) => t.getId() === id);
+      m.doAction(Actions.selectTab(tabs[(at + by + tabs.length) % tabs.length].getId()));
+    };
+    registerCommand('view.next_tab', () => step(1));
+    registerCommand('view.previous_tab', () => step(-1));
     return () => {
       unregisterCommand('navigation.back');
       unregisterCommand('navigation.forward');
       unregisterCommand('file.new_tab');
       unregisterCommand('file.close_tab');
+      unregisterCommand('view.next_tab');
+      unregisterCommand('view.previous_tab');
     };
   }, [navigateTo]);
 
