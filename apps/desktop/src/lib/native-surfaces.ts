@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
-import { nativeSurfaces } from '@/lib/backend/native';
+import { create } from 'zustand';
+import { commands } from '@/lib/backend';
+import { nativeSurfaces, type SurfaceEvent } from '@/lib/backend/native';
 
 /**
  * What the iOS app's native views (`NativeSurface`) share: keeping each on
@@ -167,14 +169,37 @@ export function retainHost(): () => void {
   };
 }
 
+/** What each surface reports, by its id. */
+export const useSurfaceStates = create<Record<string, { editing: boolean; error?: string }>>(() => ({}));
+
+function onSurfaceEvent(event: SurfaceEvent) {
+  const state = useSurfaceStates.getState()[event.id] ?? { editing: false };
+  switch (event.type) {
+    case 'editing':
+      useSurfaceStates.setState({ [event.id]: { ...state, editing: !!event.on } });
+      break;
+    case 'saved':
+      // Its own save: not a change from outside to reload.
+      void commands.fileWritten(event.path);
+      if (state.error) useSurfaceStates.setState({ [event.id]: { ...state, error: undefined } });
+      break;
+    case 'error':
+      console.error('[native]', event.path, event.message);
+      useSurfaceStates.setState({ [event.id]: { ...state, error: event.message } });
+      break;
+  }
+}
+
 function startHost(): () => void {
   const root = document.documentElement;
   root.dataset.nativeHost = '';
+  const listening = nativeSurfaces.listen(onSurfaceEvent);
   const theme = new MutationObserver(() => refreshers.forEach((refresh) => refresh()));
   theme.observe(root, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
 
   return () => {
     theme.disconnect();
+    void listening.then((listener) => listener.unregister());
     delete root.dataset.nativeHost;
     if (modal || sentRects !== '[]') {
       modal = false;

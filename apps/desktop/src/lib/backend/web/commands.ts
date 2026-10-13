@@ -137,6 +137,8 @@ export const webCommands: Commands = {
       await saveFile(path, contents, isNote(path));
       return null;
     }),
+  // Only the iOS app's native views write files themselves.
+  fileWritten: async () => {},
   createFile: (path) =>
     attempt(async () => {
       if (await exists(path)) throw new Error(`"${path.split('/').pop()}" already exists.`);

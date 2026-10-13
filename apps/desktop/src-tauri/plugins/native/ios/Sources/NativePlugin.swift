@@ -20,6 +20,7 @@ struct SurfaceArgs: Decodable {
   let caseSensitive: Bool?
   let wholeWord: Bool?
   let direction: Int?
+  let on: Bool?
 }
 
 struct HostArgs: Decodable {
@@ -55,8 +56,8 @@ class NativePlugin: Plugin {
     let app = UIApplication.shared
     var task = UIBackgroundTaskIdentifier.invalid
     task = app.beginBackgroundTask { app.endBackgroundTask(task) }
-    host?.flushAll()
-    app.endBackgroundTask(task)
+    guard let host else { return app.endBackgroundTask(task) }
+    host.flushAll { app.endBackgroundTask(task) }
   }
 
   /// A rect in the webview's CSS pixels (from `getBoundingClientRect`), in
@@ -90,6 +91,8 @@ class NativePlugin: Plugin {
         surface.isHidden = !(args.visible ?? false)
       case "reload":
         host.surfaces[args.id]?.reload()
+      case "edit":
+        host.surfaces[args.id]?.setEditing(args.on ?? false)
       case "find":
         let count =
           host.surfaces[args.id]?.find(

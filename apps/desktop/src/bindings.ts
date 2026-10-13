@@ -8,6 +8,11 @@ export const commands = {
 	listDirectory: (path: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_directory", { path })),
 	readFile: (path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { path })),
 	writeFile: (path: string, contents: string) => typedError<null, string>(__TAURI_INVOKE("write_file", { path, contents })),
+	/**
+	 *  A file the app wrote outside these commands (the iOS app's native views
+	 *  save PDFs themselves), so the watcher doesn't take it for an outside change.
+	 */
+	fileWritten: (path: string) => __TAURI_INVOKE<void>("file_written", { path }),
 	createFile: (path: string) => typedError<null, string>(__TAURI_INVOKE("create_file", { path })),
 	createDirectory: (path: string) => typedError<null, string>(__TAURI_INVOKE("create_directory", { path })),
 	renamePath: (oldPath: string, newPath: string) => typedError<null, string>(__TAURI_INVOKE("rename_path", { oldPath, newPath })),

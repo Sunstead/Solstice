@@ -23,8 +23,12 @@ class SurfaceView: UIView {
   /// The file changed under it (another device, another app).
   func reload() {}
 
-  /// Writes what's unsaved now: the tab is closing, or the app is leaving.
-  func flush() {}
+  /// Writes what's unsaved now (the tab is closing, the app is leaving),
+  /// then calls `done`.
+  func flush(_ done: @escaping () -> Void = {}) { done() }
+
+  /// Turns editing on or off (markup on a PDF).
+  func setEditing(_ on: Bool) {}
 
   /// Highlights `query`'s matches and shows the first; how many there are.
   func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) -> Int { 0 }
@@ -32,9 +36,9 @@ class SurfaceView: UIView {
   /// Shows the next (or previous) match; its index, or -1 for none.
   func findStep(_ direction: Int) -> Int { -1 }
 
-  func send(_ type: String, message: String? = nil) {
+  func send(_ type: String, _ extra: JSObject = [:]) {
     var data: JSObject = ["id": id, "type": type, "path": path]
-    if let message { data["message"] = message }
+    data.merge(extra) { $1 }
     plugin?.trigger("surface", data: data)
   }
 }
@@ -69,8 +73,14 @@ final class SurfaceHost: UIView {
     surface.removeFromSuperview()
   }
 
-  func flushAll() {
-    surfaces.values.forEach { $0.flush() }
+  /// Every surface writes what's unsaved, then `done`.
+  func flushAll(_ done: @escaping () -> Void) {
+    let group = DispatchGroup()
+    for surface in surfaces.values {
+      group.enter()
+      surface.flush { group.leave() }
+    }
+    group.notify(queue: .main, execute: done)
   }
 
   /// Sits under `webview`, the same size, and makes it see-through.

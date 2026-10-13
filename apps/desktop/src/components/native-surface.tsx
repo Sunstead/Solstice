@@ -1,7 +1,7 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { nativeSurfaces, type SurfaceKind } from '@/lib/backend/native';
 import { useFindStore } from '@/lib/stores/find';
-import { follow, refreshers, retainHost, seeThrough, unmark } from '@/lib/native-surfaces';
+import { follow, refreshers, retainHost, seeThrough, unmark, useSurfaceStates } from '@/lib/native-surfaces';
 import { useFileVersion } from '@/lib/viewer/file-version';
 
 /**
@@ -9,9 +9,8 @@ import { useFileVersion } from '@/lib/viewer/file-version';
  * system's view shows through from under the webview. It keeps that view on
  * its frame, hidden while the tab is, and tells it when the file changes.
  */
-export function NativeSurface({ kind, path }: { kind: SurfaceKind; path: string }) {
+export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKind; path: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const id = useId();
 
   useEffect(() => {
     const el = ref.current;
@@ -45,6 +44,10 @@ export function NativeSurface({ kind, path }: { kind: SurfaceKind; path: string 
       stopFollowing();
       for (const below of under) unmark(below);
       void nativeSurfaces.close(id);
+      useSurfaceStates.setState((states) => {
+        const { [id]: _closed, ...rest } = states;
+        return rest;
+      }, true);
       release();
     };
   }, [id, kind, path]);

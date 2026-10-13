@@ -58,6 +58,14 @@ pub fn write_file(app: tauri::AppHandle, path: String, contents: String) -> Resu
     Ok(())
 }
 
+/// A file the app wrote outside these commands (the iOS app's native views
+/// save PDFs themselves), so the watcher doesn't take it for an outside change.
+#[tauri::command]
+#[specta::specta]
+pub fn file_written(app: tauri::AppHandle, path: String) {
+    note_self_write(&app, Path::new(&path));
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn create_file(app: tauri::AppHandle, path: String) -> Result<(), String> {

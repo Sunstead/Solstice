@@ -6,6 +6,8 @@ The native views the app's webview places and drives.
 
 - `allow-surface`
 - `allow-host`
+- `allow-register-listener`
+- `allow-remove-listener`
 
 ## Permission Table
 
@@ -38,6 +40,58 @@ Enables the host command without any pre-configured scope.
 <td>
 
 Denies the host command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`solstice-native:allow-register-listener`
+
+</td>
+<td>
+
+Enables the register_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`solstice-native:deny-register-listener`
+
+</td>
+<td>
+
+Denies the register_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`solstice-native:allow-remove-listener`
+
+</td>
+<td>
+
+Enables the remove_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`solstice-native:deny-remove-listener`
+
+</td>
+<td>
+
+Denies the remove_listener command without any pre-configured scope.
 
 </td>
 </tr>

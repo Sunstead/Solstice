@@ -6,8 +6,7 @@ import { PdfViewer } from '@/components/viewer/pdf-viewer';
 import { UnsupportedViewer } from '@/components/viewer/unsupported-viewer';
 import { embedKind } from '@/lib/embed/kind';
 import { can } from '@/lib/backend/platform';
-import { NativeSurface } from '@/components/native-surface';
-import { ViewerFrame } from '@/components/viewer/viewer-frame';
+import { NativePdf } from '@/components/viewer/native-pdf';
 
 /**
  * Chooses what a tab actually shows.
@@ -34,13 +33,7 @@ export const FileView: React.FC<{ path: string; source?: boolean }> = ({ path, s
       return <MediaViewer path={path} kind='audio' />;
     case 'pdf':
       // On iOS, in PDFKit: Apple's scrolling, zoom and selection.
-      return can.nativeViews ? (
-        <ViewerFrame path={path} find>
-          <NativeSurface kind='pdf' path={path} />
-        </ViewerFrame>
-      ) : (
-        <PdfViewer path={path} />
-      );
+      return can.nativeViews ? <NativePdf path={path} /> : <PdfViewer path={path} />;
     case 'canvas':
       return <CanvasEditor path={path} />;
     default:
