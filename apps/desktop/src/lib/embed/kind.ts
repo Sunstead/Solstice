@@ -46,3 +46,11 @@ export function embedKind(path: string): EmbedKind {
 
   return BY_EXTENSION[extension] ?? 'unknown';
 }
+
+/**
+ * A drawing from the iOS app (`*.drawing.svg`). Everywhere it's an image;
+ * the iOS app opens it to draw on.
+ */
+export function isDrawing(path: string): boolean {
+  return path.toLowerCase().endsWith('.drawing.svg');
+}

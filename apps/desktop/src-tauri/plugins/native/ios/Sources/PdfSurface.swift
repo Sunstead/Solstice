@@ -123,6 +123,10 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
       controller.didMove(toParent: parent)
     }
     canvases[key] = (page, controller)
+    observeMarkup(of: controller) { [weak self, weak controller] in
+      guard let self, let controller, self.canvases[key]?.controller === controller else { return }
+      self.paperMarkupViewControllerDidChangeMarkup(controller)
+    }
     return controller.view
   }
 

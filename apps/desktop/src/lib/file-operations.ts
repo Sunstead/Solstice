@@ -3,8 +3,7 @@ import { applyFsChanges, selfChange } from '@/lib/fs-sync';
 import type { FileTreeNode } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
 import { joinPath, parentOf } from '@/lib/path-utils';
-import { getPresetByExtension, type FileTypePreset } from '@/lib/stores/entry-input';
-import { getFileExtension } from '@/lib/utils';
+import { getPresetForName, type FileTypePreset } from '@/lib/stores/entry-input';
 
 /**
  * In-app operations apply optimistically through the same reconciler the
@@ -80,7 +79,7 @@ async function createFile(parentPath: string, name: string, chosen?: FileTypePre
   // new-file input seeds it exactly as the New Canvas menu item does.
   //
   // Before `openFile`, so the tab never opens on the empty version.
-  const preset = getPresetByExtension(getFileExtension(name));
+  const preset = getPresetForName(name);
   if (preset?.initialContents) {
     const seeded = await commands.writeFile(path, preset.initialContents);
     if (seeded.status === 'error') {

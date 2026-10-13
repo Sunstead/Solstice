@@ -84,6 +84,7 @@ class NativePlugin: Plugin {
         guard let path = args.path else { return invoke.reject("No path.") }
         switch args.kind {
         case "pdf": host.add(PdfSurface(id: args.id, path: path, plugin: self))
+        case "drawing": host.add(DrawingSurface(id: args.id, path: path, plugin: self))
         default: return invoke.reject("No such surface: \(args.kind ?? "")")
         }
       case "frame":

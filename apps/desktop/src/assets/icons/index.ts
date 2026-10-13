@@ -23,6 +23,8 @@ export const fileIconRegistry: Record<string, SvgComponent> = {
   avif: Image,
   bmp: Image,
   svg: Image,
+  // A drawing's preset extension; its files are .svg anyway.
+  'drawing.svg': Image,
   mp4: Video,
   webm: Video,
   mov: Video,

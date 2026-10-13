@@ -4,9 +4,10 @@ import { ImageViewer } from '@/components/viewer/image-viewer';
 import { MediaViewer } from '@/components/viewer/media-viewer';
 import { PdfViewer } from '@/components/viewer/pdf-viewer';
 import { UnsupportedViewer } from '@/components/viewer/unsupported-viewer';
-import { embedKind } from '@/lib/embed/kind';
+import { embedKind, isDrawing } from '@/lib/embed/kind';
 import { can } from '@/lib/backend/platform';
 import { NativePdf } from '@/components/viewer/native-pdf';
+import { NativeDrawing } from '@/components/viewer/native-drawing';
 
 /**
  * Chooses what a tab actually shows.
@@ -20,6 +21,9 @@ export const FileView: React.FC<{ path: string; source?: boolean }> = ({ path, s
   // An empty config path is a tab pointing at nothing; `embedKind` calls that
   // a note (extensionless targets are notes) and would boot an editor over it.
   if (!path) return <UnsupportedViewer path='' />;
+
+  // A drawing is an SVG to everything but the iOS app, which draws on it.
+  if (can.nativeViews && isDrawing(path)) return <NativeDrawing path={path} />;
 
   switch (embedKind(path)) {
     case 'markdown':

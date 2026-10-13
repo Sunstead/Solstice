@@ -6,7 +6,7 @@
  */
 import { addPluginListener, invoke } from '@tauri-apps/api/core';
 
-export type SurfaceKind = 'pdf';
+export type SurfaceKind = 'pdf' | 'drawing';
 
 export type SurfaceEvent = {
   id: string;

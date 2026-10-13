@@ -124,3 +124,23 @@ final class SurfaceHost: UIView {
     if let made { object_setClass(webview, made) }
   }
 }
+
+import Observation
+import PaperKit
+
+/// Calls `changed` whenever `controller`'s markup changes, however it
+/// changed: the delegate isn't told about everything (an insert from the +
+/// menu), Observation is.
+@MainActor
+func observeMarkup(of controller: PaperMarkupViewController, _ changed: @escaping () -> Void) {
+  withObservationTracking {
+    _ = controller.markup
+  } onChange: { [weak controller] in
+    DispatchQueue.main.async {
+      guard let controller else { return }
+      changed()
+      observeMarkup(of: controller, changed)
+    }
+  }
+}
+

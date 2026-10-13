@@ -34,6 +34,16 @@ export const FILE_TYPE_PRESETS: Record<string, FileTypePreset> = {
     creatable: true,
   },
   pdf: { id: 'pdf', label: 'PDF', extension: 'pdf' },
+  // An infinite canvas to draw on, in the iOS app (`DrawingFile.swift`); an
+  // SVG picture everywhere else.
+  drawing: {
+    id: 'drawing',
+    label: 'Drawing',
+    extension: 'drawing.svg',
+    initialContents:
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" width="1024" height="768"></svg>\n',
+    creatable: can.nativeViews,
+  },
   // A4 pages to write on, in the iOS app (see `Notebook.swift`); a PDF to
   // everything else.
   notebook: {
@@ -56,13 +66,24 @@ export function getPresetByExtension(extension: string): FileTypePreset | null {
   );
 }
 
+/**
+ * The preset a file name has, a two-part extension (`drawing.svg`) before
+ * its last one (`svg`).
+ */
+export function getPresetForName(fileName: string): FileTypePreset | null {
+  const lower = fileName.toLowerCase();
+  const compound = Object.values(FILE_TYPE_PRESETS).find(
+    (p) => p.extension.includes('.') && lower.endsWith(`.${p.extension}`) && lower.length > p.extension.length + 1,
+  );
+  return compound ?? getPresetByExtension(getFileExtension(fileName));
+}
+
 export function stripPresetExtension(fileName: string): {
   name: string;
   preset: FileTypePreset | null;
 } {
-  const extension = getFileExtension(fileName);
-  const preset = getPresetByExtension(extension);
-  const name = preset ? fileName.slice(0, -(extension.length + 1)) : fileName;
+  const preset = getPresetForName(fileName);
+  const name = preset ? fileName.slice(0, -(preset.extension.length + 1)) : fileName;
 
   return { name, preset };
 }
