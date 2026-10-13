@@ -158,3 +158,12 @@ html[data-reduce-motion='true'] *::after {
 [data-native-under] {
   background: transparent !important;
 }
+
+/* Dialogs centre in what's visible: above the on-screen keyboard rather than
+   behind it (`--app-height` is the visual viewport, `useVisualViewport`). */
+[data-slot='dialog-content'],
+[data-slot='alert-dialog-content'] {
+  top: calc(var(--app-height, 100dvh) / 2);
+  max-height: calc(var(--app-height, 100dvh) - 2rem);
+  overflow-y: auto;
+}

@@ -3,6 +3,7 @@ import { useIsMac } from '@/hooks/use-platform';
 import { useFileActionDialog } from '@/lib/stores/file-action-dialog';
 import { fileOperations } from '@/lib/file-operations';
 import { MoveToFolderDialog } from './move-to-folder-dialog';
+import { NameEntryDialog } from './name-entry-dialog';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -69,6 +70,8 @@ export function FileActionDialogs() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <NameEntryDialog />
 
       <MoveToFolderDialog
         open={moveTarget !== null}

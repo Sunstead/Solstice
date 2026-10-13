@@ -31,6 +31,7 @@ import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content
 import { useFileActionDialog } from '@/lib/stores/file-action-dialog';
 import { useSetting } from '@/lib/settings/store';
 import { useRevealTarget } from '@/lib/stores/reveal-target';
+import { touchFirst } from '@/lib/backend/platform';
 
 type FileTreeProps = {
   path: string;
@@ -59,8 +60,9 @@ export function FileTree({ path }: FileTreeProps) {
     };
   }, [path, startCreateFile, startCreateFolder]);
 
+  // On a touch screen, naming happens in a dialog (NameEntryDialog).
   const showCreateInput =
-    operation?.mode === 'create' && operation.parentPath === path;
+    !touchFirst && operation?.mode === 'create' && operation.parentPath === path;
 
   return (
     <>
@@ -104,9 +106,10 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const FileIcon = getFileIcon(getFileExtension(node.name));
 
   const isRenaming =
-    operation?.mode === 'rename' && operation.path === node.path;
+    !touchFirst && operation?.mode === 'rename' && operation.path === node.path;
 
   const showCreateInput =
+    !touchFirst &&
     node.is_dir &&
     operation?.mode === 'create' &&
     operation.parentPath === node.path;
