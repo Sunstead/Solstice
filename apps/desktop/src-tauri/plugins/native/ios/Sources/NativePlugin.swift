@@ -49,7 +49,7 @@ class NativePlugin: Plugin {
     self.webview = webview
     DispatchQueue.main.async {
       self.host = SurfaceHost.install(under: webview)
-      self.fit = WebviewFit(webview)
+      self.fit = WebviewFit(webview, plugin: self)
     }
     let center = NotificationCenter.default
     center.addObserver(

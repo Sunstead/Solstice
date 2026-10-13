@@ -4,14 +4,16 @@ import WebKit
 /// Fits the webview to the app as a native view would be, rather than as a
 /// web page in Safari is:
 ///
-/// - It ends at a docked on-screen keyboard. iOS otherwise leaves the page
-///   its full height and scrolls it under the keyboard; the frontend undid
-///   that scroll a frame later, which jittered, and writing with the Pencil
-///   set off the same. A floating keyboard, and the small bar a hardware
-///   keyboard (or Scribble) brings up, leave it be: they cover a corner, not
-///   the app's bottom edge.
+/// - It keeps its full height when the keyboard comes up, and tells the page
+///   how much of its bottom a docked keyboard covers (the `keyboard` event:
+///   `inset`, `docked`, `duration`). The page then makes room only in the
+///   editor being typed in, as a native app would, rather than the whole app
+///   shrinking and every pane and dialog moving. A floating keyboard, and the
+///   small bar a hardware keyboard (or Scribble) brings up, cover a corner,
+///   not the app's bottom edge: they report no inset.
 /// - The page itself never scrolls (only what's inside it does), so nothing
-///   can drift.
+///   can drift. iOS would otherwise scroll it to keep a field above the
+///   keyboard.
 /// - It reaches the top of the window, under the status bar or the iPad's
 ///   menu bar, which the page pads for (`env(safe-area-inset-top)`) in its
 ///   own colour.
@@ -23,12 +25,14 @@ final class WebviewFit: NSObject {
   private static let keyboardMinimum: CGFloat = 150
 
   private weak var webview: WKWebView?
+  private weak var plugin: NativePlugin?
   /// How much of the app's bottom the keyboard covers.
   private var covered: CGFloat = 0
   private var observation: NSKeyValueObservation?
 
-  init(_ webview: WKWebView) {
+  init(_ webview: WKWebView, plugin: NativePlugin) {
     self.webview = webview
+    self.plugin = plugin
     super.init()
     let scroll = webview.scrollView
     scroll.contentInsetAdjustmentBehavior = .never
@@ -76,13 +80,8 @@ final class WebviewFit: NSObject {
     guard cover != covered else { return }
     covered = cover
     let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
-    let curve = note.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt ?? 7
-    UIView.animate(
-      withDuration: duration, delay: 0,
-      options: [UIView.AnimationOptions(rawValue: curve << 16), .beginFromCurrentState]
-    ) {
-      webview.frame = CGRect(
-        x: 0, y: 0, width: parent.bounds.width, height: parent.bounds.height - cover)
-    }
+    // In the webview's CSS pixels, which are its points.
+    plugin?.trigger(
+      "keyboard", data: ["inset": Double(cover), "docked": cover > 0, "duration": duration])
   }
 }

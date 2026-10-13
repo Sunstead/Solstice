@@ -8,6 +8,7 @@ import { takeHandoff } from '@/lib/stores/editor-text';
 import { ViewerHeader } from './viewer/viewer-header';
 import { LinkEditor } from './link-editor';
 import { TableTools } from './table-tools';
+import { useKeyboardRoom } from '@/lib/keyboard';
 
 type FileEditorProps = {
   path: string;
@@ -21,6 +22,8 @@ export function FileEditor({ path, source = false }: FileEditorProps) {
   const [handed] = useState(() => takeHandoff(path));
   const [content, setContent] = useState<string | null>(handed);
   const [error, setError] = useState<string | null>(null);
+  // Room for the keyboard and its bar while this editor has focus.
+  const [roomRef, room] = useKeyboardRoom();
 
   // Load file content. FileView keys this by path, so it runs once.
   useEffect(() => {
@@ -53,7 +56,7 @@ export function FileEditor({ path, source = false }: FileEditorProps) {
   }
 
   return (
-    <ScrollArea className='h-full'>
+    <ScrollArea ref={roomRef} className='h-full' style={{ paddingBottom: room }}>
       {/* Its end scrolls clear of the home indicator. */}
       <div className='flex flex-col min-h-full pb-[env(safe-area-inset-bottom)]'>
         <ViewerHeader path={path} sticky find />

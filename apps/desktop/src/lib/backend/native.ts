@@ -66,3 +66,15 @@ export const nativeMenu = {
   listen: (handler: (id: CommandId) => void) =>
     addPluginListener<{ id: CommandId }>('solstice-native', 'menu', (event) => handler(event.id)),
 };
+
+/**
+ * The on-screen keyboard (`WebviewFit`): how much of the app's bottom a
+ * docked keyboard covers, in CSS pixels, and how long it takes to get there.
+ * The webview keeps its size; the page makes room where it's typed in.
+ */
+export type KeyboardEvent = { inset: number; docked: boolean; duration: number };
+
+export const nativeKeyboard = {
+  listen: (handler: (event: KeyboardEvent) => void) =>
+    addPluginListener<KeyboardEvent>('solstice-native', 'keyboard', handler),
+};

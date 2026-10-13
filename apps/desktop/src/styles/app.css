@@ -177,10 +177,10 @@ html[data-reduce-motion='true'] *::after {
 }
 
 /* Dialogs centre in what's visible: above the on-screen keyboard rather than
-   behind it (`--app-height` is the visual viewport, `useVisualViewport`). */
+   behind it (`--keyboard-inset`, `lib/keyboard.ts`). */
 [data-slot='dialog-content'],
 [data-slot='alert-dialog-content'] {
-  top: calc(var(--app-height, 100dvh) / 2);
-  max-height: calc(var(--app-height, 100dvh) - 2rem);
+  top: calc((100dvh - var(--keyboard-inset, 0px)) / 2);
+  max-height: calc(100dvh - var(--keyboard-inset, 0px) - 2rem);
   overflow-y: auto;
 }

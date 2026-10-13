@@ -11,6 +11,7 @@ import {
   getRelativePath,
   isSamePath,
 } from '@/lib/path-utils';
+import { primeKeyboard } from '@/lib/keyboard-primer';
 import { useEntryInput } from '@/lib/stores/entry-input';
 import { useFileActionDialog } from '@/lib/stores/file-action-dialog';
 import { useFindStore } from '@/lib/stores/find';
@@ -154,6 +155,9 @@ export function find(path: string) {
  * row has to exist and be on screen first, hence the awaited reveal.
  */
 export async function startRename(path: string) {
+  // The reveal is awaited, which takes the rename out of the tap that asked
+  // for it: raise the keyboard now, while still in it.
+  primeKeyboard();
   await revealInExplorer(path);
   useEntryInput.getState().startRename(targetFromPath(path));
 }

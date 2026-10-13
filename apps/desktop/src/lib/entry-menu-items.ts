@@ -21,6 +21,7 @@ import { getFileIcon, getFolderIcon } from '@/assets/icons';
 import { usePlatform } from '@/hooks/use-platform';
 import { useFiles } from '@/hooks/use-files';
 import * as entryActions from '@/lib/entry-actions';
+import { primeKeyboard } from '@/lib/keyboard-primer';
 import type { EntryTarget } from '@/lib/entry-actions';
 import { FILE_TYPE_PRESETS, useEntryInput } from '@/lib/stores/entry-input';
 import { runCommand } from '@/lib/commands';
@@ -108,6 +109,14 @@ const separator = (id: string): EntryMenuItem => ({ kind: 'separator', id });
  */
 function deferred(run: () => void) {
   return () => setTimeout(run, 0);
+}
+
+/** Raises the keyboard in the tap, for a field `run` opens later. */
+function withKeyboard(run: () => void) {
+  return () => {
+    primeKeyboard();
+    run();
+  };
 }
 
 export function useEntryMenuItems(
@@ -288,7 +297,8 @@ export function useEntryMenuItems(
       label: 'Rename',
       icon: PencilLine,
       disabled: !renameEnabled,
-      run: deferred(() => void entryActions.startRename(path)),
+      // The keyboard comes up in the tap; the field after the menu closes.
+      run: withKeyboard(deferred(() => void entryActions.startRename(path))),
     });
     items.push({
       kind: 'item',

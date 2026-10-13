@@ -1,5 +1,6 @@
 import { FileTreeNode } from '@/hooks/use-files';
 import { useEntryMenuItems } from '@/lib/entry-menu-items';
+import { touchFirst } from '@/lib/backend/platform';
 import { EntryMenuItems } from './entry-menu-items';
 import {
   ContextMenuContent,
@@ -46,8 +47,10 @@ export function FileTreeItemContextMenuContent({
     moveEnabled,
   });
 
+  // On a touch screen, focus stays where an item put it: handed back to the
+  // trigger, it would take the keyboard from a naming dialog.
   return (
-    <ContextMenuContent className='min-w-52'>
+    <ContextMenuContent className='min-w-52' finalFocus={touchFirst ? false : undefined}>
       <EntryMenuItems items={items} components={components} />
     </ContextMenuContent>
   );

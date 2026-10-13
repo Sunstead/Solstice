@@ -1,6 +1,7 @@
 import { MoreVertical } from 'lucide-react';
 
 import { targetFromPath } from '@/lib/entry-actions';
+import { touchFirst } from '@/lib/backend/platform';
 import { Button } from '@sunstead/ui/components/button';
 import { useEntryMenuItems, type EntryMenuSurface } from '@/lib/entry-menu-items';
 import { EntryMenuItems } from './entry-menu-items';
@@ -46,7 +47,9 @@ export function FileActionsDropdown({
           </Button>
         }
       />
-      <DropdownMenuContent className='w-max min-w-52'>
+      {/* On a touch screen, focus stays where an item put it: handed back to
+          the trigger, it would take the keyboard from a naming dialog. */}
+      <DropdownMenuContent className='w-max min-w-52' finalFocus={touchFirst ? false : undefined}>
         <EntryMenuItems items={items} components={components} />
       </DropdownMenuContent>
     </DropdownMenu>

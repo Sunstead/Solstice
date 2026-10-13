@@ -5,7 +5,7 @@ import { useAccountActions } from '@/hooks/use-account-actions';
 import { BlankTab } from '@/components/blank-tab';
 import { TabContent } from '@/components/tab-content';
 import { UserAvatar } from '@/components/user-avatar';
-import { useViewport } from '@/hooks/use-visual-viewport';
+import { useKeyboard } from '@/lib/keyboard';
 import { useLayout } from '@/hooks/use-layout';
 import { useLayoutSession } from '@/hooks/use-layout-session';
 import { useWorkspace } from '@/hooks/use-workspace';
@@ -196,7 +196,7 @@ const PAGES: { id: PhonePage; label: string; icon: typeof Files }[] = [
 function AppFooter() {
   const page = usePhoneNav((s) => s.page);
   const showPage = usePhoneNav((s) => s.showPage);
-  const keyboard = useViewport((s) => s.keyboard);
+  const keyboard = useKeyboard((s) => s.docked);
   const { username, attention } = useAccountActions();
 
   if (keyboard) return null;
