@@ -13,7 +13,8 @@ use super::secrets;
 use base64::{ engine::general_purpose::URL_SAFE_NO_PAD, Engine };
 use serde::Deserialize;
 use sha2::{ Digest, Sha256 };
-use std::time::Duration;
+use std::{ collections::HashMap, sync::LazyLock, time::{ Duration, Instant } };
+use tokio::sync::Mutex;
 use tauri::{ AppHandle, Manager, Runtime };
 #[cfg(not(target_os = "ios"))]
 use tauri_plugin_opener::OpenerExt;
@@ -36,7 +37,26 @@ struct TokenResponse {
     access_token: String,
     #[serde(default)]
     refresh_token: Option<String>,
+    #[serde(default)]
+    expires_in: Option<u64>,
 }
+
+/// An access token, kept until shortly before it expires.
+struct Cached {
+    token: String,
+    until: Instant,
+}
+
+/// Access tokens by sign-in, and the lock every refresh takes. The provider
+/// rotates the refresh token on each use, so two refreshes at once would
+/// race: the loser's `invalid_grant` used to delete the winner's new token,
+/// which signed you out.
+static TOKENS: LazyLock<Mutex<HashMap<String, Cached>>> = LazyLock::new(Default::default);
+
+/// Refreshed this long before the provider says the token expires.
+const EXPIRY_MARGIN: Duration = Duration::from_secs(60);
+/// For a provider that doesn't say.
+const DEFAULT_LIFETIME: Duration = Duration::from_secs(300);
 
 #[derive(Deserialize)]
 struct TokenError {
@@ -216,11 +236,22 @@ pub async fn sign_in<R: Runtime>(
         ]
     ).await.map_err(|(_, m)| m)?;
 
+    let key = account(&issuer, &client_id);
+    let mut cache = TOKENS.lock().await;
     match &tokens.refresh_token {
-        Some(rt) => secrets::set(&account(&issuer, &client_id), rt)?,
+        Some(rt) => secrets::set(&key, rt)?,
         None => return Err("The sign-in provider gave no refresh token (is offline_access allowed?)".into()),
     }
+    cache.insert(key, cached(&tokens));
     Ok(())
+}
+
+fn cached(tokens: &TokenResponse) -> Cached {
+    let lifetime = tokens.expires_in.map(Duration::from_secs).unwrap_or(DEFAULT_LIFETIME);
+    Cached {
+        token: tokens.access_token.clone(),
+        until: Instant::now() + lifetime.saturating_sub(EXPIRY_MARGIN),
+    }
 }
 
 /// iOS suspends an app behind Safari, and with it the loopback listener, so
@@ -251,10 +282,18 @@ pub fn signed_in(issuer: &str, client_id: &str) -> bool {
     matches!(secrets::get(&account(issuer, client_id)), Ok(Some(_)))
 }
 
-/// A fresh access token from the stored refresh token. `None` means signed
-/// out: nothing stored, or the provider revoked it.
+/// An access token: the one in hand while it lasts, otherwise a fresh one
+/// from the stored refresh token. `None` means signed out: nothing stored,
+/// or the provider revoked it. Callers at the same moment share a refresh.
 pub async fn access_token(issuer: &str, client_id: &str) -> Result<Option<String>, String> {
     let key = account(issuer, client_id);
+    let mut cache = TOKENS.lock().await;
+    if let Some(c) = cache.get(&key) {
+        if Instant::now() < c.until {
+            return Ok(Some(c.token.clone()));
+        }
+    }
+    cache.remove(&key);
     let Some(refresh_token) = secrets::get(&key)? else {
         return Ok(None);
     };
@@ -273,24 +312,47 @@ pub async fn access_token(issuer: &str, client_id: &str) -> Result<Option<String
     {
         Ok(tokens) => {
             if let Some(rt) = &tokens.refresh_token {
-                secrets::set(&key, rt)?;
+                // The old one is spent: losing the new one would sign you out.
+                secrets::set(&key, rt).or_else(|_| secrets::set(&key, rt))?;
             }
+            cache.insert(key, cached(&tokens));
             Ok(Some(tokens.access_token))
         }
         Err((Some(code), _)) if code == "invalid_grant" => {
-            secrets::delete(&key)?;
-            Ok(None)
+            // Another copy of the app (a dev build beside the installed one)
+            // may have rotated it since we read it: only a token that's still
+            // the stored one is gone.
+            if secrets::get(&key)?.as_deref() == Some(refresh_token.as_str()) {
+                secrets::delete(&key)?;
+                return Ok(None);
+            }
+            Err("The sign-in changed while refreshing it. Trying again.".into())
         }
         // Network trouble: keep the refresh token and let the caller retry.
         Err((_, message)) => Err(message),
     }
 }
 
+/// The server turned `token` down (its clock runs ahead, say): the next
+/// caller gets a fresh one.
+pub async fn refused(issuer: &str, client_id: &str, token: &str) {
+    let key = account(issuer, client_id);
+    let mut cache = TOKENS.lock().await;
+    if cache.get(&key).is_some_and(|c| c.token == token) {
+        cache.remove(&key);
+    }
+}
+
 /// Forgets the sign-in, and asks the provider to revoke it (best effort).
 pub async fn sign_out(issuer: &str, client_id: &str) -> Result<(), String> {
     let key = account(issuer, client_id);
-    let stored = secrets::get(&key)?;
-    secrets::delete(&key)?;
+    let stored = {
+        let mut cache = TOKENS.lock().await;
+        cache.remove(&key);
+        let stored = secrets::get(&key)?;
+        secrets::delete(&key)?;
+        stored
+    };
     if let Some(rt) = stored {
         if let Ok(client) = http() {
             if let Ok(d) = discover(&client, issuer).await {
@@ -315,6 +377,26 @@ pub async fn sign_out(issuer: &str, client_id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn access_tokens_are_kept_until_shortly_before_they_expire() {
+        let response = |expires_in| TokenResponse {
+            access_token: "a".into(),
+            refresh_token: None,
+            expires_in,
+        };
+        let lasts = |expires_in| {
+            let before = Instant::now();
+            let until = cached(&response(expires_in)).until;
+            (until - before, until - Instant::now())
+        };
+        let (most, least) = lasts(Some(600));
+        assert!(most >= Duration::from_secs(540) && least <= Duration::from_secs(540));
+        let (most, least) = lasts(None);
+        assert!(most >= Duration::from_secs(240) && least <= Duration::from_secs(240));
+        // A token that barely lives is refreshed every time.
+        assert!(cached(&response(Some(30))).until <= Instant::now());
+    }
 
     #[test]
     fn challenge_matches_rfc_7636() {

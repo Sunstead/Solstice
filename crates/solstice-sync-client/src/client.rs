@@ -394,6 +394,15 @@ impl Actor {
                 self.send(socket, open).await;
                 self.settle_at = Some(Instant::now() + SETTLE);
             }
+            // A token the server turned down (stale, or its clock runs ahead)
+            // isn't a sign-out: only the provider revoking the sign-in is,
+            // and then there's no token at all.
+            Err(Error::SignedOut) if token.is_some() => {
+                if let Some(t) = &token {
+                    self.tokens.refused(t).await;
+                }
+                self.retry_later("the server turned the sign-in down".into());
+            }
             Err(Error::SignedOut) => self.set_status(Status::SignedOut),
             Err(e) => self.retry_later(e.to_string()),
         }
