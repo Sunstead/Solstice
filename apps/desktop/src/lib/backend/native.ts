@@ -10,9 +10,11 @@ export type SurfaceKind = 'pdf';
 
 export type SurfaceEvent = {
   id: string;
-  type: 'saved' | 'dirty' | 'error';
+  type: 'saved' | 'dirty' | 'error' | 'editing';
   path: string;
   message?: string;
+  /** For `editing`: whether it's now on. */
+  on?: boolean;
 };
 
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -33,6 +35,8 @@ export const nativeSurfaces = {
   place: (id: string, rect: Rect, visible: boolean) => surface({ op: 'frame', id, ...rect, visible }),
   reload: (id: string) => surface({ op: 'reload', id }),
   close: (id: string) => surface({ op: 'close', id }),
+  /** Markup on a PDF: the tool picker, and a finger drawing too. */
+  edit: (id: string, on: boolean) => surface({ op: 'edit', id, on }),
   /** Highlights the matches and shows the first; an empty query clears them. */
   find: (id: string, query: string, caseSensitive: boolean, wholeWord: boolean) =>
     surface<{ count: number; active: number }>({ op: 'find', id, query, caseSensitive, wholeWord }),

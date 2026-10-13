@@ -2,4 +2,4 @@
 
 [default]
 description = "The native views the app's webview places and drives."
-permissions = ["allow-surface", "allow-host"]
+permissions = ["allow-surface", "allow-host", "allow-register-listener", "allow-remove-listener"]

@@ -27,6 +27,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             files::list_directory,
             files::read_file,
             files::write_file,
+            files::file_written,
             files::create_file,
             files::create_directory,
             files::rename_path,
