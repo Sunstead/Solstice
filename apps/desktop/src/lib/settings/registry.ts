@@ -405,6 +405,21 @@ export const settingsRegistry = {
     default: touchFirst ? 'single' : 'split',
   }),
 
+  'ink.notebookTemplate': defineEnum({
+    section: 'editor',
+    group: 'Notebooks',
+    scope: 'global',
+    label: 'New pages',
+    options: [
+      { value: 'blank', label: 'Blank' },
+      { value: 'lined', label: 'Lined' },
+      { value: 'grid', label: 'Grid' },
+      { value: 'dotted', label: 'Dotted' },
+    ],
+    default: 'lined',
+    visibleWhen: () => can.nativeViews,
+  }),
+
   'editor.autosave': defineEnum({
     section: 'editor',
     group: 'Saving',

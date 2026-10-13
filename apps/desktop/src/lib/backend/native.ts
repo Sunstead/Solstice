@@ -6,7 +6,7 @@
  */
 import { addPluginListener, invoke } from '@tauri-apps/api/core';
 
-export type SurfaceKind = 'pdf';
+export type SurfaceKind = 'pdf' | 'drawing';
 
 export type SurfaceEvent = {
   id: string;
@@ -47,6 +47,9 @@ export const nativeSurfaces = {
    * web content sits over the surfaces (it takes the touches there).
    */
   overlays: (modal: boolean, rects: Rect[]) => host({ op: 'overlays', modal, rects }),
+  /** A new notebook: an A4 PDF with one page of `template`. */
+  createNotebook: (path: string, template: string) =>
+    invoke('plugin:solstice-native|host', { op: 'notebook', path, template }),
   /** The theme's background, painted behind the see-through webview. */
   background: (rgb: number[]) => host({ op: 'background', rgb }),
   listen: (handler: (event: SurfaceEvent) => void) =>

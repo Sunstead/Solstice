@@ -22,6 +22,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// The canvas over each page PDFKit is showing (or that has unsaved marks).
   private var canvases: [ObjectIdentifier: (page: PDFPage, controller: PaperMarkupViewController)] = [:]
   private var unsaved = Set<ObjectIdentifier>()
+  /// Pages added: the file needs writing even with no new marks.
+  private var pagesChanged = false
   private var editing = false
   private var saveTask: Task<Void, Never>?
   /// When we last wrote the file, so our own save isn't taken for a change.
@@ -80,7 +82,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     // Our own save, or marks not yet saved: ours win (the sync keeps the
     // other version beside it if both changed).
     let modified = try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date
-    if !unsaved.isEmpty || (written != nil && modified == written) { return }
+    if !unsaved.isEmpty || pagesChanged || (written != nil && modified == written) { return }
 
     // Back to the same page, and the same zoom if the reader had zoomed.
     let page = pdfView.currentPage.flatMap { pdfView.document?.index(for: $0) }
@@ -121,6 +123,10 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
       controller.didMove(toParent: parent)
     }
     canvases[key] = (page, controller)
+    observeMarkup(of: controller) { [weak self, weak controller] in
+      guard let self, let controller, self.canvases[key]?.controller === controller else { return }
+      self.paperMarkupViewControllerDidChangeMarkup(controller)
+    }
     return controller.view
   }
 
@@ -170,16 +176,39 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   private func showInsertMenu() {
     guard let controller = current, let parent = plugin?.manager.viewController else { return }
-    let menu = MarkupEditViewController(supportedFeatureSet: Self.features)
+    let addPage = UIAction(title: "Add Page", image: UIImage(systemName: "doc.badge.plus")) {
+      [weak self] _ in self?.addPage()
+    }
+    let menu = MarkupEditViewController(supportedFeatureSet: Self.features, additionalActions: [addPage])
     menu.delegate = controller
     menu.modalPresentationStyle = .popover
     menu.popoverPresentationController?.sourceItem = toolPicker.accessoryItem
     parent.present(menu, animated: true)
   }
 
+  /// A page after the one in view, with the document's background (a
+  /// notebook's), the size of its last page.
+  private func addPage() {
+    guard let document = pdfView.document else { return }
+    let size = document.page(at: document.pageCount - 1)?.bounds(for: .cropBox) ?? Notebook.a4
+    guard
+      let page = Notebook.page(
+        template: Notebook.template(of: document), size: CGRect(origin: .zero, size: size.size))
+    else { return }
+    let after = pdfView.currentPage.map { document.index(for: $0) } ?? document.pageCount - 1
+    document.insert(page, at: after + 1)
+    pdfView.go(to: page)
+    pagesChanged = true
+    scheduleSave()
+  }
+
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
     guard let entry = canvases.first(where: { $0.value.controller === controller }) else { return }
     unsaved.insert(entry.key)
+    scheduleSave()
+  }
+
+  private func scheduleSave() {
     send("dirty")
     saveTask?.cancel()
     saveTask = Task { @MainActor [weak self] in
@@ -202,9 +231,10 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// Writes the changed pages' marks into the PDF, through a temporary file
   /// so nothing ever reads half a PDF.
   private func save() async {
-    guard let document = pdfView.document, !unsaved.isEmpty else { return }
+    guard let document = pdfView.document, !unsaved.isEmpty || pagesChanged else { return }
     let pages = unsaved.compactMap { canvases[$0] }
     unsaved.removeAll()
+    pagesChanged = false
 
     for (page, controller) in pages {
       guard let markup = controller.markup else { continue }
@@ -229,6 +259,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     } else {
       try? FileManager.default.removeItem(at: temporary)
       for (page, _) in pages { unsaved.insert(ObjectIdentifier(page)) }
+      pagesChanged = true
       send("error", ["message": "Couldn't save this PDF."])
     }
     // Canvases scrolled away while unsaved can go now.
@@ -251,27 +282,45 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   // -- Find ------------------------------------------------------------
 
-  private var matches: [PDFSelection] = []
+  /// A find match: in the page's text, or written by hand (page space).
+  private enum Match {
+    case text(PDFSelection)
+    case ink(PDFPage, CGRect)
+  }
+
+  private var matches: [Match] = []
   private var active = -1
 
-  override func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) -> Int {
+  override func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) async -> Int {
     matches = []
     active = -1
     defer { showMatches() }
     guard !query.isEmpty, let document = pdfView.document else { return 0 }
     var pattern = NSRegularExpression.escapedPattern(for: query)
     if wholeWord { pattern = "\\b\(pattern)\\b" }
-    guard
-      let regex = try? NSRegularExpression(
-        pattern: pattern, options: caseSensitive ? [] : [.caseInsensitive])
-    else { return 0 }
+    let regex = try? NSRegularExpression(
+      pattern: pattern, options: caseSensitive ? [] : [.caseInsensitive])
+    var found: [Match] = []
     for index in 0..<document.pageCount {
-      guard let page = document.page(at: index), let text = page.string else { continue }
-      let range = NSRange(text.startIndex..., in: text)
-      for match in regex.matches(in: text, range: range) {
-        if let selection = page.selection(for: match.range) { matches.append(selection) }
+      guard let page = document.page(at: index) else { continue }
+      if let regex, let text = page.string {
+        let range = NSRange(text.startIndex..., in: text)
+        for match in regex.matches(in: text, range: range) {
+          if let selection = page.selection(for: match.range) { found.append(.text(selection)) }
+        }
+      }
+      // Marks on screen are the canvas's; otherwise what the file holds.
+      let markup = canvases[ObjectIdentifier(page)]?.controller.markup ?? PdfMarkup.read(page)
+      if let markup {
+        let box = page.bounds(for: .cropBox)
+        for rect in await handwriting(query, in: markup, caseSensitive: caseSensitive, wholeWord: wholeWord) {
+          // Markup space is top-left; the page's bottom-left.
+          let onPage = CGRect(x: box.minX + rect.minX, y: box.maxY - rect.maxY, width: rect.width, height: rect.height)
+          found.append(.ink(page, onPage))
+        }
       }
     }
+    matches = found
     if !matches.isEmpty { active = 0 }
     return matches.count
   }
@@ -284,11 +333,25 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }
 
   private func showMatches() {
+    var selections: [PDFSelection] = []
     for (index, match) in matches.enumerated() {
-      match.color = index == active ? .systemOrange : .systemYellow.withAlphaComponent(0.5)
+      guard case .text(let selection) = match else { continue }
+      selection.color = index == active ? .systemOrange : .systemYellow.withAlphaComponent(0.5)
+      selections.append(selection)
     }
-    pdfView.highlightedSelections = matches.isEmpty ? nil : matches
-    if matches.indices.contains(active) { pdfView.go(to: matches[active]) }
+    pdfView.highlightedSelections = selections.isEmpty ? nil : selections
+    guard matches.indices.contains(active) else { return }
+    switch matches[active] {
+    case .text(let selection):
+      pdfView.go(to: selection)
+    case .ink(let page, let rect):
+      pdfView.go(to: rect, on: page)
+      DispatchQueue.main.async { [weak self] in
+        guard let self, let document = self.pdfView.documentView else { return }
+        let inView = self.pdfView.convert(rect, from: page)
+        flash(self.pdfView.convert(inView, to: document), in: document)
+      }
+    }
   }
 
   // -- Fitting ------------------------------------------------------------

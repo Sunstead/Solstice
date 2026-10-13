@@ -34,6 +34,8 @@ struct HostArgs: Decodable {
   let modal: Bool?
   let rects: [Rect]?
   let rgb: [Double]?
+  let path: String?
+  let template: String?
 }
 
 class NativePlugin: Plugin {
@@ -82,6 +84,7 @@ class NativePlugin: Plugin {
         guard let path = args.path else { return invoke.reject("No path.") }
         switch args.kind {
         case "pdf": host.add(PdfSurface(id: args.id, path: path, plugin: self))
+        case "drawing": host.add(DrawingSurface(id: args.id, path: path, plugin: self))
         default: return invoke.reject("No such surface: \(args.kind ?? "")")
         }
       case "frame":
@@ -94,11 +97,16 @@ class NativePlugin: Plugin {
       case "edit":
         host.surfaces[args.id]?.setEditing(args.on ?? false)
       case "find":
-        let count =
-          host.surfaces[args.id]?.find(
-            args.query ?? "", caseSensitive: args.caseSensitive ?? false,
-            wholeWord: args.wholeWord ?? false) ?? 0
-        return invoke.resolve(["count": count, "active": count > 0 ? 0 : -1])
+        // Reading handwriting takes a moment: answered when it's done.
+        let surface = host.surfaces[args.id]
+        Task { @MainActor in
+          let count =
+            await surface?.find(
+              args.query ?? "", caseSensitive: args.caseSensitive ?? false,
+              wholeWord: args.wholeWord ?? false) ?? 0
+          invoke.resolve(["count": count, "active": count > 0 ? 0 : -1])
+        }
+        return
       case "findStep":
         let active = host.surfaces[args.id]?.findStep(args.direction ?? 1) ?? -1
         return invoke.resolve(["active": active])
@@ -120,6 +128,13 @@ class NativePlugin: Plugin {
         host.webModal = args.modal ?? false
         host.webRects = (args.rects ?? []).map {
           self.hostRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
+        }
+      case "notebook":
+        guard let path = args.path else { return invoke.reject("No path.") }
+        do {
+          try Notebook.create(at: URL(fileURLWithPath: path), template: args.template ?? "blank")
+        } catch {
+          return invoke.reject("Couldn't make the notebook: \(error.localizedDescription)")
         }
       case "background":
         if let rgb = args.rgb, rgb.count >= 3 {

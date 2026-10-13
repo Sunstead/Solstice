@@ -74,7 +74,7 @@ export function FileTree({ path }: FileTreeProps) {
             settle(
               operation.kind.type === 'folder'
                 ? fileOperations.createFolder(path, finalName)
-                : fileOperations.createFile(path, finalName),
+                : fileOperations.createFile(path, finalName, operation.kind.preset),
               cancel,
             )
           }
@@ -284,7 +284,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
                   settle(
                     operation.kind.type === 'folder'
                       ? fileOperations.createFolder(node.path, finalName)
-                      : fileOperations.createFile(node.path, finalName),
+                      : fileOperations.createFile(node.path, finalName, operation.kind.preset),
                     cancel,
                   )
                 }
