@@ -22,7 +22,9 @@ export const trailingTap = $prose(
     new Plugin({
       props: {
         handleDOMEvents: {
-          mousedown(view, event) {
+          // Pointer, not mouse: iOS sends no mousedown for a tap on the
+          // editor's empty padding.
+          pointerdown(view, event) {
             // Only the editor's own padding, under everything in it.
             if (event.target !== view.dom || !view.editable) return false;
             const { doc, schema } = view.state;
