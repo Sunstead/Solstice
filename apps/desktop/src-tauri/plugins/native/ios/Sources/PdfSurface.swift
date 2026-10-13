@@ -18,7 +18,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }()
 
   private let pdfView = PDFView()
-  private let toolPicker = PKToolPicker()
+  private var toolPicker: PKToolPicker { Ink.shared.picker }
   /// The canvas over each page PDFKit is showing (or that has unsaved marks).
   private var canvases: [ObjectIdentifier: (page: PDFPage, controller: PaperMarkupViewController)] = [:]
   private var unsaved = Set<ObjectIdentifier>()
@@ -46,9 +46,6 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     addSubview(pdfView)
 
     // Squeeze, barrel roll and the + menu come with Apple's tool picker.
-    toolPicker.accessoryItem = UIBarButtonItem(
-      image: UIImage(systemName: "plus.circle"),
-      primaryAction: UIAction { [weak self] _ in self?.showInsertMenu() })
     pencilKitResponderState.activeToolPicker = toolPicker
     pencilKitResponderState.toolPickerVisibility = .hidden
 
@@ -154,6 +151,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     editing = on
     pdfView.isInMarkupMode = on
     canvases.values.forEach { configure($0.controller) }
+    if on { Ink.shared.accessory { [weak self] in self?.showInsertMenu() } }
     pencilKitResponderState.toolPickerVisibility = on ? .visible : .hidden
     if on {
       current?.becomeFirstResponder()
@@ -171,7 +169,10 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }
 
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
-    if gesture.state == .began, !editing { setEditing(true) }
+    if gesture.state == .began, !editing {
+      Ink.shared.penInHand()
+      setEditing(true)
+    }
   }
 
   private func showInsertMenu() {
@@ -212,7 +213,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     send("dirty")
     saveTask?.cancel()
     saveTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .seconds(2))
+      try? await Task.sleep(for: .seconds(1))
       guard !Task.isCancelled else { return }
       await self?.save()
     }

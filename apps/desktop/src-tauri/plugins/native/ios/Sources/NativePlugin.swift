@@ -36,6 +36,7 @@ struct HostArgs: Decodable {
   let rgb: [Double]?
   let path: String?
   let template: String?
+  let menus: [NativeMenu.Menu]?
 }
 
 class NativePlugin: Plugin {
@@ -131,6 +132,8 @@ class NativePlugin: Plugin {
         host.webRects = (args.rects ?? []).map {
           self.hostRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
         }
+      case "menu":
+        NativeMenu.set(args.menus ?? [], plugin: self)
       case "notebook":
         guard let path = args.path else { return invoke.reject("No path.") }
         do {

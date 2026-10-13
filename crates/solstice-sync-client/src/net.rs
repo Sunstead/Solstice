@@ -15,6 +15,11 @@ pub type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 /// needs none).
 pub trait TokenSource: Send + Sync {
     fn token(&self) -> BoxFuture<'_, Result<Option<String>, String>>;
+
+    /// The server turned `token` down: don't hand it out again.
+    fn refused<'a>(&'a self, _token: &'a str) -> BoxFuture<'a, ()> {
+        Box::pin(async {})
+    }
 }
 
 /// No tokens: for development servers (`SOLSTICE_DEV_USER`) and tests.

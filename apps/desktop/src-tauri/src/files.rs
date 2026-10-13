@@ -64,6 +64,7 @@ pub fn write_file(app: tauri::AppHandle, path: String, contents: String) -> Resu
 #[specta::specta]
 pub fn file_written(app: tauri::AppHandle, path: String) {
     note_self_write(&app, Path::new(&path));
+    crate::sync::changed(&app, &path);
 }
 
 #[tauri::command]

@@ -105,10 +105,11 @@ export const commands = {
 	getMenuLayout: () => __TAURI_INVOKE<ResolvedMenu[]>("get_menu_layout"),
 	/**
 	 *  Commands whose accelerator is dispatched by the OS before the webview
-	 *  ever sees the keystroke. Only macOS installs a native menu, so every
-	 *  other platform leaves the whole registry to the frontend; the frontend
-	 *  binds exactly what is missing from this list, which keeps one
-	 *  accelerator to one dispatcher and rules out double-firing.
+	 *  ever sees the keystroke. macOS installs a native menu, and so does the
+	 *  iPad (the plugin builds the menu bar from `get_menu_layout`); every other
+	 *  platform leaves the whole registry to the frontend. The frontend binds
+	 *  exactly what is missing from this list, which keeps one accelerator to
+	 *  one dispatcher and rules out double-firing.
 	 */
 	getNativeMenuCommandIds: () => __TAURI_INVOKE<CommandId[]>("get_native_menu_command_ids"),
 	/**

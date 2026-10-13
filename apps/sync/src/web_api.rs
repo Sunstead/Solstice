@@ -30,6 +30,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::api::vault_for;
 use crate::auth::{web::same_origin, CurrentUser, Via};
+use crate::db::SESSION_TTL_SECS;
 use crate::error::AppError;
 use crate::hub::{Cmd, WebOp, WebReply};
 use crate::AppState;
@@ -69,9 +70,22 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-async fn me(who: CurrentUser) -> Result<Json<serde_json::Value>, AppError> {
+async fn me(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    who: CurrentUser,
+) -> Result<Response, AppError> {
     who.require_person()?;
-    Ok(Json(json!({ "username": who.user.username })))
+    let mut res = Json(json!({ "username": who.user.username })).into_response();
+    // The session slides as it's used, and so does its cookie: the web app
+    // asks this on every load, which keeps an active browser signed in.
+    if !headers.contains_key(header::AUTHORIZATION) {
+        if let Some(token) = state.cookie.read(&headers) {
+            res.headers_mut()
+                .insert(header::SET_COOKIE, state.cookie.set(&token, SESSION_TTL_SECS));
+        }
+    }
+    Ok(res)
 }
 
 /// Runs `op` in the vault's task.

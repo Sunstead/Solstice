@@ -358,14 +358,15 @@ pub fn get_menu_layout(app: AppHandle) -> Vec<ResolvedMenu> {
 }
 
 /// Commands whose accelerator is dispatched by the OS before the webview
-/// ever sees the keystroke. Only macOS installs a native menu, so every
-/// other platform leaves the whole registry to the frontend; the frontend
-/// binds exactly what is missing from this list, which keeps one
-/// accelerator to one dispatcher and rules out double-firing.
+/// ever sees the keystroke. macOS installs a native menu, and so does the
+/// iPad (the plugin builds the menu bar from `get_menu_layout`); every other
+/// platform leaves the whole registry to the frontend. The frontend binds
+/// exactly what is missing from this list, which keeps one accelerator to
+/// one dispatcher and rules out double-firing.
 #[tauri::command]
 #[specta::specta]
 pub fn get_native_menu_command_ids(app: AppHandle) -> Vec<CommandId> {
-    if !cfg!(target_os = "macos") {
+    if !cfg!(any(target_os = "macos", target_os = "ios")) {
         return Vec::new();
     }
 

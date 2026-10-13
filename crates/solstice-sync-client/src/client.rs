@@ -25,6 +25,8 @@ const SAVE_AFTER: Duration = Duration::from_secs(2);
 /// Quiet this long after connecting means synced.
 const SETTLE: Duration = Duration::from_millis(800);
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
+/// A download that failed is tried again after this.
+const FETCH_RETRY: Duration = Duration::from_secs(5);
 /// Access tokens are refreshed when older than this (Authentik's last 10
 /// minutes; the WebSocket only needs one at connect).
 const TOKEN_AGE: Duration = Duration::from_secs(4 * 60);
@@ -162,6 +164,7 @@ impl Client {
             connected_at: None,
             save_at: None,
             settle_at: None,
+            fetch_at: None,
         };
         tokio::spawn(actor.run(rx));
         Ok(Client {
@@ -208,6 +211,12 @@ impl Client {
             rel: rel.into(),
             text: text.into(),
         });
+    }
+
+    /// A file in the folder changed and the caller knows it (the iOS app's
+    /// PDF and drawing editors): sync it now, not when the watcher notices.
+    pub fn folder_changed(&self) {
+        let _ = self.tx.send(Cmd::FolderChanged);
     }
 
     /// Try connecting now (after signing in, or when the network returns).
@@ -280,6 +289,8 @@ struct Actor {
     connected_at: Option<Instant>,
     save_at: Option<Instant>,
     settle_at: Option<Instant>,
+    /// Downloads that failed are tried again then.
+    fetch_at: Option<Instant>,
 }
 
 async fn until(at: Option<Instant>) {
@@ -321,6 +332,10 @@ impl Actor {
                 msg = next(&mut socket) => self.incoming(msg, &mut socket).await,
                 _ = until(self.reconnect_at) => self.connect(&mut socket).await,
                 _ = until(self.save_at) => self.save().await,
+                _ = until(self.fetch_at) => {
+                    self.fetch_at = None;
+                    self.fetch_blobs();
+                }
                 _ = until(self.settle_at) => {
                     self.settle_at = None;
                     if socket.is_some() {
@@ -387,12 +402,21 @@ impl Actor {
                 self.connected_at = Some(Instant::now());
                 self.backoff = Duration::from_secs(1);
                 self.set_status(Status::Syncing);
-                if let Err(e) = self.upload_blobs().await {
-                    tracing::warn!(error = %e, "can't upload attachments yet");
+                if !self.uploaded_or_retry(socket).await {
+                    return;
                 }
                 let open = self.session.open(&self.vault);
                 self.send(socket, open).await;
                 self.settle_at = Some(Instant::now() + SETTLE);
+            }
+            // A token the server turned down (stale, or its clock runs ahead)
+            // isn't a sign-out: only the provider revoking the sign-in is,
+            // and then there's no token at all.
+            Err(Error::SignedOut) if token.is_some() => {
+                if let Some(t) = &token {
+                    self.tokens.refused(t).await;
+                }
+                self.retry_later("the server turned the sign-in down".into());
             }
             Err(Error::SignedOut) => self.set_status(Status::SignedOut),
             Err(e) => self.retry_later(e.to_string()),
@@ -608,7 +632,10 @@ impl Actor {
                 self.fetching.remove(&hash);
                 match result.and_then(|bytes| self.dir.put_blob(&bytes).map_err(Error::io)) {
                     Ok(_) => self.write_out(),
-                    Err(e) => tracing::warn!(error = %e, "can't download an attachment"),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "can't download an attachment");
+                        self.fetch_at.get_or_insert(Instant::now() + FETCH_RETRY);
+                    }
                 }
             }
             Cmd::Stop { .. } => unreachable!("handled by run"),
@@ -636,11 +663,30 @@ impl Actor {
         self.dirty.extend(msgs.iter().map(|m| m.doc.clone()));
         self.write_out();
         self.schedule_save();
-        if socket.is_some() {
-            if let Err(e) = self.upload_blobs().await {
-                tracing::warn!(error = %e, "can't upload attachments yet");
-            }
+        if socket.is_some() && self.uploaded_or_retry(socket).await {
             self.send(socket, msgs).await;
+        }
+    }
+
+    /// Uploads the attachments the vault names, so no device hears of a file
+    /// the server can't give it. If the network fails, the connection is
+    /// dropped and the changes go with the next one. The server refusing one
+    /// (too big, say) doesn't hold up the rest of the vault.
+    async fn uploaded_or_retry(&mut self, socket: &mut Option<Socket>) -> bool {
+        match self.upload_blobs().await {
+            Ok(()) => true,
+            Err(e @ (Error::Network(_) | Error::SignedOut)) => {
+                tracing::warn!(error = %e, "can't upload attachments yet");
+                if let Some(mut s) = socket.take() {
+                    let _ = s.close(None).await;
+                }
+                self.retry_later(e.to_string());
+                false
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "the server refused an attachment");
+                true
+            }
         }
     }
 
@@ -696,7 +742,7 @@ impl Actor {
                 Content::Blob(h) => Some(h),
                 Content::Note(_) => None,
             })
-            .filter(|h| !self.fetching.contains(h) && self.dir.get_blob(h).is_none())
+            .filter(|h| !self.fetching.contains(h) && !self.dir.has_blob(h))
             .collect();
         for hash in missing {
             self.fetching.insert(hash.clone());
