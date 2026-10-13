@@ -3,7 +3,7 @@ import { applyFsChanges, selfChange } from '@/lib/fs-sync';
 import type { FileTreeNode } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
 import { joinPath, parentOf } from '@/lib/path-utils';
-import { getPresetByExtension } from '@/lib/stores/entry-input';
+import { getPresetByExtension, type FileTypePreset } from '@/lib/stores/entry-input';
 import { getFileExtension } from '@/lib/utils';
 
 /**
@@ -49,8 +49,24 @@ function logFailure(operation: string, error: string) {
   console.error(`[file-operations] ${operation} failed:`, error);
 }
 
-async function createFile(parentPath: string, name: string) {
+async function createFile(parentPath: string, name: string, chosen?: FileTypePreset | null) {
   const path = joinPath(parentPath, name);
+  const made = chosen?.create;
+  if (made) {
+    if (await commands.exists(path)) {
+      return { status: 'error' as const, error: `"${name}" already exists.` };
+    }
+    try {
+      await made(path);
+    } catch (error) {
+      logFailure(`create "${path}"`, String(error));
+      return { status: 'error' as const, error: String(error) };
+    }
+    await applyFsChanges([selfChange('Created', path)]);
+    useLayout.getState().openFile(path, name);
+    return { status: 'ok' as const, data: null };
+  }
+
   const result = await commands.createFile(path);
 
   if (result.status === 'error') {

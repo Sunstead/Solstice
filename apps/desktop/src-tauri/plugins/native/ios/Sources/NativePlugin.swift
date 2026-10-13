@@ -34,6 +34,8 @@ struct HostArgs: Decodable {
   let modal: Bool?
   let rects: [Rect]?
   let rgb: [Double]?
+  let path: String?
+  let template: String?
 }
 
 class NativePlugin: Plugin {
@@ -120,6 +122,13 @@ class NativePlugin: Plugin {
         host.webModal = args.modal ?? false
         host.webRects = (args.rects ?? []).map {
           self.hostRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
+        }
+      case "notebook":
+        guard let path = args.path else { return invoke.reject("No path.") }
+        do {
+          try Notebook.create(at: URL(fileURLWithPath: path), template: args.template ?? "blank")
+        } catch {
+          return invoke.reject("Couldn't make the notebook: \(error.localizedDescription)")
         }
       case "background":
         if let rgb = args.rgb, rgb.count >= 3 {

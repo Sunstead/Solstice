@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { can } from '@/lib/backend/platform';
 import { getFileExtension } from '@/lib/utils';
 
 export type FileTypePreset = {
@@ -16,6 +17,11 @@ export type FileTypePreset = {
    */
   initialContents?: string;
   creatable?: boolean;
+  /**
+   * Made by something other than an empty file: a notebook is a PDF the iOS
+   * app draws. Gets the new file's path.
+   */
+  create?: (path: string) => Promise<unknown>;
 };
 
 export const FILE_TYPE_PRESETS: Record<string, FileTypePreset> = {
@@ -28,6 +34,19 @@ export const FILE_TYPE_PRESETS: Record<string, FileTypePreset> = {
     creatable: true,
   },
   pdf: { id: 'pdf', label: 'PDF', extension: 'pdf' },
+  // A4 pages to write on, in the iOS app (see `Notebook.swift`); a PDF to
+  // everything else.
+  notebook: {
+    id: 'notebook',
+    label: 'Notebook',
+    extension: 'pdf',
+    creatable: can.nativeViews,
+    create: async (path) => {
+      const { nativeSurfaces } = await import('@/lib/backend/native');
+      const { getSetting } = await import('@/lib/settings/store');
+      await nativeSurfaces.createNotebook(path, getSetting('ink.notebookTemplate'));
+    },
+  },
 };
 
 export function getPresetByExtension(extension: string): FileTypePreset | null {

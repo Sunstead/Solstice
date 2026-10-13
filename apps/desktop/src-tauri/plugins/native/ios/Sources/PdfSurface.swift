@@ -22,6 +22,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// The canvas over each page PDFKit is showing (or that has unsaved marks).
   private var canvases: [ObjectIdentifier: (page: PDFPage, controller: PaperMarkupViewController)] = [:]
   private var unsaved = Set<ObjectIdentifier>()
+  /// Pages added: the file needs writing even with no new marks.
+  private var pagesChanged = false
   private var editing = false
   private var saveTask: Task<Void, Never>?
   /// When we last wrote the file, so our own save isn't taken for a change.
@@ -80,7 +82,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     // Our own save, or marks not yet saved: ours win (the sync keeps the
     // other version beside it if both changed).
     let modified = try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date
-    if !unsaved.isEmpty || (written != nil && modified == written) { return }
+    if !unsaved.isEmpty || pagesChanged || (written != nil && modified == written) { return }
 
     // Back to the same page, and the same zoom if the reader had zoomed.
     let page = pdfView.currentPage.flatMap { pdfView.document?.index(for: $0) }
@@ -170,16 +172,39 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   private func showInsertMenu() {
     guard let controller = current, let parent = plugin?.manager.viewController else { return }
-    let menu = MarkupEditViewController(supportedFeatureSet: Self.features)
+    let addPage = UIAction(title: "Add Page", image: UIImage(systemName: "doc.badge.plus")) {
+      [weak self] _ in self?.addPage()
+    }
+    let menu = MarkupEditViewController(supportedFeatureSet: Self.features, additionalActions: [addPage])
     menu.delegate = controller
     menu.modalPresentationStyle = .popover
     menu.popoverPresentationController?.sourceItem = toolPicker.accessoryItem
     parent.present(menu, animated: true)
   }
 
+  /// A page after the one in view, with the document's background (a
+  /// notebook's), the size of its last page.
+  private func addPage() {
+    guard let document = pdfView.document else { return }
+    let size = document.page(at: document.pageCount - 1)?.bounds(for: .cropBox) ?? Notebook.a4
+    guard
+      let page = Notebook.page(
+        template: Notebook.template(of: document), size: CGRect(origin: .zero, size: size.size))
+    else { return }
+    let after = pdfView.currentPage.map { document.index(for: $0) } ?? document.pageCount - 1
+    document.insert(page, at: after + 1)
+    pdfView.go(to: page)
+    pagesChanged = true
+    scheduleSave()
+  }
+
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
     guard let entry = canvases.first(where: { $0.value.controller === controller }) else { return }
     unsaved.insert(entry.key)
+    scheduleSave()
+  }
+
+  private func scheduleSave() {
     send("dirty")
     saveTask?.cancel()
     saveTask = Task { @MainActor [weak self] in
@@ -202,9 +227,10 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// Writes the changed pages' marks into the PDF, through a temporary file
   /// so nothing ever reads half a PDF.
   private func save() async {
-    guard let document = pdfView.document, !unsaved.isEmpty else { return }
+    guard let document = pdfView.document, !unsaved.isEmpty || pagesChanged else { return }
     let pages = unsaved.compactMap { canvases[$0] }
     unsaved.removeAll()
+    pagesChanged = false
 
     for (page, controller) in pages {
       guard let markup = controller.markup else { continue }
@@ -229,6 +255,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     } else {
       try? FileManager.default.removeItem(at: temporary)
       for (page, _) in pages { unsaved.insert(ObjectIdentifier(page)) }
+      pagesChanged = true
       send("error", ["message": "Couldn't save this PDF."])
     }
     // Canvases scrolled away while unsaved can go now.
