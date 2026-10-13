@@ -187,7 +187,7 @@ export const CodeBlockView: React.FC = () => {
 
     /**
      * Arrow keys leave the block when there is nowhere left to go inside it,
-     * so a code block at the very top or bottom of a note is never a trap.
+     * into a new paragraph if the block starts or ends the note.
      */
     const maybeEscape =
       (unit: 'line' | 'char', dir: -1 | 1) => (cm: EditorView) => {
@@ -203,10 +203,21 @@ export const CodeBlockView: React.FC = () => {
         const base = getPosRef.current();
         if (base === undefined) return false;
 
-        const target = dir < 0 ? base : base + nodeRef.current.nodeSize;
+        const size = nodeRef.current.nodeSize;
+        const target = dir < 0 ? base : base + size;
         const next = Selection.near(view.state.doc.resolve(target), dir);
 
-        view.dispatch(view.state.tr.setSelection(next).scrollIntoView());
+        // With nothing on that side, `Selection.near` lands back in the
+        // block: a paragraph is made there instead, as math blocks do.
+        if (next.from >= base && next.from <= base + size) {
+          const paragraph = view.state.schema.nodes.paragraph?.createAndFill();
+          if (!paragraph) return false;
+          const tr = view.state.tr.insert(target, paragraph);
+          tr.setSelection(TextSelection.create(tr.doc, target + 1));
+          view.dispatch(tr.scrollIntoView());
+        } else {
+          view.dispatch(view.state.tr.setSelection(next).scrollIntoView());
+        }
         view.focus();
         return true;
       };

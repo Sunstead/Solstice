@@ -72,7 +72,9 @@
   }
   html {
     -webkit-tap-highlight-color: transparent;
-    /* No double-tap zoom, so taps land at once. Pinch still zooms. */
+    /* No double-tap zoom, so taps land at once. Nor pinch zoom (the viewport
+       and main.tsx): the app is a frame, and boards, images and PDFs zoom
+       themselves. */
     touch-action: manipulation;
   }
   @media (pointer: coarse) {

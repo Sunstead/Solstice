@@ -5,6 +5,11 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import "@/styles/app.css";
 
+// Safari (the web app on an iPad) zooms the page on a pinch whatever the
+// viewport says. Boards and the image viewer pinch with pointer events,
+// which this leaves alone.
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+
 const router = createRouter({ routeTree });
 
 declare module "@tanstack/react-router" {

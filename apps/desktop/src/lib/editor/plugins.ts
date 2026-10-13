@@ -30,6 +30,7 @@ import { listEditing } from './list-keymap';
 import { link } from '@/lib/link';
 import { imageWithSize, insertImageWithSizeInputRule } from '@/lib/image/schema';
 import { attachmentPasteDrop } from './paste-drop';
+import { trailingTap } from './trailing-tap';
 import { slashMenu } from '@/lib/slash';
 
 type NodeViewFactory = ReturnType<typeof useNodeViewFactory>;
@@ -173,6 +174,8 @@ export function createEditorFeatures({
     autoPair,
 
     attachmentPasteDrop(notePath),
+
+    trailingTap,
 
     slashMenu,
   ].flat();
