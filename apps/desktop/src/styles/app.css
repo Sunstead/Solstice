@@ -46,7 +46,7 @@
 :root {
   --color-tab-outline: color-mix(
     in oklch,
-    var(--border-color) var(--border-opacity),
+    var(--border-color) calc(var(--border-opacity) * 1.5),
     var(--sidebar)
   );
 }
