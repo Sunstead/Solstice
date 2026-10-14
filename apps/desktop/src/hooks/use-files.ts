@@ -34,7 +34,8 @@ type FilesState = {
 
   reset: () => void;
   loadRoot: (root: string) => Promise<void>;
-  loadDirectory: (path: string) => Promise<FileTreeNode[]>;
+  /** False when the folder couldn't be read; the store is left as it was. */
+  loadDirectory: (path: string) => Promise<boolean>;
   refreshDirectory: (path: string) => Promise<void>;
   removeSubtree: (path: string) => void;
   restoreExpandedFolders: (root: string) => Promise<void>;
@@ -87,10 +88,19 @@ export function useDirectoryChildren(path: string) {
   );
 }
 
-const fetchVisibleEntries = async (path: string) => {
+/**
+ * `null` when the folder couldn't be read. That's never "it's empty": a read
+ * that fails (the iPad running out of file descriptors, a folder briefly
+ * locked) would otherwise prune the whole tree, and the resync after it close
+ * every tab.
+ */
+const fetchVisibleEntries = async (path: string): Promise<FileEntry[] | null> => {
   const res = await commands.listDirectory(path);
 
-  if (res.status === 'error') return [];
+  if (res.status === 'error') {
+    console.warn(`[files] can't read ${path}: ${res.error}`);
+    return null;
+  }
 
   // Everything on disk is kept in the store; `selectChildren` decides what the
   // tree actually shows.
@@ -103,12 +113,14 @@ export const useFiles = create<FilesState>((set, get) => ({
   reset: () => set({ entries: {} }),
 
   loadRoot: async (root) => {
-    await get().loadDirectory(root);
+    // Without the root, every saved folder would look deleted.
+    if (!(await get().loadDirectory(root))) return;
     await get().restoreExpandedFolders(root);
   },
 
   loadDirectory: async (path) => {
     const files = await fetchVisibleEntries(path);
+    if (!files) return false;
 
     const nodes = files.map((file) => ({
       ...file,
@@ -123,12 +135,13 @@ export const useFiles = create<FilesState>((set, get) => ({
       },
     }));
 
-    return nodes;
+    return true;
   },
 
   refreshDirectory: async (path) => {
     const normalizedPath = normalizePath(path);
     const files = await fetchVisibleEntries(path);
+    if (!files) return;
     const freshPaths = new Set(files.map((file) => file.path));
 
     set((state) => {
@@ -209,9 +222,7 @@ export const useFiles = create<FilesState>((set, get) => ({
 
     if (!node || !node.is_dir) return;
 
-    if (!node.childrenLoaded) {
-      await get().loadDirectory(path);
-    }
+    if (!node.childrenLoaded && !(await get().loadDirectory(path))) return;
 
     useWorkspaceUIStore.getState().setFolderExpanded(path, true);
 

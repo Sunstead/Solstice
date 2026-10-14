@@ -19,8 +19,12 @@ type FileIndexState = {
   loading: boolean;
   lastLoadedAt: number | null;
 
-  /** Full re-walk of the workspace. Call on workspace open. */
-  loadIndex: (root: string) => Promise<void>;
+  /**
+   * Full re-walk of the workspace. Call on workspace open. False when the
+   * walk failed: the index then keeps what it had for this root, since a
+   * failed read isn't every file being deleted.
+   */
+  loadIndex: (root: string) => Promise<boolean>;
 
   /**
    * Incremental patch for a single path, driven by filesystem-watcher
@@ -32,22 +36,26 @@ type FileIndexState = {
   reset: () => void;
 };
 
-export const useFileIndex = create<FileIndexState>((set) => ({
+export const useFileIndex = create<FileIndexState>((set, get) => ({
   root: null,
   files: [],
   loading: false,
   lastLoadedAt: null,
 
   loadIndex: async (root) => {
+    const sameRoot = get().root === root;
     set({ loading: true, root });
 
     const res = await commands.listWorkspaceFilesRecursive(root);
 
-    set({
-      files: res.status === 'ok' ? res.data : [],
-      loading: false,
-      lastLoadedAt: Date.now(),
-    });
+    if (res.status === 'error') {
+      console.warn(`[file-index] can't walk ${root}: ${res.error}`);
+      set((state) => ({ files: sameRoot ? state.files : [], loading: false }));
+      return false;
+    }
+
+    set({ files: res.data, loading: false, lastLoadedAt: Date.now() });
+    return true;
   },
 
   upsertEntry: (entry) => {

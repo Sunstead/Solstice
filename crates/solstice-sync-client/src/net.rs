@@ -97,8 +97,11 @@ impl Server {
         if !base.path().ends_with('/') {
             base.set_path(&format!("{}/", base.path()));
         }
+        // No limit on the whole request: a large PDF on a slow link takes as
+        // long as it takes, as long as bytes keep coming.
         let http = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(60))
+            .connect_timeout(std::time::Duration::from_secs(15))
+            .read_timeout(std::time::Duration::from_secs(60))
             .build()
             .map_err(|e| Error::Network(e.to_string()))?;
         Ok(Self { base, http })

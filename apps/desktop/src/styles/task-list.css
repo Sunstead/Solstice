@@ -47,7 +47,7 @@
     border-color 100ms ease;
 }
 
-.typeset li[data-item-type='task']:hover::before {
+:root:not([data-pointer='touch']) .typeset li[data-item-type='task']:hover::before {
   border-color: var(--primary);
 }
 

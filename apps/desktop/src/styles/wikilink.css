@@ -23,7 +23,7 @@
   cursor: pointer;
 }
 
-.wikilink[data-wikilink-target]:hover {
+:root:not([data-pointer='touch']) .wikilink[data-wikilink-target]:hover {
   border-bottom-color: currentColor;
 }
 

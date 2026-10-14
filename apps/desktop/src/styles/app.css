@@ -15,6 +15,13 @@
 
 @source '../../../../node_modules/@sunstead/ui/src';
 
+/* Hover by the pointer in use, not by `(hover: hover)`, Tailwind's default:
+   that's false on an iPad, so nothing hovered under the Apple Pencil. A
+   finger's tap still leaves no highlight behind (`lib/pointer-kind.ts` sets
+   `data-pointer`). Covers @sunstead/ui's classes too, compiled here, and
+   `group-hover`/`peer-hover`, built from this. */
+@custom-variant hover (&:where(:root:not([data-pointer='touch']) *):hover);
+
 @theme inline {
   --font-sans: 'Geist Variable', sans-serif;
   /* Referenced by typeset.css and the code block theme, both of which fell
@@ -78,13 +85,21 @@
     touch-action: manipulation;
   }
   @media (pointer: coarse) {
-    /* A long press opens the row's or tab's menu, not iOS's text callout. */
-    [data-sidebar='menu-button'],
-    .flexlayout__tab_button {
+    /* A long press opens the row's menu, not iOS's text callout. */
+    [data-sidebar='menu-button'] {
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
     }
+  }
+
+  /* Nor a tab's, whatever the pointer: an iPad with a trackpad reports a
+     fine one, and the finger and Pencil still hold tabs. Nothing selects a
+     tab's name anyway. */
+  .flexlayout__tab_button {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 
@@ -162,10 +177,10 @@ html[data-reduce-motion='true'] *::after {
 }
 
 /* Dialogs centre in what's visible: above the on-screen keyboard rather than
-   behind it (`--app-height` is the visual viewport, `useVisualViewport`). */
+   behind it (`--keyboard-inset`, `lib/keyboard.ts`). */
 [data-slot='dialog-content'],
 [data-slot='alert-dialog-content'] {
-  top: calc(var(--app-height, 100dvh) / 2);
-  max-height: calc(var(--app-height, 100dvh) - 2rem);
+  top: calc((100dvh - var(--keyboard-inset, 0px)) / 2);
+  max-height: calc(100dvh - var(--keyboard-inset, 0px) - 2rem);
   overflow-y: auto;
 }

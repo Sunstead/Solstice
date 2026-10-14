@@ -79,7 +79,7 @@
   cursor: pointer;
 }
 
-.solstice-embed-file:hover {
+:root:not([data-pointer='touch']) .solstice-embed-file:hover {
   color: var(--foreground);
   background-color: var(--muted);
 }

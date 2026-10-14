@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 
+import { KEYBOARD_BAR_PX, useKeyboard, useKeyboardBarShown } from '@/lib/keyboard';
 import { useSlashMenu } from '@/lib/slash';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +12,8 @@ const GAP = 6;
 export function SlashMenu() {
   const { items, index, at, choose } = useSlashMenu();
   const list = useRef<HTMLDivElement>(null);
+  const inset = useKeyboard((s) => s.inset);
+  const bar = useKeyboardBarShown();
 
   useEffect(() => {
     list.current?.querySelector('[data-active]')?.scrollIntoView({ block: 'nearest' });
@@ -19,9 +22,10 @@ export function SlashMenu() {
   if (!at || !choose || items.length === 0) return null;
 
   // `fixed` is placed in the layout viewport, but what can be seen ends at
-  // the on-screen keyboard: the visual viewport.
+  // the on-screen keyboard and the bar on it.
   const room = document.documentElement.clientHeight;
-  const visible = Math.min(room, window.visualViewport?.height ?? room);
+  const covered = inset + (bar ? KEYBOARD_BAR_PX : 0);
+  const visible = Math.min(room - covered, window.visualViewport?.height ?? room);
   const below = visible - at.bottom - GAP;
   const above = at.top - GAP;
   const flip = below < Math.min(MAX_HEIGHT, 160) && above > below;

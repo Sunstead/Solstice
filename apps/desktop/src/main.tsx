@@ -4,11 +4,15 @@ import ReactDOM from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import "@/styles/app.css";
+import { trackPointerKind } from "@/lib/pointer-kind";
 
 // Safari (the web app on an iPad) zooms the page on a pinch whatever the
 // viewport says. Boards and the image viewer pinch with pointer events,
 // which this leaves alone.
 document.addEventListener("gesturestart", (e) => e.preventDefault());
+
+// Which pointer hovers: the Pencil and a trackpad do, a finger doesn't.
+trackPointerKind();
 
 const router = createRouter({ routeTree });
 

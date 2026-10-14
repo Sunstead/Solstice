@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+
+import { primeKeyboard } from '@/lib/keyboard-primer';
 import { can } from '@/lib/backend/platform';
 import { getFileExtension } from '@/lib/utils';
 
@@ -106,21 +108,28 @@ interface EntryInputState {
 export const useEntryInput = create<EntryInputState>((set) => ({
   operation: null,
 
-  startCreateFile: (parentPath, preset) =>
+  // Each raises the keyboard straight away on a touch screen, while still in
+  // the tap that asked: the naming dialog's field comes a moment later.
+  startCreateFile: (parentPath, preset) => {
+    primeKeyboard();
     set({
       operation: {
         mode: 'create',
         parentPath,
         kind: { type: 'file', preset: preset ?? null },
       },
-    }),
+    });
+  },
 
-  startCreateFolder: (parentPath) =>
+  startCreateFolder: (parentPath) => {
+    primeKeyboard();
     set({
       operation: { mode: 'create', parentPath, kind: { type: 'folder' } },
-    }),
+    });
+  },
 
   startRename: (node) => {
+    primeKeyboard();
     if (node.is_dir) {
       set({
         operation: {

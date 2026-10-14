@@ -343,3 +343,52 @@ async fn a_vault_deleted_on_the_server_stops_its_folders_and_keeps_their_files()
     assert_eq!(read(&p.b, "From A.md").as_deref(), Some("written on A\n"));
     p.server.stop().await;
 }
+
+fn cached_blobs(folder: &Path) -> usize {
+    std::fs::read_dir(folder.join(".solstice/sync/blobs"))
+        .map(|d| d.count())
+        .unwrap_or(0)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn cached_attachments_go_once_they_are_in_their_files() {
+    let (p, ca, cb) = pair().await;
+    // Both linked with pic.png cached: A uploaded it, B downloaded it.
+    eventually("A's cache to empty", || cached_blobs(&p.a) == 0).await;
+    eventually("B's cache to empty", || cached_blobs(&p.b) == 0).await;
+
+    // One added while running: B downloads it, counts it as on the server,
+    // and drops its copy once it's written.
+    std::fs::write(p.a.join("doc.pdf"), b"%PDF from A").unwrap();
+    ca.folder_changed();
+    eventually("doc.pdf on B", || p.b.join("doc.pdf").exists()).await;
+    assert_eq!(std::fs::read(p.b.join("doc.pdf")).unwrap(), b"%PDF from A");
+    eventually("A's cache to empty", || cached_blobs(&p.a) == 0).await;
+    eventually("B's cache to empty", || cached_blobs(&p.b) == 0).await;
+
+    ca.stop().await;
+    cb.stop().await;
+    p.server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn linking_downloads_only_what_the_folder_lacks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let server = start_server(tmp.path()).await;
+    let vault = server.create_vault("Notes").await;
+    let (a, b) = (tmp.path().join("a"), tmp.path().join("b"));
+    std::fs::create_dir_all(&a).unwrap();
+    std::fs::create_dir_all(&b).unwrap();
+    std::fs::write(a.join("pic.png"), [1u8, 2, 3, 4]).unwrap();
+    std::fs::write(b.join("pic.png"), [1u8, 2, 3, 4]).unwrap();
+    link(&a, &server.url, &vault, "Notes", "laptop", &NoTokens)
+        .await
+        .unwrap();
+    let report = link(&b, &server.url, &vault, "Notes", "desktop", &NoTokens)
+        .await
+        .unwrap();
+    assert_eq!(report.same, 1, "{report:?}");
+    // Already in the folder, so neither downloaded nor cached.
+    assert_eq!(cached_blobs(&b), 0);
+    server.stop().await;
+}

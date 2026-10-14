@@ -111,12 +111,12 @@
   color: var(--color-muted-foreground);
 }
 
-.flexlayout-custom .flexlayout__tab_toolbar_button:hover {
+:root:not([data-pointer='touch']) .flexlayout-custom .flexlayout__tab_toolbar_button:hover {
   background-color: var(--color-muted);
   color: var(--color-foreground);
 }
 
-.dark .flexlayout-custom .flexlayout__tab_toolbar_button:hover {
+:root.dark:not([data-pointer='touch']) .flexlayout-custom .flexlayout__tab_toolbar_button:hover {
   background-color: color-mix(in oklab, var(--color-muted) 50%, transparent);
 }
 
@@ -158,7 +158,7 @@
   height: 30px;
 }
 
-.flexlayout-custom
+:root:not([data-pointer='touch']) .flexlayout-custom
   .flexlayout__tab_button:hover:not(.flexlayout__tab_button--selected) {
   background-color: var(--color-muted);
   border-radius: min(var(--radius-md), 10px);

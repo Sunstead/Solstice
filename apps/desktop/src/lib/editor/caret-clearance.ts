@@ -2,8 +2,9 @@ import { Plugin } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { $prose } from '@milkdown/kit/utils';
 
-/** Room kept below the caret: a line, and the keyboard bar's height. */
-const BELOW = 72;
+/** Room kept below the caret: about a line. (The keyboard and its bar are
+    room the editor's pane makes, `useKeyboardRoom`.) */
+const BELOW = 32;
 
 function scroller(node: HTMLElement): HTMLElement | null {
   for (let el = node.parentElement; el; el = el.parentElement) {
@@ -14,8 +15,9 @@ function scroller(node: HTMLElement): HTMLElement | null {
 }
 
 /**
- * Keeps the caret clear of the on-screen keyboard. The editor's pane shrinks
- * when the keyboard (and the keyboard bar above it) appear, but ProseMirror
+ * Keeps the caret clear of the on-screen keyboard. The editor's scroll area
+ * shrinks when the keyboard (and the keyboard bar above it) appear
+ * (`useKeyboardRoom`), but ProseMirror
  * only scrolls to the caret when something's typed, so a line tapped near
  * the bottom stayed under the keyboard until then. When the pane changes
  * size with the editor focused, the caret is scrolled back into view.

@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type ComponentType } from 'react';
+import { useState, type ComponentType } from 'react';
 import {
   Bold,
   Brackets,
@@ -25,7 +25,7 @@ import {
   Undo2,
 } from 'lucide-react';
 
-import { useViewport } from '@/hooks/use-visual-viewport';
+import { KEYBOARD_BAR_GAP_PX, KEYBOARD_BAR_PX, useEditingFocus, useKeyboard, useKeyboardBarShown, useRect } from '@/lib/keyboard';
 import { isCommandEnabled, runCommand, type ScopedCommandId } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { cn } from '@/lib/utils';
@@ -58,43 +58,37 @@ const HEADINGS: Item[] = [
   { icon: Pilcrow, label: 'Paragraph', id: 'edit.paragraph' },
 ];
 
-const coarse = typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)') : null;
-const subscribeCoarse = (onChange: () => void) => {
-  coarse?.addEventListener('change', onChange);
-  return () => coarse?.removeEventListener('change', onChange);
-};
-
-/** Whether focus is in a note editor (a tab's or a canvas card's). */
-function useEditorFocused() {
-  const [focused, setFocused] = useState(false);
-  useEffect(() => {
-    const check = () =>
-      setFocused(!!document.activeElement?.closest('.ProseMirror[data-command-surface]'));
-    document.addEventListener('focusin', check);
-    document.addEventListener('focusout', check);
-    return () => {
-      document.removeEventListener('focusin', check);
-      document.removeEventListener('focusout', check);
-    };
-  }, []);
-  return focused;
-}
-
 /**
- * Formatting above the on-screen keyboard, while a note is being edited on a
- * touch screen. The commands are the menu's and the shortcuts'; this is just
- * somewhere to reach them without a keyboard (Tab included).
+ * Formatting while a note is being edited on a touch screen, whatever's
+ * typing: on top of a docked on-screen keyboard, or along the foot of the
+ * note's pane with a floating or hardware keyboard, or the Pencil. The
+ * commands are the menu's and the shortcuts'; this is just somewhere to reach
+ * them without a keyboard (Tab included). It floats, so nothing moves for
+ * it: the note's pane makes room (`useKeyboardRoom`).
  */
 export function KeyboardBar() {
-  const keyboard = useViewport((s) => s.keyboard);
-  const touch = useSyncExternalStore(subscribeCoarse, () => !!coarse?.matches, () => false);
-  const focused = useEditorFocused();
+  const shown = useKeyboardBarShown();
+  const { inset, docked } = useKeyboard();
+  const focus = useEditingFocus((s) => s.element);
+  // The pane the note's in: its scroll area, else a canvas card's tab.
+  const pane = shown ? (focus?.closest<HTMLElement>("[data-slot='scroll-area'], .flexlayout__tab") ?? null) : null;
+  const rect = useRect(docked ? null : pane);
   const [headings, setHeadings] = useState(false);
   // Re-render as the selection moves, for the pressed and disabled states.
   useActiveEditorStore((s) => s.commandStateVersion);
   const formats = useActiveEditorStore((s) => s.activeFormats);
 
-  if (!keyboard || !touch || !focused) return null;
+  if (!shown) return null;
+
+  const place: React.CSSProperties = docked
+    ? { left: 0, right: 0, bottom: inset }
+    : rect
+      ? {
+          left: rect.left + KEYBOARD_BAR_GAP_PX,
+          width: rect.width - 2 * KEYBOARD_BAR_GAP_PX,
+          bottom: `calc(max(${Math.max(0, window.innerHeight - rect.bottom)}px, env(safe-area-inset-bottom)) + ${KEYBOARD_BAR_GAP_PX}px)`,
+        }
+      : { left: 0, right: 0, bottom: 'env(safe-area-inset-bottom)' };
 
   // Taps mustn't take focus from the editor, or the keyboard drops.
   const keep = (e: React.SyntheticEvent) => e.preventDefault();
@@ -138,7 +132,13 @@ export function KeyboardBar() {
   return (
     // A box exactly as tall as its buttons, scrolling sideways only: anything
     // taller rubber-bands up and down under a thumb.
-    <div className='flex shrink-0 box-content h-11 items-center border-t bg-sidebar select-none'>
+    <div
+      className={cn(
+        'fixed z-40 flex box-content items-center bg-sidebar select-none',
+        docked ? 'border-t' : 'border rounded-lg shadow-sm',
+      )}
+      style={{ ...place, height: KEYBOARD_BAR_PX }}
+    >
       <div
         // Remounted per row, so each starts scrolled to its beginning.
         key={headings ? 'headings' : 'main'}
