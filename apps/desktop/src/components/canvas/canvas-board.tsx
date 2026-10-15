@@ -33,6 +33,7 @@ import {
   setLabel,
 } from '@/lib/canvas/doc';
 import { snapStepForScale, snapValue } from '@/lib/canvas/grid';
+import { primeKeyboard } from '@/lib/keyboard-primer';
 import { useCanvasGestures } from '@/lib/canvas/use-canvas-gestures';
 import {
   DEFAULT_NODE_SIZE,
@@ -166,7 +167,10 @@ export function CanvasBoard({ path }: { path: string }) {
       state.commit(addNode(state.doc, node));
       state.select([node.id], 'replace');
       // Straight into edit mode: nobody adds an empty card to look at it.
-      if (type === 'text') state.setEditing(node.id);
+      if (type === 'text') {
+        primeKeyboard();
+        state.setEditing(node.id);
+      }
     },
     [store],
   );

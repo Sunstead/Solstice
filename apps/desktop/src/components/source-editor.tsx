@@ -13,6 +13,7 @@ import { useExternalFileChanges } from '@/hooks/use-external-file-changes';
 import { useLayout } from '@/hooks/use-layout';
 import { createAutosaver, type Autosaver } from '@/lib/autosave';
 import { createSearchPanel } from '@/lib/codeblock/search-panel';
+import { sourceCaretClearance } from '@/lib/editor/caret-clearance';
 import { codeBlockHighlighting } from '@/lib/codeblock/theme';
 import { registerScopedCommand, unregisterScopedCommand, type ScopedCommandId } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
@@ -80,6 +81,7 @@ export function SourceEditor({ path, initialContent }: { path: string; initialCo
             EditorView.lineWrapping,
             EditorView.contentAttributes.of({ 'data-command-surface': 'true', spellcheck: 'true' }),
             search({ createPanel: createSearchPanel, top: true }),
+            sourceCaretClearance,
             EditorView.updateListener.of((update) => {
               if (!update.docChanged || update.transactions.some((tr) => tr.annotation(external))) return;
               saver.markDirty();

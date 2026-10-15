@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { PenLine } from 'lucide-react';
+import { Hand } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { NativeSurface } from '@/components/native-surface';
@@ -8,13 +8,13 @@ import { useSurfaceStates } from '@/lib/native-surfaces';
 import { ViewerFrame } from './viewer-frame';
 
 /**
- * A drawing in the iOS app: an infinite PaperKit canvas. The Pencil starts
- * drawing by itself; the button is for a finger, and to finish. Find looks
- * for the words written in it.
+ * A drawing in the iOS app: an infinite PaperKit canvas. The Pencil draws
+ * from its first touch; the button lets a finger draw too, on every PDF and
+ * drawing. Find looks for the words written in it.
  */
 export function NativeDrawing({ path }: { path: string }) {
   const id = useId();
-  const editing = useSurfaceStates((s) => s[id]?.editing ?? false);
+  const fingerDraws = useSurfaceStates((s) => s[id]?.editing ?? false);
   const error = useSurfaceStates((s) => s[id]?.error);
 
   return (
@@ -23,14 +23,14 @@ export function NativeDrawing({ path }: { path: string }) {
       find
       leading={
         <Button
-          variant={editing ? 'secondary' : 'ghost'}
+          variant={fingerDraws ? 'secondary' : 'ghost'}
           size='icon-sm'
-          aria-pressed={editing}
-          title={editing ? 'Done' : 'Draw'}
-          onClick={() => void nativeSurfaces.edit(id, !editing)}
+          aria-pressed={fingerDraws}
+          title='Draw with Finger'
+          onClick={() => void nativeSurfaces.edit(id, !fingerDraws)}
         >
-          <PenLine />
-          <span className='sr-only'>{editing ? 'Done' : 'Draw'}</span>
+          <Hand />
+          <span className='sr-only'>Draw with Finger</span>
         </Button>
       }
     >

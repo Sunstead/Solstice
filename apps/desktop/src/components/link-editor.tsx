@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { openUrl } from '@/lib/backend/shell';
 import { Check, Copy, ExternalLink, Link2Off, Pencil } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { Input } from '@sunstead/ui/components/input';
+import { useAboveKeyboard } from '@/lib/keyboard';
 import { isSafeExternalHref } from '@/lib/link/url';
 import { useLinkEditor, type LinkTarget } from '@/lib/stores/link-editor';
 
@@ -33,17 +34,10 @@ function LinkEditorPanel({
 }) {
   const [draft, setDraft] = useState(target.href);
   const [copied, setCopied] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  // Kept on screen: a link near the right edge of a narrow window would
-  // otherwise push the panel past it.
-  useLayoutEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return;
-    const room = window.innerWidth - 8;
-    const { width } = panel.getBoundingClientRect();
-    panel.style.left = `${Math.max(8, Math.min(target.rect.left, room - width))}px`;
-  }, [target.rect.left, editing]);
+  // Kept on screen and above the keyboard: a link near the right edge of a
+  // narrow window, or low in a note being typed in, would otherwise push the
+  // panel past the edge or under the keyboard.
+  const [panelRef, place] = useAboveKeyboard(target.rect);
 
   // Re-seed when the caret moves to a different link without closing first.
   useEffect(() => setDraft(target.href), [target.href, target.from]);
@@ -72,7 +66,7 @@ function LinkEditorPanel({
     <div
       ref={panelRef}
       className='fixed z-50 flex w-max max-w-[min(28rem,calc(100vw-1rem))] items-center gap-0.5 rounded-xl border bg-popover p-1 shadow-lg backdrop-blur-xl backdrop-saturate-150 animate-in fade-in-0 slide-in-from-top-1'
-      style={{ top: target.rect.bottom + 6, left: target.rect.left }}
+      style={place}
     >
       {editing ? (
         <>

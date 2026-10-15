@@ -27,8 +27,24 @@ class SurfaceView: UIView {
   /// then calls `done`.
   func flush(_ done: @escaping () -> Void = {}) { done() }
 
-  /// Turns editing on or off (markup on a PDF).
-  func setEditing(_ on: Bool) {}
+  /// Shown in its tab, in a window.
+  var isShown: Bool { !isHidden && window != nil }
+
+  override var isHidden: Bool {
+    didSet { if oldValue != isHidden { Ink.shared.visibilityChanged(self) } }
+  }
+
+  /// Takes the tool picker: its canvas becomes first responder (`Ink`).
+  func takeTools() {}
+
+  /// Lets the tool picker go.
+  func dropTools() {}
+
+  /// `Ink.fingerDraws` changed: set up the canvases for it.
+  func inkChanged() {}
+
+  /// The picker's + button: shapes, text, stickers, and the surface's own.
+  func showInsertMenu() {}
 
   /// Highlights `query`'s matches and shows the first; how many there are.
   func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) async -> Int { 0 }
@@ -69,6 +85,7 @@ final class SurfaceHost: UIView {
 
   func remove(_ id: String) {
     guard let surface = surfaces.removeValue(forKey: id) else { return }
+    Ink.shared.deactivate(surface)
     surface.flush()
     surface.removeFromSuperview()
   }

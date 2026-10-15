@@ -1,11 +1,13 @@
+import CryptoKit
 import PaperKit
 import PencilKit
 import Tauri
 import UIKit
 
 /// An infinite drawing (`*.drawing.svg`), as in Freeform: one PaperKit
-/// canvas you pan and zoom, Apple's tool picker, the Pencil starting to draw
-/// by itself. Saved as an SVG (`DrawingFile`) whose markup is read back here.
+/// canvas you pan and zoom, Apple's tool picker, the Pencil drawing from its
+/// first touch (a finger pans, or draws too with finger drawing on: `Ink`).
+/// Saved as an SVG (`DrawingFile`) whose markup is read back here.
 final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   /// The canvas starts this big, the content in its middle, and grows when
   /// drawing nears an edge.
@@ -20,10 +22,16 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   private var controller: PaperMarkupViewController?
   private var toolPicker: PKToolPicker { Ink.shared.picker }
-  private var editing = false
   private var unsaved = false
-  private var saveTask: Task<Void, Never>?
-  private var written: Date?
+  /// The wait before a save; a new mark restarts it.
+  private var pendingSave: Task<Void, Never>?
+  /// The save being written. Never cancelled: marks made meanwhile are
+  /// saved after it.
+  private var saving: Task<Void, Never>?
+  /// What we last wrote, so our own save isn't taken for a change.
+  private var written: String?
+  /// When a stroke last began: no reload under a moving Pencil.
+  private var drewAt: Date?
 
   override init(id: String, path: String, plugin: NativePlugin) {
     super.init(id: id, path: path, plugin: plugin)
@@ -34,9 +42,11 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     pencil.minimumPressDuration = 0
     pencil.allowedTouchTypes = [UITouch.TouchType.pencil.rawValue as NSNumber]
     pencil.cancelsTouchesInView = false
+    pencil.delaysTouchesBegan = false
     pencil.delegate = self
     addGestureRecognizer(pencil)
 
+    Ink.shared.register(self)
     load()
   }
 
@@ -58,6 +68,8 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     controller.view.backgroundColor = .white
     controller.zoomRange = 0.1...8
+    controller.isEditable = true
+    controller.drawingTool = Ink.shared.tool
     configure(controller)
     toolPicker.addObserver(controller)
     if let parent = plugin?.manager.viewController {
@@ -74,6 +86,9 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     }
     opening = markup
     setNeedsLayout()
+    if pencilKitResponderState.toolPickerVisibility == .visible {
+      DispatchQueue.main.async { controller.becomeFirstResponder() }
+    }
   }
 
   /// The markup just loaded, until the surface has a size to show it in (its
@@ -114,42 +129,61 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     return shift
   }
 
+  /// Marks in hand: unsaved, being saved, or being drawn.
+  private var busy: Bool {
+    unsaved || pendingSave != nil || saving != nil || drewAt.map { -$0.timeIntervalSinceNow < 5 } ?? false
+  }
+
   override func reload() {
-    let modified = try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date
-    if unsaved || (written != nil && modified == written) { return }
-    load()
+    // Ours win while marks are in hand (the sync keeps the other version
+    // beside it if both changed).
+    guard !busy else { return }
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      // Our own save, or the same bytes written back: nothing new to show.
+      if let written = self.written, await PdfStore.hash(self.path) == written { return }
+      guard !self.busy else { return }
+      // Back to the same place.
+      let visible = self.controller?.contentVisibleFrame
+      self.load()
+      if let visible, let controller = self.controller {
+        self.opening = nil
+        controller.view.layoutIfNeeded()
+        controller.setContentVisibleFrame(visible, animated: false)
+      }
+    }
   }
 
   // -- Editing ------------------------------------------------------------
 
   private func configure(_ controller: PaperMarkupViewController) {
-    controller.isEditable = editing
-    controller.directTouchAutomaticallyDraws = editing && !UIPencilInteraction.prefersPencilOnlyDrawing
+    controller.directTouchAutomaticallyDraws = Ink.shared.fingerDrawsNow
   }
 
-  override func setEditing(_ on: Bool) {
-    guard on != editing, let controller else { return }
-    editing = on
-    configure(controller)
-    if on { Ink.shared.accessory { [weak self] in self?.showInsertMenu() } }
-    pencilKitResponderState.toolPickerVisibility = on ? .visible : .hidden
-    if on {
-      controller.becomeFirstResponder()
-    } else {
-      controller.resignFirstResponder()
-      flush()
-    }
-    send("editing", ["on": on])
+  override func inkChanged() {
+    controller.map(configure)
+  }
+
+  override func takeTools() {
+    pencilKitResponderState.toolPickerVisibility = .visible
+    controller?.becomeFirstResponder()
+  }
+
+  override func dropTools() {
+    pencilKitResponderState.toolPickerVisibility = .hidden
+    controller?.resignFirstResponder()
+    flush()
   }
 
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
-    if gesture.state == .began, !editing {
-      Ink.shared.penInHand()
-      setEditing(true)
-    }
+    if gesture.state == .began { Ink.shared.activate(self, touched: true) }
   }
 
-  private func showInsertMenu() {
+  func paperMarkupViewControllerDidBeginDrawing(_ controller: PaperMarkupViewController) {
+    drewAt = Date()
+  }
+
+  override func showInsertMenu() {
     guard let controller, let parent = plugin?.manager.viewController else { return }
     let menu = MarkupEditViewController(supportedFeatureSet: Self.features)
     menu.delegate = controller
@@ -161,11 +195,12 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
     unsaved = true
     send("dirty")
-    saveTask?.cancel()
-    saveTask = Task { @MainActor [weak self] in
+    pendingSave?.cancel()
+    pendingSave = Task { @MainActor [weak self] in
       try? await Task.sleep(for: .seconds(1))
-      guard !Task.isCancelled else { return }
-      await self?.save()
+      guard !Task.isCancelled, let self else { return }
+      self.pendingSave = nil
+      await self.save()
     }
   }
 
@@ -210,14 +245,25 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   // -- Saving ------------------------------------------------------------
 
   override func flush(_ done: @escaping () -> Void = {}) {
-    saveTask?.cancel()
+    pendingSave?.cancel()
+    pendingSave = nil
     Task { @MainActor in
       await self.save()
       done()
     }
   }
 
+  /// Writes what's unsaved, after any save already under way.
   private func save() async {
+    while let saving { await saving.value }
+    guard unsaved else { return }
+    let task = Task { @MainActor in await self.write() }
+    saving = task
+    await task.value
+    saving = nil
+  }
+
+  private func write() async {
     guard unsaved, let controller, var markup = controller.markup else { return }
     unsaved = false
 
@@ -231,12 +277,17 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
     do {
       let svg = try await DrawingFile.write(markup)
-      let url = URL(fileURLWithPath: path)
-      let temporary = url.deletingLastPathComponent()
-        .appendingPathComponent(".\(url.lastPathComponent).saving")
-      try svg.write(to: temporary, atomically: false, encoding: .utf8)
-      _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
-      written = try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date
+      let path = self.path
+      // Written off the main thread, through a temporary file.
+      written = try await Task.detached(priority: .userInitiated) {
+        let url = URL(fileURLWithPath: path)
+        let temporary = url.deletingLastPathComponent()
+          .appendingPathComponent(".\(url.lastPathComponent).saving")
+        let data = Data(svg.utf8)
+        try data.write(to: temporary)
+        _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+      }.value
       send("saved")
     } catch {
       unsaved = true

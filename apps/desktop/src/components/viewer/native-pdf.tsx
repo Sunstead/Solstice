@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { PenLine } from 'lucide-react';
+import { Hand } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { NativeSurface } from '@/components/native-surface';
@@ -9,11 +9,12 @@ import { ViewerFrame } from './viewer-frame';
 
 /**
  * A PDF in the iOS app: PDFKit, marked up with Apple's tools. The Pencil
- * starts marking up by itself; the button is for a finger, and to finish.
+ * draws from its first touch; the button lets a finger draw too, on every
+ * PDF and drawing.
  */
 export function NativePdf({ path }: { path: string }) {
   const id = useId();
-  const editing = useSurfaceStates((s) => s[id]?.editing ?? false);
+  const fingerDraws = useSurfaceStates((s) => s[id]?.editing ?? false);
   const error = useSurfaceStates((s) => s[id]?.error);
 
   return (
@@ -22,14 +23,14 @@ export function NativePdf({ path }: { path: string }) {
       find
       leading={
         <Button
-          variant={editing ? 'secondary' : 'ghost'}
+          variant={fingerDraws ? 'secondary' : 'ghost'}
           size='icon-sm'
-          aria-pressed={editing}
-          title={editing ? 'Done' : 'Markup'}
-          onClick={() => void nativeSurfaces.edit(id, !editing)}
+          aria-pressed={fingerDraws}
+          title='Draw with Finger'
+          onClick={() => void nativeSurfaces.edit(id, !fingerDraws)}
         >
-          <PenLine />
-          <span className='sr-only'>{editing ? 'Done' : 'Markup'}</span>
+          <Hand />
+          <span className='sr-only'>Draw with Finger</span>
         </Button>
       }
     >

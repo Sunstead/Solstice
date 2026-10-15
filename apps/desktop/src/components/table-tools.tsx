@@ -21,6 +21,7 @@ import {
 
 import { Button } from '@sunstead/ui/components/button';
 import { Separator } from '@sunstead/ui/components/separator';
+import { useAboveKeyboard } from '@/lib/keyboard';
 import { setColumnAlignment, type ColumnAlignment } from '@/lib/table';
 import { useTableTools, type TableTarget } from '@/lib/stores/table-tools';
 
@@ -54,11 +55,15 @@ function TableToolsPanel({ target }: { target: TableTarget }) {
   // Read from the store rather than recomputed here: the store is what
   // actually changes (and re-renders this component) after an align click.
   const active = target.alignment;
+  // Above the table, or over its first row when that's off screen; never
+  // under the keyboard.
+  const [panelRef, place] = useAboveKeyboard({ ...target.rect, bottom: target.rect.top }, 'above');
 
   return (
     <div
+      ref={panelRef}
       className='fixed z-40 flex w-max items-center gap-0.5 rounded-xl border bg-popover p-1 shadow-lg backdrop-blur-xl backdrop-saturate-150 animate-in fade-in-0 slide-in-from-bottom-1'
-      style={{ top: target.rect.top - 42, left: target.rect.left }}
+      style={place}
     >
       <Button size='icon-sm' variant='ghost' title='Row above' onClick={run(addRowBefore)}>
         <ArrowUpToLine />

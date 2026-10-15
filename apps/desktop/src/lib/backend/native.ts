@@ -14,7 +14,7 @@ export type SurfaceEvent = {
   type: 'saved' | 'dirty' | 'error' | 'editing';
   path: string;
   message?: string;
-  /** For `editing`: whether it's now on. */
+  /** For `editing`: whether a finger draws too (on every surface). */
   on?: boolean;
 };
 
@@ -36,7 +36,7 @@ export const nativeSurfaces = {
   place: (id: string, rect: Rect, visible: boolean) => surface({ op: 'frame', id, ...rect, visible }),
   reload: (id: string) => surface({ op: 'reload', id }),
   close: (id: string) => surface({ op: 'close', id }),
-  /** Markup on a PDF: the tool picker, and a finger drawing too. */
+  /** Finger drawing, on every surface (the Pencil always draws). */
   edit: (id: string, on: boolean) => surface({ op: 'edit', id, on }),
   /** Highlights the matches and shows the first; an empty query clears them. */
   find: (id: string, query: string, caseSensitive: boolean, wholeWord: boolean) =>
@@ -48,6 +48,11 @@ export const nativeSurfaces = {
    * web content sits over the surfaces (it takes the touches there).
    */
   overlays: (modal: boolean, rects: Rect[]) => host({ op: 'overlays', modal, rects }),
+  /**
+   * Web text took focus, or lost it: typing wins, so the surface in front
+   * lets the tool picker go until the Pencil touches it again.
+   */
+  webFocus: (on: boolean) => host({ op: 'webFocus', on }),
   /** A new notebook: an A4 PDF with one page of `template`. */
   createNotebook: (path: string, template: string) =>
     invoke('plugin:solstice-native|host', { op: 'notebook', path, template }),
@@ -69,10 +74,11 @@ export const nativeMenu = {
 
 /**
  * The on-screen keyboard (`WebviewFit`): how much of the app's bottom a
- * docked keyboard covers, in CSS pixels, and how long it takes to get there.
- * The webview keeps its size; the page makes room where it's typed in.
+ * docked keyboard covers, in CSS pixels, and how long it takes to get there;
+ * and whether a hardware keyboard is attached. The webview keeps its size;
+ * the page makes room where it's typed in.
  */
-export type KeyboardEvent = { inset: number; docked: boolean; duration: number };
+export type KeyboardEvent = { inset: number; docked: boolean; duration: number; hardware?: boolean };
 
 export const nativeKeyboard = {
   listen: (handler: (event: KeyboardEvent) => void) =>

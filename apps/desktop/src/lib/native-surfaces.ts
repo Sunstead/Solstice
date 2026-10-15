@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { create } from 'zustand';
 import { commands } from '@/lib/backend';
 import { nativeSurfaces, type SurfaceEvent } from '@/lib/backend/native';
+import { useEditingFocus } from '@/lib/keyboard';
 
 /**
  * What the iOS app's native views (`NativeSurface`) share: keeping each on
@@ -190,14 +191,45 @@ function onSurfaceEvent(event: SurfaceEvent) {
   }
 }
 
+/** How long focus may be away before the tools come back: moving it from one field to the next passes through none. */
+const WEB_BLUR_GRACE_MS = 150;
+
+/**
+ * Tells the native side when web text has focus (`webFocus`): the tool
+ * picker goes while it does, and comes back after.
+ */
+function followWebFocus(): () => void {
+  let sent = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const update = (focused: boolean) => {
+    clearTimeout(timer);
+    if (focused === sent) return;
+    const send = () => {
+      sent = focused;
+      void nativeSurfaces.webFocus(focused);
+    };
+    if (focused) send();
+    else timer = setTimeout(send, WEB_BLUR_GRACE_MS);
+  };
+  update(!!useEditingFocus.getState().element);
+  const unsubscribe = useEditingFocus.subscribe((s) => update(!!s.element));
+  return () => {
+    clearTimeout(timer);
+    unsubscribe();
+    if (sent) void nativeSurfaces.webFocus(false);
+  };
+}
+
 function startHost(): () => void {
   const root = document.documentElement;
   root.dataset.nativeHost = '';
   const listening = nativeSurfaces.listen(onSurfaceEvent);
+  const stopFocus = followWebFocus();
   const theme = new MutationObserver(() => refreshers.forEach((refresh) => refresh()));
   theme.observe(root, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
 
   return () => {
+    stopFocus();
     theme.disconnect();
     void listening.then((listener) => listener.unregister());
     delete root.dataset.nativeHost;
