@@ -39,8 +39,15 @@ public enum ScratchOut {
 
   // -- Sweeps --
 
+  /// A unit direction. (Not CGVector: Foundation on Linux, where CI runs
+  /// these tests, has CGPoint and CGFloat but not that.)
+  struct Direction {
+    var dx: CGFloat
+    var dy: CGFloat
+  }
+
   /// The scribble's long and short axes: its points' principal directions.
-  static func axes(of points: [CGPoint]) -> (CGVector, CGVector)? {
+  static func axes(of points: [CGPoint]) -> (Direction, Direction)? {
     let n = CGFloat(points.count)
     let mx = points.reduce(0) { $0 + $1.x } / n
     let my = points.reduce(0) { $0 + $1.y } / n
@@ -53,8 +60,8 @@ public enum ScratchOut {
     }
     guard xx + yy > 0 else { return nil }
     let angle = 0.5 * atan2(2 * xy, xx - yy)
-    let major = CGVector(dx: cos(angle), dy: sin(angle))
-    return (major, CGVector(dx: -major.dy, dy: major.dx))
+    let major = Direction(dx: cos(angle), dy: sin(angle))
+    return (major, Direction(dx: -major.dy, dy: major.dx))
   }
 
   /// How the points sweep back and forth along `axis`: how many sweeps cross
@@ -67,12 +74,12 @@ public enum ScratchOut {
   }
 
   /// Whether they sweep enough, straight enough and close enough together.
-  static func sweeps(of points: [CGPoint], along axis: CGVector, across side: CGVector) -> Bool {
+  static func sweeps(of points: [CGPoint], along axis: Direction, across side: Direction) -> Bool {
     guard let sweeps = measure(points, along: axis, across: side) else { return false }
     return sweeps.full >= minimumSweeps && sweeps.bow <= maximumBow && sweeps.drift <= maximumDrift
   }
 
-  static func measure(_ points: [CGPoint], along axis: CGVector, across side: CGVector) -> Sweeps? {
+  static func measure(_ points: [CGPoint], along axis: Direction, across side: Direction) -> Sweeps? {
     let s = points.map { $0.x * axis.dx + $0.y * axis.dy }
     let t = points.map { $0.x * side.dx + $0.y * side.dy }
     guard let low = s.min(), let high = s.max() else { return nil }
