@@ -67,7 +67,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       collapsible='rail'
       mobileWidth='min(85vw, 20rem)'
       className={cn(
-        'overflow-hidden *:data-[sidebar=sidebar]:flex-row',
+        // Clipped inside, not on the container: the rail hangs half outside
+        // it, and a clipped half takes no touch.
+        '*:data-[sidebar=sidebar]:flex-row *:data-[sidebar=sidebar]:overflow-hidden',
         isMobile &&
           'data-[side=left]:w-(--sidebar-width) data-[side=left]:max-w-none pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]',
       )}
