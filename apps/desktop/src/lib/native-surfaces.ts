@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { commands } from '@/lib/backend';
 import { nativeSurfaces, type SurfaceEvent } from '@/lib/backend/native';
 import { useEditingFocus } from '@/lib/keyboard';
+import { getSetting, subscribeToSetting } from '@/lib/settings/store';
 
 /**
  * What the iOS app's native views (`NativeSurface`) share: keeping each on
@@ -225,11 +226,14 @@ function startHost(): () => void {
   root.dataset.nativeHost = '';
   const listening = nativeSurfaces.listen(onSurfaceEvent);
   const stopFocus = followWebFocus();
+  void nativeSurfaces.ink({ scratchOut: getSetting('ink.scratchOut') });
+  const stopInk = subscribeToSetting('ink.scratchOut', (scratchOut) => void nativeSurfaces.ink({ scratchOut }));
   const theme = new MutationObserver(() => refreshers.forEach((refresh) => refresh()));
   theme.observe(root, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
 
   return () => {
     stopFocus();
+    stopInk();
     theme.disconnect();
     void listening.then((listener) => listener.unregister());
     delete root.dataset.nativeHost;

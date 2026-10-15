@@ -35,7 +35,7 @@ import { Button } from '@sunstead/ui/components/button';
 import { stripPresetExtension } from '@/lib/stores/entry-input';
 import { useSetting } from '@/lib/settings/store';
 import { TabCloseIcon } from './tab-close-icon';
-import { closeTab, playEnter } from '@/lib/tab-motion';
+import { closeTab, playEnter, watchClosePresses } from '@/lib/tab-motion';
 import { TabMenu } from './tab-menu';
 import { useTabLongPress, type TabMenuRequest } from '@/lib/tab-long-press';
 
@@ -157,17 +157,16 @@ export default function FlexLayoutRoot() {
   // flexlayout's own close button (and its keyboard close) come through
   // here; the tab's motion decides when it really leaves the model. Its
   // pointerdown is seen first, so a close from the mouse holds tab widths.
-  const closePressedAt = useRef(-Infinity);
+  const closePresses = useRef<ReturnType<typeof watchClosePresses> | null>(null);
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if ((event.target as Element | null)?.closest('.flexlayout__tab_button_trailing')) {
-        closePressedAt.current = event.timeStamp;
-      }
+    const presses = watchClosePresses(container);
+    closePresses.current = presses;
+    return () => {
+      presses.dispose();
+      closePresses.current = null;
     };
-    container.addEventListener('pointerdown', onPointerDown, { capture: true });
-    return () => container.removeEventListener('pointerdown', onPointerDown, { capture: true });
   }, []);
 
   // A tab's menu: right click, or holding it with a finger or the Pencil.
@@ -182,8 +181,7 @@ export default function FlexLayoutRoot() {
 
   const handleAction = (action: Action): Action | undefined => {
     if (action.type !== Actions.DELETE_TAB || !model) return action;
-    const pointer = performance.now() - closePressedAt.current < 2000;
-    closePressedAt.current = -Infinity;
+    const pointer = closePresses.current?.pointer() ?? false;
     closeTab(model, action.data.node as string, { pointer });
     return undefined;
   };

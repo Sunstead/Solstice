@@ -14,6 +14,7 @@
 		52EA0B4A33D09498FA3C66E9 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 338533404C6BD4F069CD2042 /* UIKit.framework */; };
 		5F8B7C6F80CA36C2C391F75B /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60E03F389BCAA87E1D64AC51 /* MetalKit.framework */; };
 		807F1AB4BDD14F3925044EF2 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = ECE1E3A9254A53E0F9100B8E /* LaunchScreen.storyboard */; };
+		5373308269A04547C24C6C11 /* mac.icon in Resources */ = {isa = PBXBuildFile; fileRef = 30A9226E1228E7AC5FC50BDB /* mac.icon */; };
 		8D24A76F3885B7B2F9FADFBE /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B1F27F61420675816C435162 /* Security.framework */; };
 		941A64EE627E257574F7C1B7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3243869969CEBA921DBEB290 /* Assets.xcassets */; };
 		A8C2ED90957B60F97051F656 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABDBBEED87E0A84CB8DAB345 /* WebKit.framework */; };
@@ -22,6 +23,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		30A9226E1228E7AC5FC50BDB /* mac.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = mac.icon; sourceTree = "<group>"; };
 		0BF24ED53352AF40FEDAF36F /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		3243869969CEBA921DBEB290 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		338533404C6BD4F069CD2042 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
@@ -106,6 +108,7 @@
 				5FCA11D1985B7B23A9B05332 /* assets */,
 				3243869969CEBA921DBEB290 /* Assets.xcassets */,
 				ECE1E3A9254A53E0F9100B8E /* LaunchScreen.storyboard */,
+				A9BE7B8194C3A96ED7647CB7 /* app */,
 				68DA699D85D12FE6B4DF37C5 /* Externals */,
 				CF90D49FA764A80AB79F3541 /* solstice_iOS */,
 				642A1BF6B6B49FA9C10D0392 /* Sources */,
@@ -194,6 +197,15 @@
 			path = commands;
 			sourceTree = "<group>";
 		};
+		A9BE7B8194C3A96ED7647CB7 /* app */ = {
+			isa = PBXGroup;
+			children = (
+				30A9226E1228E7AC5FC50BDB /* mac.icon */,
+			);
+			name = app;
+			path = ../../../src/assets/icons/app;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -255,6 +267,7 @@
 				941A64EE627E257574F7C1B7 /* Assets.xcassets in Resources */,
 				807F1AB4BDD14F3925044EF2 /* LaunchScreen.storyboard in Resources */,
 				4D0AC96D76E1B57338FEA04F /* assets in Resources */,
+				5373308269A04547C24C6C11 /* mac.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -366,7 +379,7 @@
 				ARCHS = (
 					arm64,
 				);
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = mac;
 				CODE_SIGN_ENTITLEMENTS = solstice_iOS/solstice_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_BITCODE = NO;
@@ -398,7 +411,7 @@
 				ARCHS = (
 					arm64,
 				);
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = mac;
 				CODE_SIGN_ENTITLEMENTS = solstice_iOS/solstice_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_BITCODE = NO;

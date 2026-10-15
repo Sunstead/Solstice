@@ -53,6 +53,8 @@ export const nativeSurfaces = {
    * lets the tool picker go until the Pencil touches it again.
    */
   webFocus: (on: boolean) => host({ op: 'webFocus', on }),
+  /** How ink behaves: scratching out with the Pencil erases (`ink.scratchOut`). */
+  ink: (options: { scratchOut: boolean }) => host({ op: 'ink', ...options }),
   /** A new notebook: an A4 PDF with one page of `template`. */
   createNotebook: (path: string, template: string) =>
     invoke('plugin:solstice-native|host', { op: 'notebook', path, template }),
@@ -78,9 +80,14 @@ export const nativeMenu = {
  * and whether a hardware keyboard is attached. The webview keeps its size;
  * the page makes room where it's typed in.
  */
-export type KeyboardEvent = { inset: number; docked: boolean; duration: number; hardware?: boolean };
+export type KeyboardEvent = { inset: number; docked: boolean; shown?: boolean; duration: number; hardware?: boolean };
 
 export const nativeKeyboard = {
   listen: (handler: (event: KeyboardEvent) => void) =>
     addPluginListener<KeyboardEvent>('solstice-native', 'keyboard', handler),
+  /**
+   * A finger is about to type: iOS stops expecting the Pencil, which it does
+   * for some seconds after Scribble, keeping the keyboard down meanwhile.
+   */
+  expectTyping: () => host({ op: 'expectTyping' }),
 };

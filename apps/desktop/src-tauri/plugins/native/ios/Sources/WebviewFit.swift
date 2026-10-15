@@ -11,7 +11,9 @@ import WebKit
 ///   editor being typed in, as a native app would, rather than the whole app
 ///   shrinking and every pane and dialog moving. A floating keyboard, and the
 ///   small bar a hardware keyboard (or Scribble) brings up, cover a corner,
-///   not the app's bottom edge: they report no inset.
+///   not the app's bottom edge: they report no inset. Whether a keyboard is
+///   up at all, docked or floating (`shown`), is reported too: with none,
+///   a finger's tap brings it back (`useKeyboardRefocus` on the page).
 /// - The page itself never scrolls (only what's inside it does), so nothing
 ///   can drift. iOS would otherwise scroll it to keep a field above the
 ///   keyboard.
@@ -31,6 +33,8 @@ final class WebviewFit: NSObject {
   private weak var plugin: NativePlugin?
   /// How much of the app's bottom the keyboard covers.
   private var covered: CGFloat = 0
+  /// A keyboard is up, docked or floating.
+  private var shown = false
   /// A hardware keyboard is attached.
   private var hardware = GCKeyboard.coalesced != nil
   private var observation: NSKeyValueObservation?
@@ -80,6 +84,7 @@ final class WebviewFit: NSObject {
     guard let webview, let parent = webview.superview else { return }
     noShortcutsBar()
     var cover: CGFloat = 0
+    var up = false
     if note.name != UIResponder.keyboardWillHideNotification,
       let end = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
       let screen = parent.window?.windowScene?.screen
@@ -90,11 +95,13 @@ final class WebviewFit: NSObject {
       let docked = frame.maxY >= bounds.maxY - 1 && frame.minX <= bounds.minX + 1 && frame.maxX >= bounds.maxX - 1
       let overlap = bounds.maxY - frame.minY
       if docked, overlap >= Self.keyboardMinimum { cover = min(overlap, bounds.height) }
+      up = frame.intersection(bounds).height >= Self.keyboardMinimum
     }
     // The page hears of a hardware keyboard with the first focus too.
     let attached = GCKeyboard.coalesced != nil
-    guard cover != covered || attached != hardware || !reported else { return }
+    guard cover != covered || up != shown || attached != hardware || !reported else { return }
     covered = cover
+    shown = up
     hardware = attached
     report(duration: note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25)
   }
@@ -107,6 +114,8 @@ final class WebviewFit: NSObject {
     // In the webview's CSS pixels, which are its points.
     plugin?.trigger(
       "keyboard",
-      data: ["inset": Double(covered), "docked": covered > 0, "duration": duration, "hardware": hardware])
+      data: [
+        "inset": Double(covered), "docked": covered > 0, "shown": shown, "duration": duration, "hardware": hardware,
+      ])
   }
 }

@@ -11,7 +11,7 @@ export default function TitleBar() {
   const isMac = useIsMac();
 
   return (
-    <header className='bg-sidebar w-full h-10 min-h-9 draggable relative flex items-center border-b'>
+    <header className='bg-sidebar w-full h-10 touch:h-11 min-h-9 draggable relative flex items-center border-b'>
       <div data-tauri-drag-region className='size-full absolute inset-0' />
 
       <div className='flex items-center w-max h-max'>

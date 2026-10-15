@@ -254,6 +254,34 @@ export function closeTab(model: Model, id: string, { pointer }: { pointer: boole
   animation.finished.then(remove, remove);
 }
 
+/**
+ * Watches `container` for presses on a tab's close button, so the close
+ * flexlayout reports next can say whether it came from the mouse (and
+ * holds widths) or not. `pointer()` answers once per close.
+ *
+ * Only a mouse (an iPad's trackpad too) holds: a finger or the Pencil has
+ * left the strip by the time its tap's click closes the tab, so nothing
+ * would let the hold go, and the next tap needn't land where this one did.
+ */
+export function watchClosePresses(container: HTMLElement): { pointer: () => boolean; dispose: () => void } {
+  let pressedAt = -Infinity;
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.pointerType !== 'mouse') return;
+    if ((event.target as Element | null)?.closest('.flexlayout__tab_button_trailing')) {
+      pressedAt = event.timeStamp;
+    }
+  };
+  container.addEventListener('pointerdown', onPointerDown, { capture: true });
+  return {
+    pointer: () => {
+      const recent = performance.now() - pressedAt < 2000;
+      pressedAt = -Infinity;
+      return recent;
+    },
+    dispose: () => container.removeEventListener('pointerdown', onPointerDown, { capture: true }),
+  };
+}
+
 // -- Holding widths while closing with the pointer --
 
 let frozen: { strip: HTMLElement; release: () => void } | null = null;

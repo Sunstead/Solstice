@@ -32,6 +32,10 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   private var written: String?
   /// When a stroke last began: no reload under a moving Pencil.
   private var drewAt: Date?
+  /// Whether the last touch to land was the Pencil's: what drew the stroke
+  /// that just ended.
+  private let touchKind = TouchKind { _ in }
+  private var scratcher: Scratcher?
 
   override init(id: String, path: String, plugin: NativePlugin) {
     super.init(id: id, path: path, plugin: plugin)
@@ -45,6 +49,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     pencil.delaysTouchesBegan = false
     pencil.delegate = self
     addGestureRecognizer(pencil)
+    addGestureRecognizer(touchKind)
 
     Ink.shared.register(self)
     load()
@@ -80,6 +85,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
       addSubview(controller.view)
     }
     self.controller = controller
+    scratcher = Scratcher(markup)
     observeMarkup(of: controller) { [weak self, weak controller] in
       guard let self, let controller, self.controller === controller else { return }
       self.paperMarkupViewControllerDidChangeMarkup(controller)
@@ -193,6 +199,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
+    scratcher?.check(controller, pencil: touchKind.pencil)
     unsaved = true
     send("dirty")
     pendingSave?.cancel()

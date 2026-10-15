@@ -5,7 +5,8 @@
 #                                  ->  src-tauri/icons/icon.icns   (flat fallback, older macOS)
 #
 # Needs Xcode 26+ (actool) and Icon Composer (ictool); the App icons workflow
-# runs it on GitHub's macOS runners. Outputs are committed, so this only needs
+# runs it on GitHub's macOS runners. The iOS app needs nothing from here: Xcode
+# compiles mac.icon itself (gen/apple/project.yml). Outputs are committed, so this only needs
 # re-running when the icon changes. The other platforms' icons come from
 # scripts/build-icons.mjs. Ported from Cosmos.
 set -euo pipefail

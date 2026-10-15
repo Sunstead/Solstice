@@ -21,6 +21,10 @@ final class Ink: NSObject {
   private(set) var fingerDraws = UserDefaults.standard.bool(forKey: fingerDrawsKey)
   var fingerDrawsNow: Bool { fingerDraws && !UIPencilInteraction.prefersPencilOnlyDrawing }
 
+  /// Scribbling over strokes with the Pencil erases them (`Scratcher`): the
+  /// `ink.scratchOut` setting, sent from the web side.
+  var scratchOut = true
+
   /// The surface holding the tools: its canvas is first responder.
   private weak var active: SurfaceView?
   /// The one that last held them, to hand them back to after typing.

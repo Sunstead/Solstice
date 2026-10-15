@@ -53,6 +53,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   private var written: String?
   /// When a stroke last began: no reload under a moving Pencil.
   private var drewAt: Date?
+  /// Each canvas's scratching out (`Scratcher`), by page.
+  private var scratchers: [ObjectIdentifier: Scratcher] = [:]
   /// A change from outside came while marks were in hand: look again after.
   private var reloadWanted = false
   /// The file is encrypted: PDFKit reads and writes the marks (`PdfMarkup`).
@@ -243,6 +245,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     let host = CanvasHost(controller: controller, page: CGRect(origin: .zero, size: size))
     host.zoom = zoom
     canvases[key] = (page, controller, host)
+    scratchers[key] = Scratcher(markup)
     observeMarkup(of: controller) { [weak self, weak controller] in
       guard let self, let controller, self.canvases[key]?.controller === controller else { return }
       self.paperMarkupViewControllerDidChangeMarkup(controller)
@@ -387,6 +390,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
     guard let entry = canvases.first(where: { $0.value.controller === controller }) else { return }
+    scratchers[entry.key]?.check(controller, pencil: pdfView.pencilLanded)
     unsaved.insert(entry.key)
     scheduleSave()
   }
@@ -501,6 +505,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// scrolled away, not reloaded).
   private func dropCanvas(_ key: ObjectIdentifier, keep: Bool = true) {
     guard let entry = canvases.removeValue(forKey: key) else { return }
+    scratchers[key] = nil
     if keep, let markup = entry.controller.markup { cached[key] = markup }
     toolPicker.removeObserver(entry.controller)
     let wasResponder = entry.controller.isFirstResponder
@@ -662,52 +667,21 @@ final class MarkupPDFView: PDFView {
     didSet { isInMarkupMode = fingerDraws }
   }
 
+  /// The last touch to land was the Pencil's (`TouchKind`): what drew the
+  /// stroke that just ended.
+  var pencilLanded: Bool { touchKind.pencil }
+  private lazy var touchKind = TouchKind { [weak self] pencil in
+    guard let self, !self.fingerDraws, self.isInMarkupMode != pencil else { return }
+    self.isInMarkupMode = pencil
+  }
+
   override init(frame: CGRect) {
     super.init(frame: frame)
-    addGestureRecognizer(TouchKind { [weak self] pencil in
-      guard let self, !self.fingerDraws, self.isInMarkupMode != pencil else { return }
-      self.isInMarkupMode = pencil
-    })
+    addGestureRecognizer(touchKind)
   }
 
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError() }
-}
-
-/// Reports whether each touch landing is the Pencil's, before the view's
-/// other gestures act on it, and never takes part itself. (Hit testing comes
-/// too early: its event doesn't hold the touch yet.)
-private final class TouchKind: UIGestureRecognizer, UIGestureRecognizerDelegate {
-  private let landed: (_ pencil: Bool) -> Void
-
-  init(_ landed: @escaping (_ pencil: Bool) -> Void) {
-    self.landed = landed
-    super.init(target: nil, action: nil)
-    cancelsTouchesInView = false
-    delaysTouchesBegan = false
-    delaysTouchesEnded = false
-    delegate = self
-  }
-
-  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-    // A Pencil landing with a palm already down, or still down as a finger
-    // lands: markup stays on.
-    let all = event.allTouches ?? touches
-    landed(all.contains { $0.type == .pencil && $0.phase != .ended && $0.phase != .cancelled })
-  }
-
-  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) { finish(event) }
-  override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { finish(event) }
-
-  /// Watches until every touch has lifted, so a second one landing is seen too.
-  private func finish(_ event: UIEvent) {
-    let down = event.allTouches?.contains { $0.phase != .ended && $0.phase != .cancelled } ?? false
-    if !down { state = .failed }
-  }
-
-  func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-    true
-  }
 }
 
 extension Array {

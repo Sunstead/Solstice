@@ -14,13 +14,15 @@ let package = Package(
       targets: ["tauri-plugin-solstice-native"])
   ],
   dependencies: [
-    .package(name: "Tauri", path: "../.tauri/tauri-api")
+    .package(name: "Tauri", path: "../.tauri/tauri-api"),
+    .package(path: "../ScratchOut"),
   ],
   targets: [
     .target(
       name: "tauri-plugin-solstice-native",
       dependencies: [
-        .byName(name: "Tauri")
+        .byName(name: "Tauri"),
+        .product(name: "ScratchOut", package: "ScratchOut"),
       ],
       path: "Sources")
   ]

@@ -1,3 +1,5 @@
 /.tauri
 /ios/.build
 /ios/.swiftpm
+/ScratchOut/.build
+/ScratchOut/.swiftpm

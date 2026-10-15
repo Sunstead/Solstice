@@ -36,6 +36,11 @@ targets:
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
+      # The Mac's icon, Liquid Glass and all: Xcode compiles it into the
+      # asset catalog as "mac", which CFBundleIconName names.
+      - path: ../../../src/assets/icons/app/mac.icon
+        type: file
+        buildPhase: resources
     info:
       path: solstice_iOS/Info.plist
       properties:
@@ -62,6 +67,7 @@ targets:
     settings:
       base:
         ENABLE_BITCODE: false
+        ASSETCATALOG_COMPILER_APPICON_NAME: mac
         ARCHS: [arm64]
         VALID_ARCHS: arm64 
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
