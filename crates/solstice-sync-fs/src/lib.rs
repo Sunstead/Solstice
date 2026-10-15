@@ -173,6 +173,22 @@ impl VaultDir {
         std::fs::read(self.abs(rel))
     }
 
+    /// Reads a file to absorb it, and records what was read as seen: it may
+    /// have been saved again since the scan hashed it, and the vault takes
+    /// these bytes. Size and mtime come from before the read, so a save
+    /// landing during it reads as a change next time.
+    fn read_seen(&mut self, rel: &str) -> std::io::Result<Vec<u8>> {
+        let meta = std::fs::metadata(self.abs(rel))?;
+        let bytes = self.read(rel)?;
+        let found = Found {
+            hash: content_hash(&bytes),
+            size: meta.len(),
+            modified: meta.modified().ok(),
+        };
+        self.seen.insert(rel.to_string(), found);
+        Ok(bytes)
+    }
+
     /// Writes through a temporary file, so readers never see half a file.
     fn write(&mut self, rel: &str, bytes: &[u8]) -> std::io::Result<()> {
         let path = self.abs(rel);
@@ -371,6 +387,13 @@ impl VaultDir {
                     }
                 }
             }
+            // Changed here since it was last read: an edit not absorbed yet
+            // (it may be mid-save). Writing over it would lose it; the next
+            // absorb takes it in, then this is written if still needed.
+            if self.seen.contains_key(path) && self.changed_on_disk(path) && self.abs(path).exists()
+            {
+                continue;
+            }
             if self.seen.get(path).map(|f| &f.hash) != Some(&hash) || !self.abs(path).exists() {
                 let bytes = match content {
                     Content::Note(text) => text.clone().into_bytes(),
@@ -490,7 +513,7 @@ impl VaultDir {
         id: &str,
         path: &str,
     ) -> std::io::Result<Vec<Msg>> {
-        let bytes = self.read(path)?;
+        let bytes = self.read_seen(path)?;
         match Kind::for_path(path) {
             Kind::Note => {
                 let text = String::from_utf8_lossy(&bytes);
@@ -504,7 +527,7 @@ impl VaultDir {
     }
 
     fn absorb_new(&mut self, vault: &mut Vault, path: &str) -> std::io::Result<Vec<Msg>> {
-        let bytes = self.read(path)?;
+        let bytes = self.read_seen(path)?;
         let created = match Kind::for_path(path) {
             Kind::Note => vault.create_note(path, &String::from_utf8_lossy(&bytes)),
             Kind::Blob => {
@@ -684,7 +707,71 @@ mod tests {
         let _ = std::fs::remove_file(vd.blob_path(&hash));
         assert!(vd.has_blob(&hash));
         vd.materialize(&vault).unwrap();
-        assert_eq!(std::fs::read(vd.root().join("doc.pdf")).unwrap(), b"%PDF one");
+        assert_eq!(
+            std::fs::read(vd.root().join("doc.pdf")).unwrap(),
+            b"%PDF one"
+        );
+    }
+
+    /// Sets a file's mtime, as a save landing in the same tick looks.
+    fn touch(path: &Path, when: SystemTime) {
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(when)
+            .unwrap();
+    }
+
+    #[test]
+    fn a_save_between_scan_and_read_isnt_written_back() {
+        let (_tmp, mut vd) = dir();
+        let pdf = vd.root().join("doc.pdf");
+        std::fs::write(&pdf, b"%PDF one").unwrap();
+        let mut vault = Vault::new("server");
+        vd.absorb(&mut vault).unwrap();
+
+        // An edit, scanned...
+        std::fs::write(&pdf, b"%PDF two").unwrap();
+        let when = SystemTime::now() - std::time::Duration::from_secs(60);
+        touch(&pdf, when);
+        vd.scan().unwrap();
+        // ...then saved over again before it's read: same size, same mtime,
+        // so the scan's hash is the stale one.
+        std::fs::write(&pdf, b"%PDF 3!!").unwrap();
+        touch(&pdf, when);
+
+        vd.absorb(&mut vault).unwrap();
+        let files = vault.files();
+        assert!(matches!(&files["doc.pdf"].1, Content::Blob(h) if *h == content_hash(b"%PDF 3!!")));
+        // What was read is what's there: the file isn't rewritten (a rewrite
+        // tells the editor its file changed under it).
+        assert_eq!(std::fs::metadata(&pdf).unwrap().modified().unwrap(), when);
+        assert_eq!(std::fs::read(&pdf).unwrap(), b"%PDF 3!!");
+    }
+
+    #[test]
+    fn an_unread_edit_is_never_written_over() {
+        let (_tmp, mut vd) = dir();
+        let pdf = vd.root().join("doc.pdf");
+        std::fs::write(&pdf, b"%PDF one").unwrap();
+        let mut vault = Vault::new("server");
+        vd.absorb(&mut vault).unwrap();
+        let id = vault.files()["doc.pdf"].0.clone();
+
+        // Saved here, not absorbed yet; meanwhile another device's version
+        // arrives and is written out.
+        std::fs::write(&pdf, b"%PDF local edit").unwrap();
+        let remote = vd.put_blob(b"%PDF remote").unwrap();
+        vault.set_blob(&id, &remote);
+        vd.materialize(&vault).unwrap();
+        assert_eq!(std::fs::read(&pdf).unwrap(), b"%PDF local edit");
+
+        // The next absorb takes the local edit.
+        vd.absorb(&mut vault).unwrap();
+        assert!(
+            matches!(&vault.files()["doc.pdf"].1, Content::Blob(h) if *h == content_hash(b"%PDF local edit"))
+        );
     }
 
     /// Makes every write fail, as running out of file descriptors does: the
