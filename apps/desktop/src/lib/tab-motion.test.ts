@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Model, TabSetNode } from 'flexlayout-react';
-import { closeTab, isClosing, markEntering, playEnter } from '@/lib/tab-motion';
+import { closeTab, isClosing, markEntering, playEnter, settle, watchClosePresses } from '@/lib/tab-motion';
 
 function model(selected = 1) {
   return Model.fromJson({
@@ -101,5 +101,98 @@ describe('opening a tab', () => {
     playEnter('new', marked.el);
     await Promise.resolve();
     expect(marked.el.animate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a close from the pointer', () => {
+  /** A close button in a tab strip, as flexlayout renders it. */
+  function closeButton() {
+    const strip = document.createElement('div');
+    const close = document.createElement('div');
+    close.className = 'flexlayout__tab_button_trailing';
+    strip.append(close);
+    document.body.append(strip);
+    return { strip, close };
+  }
+  const press = (el: Element, pointerType: string) =>
+    el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType }));
+
+  it('holds widths when the mouse closed it', () => {
+    const { strip, close } = closeButton();
+    const presses = watchClosePresses(strip);
+    press(close, 'mouse');
+    expect(presses.pointer()).toBe(true);
+    // Once per close: the keyboard's next close isn't the pointer's.
+    expect(presses.pointer()).toBe(false);
+    presses.dispose();
+  });
+
+  // A finger or the Pencil leaves the strip (pointerleave) before its tap's
+  // click closes the tab, so a hold would never be let go.
+  it.each(['touch', 'pen'])('resizes at once when %s closed it', (kind) => {
+    const { strip, close } = closeButton();
+    const presses = watchClosePresses(strip);
+    press(close, kind);
+    expect(presses.pointer()).toBe(false);
+    presses.dispose();
+  });
+
+  it('ignores presses elsewhere in the strip', () => {
+    const { strip } = closeButton();
+    const presses = watchClosePresses(strip);
+    press(strip, 'mouse');
+    expect(presses.pointer()).toBe(false);
+    presses.dispose();
+  });
+});
+
+describe('holding widths', () => {
+  /** A squeezed strip: tabs narrower than their max width. */
+  function strip() {
+    const outer = document.createElement('div');
+    outer.className = 'flexlayout__tabset_tabbar_outer';
+    const inner = document.createElement('div');
+    outer.append(inner);
+    document.body.append(outer);
+    const tabs = ['a', 'b', 'c'].map((id) => {
+      const { el } = button(id);
+      el.style.maxWidth = '192px';
+      el.style.margin = '0px';
+      el.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+      inner.append(el);
+      return el;
+    });
+    return { outer, tabs };
+  }
+  const held = (tabs: HTMLElement[]) => tabs.map((t) => t.style.getPropertyValue('--tab-held'));
+
+  afterEach(() => settle());
+
+  it('pins every tab when the pointer closes one', () => {
+    const { tabs } = strip();
+    closeTab(model(), 'b', { pointer: true });
+    expect(held(tabs)).toEqual(['100px', '100px', '100px']);
+    expect(tabs.every((t) => t.dataset.tabFrozen !== undefined)).toBe(true);
+  });
+
+  it('lets go when the pointer leaves the strip', () => {
+    const { outer, tabs } = strip();
+    closeTab(model(), 'b', { pointer: true });
+    outer.dispatchEvent(new Event('pointerleave'));
+    expect(held(tabs)).toEqual(['', '', '']);
+  });
+
+  it('lets go on a close that is not the pointer\'s', () => {
+    const { tabs } = strip();
+    const m = model();
+    closeTab(m, 'b', { pointer: true });
+    closeTab(m, 'c', { pointer: false });
+    expect(held(tabs)).toEqual(['', '', '']);
+  });
+
+  it('holds nothing on a close that is not the pointer\'s', () => {
+    const { tabs } = strip();
+    closeTab(model(), 'b', { pointer: false });
+    expect(held(tabs)).toEqual(['', '', '']);
   });
 });
