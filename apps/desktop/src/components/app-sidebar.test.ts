@@ -69,6 +69,26 @@ describe('sidebar rail', () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
+  // AppSidebar hands it to useOverSurface, so its half over a PDF or a
+  // drawing takes touches instead of the native view under the webview.
+  it('hands its element to a ref, and still drags', () => {
+    const ref = vi.fn();
+    act(() => {
+      root.render(
+        h(
+          SidebarProvider,
+          { defaultWidth: '256px', open: true, onOpenChange },
+          h(Sidebar, { collapsible: 'rail' }, h(SidebarRail, { ref })),
+        ),
+      );
+    });
+    expect(ref).toHaveBeenCalledWith(rail());
+    pointer(rail(), 'pointerdown', 'touch', 256);
+    pointer(document, 'pointermove', 'touch', 320);
+    pointer(document, 'pointerup', 'touch', 320);
+    expect(width()).not.toBe('256px');
+  });
+
   it('toggles on a mouse click', () => {
     pointer(rail(), 'pointerdown', 'mouse', 256);
     pointer(document, 'pointerup', 'mouse', 256);

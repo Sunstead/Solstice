@@ -23,9 +23,13 @@ import { WorkspaceSwitcher } from './workspace-switcher';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { AccountButton } from './account-button';
 import { cn } from '@/lib/utils';
+import { useOverSurface } from '@/lib/native-surfaces';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { open, setOpen, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
+  // Half the rail lies over the editor: over a PDF or a drawing, its
+  // touches would otherwise go to the native view under the webview.
+  const overSurface = useOverSurface();
 
   const activePrimaryView = useWorkspaceUIStore((s) => s.activePrimaryView);
   const setActivePrimaryView = useWorkspaceUIStore(
@@ -139,7 +143,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <WorkspaceSwitcher />
         </SidebarFooter>
       </Sidebar>
-      <SidebarRail />
+      <SidebarRail ref={overSurface} />
     </Sidebar>
   );
 }
