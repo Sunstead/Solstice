@@ -361,6 +361,17 @@
   display: none;
 }
 
+/* flexlayout's own close-button hover, behind the pointer guard: a tap
+   leaves :hover on whatever slides under the finger, the next tab's close
+   button, which stayed lit. */
+.flexlayout-custom .flexlayout__tab_button_trailing:hover {
+  background-color: transparent;
+}
+
+:root:not([data-pointer='touch']) .flexlayout-custom .flexlayout__tab_button_trailing:hover {
+  background-color: var(--color-toolbar-button-hover);
+}
+
 .flexlayout-custom
   .flexlayout__tab_button--selected
   .flexlayout__tab_button_trailing,
