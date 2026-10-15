@@ -420,6 +420,16 @@ export const settingsRegistry = {
     visibleWhen: () => can.nativeViews,
   }),
 
+  'ink.scratchOut': defineBoolean({
+    section: 'editor',
+    group: 'Apple Pencil',
+    scope: 'global',
+    // Scribbling back and forth over strokes erases them (Scratcher.swift).
+    label: 'Scribble over ink to erase it',
+    default: true,
+    visibleWhen: () => can.nativeViews,
+  }),
+
   'editor.autosave': defineEnum({
     section: 'editor',
     group: 'Saving',

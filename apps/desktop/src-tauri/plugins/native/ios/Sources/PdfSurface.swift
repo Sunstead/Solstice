@@ -53,6 +53,11 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   private var written: String?
   /// When a stroke last began: no reload under a moving Pencil.
   private var drewAt: Date?
+  /// The Pencil is on the glass; the stroke being drawn is the Pencil's.
+  private var pencilTouching = false
+  private var drawnByPencil = false
+  /// Each canvas's scratching out (`Scratcher`), by page.
+  private var scratchers: [ObjectIdentifier: Scratcher] = [:]
   /// A change from outside came while marks were in hand: look again after.
   private var reloadWanted = false
   /// The file is encrypted: PDFKit reads and writes the marks (`PdfMarkup`).
@@ -243,6 +248,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     let host = CanvasHost(controller: controller, page: CGRect(origin: .zero, size: size))
     host.zoom = zoom
     canvases[key] = (page, controller, host)
+    scratchers[key] = Scratcher(markup)
     observeMarkup(of: controller) { [weak self, weak controller] in
       guard let self, let controller, self.canvases[key]?.controller === controller else { return }
       self.paperMarkupViewControllerDidChangeMarkup(controller)
@@ -334,6 +340,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }
 
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
+    pencilTouching = gesture.state == .began || gesture.state == .changed
     guard gesture.state == .began else { return }
     Ink.shared.activate(self, touched: true)
     // The page under the Pencil holds the tools, so the picker stays.
@@ -383,10 +390,13 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   func paperMarkupViewControllerDidBeginDrawing(_ controller: PaperMarkupViewController) {
     drewAt = Date()
+    drawnByPencil = pencilTouching
   }
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
     guard let entry = canvases.first(where: { $0.value.controller === controller }) else { return }
+    scratchers[entry.key]?.check(controller, pencil: drawnByPencil)
+    drawnByPencil = false
     unsaved.insert(entry.key)
     scheduleSave()
   }
@@ -501,6 +511,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// scrolled away, not reloaded).
   private func dropCanvas(_ key: ObjectIdentifier, keep: Bool = true) {
     guard let entry = canvases.removeValue(forKey: key) else { return }
+    scratchers[key] = nil
     if keep, let markup = entry.controller.markup { cached[key] = markup }
     toolPicker.removeObserver(entry.controller)
     let wasResponder = entry.controller.isFirstResponder

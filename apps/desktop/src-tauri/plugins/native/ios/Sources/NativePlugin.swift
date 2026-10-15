@@ -38,6 +38,7 @@ struct HostArgs: Decodable {
   let template: String?
   let menus: [NativeMenu.Menu]?
   let on: Bool?
+  let scratchOut: Bool?
 }
 
 class NativePlugin: Plugin {
@@ -139,6 +140,8 @@ class NativePlugin: Plugin {
       case "webFocus":
         // Web text took focus (typing wins the tools), or lost it.
         Ink.shared.webFocus(args.on ?? false)
+      case "ink":
+        if let scratchOut = args.scratchOut { Ink.shared.scratchOut = scratchOut }
       case "notebook":
         guard let path = args.path else { return invoke.reject("No path.") }
         do {

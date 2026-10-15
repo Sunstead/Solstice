@@ -9,18 +9,30 @@ vi.hoisted(() => {
     removeEventListener: () => {},
   })) as unknown as typeof window.matchMedia;
 });
-const { webFocus } = vi.hoisted(() => ({ webFocus: vi.fn() }));
+const { webFocus, ink, settings } = vi.hoisted(() => ({
+  webFocus: vi.fn(),
+  ink: vi.fn(),
+  settings: { scratchOut: true, listeners: new Set<(value: boolean) => void>() },
+}));
 vi.mock('@/lib/backend/native', () => ({
   nativeKeyboard: { listen: vi.fn() },
   nativeSurfaces: {
     listen: vi.fn(() => Promise.resolve({ unregister: vi.fn() })),
     webFocus,
+    ink,
     overlays: vi.fn(),
     background: vi.fn(),
   },
 }));
 vi.mock('@/lib/backend', () => ({ commands: { fileWritten: vi.fn() } }));
 vi.mock('@/lib/backend/platform', () => ({ can: { nativeViews: true } }));
+vi.mock('@/lib/settings/store', () => ({
+  getSetting: () => settings.scratchOut,
+  subscribeToSetting: (_key: string, listener: (value: boolean) => void) => {
+    settings.listeners.add(listener);
+    return () => settings.listeners.delete(listener);
+  },
+}));
 
 import { useEditingFocus } from './keyboard';
 import { retainHost } from './native-surfaces';
@@ -59,5 +71,28 @@ describe('web focus, while surfaces are open', () => {
     useEditingFocus.setState({ element: document.createElement('textarea') });
     vi.advanceTimersByTime(200);
     expect(webFocus.mock.calls).toEqual([[true]]);
+  });
+});
+
+describe('scratching out ink', () => {
+  const change = (value: boolean) => {
+    settings.scratchOut = value;
+    settings.listeners.forEach((listener) => listener(value));
+  };
+  beforeEach(() => {
+    ink.mockClear();
+    settings.scratchOut = true;
+  });
+
+  it('tells the native side the setting once surfaces open, and as it changes', () => {
+    change(false);
+    expect(ink).not.toHaveBeenCalled();
+    const release = retainHost();
+    expect(ink).toHaveBeenLastCalledWith({ scratchOut: false });
+    change(true);
+    expect(ink).toHaveBeenLastCalledWith({ scratchOut: true });
+    release();
+    change(false);
+    expect(ink).toHaveBeenCalledTimes(2);
   });
 });

@@ -32,6 +32,10 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   private var written: String?
   /// When a stroke last began: no reload under a moving Pencil.
   private var drewAt: Date?
+  /// The Pencil is on the glass; the stroke being drawn is the Pencil's.
+  private var pencilTouching = false
+  private var drawnByPencil = false
+  private var scratcher: Scratcher?
 
   override init(id: String, path: String, plugin: NativePlugin) {
     super.init(id: id, path: path, plugin: plugin)
@@ -80,6 +84,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
       addSubview(controller.view)
     }
     self.controller = controller
+    scratcher = Scratcher(markup)
     observeMarkup(of: controller) { [weak self, weak controller] in
       guard let self, let controller, self.controller === controller else { return }
       self.paperMarkupViewControllerDidChangeMarkup(controller)
@@ -176,11 +181,13 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }
 
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
+    pencilTouching = gesture.state == .began || gesture.state == .changed
     if gesture.state == .began { Ink.shared.activate(self, touched: true) }
   }
 
   func paperMarkupViewControllerDidBeginDrawing(_ controller: PaperMarkupViewController) {
     drewAt = Date()
+    drawnByPencil = pencilTouching
   }
 
   override func showInsertMenu() {
@@ -193,6 +200,8 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
+    scratcher?.check(controller, pencil: drawnByPencil)
+    drawnByPencil = false
     unsaved = true
     send("dirty")
     pendingSave?.cancel()

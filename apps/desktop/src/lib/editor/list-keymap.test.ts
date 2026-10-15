@@ -74,3 +74,50 @@ describe('list keys, through the editor', () => {
     expect(await press('* [x] Milk|\n', 'Enter')).toBe('* [x] Milk\n* [ ] <br />\n');
   });
 });
+
+/**
+ * Selects from `«` to `»` in `markdown` (the caret, if they touch), then sends
+ * the `beforeinput` a deletion from the system brings (Scribble's scratch-out
+ * deletes what it covered this way). Returns whether the editor cancelled it.
+ */
+async function deleteInput(markdown: string): Promise<boolean> {
+  const { editorViewCtx, parserCtx } = await import('@milkdown/kit/core');
+  const { TextSelection } = await import('@milkdown/kit/prose/state');
+  return editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    const doc = ctx.get(parserCtx)(markdown);
+    view.dispatch(view.state.tr.replaceWith(0, view.state.doc.content.size, doc.content));
+    const take = (mark: string) => {
+      let at = -1;
+      view.state.doc.descendants((node, pos) => {
+        if (at < 0 && node.isText && node.text!.includes(mark)) at = pos + node.text!.indexOf(mark);
+      });
+      view.dispatch(view.state.tr.delete(at, at + 1));
+      return at;
+    };
+    const from = take('«');
+    const to = take('»');
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, from, to)));
+    const event = new InputEvent('beforeinput', { inputType: 'deleteContentBackward', cancelable: true });
+    view.someProp('handleDOMEvents', (handlers) => handlers.beforeinput?.(view, event));
+    return event.defaultPrevented;
+  });
+}
+
+describe('deleting from the system (Backspace on screen, Scribble)', () => {
+  it('leaves a scratched-out word in a paragraph to the browser', async () => {
+    expect(await deleteInput('Buy «eggs» today\n')).toBe(false);
+  });
+
+  it('leaves a scratched-out word in a list item to the browser', async () => {
+    expect(await deleteInput('* Buy «eggs» today\n')).toBe(false);
+  });
+
+  it('leaves scratched-out words from the start of an item to the browser', async () => {
+    expect(await deleteInput('* Milk\n* «Buy eggs» today\n')).toBe(false);
+  });
+
+  it('still takes Backspace at the start of an item', async () => {
+    expect(await deleteInput('* Milk\n* «»Eggs\n')).toBe(true);
+  });
+});
