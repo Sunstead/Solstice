@@ -57,14 +57,27 @@ public enum ScratchOut {
     return (major, CGVector(dx: -major.dy, dy: major.dx))
   }
 
-  /// Whether the points sweep back and forth along `axis` enough, straight
-  /// enough and close enough together across it.
+  /// How the points sweep back and forth along `axis`: how many sweeps cross
+  /// most of it, how much they bow (the median), and how far they drift
+  /// across it per sweep, both against the scribble's length.
+  struct Sweeps {
+    var full: Int
+    var bow: CGFloat
+    var drift: CGFloat
+  }
+
+  /// Whether they sweep enough, straight enough and close enough together.
   static func sweeps(of points: [CGPoint], along axis: CGVector, across side: CGVector) -> Bool {
+    guard let sweeps = measure(points, along: axis, across: side) else { return false }
+    return sweeps.full >= minimumSweeps && sweeps.bow <= maximumBow && sweeps.drift <= maximumDrift
+  }
+
+  static func measure(_ points: [CGPoint], along axis: CGVector, across side: CGVector) -> Sweeps? {
     let s = points.map { $0.x * axis.dx + $0.y * axis.dy }
     let t = points.map { $0.x * side.dx + $0.y * side.dy }
-    guard let low = s.min(), let high = s.max() else { return false }
+    guard let low = s.min(), let high = s.max() else { return nil }
     let extent = high - low
-    guard extent > 0 else { return false }
+    guard extent > 0 else { return nil }
 
     // Where it turns: a reversal counts once it has come back further than
     // a hand's jitter.
@@ -87,17 +100,11 @@ public enum ScratchOut {
     turns.append(s.count - 1)
 
     // The sweeps that cross most of it.
-    var full: [(from: Int, to: Int)] = []
-    for (a, b) in zip(turns, turns.dropFirst()) where abs(s[b] - s[a]) >= extent / 2 {
-      full.append((a, b))
-    }
-    guard full.count >= minimumSweeps else { return false }
-
-    let bows = full.map { bow(points, from: $0.from, to: $0.to) }.sorted()
-    guard bows[bows.count / 2] <= maximumBow else { return false }
-
+    let full = zip(turns, turns.dropFirst()).filter { abs(s[$1] - s[$0]) >= extent / 2 }
+    guard !full.isEmpty else { return Sweeps(full: 0, bow: 1, drift: 1) }
+    let bows = full.map { bow(points, from: $0.0, to: $0.1) }.sorted()
     let across = (t.max() ?? 0) - (t.min() ?? 0)
-    return across / CGFloat(full.count) <= maximumDrift * extent
+    return Sweeps(full: full.count, bow: bows[bows.count / 2], drift: across / CGFloat(full.count) / extent)
   }
 
   /// How far the points between `from` and `to` stray from the chord joining

@@ -53,9 +53,6 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   private var written: String?
   /// When a stroke last began: no reload under a moving Pencil.
   private var drewAt: Date?
-  /// The Pencil is on the glass; the stroke being drawn is the Pencil's.
-  private var pencilTouching = false
-  private var drawnByPencil = false
   /// Each canvas's scratching out (`Scratcher`), by page.
   private var scratchers: [ObjectIdentifier: Scratcher] = [:]
   /// A change from outside came while marks were in hand: look again after.
@@ -340,7 +337,6 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }
 
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
-    pencilTouching = gesture.state == .began || gesture.state == .changed
     guard gesture.state == .began else { return }
     Ink.shared.activate(self, touched: true)
     // The page under the Pencil holds the tools, so the picker stays.
@@ -390,13 +386,11 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   func paperMarkupViewControllerDidBeginDrawing(_ controller: PaperMarkupViewController) {
     drewAt = Date()
-    drawnByPencil = pencilTouching
   }
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
     guard let entry = canvases.first(where: { $0.value.controller === controller }) else { return }
-    scratchers[entry.key]?.check(controller, pencil: drawnByPencil)
-    drawnByPencil = false
+    scratchers[entry.key]?.check(controller, pencil: pdfView.pencilLanded)
     unsaved.insert(entry.key)
     scheduleSave()
   }
@@ -673,52 +667,21 @@ final class MarkupPDFView: PDFView {
     didSet { isInMarkupMode = fingerDraws }
   }
 
+  /// The last touch to land was the Pencil's (`TouchKind`): what drew the
+  /// stroke that just ended.
+  var pencilLanded: Bool { touchKind.pencil }
+  private lazy var touchKind = TouchKind { [weak self] pencil in
+    guard let self, !self.fingerDraws, self.isInMarkupMode != pencil else { return }
+    self.isInMarkupMode = pencil
+  }
+
   override init(frame: CGRect) {
     super.init(frame: frame)
-    addGestureRecognizer(TouchKind { [weak self] pencil in
-      guard let self, !self.fingerDraws, self.isInMarkupMode != pencil else { return }
-      self.isInMarkupMode = pencil
-    })
+    addGestureRecognizer(touchKind)
   }
 
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError() }
-}
-
-/// Reports whether each touch landing is the Pencil's, before the view's
-/// other gestures act on it, and never takes part itself. (Hit testing comes
-/// too early: its event doesn't hold the touch yet.)
-private final class TouchKind: UIGestureRecognizer, UIGestureRecognizerDelegate {
-  private let landed: (_ pencil: Bool) -> Void
-
-  init(_ landed: @escaping (_ pencil: Bool) -> Void) {
-    self.landed = landed
-    super.init(target: nil, action: nil)
-    cancelsTouchesInView = false
-    delaysTouchesBegan = false
-    delaysTouchesEnded = false
-    delegate = self
-  }
-
-  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-    // A Pencil landing with a palm already down, or still down as a finger
-    // lands: markup stays on.
-    let all = event.allTouches ?? touches
-    landed(all.contains { $0.type == .pencil && $0.phase != .ended && $0.phase != .cancelled })
-  }
-
-  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) { finish(event) }
-  override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { finish(event) }
-
-  /// Watches until every touch has lifted, so a second one landing is seen too.
-  private func finish(_ event: UIEvent) {
-    let down = event.allTouches?.contains { $0.phase != .ended && $0.phase != .cancelled } ?? false
-    if !down { state = .failed }
-  }
-
-  func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-    true
-  }
 }
 
 extension Array {
