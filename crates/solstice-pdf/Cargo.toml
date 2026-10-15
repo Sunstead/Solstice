@@ -1,0 +1,18 @@
+[package]
+name = "solstice-pdf"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Solstice's handwritten marks in a PDF: read them, write them, and keep the file small. Used by the iOS app's PDF view."
+publish = false
+
+[dependencies]
+lopdf = { version = "0.45", default-features = false }
+flate2 = "1"
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3"

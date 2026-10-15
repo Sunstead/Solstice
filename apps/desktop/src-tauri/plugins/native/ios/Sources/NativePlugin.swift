@@ -37,6 +37,7 @@ struct HostArgs: Decodable {
   let path: String?
   let template: String?
   let menus: [NativeMenu.Menu]?
+  let on: Bool?
 }
 
 class NativePlugin: Plugin {
@@ -98,7 +99,8 @@ class NativePlugin: Plugin {
       case "reload":
         host.surfaces[args.id]?.reload()
       case "edit":
-        host.surfaces[args.id]?.setEditing(args.on ?? false)
+        // Finger drawing, on every surface.
+        Ink.shared.setFingerDraws(args.on ?? false)
       case "find":
         // Reading handwriting takes a moment: answered when it's done.
         let surface = host.surfaces[args.id]
@@ -134,6 +136,9 @@ class NativePlugin: Plugin {
         }
       case "menu":
         NativeMenu.set(args.menus ?? [], plugin: self)
+      case "webFocus":
+        // Web text took focus (typing wins the tools), or lost it.
+        Ink.shared.webFocus(args.on ?? false)
       case "notebook":
         guard let path = args.path else { return invoke.reject("No path.") }
         do {

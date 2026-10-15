@@ -1,3 +1,4 @@
+import GameController
 import UIKit
 import WebKit
 
@@ -18,7 +19,9 @@ import WebKit
 ///   menu bar, which the page pads for (`env(safe-area-inset-top)`) in its
 ///   own colour.
 /// - No shortcuts bar over a hardware keyboard: Solstice's commands and menus
-///   do what its Bold, Italic and Paste buttons would.
+///   do what its Bold, Italic and Paste buttons would. Whether one is
+///   attached goes with the `keyboard` event (`hardware`), so the page's own
+///   keyboard bar stays away too.
 @MainActor
 final class WebviewFit: NSObject {
   /// A keyboard is at least this tall; the hardware keyboard's bar isn't.
@@ -28,6 +31,8 @@ final class WebviewFit: NSObject {
   private weak var plugin: NativePlugin?
   /// How much of the app's bottom the keyboard covers.
   private var covered: CGFloat = 0
+  /// A hardware keyboard is attached.
+  private var hardware = GCKeyboard.coalesced != nil
   private var observation: NSKeyValueObservation?
 
   init(_ webview: WKWebView, plugin: NativePlugin) {
@@ -54,6 +59,15 @@ final class WebviewFit: NSObject {
     center.addObserver(
       self, selector: #selector(keyboard(_:)),
       name: UIResponder.keyboardDidShowNotification, object: nil)
+    center.addObserver(self, selector: #selector(hardwareChanged), name: .GCKeyboardDidConnect, object: nil)
+    center.addObserver(self, selector: #selector(hardwareChanged), name: .GCKeyboardDidDisconnect, object: nil)
+  }
+
+  @objc private func hardwareChanged() {
+    let attached = GCKeyboard.coalesced != nil
+    guard attached != hardware else { return }
+    hardware = attached
+    report(duration: 0.25)
   }
 
   private func noShortcutsBar() {
@@ -77,11 +91,22 @@ final class WebviewFit: NSObject {
       let overlap = bounds.maxY - frame.minY
       if docked, overlap >= Self.keyboardMinimum { cover = min(overlap, bounds.height) }
     }
-    guard cover != covered else { return }
+    // The page hears of a hardware keyboard with the first focus too.
+    let attached = GCKeyboard.coalesced != nil
+    guard cover != covered || attached != hardware || !reported else { return }
     covered = cover
-    let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+    hardware = attached
+    report(duration: note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25)
+  }
+
+  /// Whether the page has heard anything yet.
+  private var reported = false
+
+  private func report(duration: Double) {
+    reported = true
     // In the webview's CSS pixels, which are its points.
     plugin?.trigger(
-      "keyboard", data: ["inset": Double(cover), "docked": cover > 0, "duration": duration])
+      "keyboard",
+      data: ["inset": Double(covered), "docked": covered > 0, "duration": duration, "hardware": hardware])
   }
 }

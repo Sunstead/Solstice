@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MilkdownEditorWrapper } from '@/components/milkdown-editor';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { isEditableCard } from '@/lib/canvas/editable';
+import { useCardAboveKeyboard } from '@/lib/canvas/use-card-above-keyboard';
 import type { CanvasNode } from '@/lib/canvas/types';
 import { useCanvasStoreApi } from '@/lib/canvas/use-canvas-store';
 import { commands } from '@/lib/backend';
@@ -22,16 +23,23 @@ import { CanvasTextEditor } from './canvas-text-editor';
  * here, and the note's other open tabs hear about edits as they always do.
  */
 export function CanvasCardEditor({ node }: { node: CanvasNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useCardAboveKeyboard(ref);
+
   if (node.type === 'text') {
     return (
-      <div className='typeset h-full overflow-auto'>
+      <div ref={ref} className='typeset h-full overflow-auto'>
         <CanvasTextEditor node={node} />
       </div>
     );
   }
 
   if (node.type === 'file' && isEditableCard(node)) {
-    return <FileCardEditor id={node.id} file={node.file} />;
+    return (
+      <div ref={ref} className='contents'>
+        <FileCardEditor id={node.id} file={node.file} />
+      </div>
+    );
   }
 
   return null;

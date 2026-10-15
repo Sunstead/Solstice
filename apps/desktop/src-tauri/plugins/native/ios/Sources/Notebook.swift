@@ -34,11 +34,15 @@ enum Notebook {
 
   /// One page of `template`, `size` big.
   static func page(template: String, size: CGRect) -> PDFPage? {
-    let data = UIGraphicsPDFRenderer(bounds: size).pdfData { context in
+    pageData(template: template, size: size).flatMap { PDFDocument(data: $0)?.page(at: 0) }
+  }
+
+  /// One page of `template`, `size` big, as a one-page PDF.
+  static func pageData(template: String, size: CGRect) -> Data? {
+    UIGraphicsPDFRenderer(bounds: size).pdfData { context in
       context.beginPage()
       draw(template, in: size, context.cgContext)
     }
-    return PDFDocument(data: data)?.page(at: 0)
   }
 
   /// Quiet enough to write over, and to print.

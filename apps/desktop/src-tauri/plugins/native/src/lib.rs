@@ -10,6 +10,9 @@ use tauri::{
 #[cfg(target_os = "ios")]
 tauri::ios_plugin_binding!(init_plugin_solstice_native);
 
+#[cfg(target_os = "ios")]
+mod pdf;
+
 pub struct Native<R: Runtime> {
     #[cfg(target_os = "ios")]
     handle: tauri::plugin::PluginHandle<R>,

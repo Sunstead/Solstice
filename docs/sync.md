@@ -261,6 +261,11 @@ of its document that mirrors exactly what the editor holds
 and merged into the real note as a concurrent edit. So a buffer that never
 reloaded can't revert changes that arrived meanwhile, even over several
 saves. Writes by anything else are read from the folder like outside edits.
+A file is absorbed as the bytes actually read (not the scan's hash of a save
+that has since been replaced), and writing the vault out never overwrites a
+file changed on disk since it was last read: that edit is absorbed first, so
+a save landing mid-sync (the iPad's PDFs, every second while writing) is
+neither lost nor rewritten under the editor.
 
 **Desktop.** `src-tauri/src/sync/` signs in (Cosmos's PKCE loopback flow; the
 refresh token in the OS keychain under `net.sunstead.solstice`, never in the

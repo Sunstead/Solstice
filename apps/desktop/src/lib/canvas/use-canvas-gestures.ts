@@ -9,6 +9,7 @@ import {
   updateEdge,
 } from '@/lib/canvas/doc';
 import { snapStepForScale } from '@/lib/canvas/grid';
+import { primeKeyboard } from '@/lib/keyboard-primer';
 import { createCanvasId } from '@/lib/canvas/ids';
 import {
   beginDrag,
@@ -391,6 +392,9 @@ export function useCanvasGestures({
           );
 
           if (node && isEditableCard(node)) {
+            // The card's editor mounts after this tap: raise the keyboard
+            // in it, which iOS only does during a tap.
+            primeKeyboard();
             live.select([activateId], 'replace');
             live.setEditing(activateId);
           } else if (node?.type === 'link') {
