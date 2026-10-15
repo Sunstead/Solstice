@@ -42,7 +42,7 @@ export function HeaderControls() {
   }, []);
 
   return (
-    <div ref={ref} className='no-drag relative z-30 flex h-10 items-center'>
+    <div ref={ref} className='no-drag relative z-30 flex h-10 touch:h-11 items-center'>
       {/* macOS has a native menu bar; a browser tab never does. */}
       {/* macOS has the native menu bar; everywhere else draws its own. */}
       {can.appMenu && !(can.windowChrome && isMac) && <AppMenubar />}

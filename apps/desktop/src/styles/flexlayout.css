@@ -251,6 +251,35 @@
   max-width: calc(100% - 2rem - 4px);
 }
 
+/*
+ * Touch first (`data-touch`, main.tsx): a taller strip, as the title bar
+ * beside it grows to match (h-11). Heights only: the widths above are what
+ * tab motion measures. The + button grows too, and its room with it.
+ */
+:root[data-touch] .flexlayout-custom .flexlayout__tabset_tabbar_outer {
+  height: 44px;
+}
+
+:root[data-touch] .flexlayout-custom
+  .flexlayout__tab_button:not(.flexlayout__tab_button--selected) {
+  height: 34px;
+}
+
+:root[data-touch] .flexlayout-custom .flexlayout__tab_button_trailing {
+  padding: 6px;
+}
+
+:root[data-touch] .flexlayout-custom .flexlayout__tab_toolbar_button {
+  min-width: 36px;
+  height: 36px;
+}
+
+:root[data-touch] .flexlayout-custom
+  .flexlayout__tabset_tabbar_inner:has(> .flexlayout__tab_toolbar_sticky_buttons_container)
+  > .flexlayout__tabset_tabbar_inner_tab_container {
+  max-width: calc(100% - 2.25rem - 4px);
+}
+
 /* spacers/dividers: fixed size, never grow or shrink */
 .flexlayout-custom .flexlayout__tabset_tab_spacer,
 .flexlayout-custom .flexlayout__tabset_tab_divider_selected_before,
