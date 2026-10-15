@@ -19,7 +19,7 @@ import {
   keyboardBarShown,
   keyboardRoom,
   placeAboveKeyboard,
-  shouldRefocus,
+  shouldReleaseFocus,
   KEYBOARD_BAR_GAP_PX,
   KEYBOARD_BAR_PX,
 } from './keyboard';
@@ -49,11 +49,15 @@ describe('keyboardRoom', () => {
 });
 
 describe('keyboardBarShown', () => {
+  it('goes with the keyboard when it was put away', () => {
+    expect(keyboardBarShown({ touch: true, note: true, hardware: false, dismissed: true })).toBe(false);
+  });
+
   it('shows for a note on a touch screen, unless a hardware keyboard types', () => {
-    expect(keyboardBarShown({ touch: true, note: true, hardware: false })).toBe(true);
-    expect(keyboardBarShown({ touch: true, note: true, hardware: true })).toBe(false);
-    expect(keyboardBarShown({ touch: false, note: true, hardware: false })).toBe(false);
-    expect(keyboardBarShown({ touch: true, note: false, hardware: false })).toBe(false);
+    expect(keyboardBarShown({ touch: true, note: true, hardware: false, dismissed: false })).toBe(true);
+    expect(keyboardBarShown({ touch: true, note: true, hardware: true, dismissed: false })).toBe(false);
+    expect(keyboardBarShown({ touch: false, note: true, hardware: false, dismissed: false })).toBe(false);
+    expect(keyboardBarShown({ touch: true, note: false, hardware: false, dismissed: false })).toBe(false);
   });
 });
 
@@ -95,7 +99,7 @@ describe('caretOverlap', () => {
   });
 });
 
-describe('shouldRefocus', () => {
+describe('shouldReleaseFocus', () => {
   let editor: HTMLElement;
   let inside: HTMLElement;
   beforeEach(() => {
@@ -107,18 +111,18 @@ describe('shouldRefocus', () => {
   });
   afterEach(() => editor.remove());
 
-  const tap = { touch: true, docked: false, hardware: false };
+  const tap = { touch: true, shown: false, hardware: false };
 
-  it('refocuses a finger tap in the focused text with no keyboard up (after Scribble)', () => {
-    expect(shouldRefocus({ ...tap, focused: editor, target: inside })).toBe(true);
+  it('lets go for a finger landing in the focused text with no keyboard up (after Scribble)', () => {
+    expect(shouldReleaseFocus({ ...tap, focused: editor, target: inside })).toBe(true);
   });
 
-  it('leaves it be with a keyboard up, a hardware keyboard, the Pencil, or a tap elsewhere', () => {
-    expect(shouldRefocus({ ...tap, docked: true, focused: editor, target: inside })).toBe(false);
-    expect(shouldRefocus({ ...tap, hardware: true, focused: editor, target: inside })).toBe(false);
-    expect(shouldRefocus({ ...tap, touch: false, focused: editor, target: inside })).toBe(false);
-    expect(shouldRefocus({ ...tap, focused: editor, target: document.body })).toBe(false);
-    expect(shouldRefocus({ ...tap, focused: null, target: inside })).toBe(false);
+  it('leaves it be with a keyboard shown (docked or floating), a hardware keyboard, the Pencil, or a tap elsewhere', () => {
+    expect(shouldReleaseFocus({ ...tap, shown: true, focused: editor, target: inside })).toBe(false);
+    expect(shouldReleaseFocus({ ...tap, hardware: true, focused: editor, target: inside })).toBe(false);
+    expect(shouldReleaseFocus({ ...tap, touch: false, focused: editor, target: inside })).toBe(false);
+    expect(shouldReleaseFocus({ ...tap, focused: editor, target: document.body })).toBe(false);
+    expect(shouldReleaseFocus({ ...tap, focused: null, target: inside })).toBe(false);
   });
 });
 

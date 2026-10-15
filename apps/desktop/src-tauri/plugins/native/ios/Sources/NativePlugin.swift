@@ -140,6 +140,10 @@ class NativePlugin: Plugin {
       case "webFocus":
         // Web text took focus (typing wins the tools), or lost it.
         Ink.shared.webFocus(args.on ?? false)
+      case "expectTyping":
+        // A finger tapped text to type: the keyboard, not Scribble's
+        // seconds of waiting for the Pencil.
+        UITextInputContext.current().isPencilInputExpected = false
       case "ink":
         if let scratchOut = args.scratchOut { Ink.shared.scratchOut = scratchOut }
       case "notebook":

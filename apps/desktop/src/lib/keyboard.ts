@@ -11,28 +11,41 @@ import { can } from '@/lib/backend/platform';
  *   floating keyboard, a hardware keyboard's bar, or none. Also on `<html>`
  *   as `--keyboard-inset`.
  * - `docked`: a keyboard is up along the bottom.
+ * - `shown`: a keyboard is up at all, docked or floating (not the small bar
+ *   a hardware keyboard or Scribble brings up).
  * - `hardware`: a hardware keyboard is attached (the iOS app; a browser
  *   can't tell). It types, so the keyboard bar stays away.
+ * - `dismissed`: the keyboard was put away (its own hide button) with the
+ *   note still focused; the keyboard bar goes with it
+ *   (`useKeyboardDismissal`).
  *
  * Nothing resizes for it: the app keeps its full height, and only the editor
  * being typed in makes room (`useKeyboardRoom`), along with the dialogs,
  * which centre above it. The keyboard bar sits on top of it.
  */
-export const useKeyboard = create<{ inset: number; docked: boolean; hardware: boolean }>(() => ({
+export const useKeyboard = create<{
+  inset: number;
+  docked: boolean;
+  shown: boolean;
+  hardware: boolean;
+  dismissed: boolean;
+}>(() => ({
   inset: 0,
   docked: false,
+  shown: false,
   hardware: false,
+  dismissed: false,
 }));
 
 /** A keyboard is at least this tall; the iPad's shortcut bar and browser chrome aren't. */
 const KEYBOARD_MIN_PX = 150;
 
-function publish(inset: number, docked: boolean, hardware = useKeyboard.getState().hardware) {
+function publish(inset: number, docked: boolean, shown = docked, hardware = useKeyboard.getState().hardware) {
   const rounded = Math.max(0, Math.round(inset));
   document.documentElement.style.setProperty('--keyboard-inset', `${rounded}px`);
   const now = useKeyboard.getState();
-  if (now.inset !== rounded || now.docked !== docked || now.hardware !== hardware) {
-    useKeyboard.setState({ inset: rounded, docked, hardware });
+  if (now.inset !== rounded || now.docked !== docked || now.shown !== shown || now.hardware !== hardware) {
+    useKeyboard.setState({ inset: rounded, docked, shown, hardware });
   }
 }
 
@@ -48,14 +61,14 @@ export function useKeyboardTracking() {
     const root = document.documentElement;
     const cleanup = () => {
       root.style.removeProperty('--keyboard-inset');
-      useKeyboard.setState({ inset: 0, docked: false, hardware: false });
+      useKeyboard.setState({ inset: 0, docked: false, shown: false, hardware: false, dismissed: false });
     };
 
     if (can.nativeViews) {
       let cancelled = false;
       let stop: (() => void) | undefined;
       void nativeKeyboard
-        .listen(({ inset, docked, hardware }) => publish(docked ? inset : 0, docked, !!hardware))
+        .listen(({ inset, docked, shown, hardware }) => publish(docked ? inset : 0, docked, shown ?? docked, !!hardware))
         .then((listener) => {
           if (cancelled) void listener.unregister();
           else stop = () => void listener.unregister();
@@ -161,17 +174,61 @@ export function useTouchScreen() {
 
 /**
  * Whether the keyboard bar is up: a note editor has focus on a touch screen,
- * and no hardware keyboard is there to format with.
+ * no hardware keyboard is there to format with, and the keyboard wasn't put
+ * away (`dismissed`).
  */
-export function keyboardBarShown({ touch, note, hardware }: { touch: boolean; note: boolean; hardware: boolean }) {
-  return touch && note && !hardware;
+export function keyboardBarShown({
+  touch,
+  note,
+  hardware,
+  dismissed,
+}: {
+  touch: boolean;
+  note: boolean;
+  hardware: boolean;
+  dismissed: boolean;
+}) {
+  return touch && note && !hardware && !dismissed;
 }
 
 export function useKeyboardBarShown() {
   const touch = useTouchScreen();
   const note = useEditingFocus((s) => s.note);
   const hardware = useKeyboard((s) => s.hardware);
-  return keyboardBarShown({ touch, note, hardware });
+  const dismissed = useKeyboard((s) => s.dismissed);
+  return keyboardBarShown({ touch, note, hardware, dismissed });
+}
+
+/**
+ * Keeps `useKeyboard().dismissed`: the keyboard went away with text still
+ * focused, so it was put away (its hide button: iOS keeps the focus), and
+ * the keyboard bar goes too. Scribble, where no keyboard came up, isn't
+ * that. It ends when the keyboard comes back, the Pencil writes in the
+ * text, or focus moves. Mount once (the root does).
+ */
+export function useKeyboardDismissal() {
+  useEffect(() => {
+    const set = (dismissed: boolean) => {
+      if (useKeyboard.getState().dismissed !== dismissed) useKeyboard.setState({ dismissed });
+    };
+    const stopKeyboard = useKeyboard.subscribe((now, before) => {
+      if (now.shown && !before.shown) set(false);
+      else if (!now.shown && before.shown && useEditingFocus.getState().element) set(true);
+    });
+    const stopFocus = useEditingFocus.subscribe((now, before) => {
+      if (now.element !== before.element) set(false);
+    });
+    const pen = (e: PointerEvent) => {
+      const focused = useEditingFocus.getState().element;
+      if (e.pointerType === 'pen' && focused && e.target instanceof Node && focused.contains(e.target)) set(false);
+    };
+    document.addEventListener('pointerdown', pen, true);
+    return () => {
+      stopKeyboard();
+      stopFocus();
+      document.removeEventListener('pointerdown', pen, true);
+    };
+  }, []);
 }
 
 /** `el`'s place on screen, kept current as it or the window changes size. */
@@ -313,67 +370,48 @@ export function useAboveKeyboard(
 }
 
 /**
- * Whether a tap should focus the text afresh to bring the keyboard back: a
- * finger tapped inside the text that has focus, and no keyboard (on-screen
- * or hardware) is there to type with. That's the note after Scribble: iOS
- * keeps it focused with no keyboard, and a tap on a focused field starts
- * nothing new.
+ * Whether a finger landing should take focus from the text it lands in, so
+ * the tap focuses it afresh and the keyboard comes up: a finger in the text
+ * that has focus, with no keyboard (on-screen, docked or floating, or
+ * hardware) to type with. That's the note after Scribble: iOS keeps it
+ * focused with no keyboard, takes it as Pencil input still, and a tap on
+ * focused text starts nothing new (nor does focusing it again from script).
  */
-export function shouldRefocus({
+export function shouldReleaseFocus({
   touch,
   focused,
   target,
-  docked,
+  shown,
   hardware,
 }: {
   touch: boolean;
   focused: HTMLElement | null;
   target: EventTarget | null;
-  docked: boolean;
+  shown: boolean;
   hardware: boolean;
 }): boolean {
-  return touch && !docked && !hardware && !!focused && target instanceof Node && focused.contains(target);
+  return touch && !shown && !hardware && !!focused && target instanceof Node && focused.contains(target);
 }
 
 /**
  * Brings the keyboard back for a finger tap in focused text with none up
- * (`shouldRefocus`): focuses it again inside the tap, which iOS raises the
- * keyboard for, keeping the caret where the tap put it. Mount once (the
- * root does).
+ * (`shouldReleaseFocus`): focus goes as the finger lands, and the tap then
+ * focuses the text itself, the caret where it lands, as any tap on text
+ * does, which iOS raises the keyboard for, once told a finger types now
+ * (`expectTyping`). Mount once (the root does).
  */
 export function useKeyboardRefocus() {
   useEffect(() => {
-    let touch = false;
     const down = (e: PointerEvent) => {
-      touch = e.pointerType === 'touch';
-    };
-    const click = (e: MouseEvent) => {
       const focused = useEditingFocus.getState().element;
-      const { docked, hardware } = useKeyboard.getState();
-      if (!coarse?.matches || !shouldRefocus({ touch, focused, target: e.target, docked, hardware })) return;
-      refocus(focused!);
+      const { shown, hardware } = useKeyboard.getState();
+      if (!coarse?.matches) return;
+      if (shouldReleaseFocus({ touch: e.pointerType === 'touch', focused, target: e.target, shown, hardware })) {
+        focused!.blur();
+        if (can.nativeViews) void nativeKeyboard.expectTyping();
+      }
     };
     document.addEventListener('pointerdown', down, true);
-    document.addEventListener('click', click, true);
-    return () => {
-      document.removeEventListener('pointerdown', down, true);
-      document.removeEventListener('click', click, true);
-    };
+    return () => document.removeEventListener('pointerdown', down, true);
   }, []);
-}
-
-function refocus(el: HTMLElement) {
-  // The editors (ProseMirror, CodeMirror) read their selection from the
-  // page's, so putting it back keeps the caret where it was.
-  const selection = document.getSelection();
-  const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
-  const field = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? el : null;
-  const [start, end] = field ? [field.selectionStart, field.selectionEnd] : [null, null];
-  el.blur();
-  el.focus({ preventScroll: true });
-  if (field && start !== null && end !== null) field.setSelectionRange(start, end);
-  else if (range && selection) {
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }
 }

@@ -26,7 +26,12 @@ import { useSyncStatus } from '@/lib/stores/sync';
 import { WorkspaceDialogs } from '@/components/workspace-dialogs';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
 import { answerPick, useNotePicker } from '@/lib/stores/note-picker';
-import { useEditingFocusTracking, useKeyboardRefocus, useKeyboardTracking } from '@/lib/keyboard';
+import {
+  useEditingFocusTracking,
+  useKeyboardDismissal,
+  useKeyboardRefocus,
+  useKeyboardTracking,
+} from '@/lib/keyboard';
 import { useSourceModeCommand } from '@/hooks/use-source-mode';
 import { KeyboardBar } from '@/components/mobile/keyboard-bar';
 import { SlashMenu } from '@/components/editor/slash-menu';
@@ -64,6 +69,7 @@ export const Route = createRootRoute({
     useKeyboardTracking();
     useEditingFocusTracking();
     useKeyboardRefocus();
+    useKeyboardDismissal();
     useSourceModeCommand();
     useFileCommands();
     useThemeEffect();
