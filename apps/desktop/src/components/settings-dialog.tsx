@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import {
   Dialog,
   DialogClose,
@@ -19,8 +19,9 @@ import {
 } from '@sunstead/ui/components/resizable-sidebar';
 import { ScrollArea } from '@sunstead/ui/components/scroll-area';
 import { cn } from '@/lib/utils';
-import { customPanes } from './settings/panes';
-import { SettingsPane } from './settings/settings-pane';
+import { touchFirst } from '@/lib/backend/platform';
+import { SettingsSectionBody, SettingsSectionList } from './settings/settings-nav';
+import { PushPane } from './mobile/push-pane';
 import { SettingsSearch } from './settings/settings-search';
 import { SettingsSearchResults } from './settings/settings-search-results';
 import {
@@ -31,7 +32,7 @@ import {
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { Button } from '@sunstead/ui/components/button';
-import { X } from 'lucide-react';
+import { ChevronLeft, X } from 'lucide-react';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 
 /**
@@ -71,27 +72,32 @@ function SectionTabs({
  * `useSettingsDialog().openSettings()` or the `app.settings` command.
  *
  * The nav comes from `settingsSections` and the body from the settings
- * registry, so neither grows when a setting is added.
+ * registry, so neither grows when a setting is added. Where touch leads it's
+ * a narrow list of sections, each a page of its own, as iPad apps do; with a
+ * mouse, a sidebar beside the section. A phone has settings as pages on You
+ * instead (`YouPage`).
  */
 export function SettingsDialog() {
+  const isMobile = useIsMobile();
+  if (isMobile) return null;
+  return touchFirst ? <SettingsPagesDialog /> : <SettingsSplitDialog />;
+}
+
+/** The sections in a sidebar, the open one beside it. */
+function SettingsSplitDialog() {
   const open = useSettingsDialog((s) => s.open);
   const close = useSettingsDialog((s) => s.close);
   const activeSection = useSettingsDialog((s) => s.activeSection);
   const setActiveSection = useSettingsDialog((s) => s.setActiveSection);
   const query = useSettingsDialog((s) => s.query.trim());
   const workspacePath = useWorkspace((s) => s.path);
-  // A phone has settings as pages on You instead (`YouPage`).
-  const isMobile = useIsMobile();
 
   const section = getSection(activeSection);
-  const CustomPane = customPanes[activeSection];
 
   // Base UI otherwise focuses the first tabbable element, which is the search
   // field. Focusing the panel keeps the dialog announced without capturing the
   // first keystroke into search.
   const panelRef = useRef<HTMLDivElement>(null);
-
-  if (isMobile) return null;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
@@ -170,10 +176,8 @@ export function SettingsDialog() {
                   <div className='px-4 py-6 md:px-6 '>
                     {query ? (
                       <SettingsSearchResults query={query} />
-                    ) : CustomPane ? (
-                      <CustomPane />
                     ) : (
-                      <SettingsPane section={activeSection} />
+                      <SettingsSectionBody id={activeSection} />
                     )}
                   </div>
                 </div>
@@ -181,6 +185,97 @@ export function SettingsDialog() {
             </div>
           </SidebarInset>
         </SidebarProvider>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Where a page's swipe back starts: below its header, clear of Back. */
+const PAGE_HEADER_HEIGHT = 48;
+
+/** A page's header in the touch dialog: Back (on a section), its title, Close. */
+function PageHeader({ title, onBack }: { title: ReactNode; onBack?: () => void }) {
+  return (
+    <div className='flex h-12 shrink-0 items-center gap-1 border-b px-1.5'>
+      {onBack && (
+        <Button variant='ghost' size='icon' onClick={onBack}>
+          <ChevronLeft />
+          <span className='sr-only'>Back</span>
+        </Button>
+      )}
+      <h2 className={cn('min-w-0 flex-1 truncate text-base font-semibold', !onBack && 'px-2.5')}>{title}</h2>
+      <DialogClose
+        render={
+          <Button variant='ghost' size='icon'>
+            <X />
+            <span className='sr-only'>Close</span>
+          </Button>
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * Settings where touch leads: a narrow dialog listing the sections, each
+ * pushed as a page of its own over the list (back by its button or a swipe
+ * from the left edge), the way iPad apps do it.
+ */
+function SettingsPagesDialog() {
+  const open = useSettingsDialog((s) => s.open);
+  const close = useSettingsDialog((s) => s.close);
+  const page = useSettingsDialog((s) => s.page);
+  const shown = useSettingsDialog((s) => s.shown);
+  const pushPage = useSettingsDialog((s) => s.pushPage);
+  const popPage = useSettingsDialog((s) => s.popPage);
+  const query = useSettingsDialog((s) => s.query.trim());
+  const workspacePath = useWorkspace((s) => s.path);
+  const list = useRef<HTMLDivElement>(null);
+  // As in the split dialog: the panel takes focus, not the search field.
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      <DialogContent
+        ref={panelRef}
+        initialFocus={panelRef}
+        showCloseButton={false}
+        className='flex h-[min(92svh,760px)] w-[calc(100%-2rem)] flex-col overflow-hidden bg-background p-0 sm:max-w-lg'
+      >
+        <DialogTitle className='sr-only'>Settings</DialogTitle>
+        <DialogDescription className='sr-only'>Customize your settings here.</DialogDescription>
+        <div className='relative min-h-0 flex-1 overflow-hidden'>
+          <div ref={list} className='absolute inset-0 flex flex-col bg-background'>
+            <PageHeader title='Settings' />
+            <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain'>
+              <div className='flex flex-col gap-3 p-4'>
+                <SettingsSearch className='[&_input]:h-10' />
+                {query ? (
+                  <SettingsSearchResults query={query} onOpenSection={pushPage} />
+                ) : (
+                  <SettingsSectionList onOpen={pushPage} />
+                )}
+                {!workspacePath && (
+                  <p className='px-1 text-xs text-muted-foreground/80 italic'>
+                    No workspace is open, so per-workspace overrides are unavailable.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          <PushPane open={page !== null} onClose={popPage} behind={list} edgeTop={PAGE_HEADER_HEIGHT}>
+            {shown && (
+              <>
+                <PageHeader title={getSection(shown).label} onBack={popPage} />
+                <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain'>
+                  <div className='px-4 py-6'>
+                    <SettingsSectionBody id={shown} />
+                  </div>
+                </div>
+              </>
+            )}
+          </PushPane>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -8,8 +8,17 @@ type SettingsDialogState = {
   query: string;
   /** The section the last `openSettings` asked for, if it named one. */
   requested: SectionId | null;
+  /**
+   * The section pushed as a page over the list (the touch dialog), or null
+   * on the list. `shown` is what that page renders: it stays set while the
+   * page slides away.
+   */
+  page: SectionId | null;
+  shown: SectionId | null;
   openSettings: (section?: SectionId) => void;
   setActiveSection: (section: SectionId) => void;
+  pushPage: (section: SectionId) => void;
+  popPage: () => void;
   setQuery: (query: string) => void;
   close: () => void;
 };
@@ -27,15 +36,19 @@ export const useSettingsDialog = create<SettingsDialogState>((set) => ({
   activeSection: 'appearance',
   query: '',
   requested: null,
+  page: null,
+  shown: null,
   openSettings: (section) =>
     set((state) =>
       state.open
-        ? { open: false, query: '' }
+        ? { open: false, query: '', page: null }
         : section
-          ? { open: true, activeSection: section, query: '', requested: section }
-          : { open: true, query: '', requested: null },
+          ? { open: true, activeSection: section, query: '', requested: section, page: section, shown: section }
+          : { open: true, query: '', requested: null, page: null },
     ),
   setActiveSection: (activeSection) => set({ activeSection, query: '' }),
+  pushPage: (section) => set({ page: section, shown: section, activeSection: section, query: '' }),
+  popPage: () => set({ page: null }),
   setQuery: (query) => set({ query }),
-  close: () => set({ open: false, query: '' }),
+  close: () => set({ open: false, query: '', page: null }),
 }));

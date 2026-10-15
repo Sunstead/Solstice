@@ -3,15 +3,14 @@ import { ChevronLeft, ChevronsUpDown, LogIn, LogOut } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { useAccountActions } from '@/hooks/use-account-actions';
-import { customPanes } from '@/components/settings/panes';
-import { SettingsPane } from '@/components/settings/settings-pane';
+import { SettingsSectionBody, SettingsSectionList } from '@/components/settings/settings-nav';
 import { SettingsSearch } from '@/components/settings/settings-search';
 import { SettingsSearchResults } from '@/components/settings/settings-search-results';
 import { SyncStatusLine } from '@/components/sync/status';
 import { UserAvatar } from '@/components/user-avatar';
 import { useWorkspaceChoices } from '@/hooks/use-workspace-choices';
 import { can } from '@/lib/backend/platform';
-import { getSection, settingsSections, type SectionId } from '@/lib/settings/sections';
+import { getSection, type SectionId } from '@/lib/settings/sections';
 import { usePhoneNav } from '@/lib/stores/phone-nav';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { useSync } from '@/lib/stores/sync';
@@ -64,16 +63,8 @@ export function YouPage() {
                   <SettingsSearchResults query={query} onOpenSection={open} />
                 </div>
               ) : (
-                <div className='mt-1.5 flex flex-col divide-y overflow-hidden rounded-xl border bg-card'>
-                  {settingsSections.map((section) => (
-                    <Row
-                      key={section.id}
-                      icon={section.icon}
-                      label={section.label}
-                      chevron
-                      onClick={() => open(section.id)}
-                    />
-                  ))}
+                <div className='mt-1.5'>
+                  <SettingsSectionList onOpen={open} />
                 </div>
               )}
             </section>
@@ -90,7 +81,6 @@ export function YouPage() {
 
 function SectionPage({ id, onBack }: { id: SectionId; onBack: () => void }) {
   const section = getSection(id);
-  const Custom = customPanes[id];
   return (
     <>
       <PhoneHeader>
@@ -102,7 +92,7 @@ function SectionPage({ id, onBack }: { id: SectionId; onBack: () => void }) {
       </PhoneHeader>
       <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain'>
         <div className='mx-auto max-w-xl px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
-          {Custom ? <Custom /> : <SettingsPane section={id} />}
+          <SettingsSectionBody id={id} />
         </div>
       </div>
     </>
