@@ -29,6 +29,12 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     [ObjectIdentifier: (page: PDFPage, controller: PaperMarkupViewController, host: CanvasHost)] = [:]
   /// Each page's markup as the file holds it, until its canvas is made.
   private var stored: [ObjectIdentifier: Data] = [:]
+  /// Ink Apple's Markup wrote on each page (Preview, Files), drawn by the
+  /// page's canvas in place of Apple's blurry picture of it. Taken into the
+  /// page's marks for good with the page's next save (`Edit.absorbed`).
+  private var appleInks: [ObjectIdentifier: [(fingerprint: String, drawing: PKDrawing)]] = [:]
+  /// The marks of canvases scrolled away, for when they're shown again.
+  private var cached: [ObjectIdentifier: PaperMarkup] = [:]
 
   // -- Saving state ----------------------------------------------------------
   /// Pages with marks not yet written.
@@ -119,13 +125,24 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   private func show(_ document: PDFDocument, _ opened: PdfStore.Opened?) {
     stored = [:]
+    appleInks = [:]
+    cached = [:]
     for index in 0..<document.pageCount {
       guard let page = document.page(at: index) else { continue }
+      let key = ObjectIdentifier(page)
       // The page canvases draw Solstice's marks; the copies in the file are
       // for other readers.
       PdfMarkup.showCopies(false, on: page)
       if let base64 = opened?.pages[safe: index] ?? nil, let data = Data(base64Encoded: base64) {
-        stored[ObjectIdentifier(page)] = data
+        stored[key] = data
+      }
+      let box = page.bounds(for: .cropBox)
+      for ink in opened?.apple?[safe: index] ?? [] {
+        guard ink.rect.count == 4, let archive = Data(base64Encoded: ink.archive) else { continue }
+        let rect = CGRect(x: ink.rect[0], y: ink.rect[1], width: ink.rect[2] - ink.rect[0], height: ink.rect[3] - ink.rect[1])
+        guard let drawing = PdfMarkup.appleInk(archive, rect: rect, box: box) else { continue }
+        appleInks[key, default: []].append((ink.fingerprint, drawing))
+        PdfMarkup.hideAppleInk(at: rect, on: page)
       }
     }
     dropCanvases()
@@ -201,10 +218,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     if let existing = canvases[key] { return existing.host }
 
     let size = page.bounds(for: .cropBox).size
-    var markup =
-      stored[key].flatMap { try? PaperMarkup(dataRepresentation: $0) }
-      ?? (encrypted ? PdfMarkup.read(page) : nil)
-      ?? PaperMarkup(bounds: CGRect(origin: .zero, size: size))
+    var markup = marks(of: page) ?? PaperMarkup(bounds: CGRect(origin: .zero, size: size))
     // The page shows through: PaperKit's canvas is otherwise white paper.
     markup.backgroundColor = UIColor.clear.cgColor
     let controller = PaperMarkupViewController(markup: markup, supportedFeatureSet: Self.features)
@@ -236,6 +250,20 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     // Made after this took the tools (still loading, or scrolled to).
     DispatchQueue.main.async { [weak self] in self?.pageChanged() }
     return host
+  }
+
+  /// What's marked on `page`: its canvas's if it has had one, else the
+  /// file's, with Apple's ink on it.
+  private func marks(of page: PDFPage) -> PaperMarkup? {
+    let key = ObjectIdentifier(page)
+    if let markup = canvases[key]?.controller.markup ?? cached[key] { return markup }
+    var markup =
+      stored[key].flatMap { try? PaperMarkup(dataRepresentation: $0) }
+      ?? (encrypted ? PdfMarkup.read(page) : nil)
+    guard let inks = appleInks[key], !inks.isEmpty else { return markup }
+    if markup == nil { markup = PaperMarkup(bounds: CGRect(origin: .zero, size: page.bounds(for: .cropBox).size)) }
+    for ink in inks { markup?.append(contentsOf: ink.drawing) }
+    return markup
   }
 
   func pdfView(_ pdfView: PDFView, willEndDisplayingOverlayView overlayView: UIView, for page: PDFPage) {
@@ -422,7 +450,9 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
         let collect = Self.signposts.beginInterval("collect")
         for entry in pages {
           guard let markup = entry.controller.markup else { continue }
-          request.edits.append(try await PdfMarkup.edit(of: markup, page: entry.page, index: entry.index))
+          let absorbed = appleInks[entry.key]?.map(\.fingerprint) ?? []
+          request.edits.append(
+            try await PdfMarkup.edit(of: markup, page: entry.page, index: entry.index, absorbed: absorbed))
         }
         Self.signposts.endInterval("collect", collect)
         if !request.isEmpty || repairing {
@@ -435,6 +465,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     }
 
     if saved {
+      // Apple's ink on these pages is Solstice's now, in the file too.
+      if !encrypted { for entry in pages { appleInks[entry.key] = nil } }
       send("saved")
     } else {
       // Kept to try again with the next change.
@@ -469,15 +501,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// scrolled away, not reloaded).
   private func dropCanvas(_ key: ObjectIdentifier, keep: Bool = true) {
     guard let entry = canvases.removeValue(forKey: key) else { return }
-    if keep, let markup = entry.controller.markup {
-      // Only for this document: another's pages could reuse the identifier.
-      let document = pdfView.document
-      Task { @MainActor [weak self] in
-        guard let data = try? await markup.dataRepresentation(), let self, self.pdfView.document === document
-        else { return }
-        self.stored[key] = data
-      }
-    }
+    if keep, let markup = entry.controller.markup { cached[key] = markup }
     toolPicker.removeObserver(entry.controller)
     let wasResponder = entry.controller.isFirstResponder
     entry.controller.willMove(toParent: nil)
@@ -520,12 +544,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
         }
       }
       // Marks on screen are the canvas's; otherwise what the file holds.
-      let key = ObjectIdentifier(page)
-      let markup =
-        canvases[key]?.controller.markup
-        ?? stored[key].flatMap { try? PaperMarkup(dataRepresentation: $0) }
-        ?? (encrypted ? PdfMarkup.read(page) : nil)
-      if let markup {
+      if let markup = marks(of: page) {
         let box = page.bounds(for: .cropBox)
         for rect in await handwriting(query, in: markup, caseSensitive: caseSensitive, wholeWord: wholeWord) {
           // Markup space is top-left; the page's bottom-left.

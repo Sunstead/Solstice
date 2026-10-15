@@ -43,8 +43,9 @@ enum DrawingFile {
     if let picture = await picture(of: markup, in: box) {
       body += "  <image x=\"\(n(box.minX))\" y=\"\(n(box.minY))\" width=\"\(n(box.width))\" height=\"\(n(box.height))\" href=\"data:image/png;base64,\(picture.base64EncodedString())\"/>\n"
     }
-    for stroke in markup.subelements.strokes {
-      body += self.stroke(stroke)
+    let strokes = Array(markup.subelements.strokes)
+    for (stroke, look) in zip(strokes, await InkOutline.looks(of: strokes)) {
+      body += self.stroke(stroke, look)
     }
 
     return """
@@ -60,25 +61,13 @@ enum DrawingFile {
 
   // -- Ink ------------------------------------------------------------
 
-  /// A stroke's visible parts (an eraser can cut it into several), each as a
-  /// filled outline whose width follows the pressure.
-  private static func stroke(_ stroke: PKStroke) -> String {
-    let transform = stroke.transform
-    let scale = sqrt(abs(transform.a * transform.d - transform.b * transform.c))
-    var color = stroke.ink.color
-    var blend = ""
-    if stroke.ink.inkType == .marker {
-      color = color.withAlphaComponent(min(color.cgColor.alpha, 0.5))
-      blend = " style=\"mix-blend-mode:multiply\""
-    }
-    let (fill, alpha) = hex(color)
+  /// A stroke's visible parts, each as a filled outline (`InkOutline`).
+  private static func stroke(_ stroke: PKStroke, _ look: InkOutline.Look) -> String {
     var out = ""
-    for range in stroke.maskedPathRanges {
-      let points = Array(stroke.path.interpolatedPoints(in: range, by: .distance(1.5)))
-      guard !points.isEmpty else { continue }
-      let opacity = alpha * points.map(\.opacity).reduce(0, +) / CGFloat(points.count)
-      let d = outline(points.map { ($0.location.applying(transform), $0.size.width * scale / 2) })
-      out += "  <path d=\"\(d)\" fill=\"\(fill)\" fill-opacity=\"\(n(opacity))\"\(blend)/>\n"
+    for part in InkOutline.parts(of: stroke, look) {
+      let (fill, alpha) = hex(part.color)
+      let blend = part.multiply ? " style=\"mix-blend-mode:multiply\"" : ""
+      out += "  <path d=\"\(outline(part.points))\" fill=\"\(fill)\" fill-opacity=\"\(n(alpha * part.opacity))\"\(blend)/>\n"
     }
     return out
   }
@@ -90,19 +79,7 @@ enum DrawingFile {
       let (p, r) = points[0]
       return "M\(n(p.x - r)) \(n(p.y))a\(n(r)) \(n(r)) 0 1 0 \(n(2 * r)) 0a\(n(r)) \(n(r)) 0 1 0 \(n(-2 * r)) 0Z"
     }
-    var left: [CGPoint] = []
-    var right: [CGPoint] = []
-    for (i, (p, r)) in points.enumerated() {
-      let a = points[max(i - 1, 0)].0
-      let b = points[min(i + 1, points.count - 1)].0
-      var dx = b.x - a.x
-      var dy = b.y - a.y
-      let length = max(hypot(dx, dy), 0.0001)
-      dx /= length
-      dy /= length
-      left.append(CGPoint(x: p.x - dy * r, y: p.y + dx * r))
-      right.append(CGPoint(x: p.x + dy * r, y: p.y - dx * r))
-    }
+    let (left, right) = InkOutline.sides(points)
     let endR = points[points.count - 1].1
     let startR = points[0].1
     var d = "M\(n(left[0].x)) \(n(left[0].y))"

@@ -18,8 +18,19 @@ enum PdfStore {
   struct Opened: Decodable {
     /// Each page's PaperKit data, in base64.
     let pages: [String?]
+    /// Each page's annotations of Apple's Markup (Preview, Files).
+    let apple: [[AppleInk]]?
     /// Written by an old save: rewrite it once.
     let needsRepair: Bool
+  }
+
+  /// An annotation of Apple's Markup: its archive (base64; an
+  /// `AKInkAnnotation2`'s holds the ink as a `PKDrawing`), and its rect in
+  /// page space (x0, y0, x1, y1).
+  struct AppleInk: Decodable {
+    let fingerprint: String
+    let archive: String
+    let rect: [CGFloat]
   }
 
   struct Saved: Decodable {
@@ -43,6 +54,8 @@ enum PdfStore {
   struct Edit: Encodable {
     let page: Int
     let markup: Markup?
+    /// Apple's annotations on the page whose ink is in `markup` now: they go.
+    var absorbed: [String] = []
   }
 
   struct Markup: Encodable {

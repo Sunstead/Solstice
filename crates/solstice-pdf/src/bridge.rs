@@ -28,6 +28,8 @@ struct InsertJson {
 struct EditJson {
     page: usize,
     markup: Option<MarkupJson>,
+    #[serde(default)]
+    absorbed: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -57,7 +59,15 @@ struct Saved {
 #[serde(rename_all = "camelCase")]
 struct Read {
     pages: Vec<Option<String>>,
+    apple: Vec<Vec<AppleInkJson>>,
     needs_repair: bool,
+}
+
+#[derive(Serialize)]
+struct AppleInkJson {
+    fingerprint: String,
+    archive: String,
+    rect: [f32; 4],
 }
 
 fn bytes(base64: &str) -> Result<Vec<u8>> {
@@ -101,6 +111,7 @@ pub fn save(path: &Path, request: &str) -> Result<String> {
             Ok(Edit {
                 page: e.page,
                 markup,
+                absorbed: e.absorbed,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -115,7 +126,8 @@ pub fn save(path: &Path, request: &str) -> Result<String> {
     .map_err(|e| e.to_string())
 }
 
-/// The marks in the PDF at `path`: `{pages: [base64 | null], needsRepair}`.
+/// The marks in the PDF at `path`: `{pages: [base64 | null], apple:
+/// [[{fingerprint, archive, rect}]], needsRepair}`.
 pub fn read(path: &Path) -> Result<String> {
     let pdf = std::fs::read(path).map_err(|e| e.to_string())?;
     let opened = crate::read(&pdf)?;
@@ -124,8 +136,22 @@ pub fn read(path: &Path) -> Result<String> {
         .iter()
         .map(|p| p.as_deref().map(|b| STANDARD.encode(b)))
         .collect();
+    let apple = opened
+        .apple
+        .into_iter()
+        .map(|inks| {
+            inks.into_iter()
+                .map(|ink| AppleInkJson {
+                    fingerprint: ink.fingerprint,
+                    archive: STANDARD.encode(ink.archive),
+                    rect: ink.rect,
+                })
+                .collect()
+        })
+        .collect();
     serde_json::to_string(&Read {
         pages,
+        apple,
         needs_repair: opened.needs_repair,
     })
     .map_err(|e| e.to_string())

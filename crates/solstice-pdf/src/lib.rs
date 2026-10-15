@@ -13,6 +13,12 @@
 //! it had ever removed and a second copy of each it kept (`AAPL:AKExtras`),
 //! and wrote the stamps it was hiding on screen as hidden from every
 //! viewer; files it wrote are repaired on open ([`Opened::needs_repair`]).
+//!
+//! Apple's Markup (Preview, Files) writes ink as a stamp whose appearance
+//! is a picture, blurred at any zoom, with the ink itself in vector in an
+//! archive under `AAPL:AKExtras` ([`AppleInk`]). The iPad takes that ink
+//! into the page's own marks to draw it live, and the first save of the
+//! page drops Apple's annotation ([`Edit::absorbed`]).
 
 pub mod bridge;
 
@@ -33,6 +39,8 @@ const COPY: &[u8] = b"copy";
 const DATA: &[u8] = b"data";
 const LEGACY_PREFIX: &[u8] = b"paperkit:";
 const APPLE_EXTRAS: &[u8] = b"AAPL:AKExtras";
+/// In Apple's extras: the archived annotation (`AKInkAnnotation2` for ink).
+const APPLE_ARCHIVE: &[u8] = b"AAPL:AKAnnotationV2";
 
 /// Annotation flags (PDF 32000, 12.5.3).
 const HIDDEN: i64 = 2;
@@ -69,6 +77,20 @@ pub struct Edit {
     /// Zero-based, counted after this save's inserts.
     pub page: usize,
     pub markup: Option<Markup>,
+    /// [`AppleInk::fingerprint`]s of Apple's annotations on the page whose
+    /// ink is now in `markup`: they go, unless changed since.
+    pub absorbed: Vec<String>,
+}
+
+/// An annotation of Apple's Markup on a page, as written: its archive (an
+/// `AKInkAnnotation2`'s holds a `PKDrawing`), and where it is, in page space.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AppleInk {
+    /// The archive's [`content_hash`]: which annotation, as it was read.
+    pub fingerprint: String,
+    pub archive: Vec<u8>,
+    /// `[x0, y0, x1, y1]`.
+    pub rect: [f32; 4],
 }
 
 /// A page added at `at` (zero-based), copied from a one-page PDF.
@@ -82,6 +104,8 @@ pub struct Insert {
 pub struct Opened {
     /// Each page's PaperKit data, if it has marks of ours.
     pub pages: Vec<Option<Vec<u8>>>,
+    /// Each page's annotations of Apple's Markup.
+    pub apple: Vec<Vec<AppleInk>>,
     /// The file has marks of ours and was written badly (an old save):
     /// [`repair`] it.
     pub needs_repair: bool,
@@ -96,12 +120,21 @@ pub fn read(pdf: &[u8]) -> Result<Opened> {
         return Err(ENCRYPTED.into());
     }
     let mut pages = Vec::new();
+    let mut apple = Vec::new();
     let mut ours = false;
     let mut badly_written = false;
     for page in doc.get_pages().into_values() {
         let mut data = None;
+        let mut inks = Vec::new();
         for (_, annotation) in annotations(&doc, page) {
             let Some(kind) = marker(annotation) else {
+                if let Some(archive) = apple_archive(&doc, annotation) {
+                    inks.push(AppleInk {
+                        fingerprint: content_hash(&archive),
+                        archive,
+                        rect: rect(&doc, annotation),
+                    });
+                }
                 continue;
             };
             ours = true;
@@ -113,10 +146,12 @@ pub fn read(pdf: &[u8]) -> Result<Opened> {
                 || (kind == COPY && flags(annotation) & (HIDDEN | NO_VIEW) != 0);
         }
         pages.push(data);
+        apple.push(inks);
     }
     let needs_repair = ours && (badly_written || has_orphans(&doc));
     Ok(Opened {
         pages,
+        apple,
         needs_repair,
     })
 }
@@ -139,6 +174,17 @@ pub fn apply(pdf: &[u8], inserts: &[Insert], edits: &[Edit]) -> Result<Vec<u8>> 
         let page = *pages
             .get(edit.page)
             .ok_or_else(|| format!("No page {}.", edit.page + 1))?;
+        if !edit.absorbed.is_empty() {
+            let absorbed: Vec<Slot> = annotations(&doc, page)
+                .into_iter()
+                .filter(|(_, a)| {
+                    apple_archive(&doc, a)
+                        .is_some_and(|archive| edit.absorbed.contains(&content_hash(&archive)))
+                })
+                .map(|(slot, _)| slot)
+                .collect();
+            remove_annotations(&mut doc, page, |slot, _| absorbed.contains(&slot));
+        }
         replace_marks(&mut doc, page, edit.markup.as_ref())?;
     }
     prune(&mut doc);
@@ -230,6 +276,30 @@ fn paperkit_data(doc: &Document, annotation: &Dictionary) -> Option<Vec<u8>> {
     }
     let legacy = marker(annotation)?.strip_prefix(LEGACY_PREFIX)?;
     decode_base64(legacy)
+}
+
+/// The archive of an annotation of Apple's Markup, if it is one.
+fn apple_archive(doc: &Document, annotation: &Dictionary) -> Option<Vec<u8>> {
+    let extras = annotation.get(APPLE_EXTRAS).ok()?;
+    let (_, extras) = doc.dereference(extras).ok()?;
+    let archive = extras.as_dict().ok()?.get(APPLE_ARCHIVE).ok()?;
+    let (_, archive) = doc.dereference(archive).ok()?;
+    decode_base64(archive.as_str().ok()?)
+}
+
+/// An annotation's `/Rect`, ordered.
+fn rect(doc: &Document, annotation: &Dictionary) -> [f32; 4] {
+    let numbers: Vec<f32> = annotation
+        .get(b"Rect")
+        .ok()
+        .and_then(|o| doc.dereference(o).ok())
+        .and_then(|(_, o)| o.as_array().ok())
+        .map(|a| a.iter().filter_map(|v| v.as_float().ok()).collect())
+        .unwrap_or_default();
+    match numbers[..] {
+        [a, b, c, d] => [a.min(c), b.min(d), a.max(c), b.max(d)],
+        _ => [0.0; 4],
+    }
 }
 
 fn decode_base64(text: &[u8]) -> Option<Vec<u8>> {

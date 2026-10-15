@@ -1,5 +1,6 @@
 import PDFKit
 import PaperKit
+import PencilKit
 import UIKit
 
 /// What Solstice writes into a PDF page: the page's PaperKit markup, so it
@@ -24,8 +25,13 @@ enum PdfMarkup {
   }
 
   /// The page's marks as `PdfStore` writes them; nil when there are none.
-  static func edit(of markup: PaperMarkup, page: PDFPage, index: Int) async throws -> PdfStore.Edit {
-    guard !markup.subelements.ids.isEmpty else { return PdfStore.Edit(page: index, markup: nil) }
+  /// `absorbed`: Apple's annotations whose ink is in `markup`.
+  static func edit(
+    of markup: PaperMarkup, page: PDFPage, index: Int, absorbed: [String] = []
+  ) async throws -> PdfStore.Edit {
+    guard !markup.subelements.ids.isEmpty else {
+      return PdfStore.Edit(page: index, markup: nil, absorbed: absorbed)
+    }
     let data = try await markup.dataRepresentation()
     let text = await markup.indexableContent ?? ""
     let box = page.bounds(for: .cropBox)
@@ -36,7 +42,43 @@ enum PdfMarkup {
     return PdfStore.Edit(
       page: index,
       markup: PdfStore.Markup(
-        data: data.base64EncodedString(), text: text, art: art?.base64EncodedString(), links: links))
+        data: data.base64EncodedString(), text: text, art: art?.base64EncodedString(), links: links),
+      absorbed: absorbed)
+  }
+
+  // -- Apple's Markup -------------------------------------------------------
+  // Preview and Files write ink as a stamp whose appearance is a picture,
+  // blurred at any zoom; the ink itself, in vector, is a `PKDrawing` in the
+  // annotation's archive. Solstice draws that instead, on the page's canvas.
+
+  /// The ink in an annotation of Apple's Markup, in markup space; nil for
+  /// anything else of Apple's (a text box, a shape), which PDFKit draws.
+  static func appleInk(_ archive: Data, rect: CGRect, box: CGRect) -> PKDrawing? {
+    guard
+      let plist = try? PropertyListSerialization.propertyList(from: archive, format: nil) as? [String: Any],
+      let objects = plist["$objects"] as? [Any],
+      let drawing = objects.lazy.compactMap({ ($0 as? Data).flatMap { try? PKDrawing(data: $0) } }).first,
+      !drawing.strokes.isEmpty
+    else { return nil }
+    // Apple keeps it in the page's space, origin top-left, as markup is; a
+    // drawing the annotation's size is moved onto the annotation, in case
+    // the page's box doesn't start at zero.
+    let target = CGRect(x: rect.minX - box.minX, y: box.maxY - rect.maxY, width: rect.width, height: rect.height)
+    let bounds = drawing.bounds
+    guard abs(bounds.width - target.width) < 4, abs(bounds.height - target.height) < 4 else { return drawing }
+    return drawing.transformed(
+      using: CGAffineTransform(translationX: target.minX - bounds.minX, y: target.minY - bounds.minY))
+  }
+
+  /// Hides Apple's picture of the ink at `rect` on screen: the canvas draws it.
+  static func hideAppleInk(at rect: CGRect, on page: PDFPage) {
+    for annotation in page.annotations
+    where annotation.value(forAnnotationKey: key) == nil
+      && abs(annotation.bounds.minX - rect.minX) < 1 && abs(annotation.bounds.minY - rect.minY) < 1
+      && abs(annotation.bounds.width - rect.width) < 1 && abs(annotation.bounds.height - rect.height) < 1
+    {
+      annotation.shouldDisplay = false
+    }
   }
 
   /// The markup's links, in page space.
@@ -49,8 +91,9 @@ enum PdfMarkup {
     }
   }
 
-  /// The markup as a one-page PDF the size of the page: vector where
-  /// PaperKit draws vectors.
+  /// The markup as a one-page PDF the size of the page. Ink is vector
+  /// (`InkOutline`), sharp at any zoom in every reader: PaperKit draws ink as
+  /// a bitmap. Shapes, text and stickers are as PaperKit draws them, under it.
   private static func render(_ markup: PaperMarkup, size: CGSize) async -> Data? {
     let data = NSMutableData()
     var mediaBox = CGRect(origin: .zero, size: size)
@@ -60,8 +103,17 @@ enum PdfMarkup {
     context.beginPDFPage(nil)
     context.translateBy(x: 0, y: size.height)
     context.scaleBy(x: 1, y: -1)
-    await markup.draw(
-      in: context, frame: mediaBox, options: RenderingOptions(darkUserInterfaceStyle: false))
+    var rest = markup
+    for id in markup.subelements.ids {
+      if case .stroke = id { _ = rest.subelements.removeElement(for: id) }
+    }
+    if !rest.subelements.ids.isEmpty {
+      await rest.draw(in: context, frame: mediaBox, options: RenderingOptions(darkUserInterfaceStyle: false))
+    }
+    let strokes = Array(markup.subelements.strokes)
+    for (stroke, look) in zip(strokes, await InkOutline.looks(of: strokes)) {
+      InkOutline.draw(stroke, look, in: context)
+    }
     context.endPDFPage()
     context.closePDF()
     return data as Data

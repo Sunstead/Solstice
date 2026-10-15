@@ -3,7 +3,7 @@
 //! every annotation, stamps hidden from every viewer), and plain ones.
 
 use lopdf::{dictionary, Dictionary, Document, Object, ObjectId, Stream};
-use solstice_pdf::{apply, read, repair, Edit, Insert, Link, Markup};
+use solstice_pdf::{apply, read, repair, AppleInk, Edit, Insert, Link, Markup};
 
 const KEY: &[u8] = b"SolsticeMarkup";
 
@@ -217,6 +217,7 @@ fn saving_again_and_again_keeps_the_file_the_same_size() {
             &[Edit {
                 page: save % 2,
                 markup: Some(markup(save)),
+                absorbed: vec![],
             }],
         )
         .unwrap();
@@ -246,6 +247,7 @@ fn every_page_stays_visible_after_editing_one() {
         &[Edit {
             page: 2,
             markup: Some(markup(2)),
+            absorbed: vec![],
         }],
     )
     .unwrap();
@@ -328,6 +330,7 @@ fn the_stamp_draws_the_markup() {
         &[Edit {
             page: 0,
             markup: Some(markup(0)),
+            absorbed: vec![],
         }],
     )
     .unwrap();
@@ -378,6 +381,7 @@ fn links_stay_links() {
         &[Edit {
             page: 0,
             markup: Some(with_link),
+            absorbed: vec![],
         }],
     )
     .unwrap();
@@ -404,6 +408,7 @@ fn clearing_a_page_leaves_other_annotations() {
         &[Edit {
             page: 0,
             markup: None,
+            absorbed: vec![],
         }],
     )
     .unwrap();
@@ -461,6 +466,7 @@ fn added_pages_go_where_asked() {
         &[Edit {
             page: 1,
             markup: Some(markup(1)),
+            absorbed: vec![],
         }],
     )
     .unwrap();
@@ -567,10 +573,144 @@ fn saving_a_long_pdf_is_quick() {
         &[Edit {
             page: 150,
             markup: Some(markup(150)),
+            absorbed: vec![],
         }],
     )
     .unwrap();
     println!("{} MB in {:?}", saved.len() / 1_000_000, start.elapsed());
+}
+
+// -- Apple's markup -------------------------------------------------------
+
+/// An annotation as Apple's Markup (Preview, Files) writes it: a stamp whose
+/// appearance is a picture of the ink, and the ink itself, in vector, in an
+/// archived `AKInkAnnotation2` under `AAPL:AKExtras`.
+fn apple_ink(doc: &mut Document, page: ObjectId, archive: &[u8], rect: [i64; 4]) -> ObjectId {
+    use base64::Engine;
+    let picture = doc.add_object(Stream::new(
+        dictionary! { "Type" => "XObject", "Subtype" => "Image", "Width" => 512, "Height" => 512 },
+        vec![0; 64],
+    ));
+    let form = doc.add_object(Stream::new(
+        dictionary! {
+            "Type" => "XObject", "Subtype" => "Form",
+            "BBox" => vec![0.into(), 0.into(), (rect[2] - rect[0]).into(), (rect[3] - rect[1]).into()],
+            "Resources" => dictionary! { "XObject" => dictionary! { "Im0" => picture } },
+        },
+        b"q 256 0 0 256 0 0 cm /Im0 Do Q".to_vec(),
+    ));
+    let extras = dictionary! {
+        "AAPL:AKAnnotationV2" => Object::string_literal(base64::engine::general_purpose::STANDARD.encode(archive)),
+        "PPK" => Object::string_literal("Y3JkdA=="),
+        "PPKType" => Object::string_literal("draw"),
+    };
+    add_annotation(
+        doc,
+        page,
+        dictionary! {
+            "Type" => "Annot", "Subtype" => "Stamp", "F" => 644,
+            "Rect" => rect.iter().map(|&v| Object::Integer(v)).collect::<Vec<_>>(),
+            "T" => Object::string_literal("Mobile User"),
+            "AP" => dictionary! { "N" => form },
+            "AAPL:AKExtras" => extras,
+        },
+    )
+}
+
+#[test]
+fn apples_ink_is_handed_over_to_draw_live() {
+    let mut doc = plain(2);
+    let pages = page_ids(&doc);
+    apple_ink(&mut doc, pages[1], b"bplist00 one", [106, 203, 604, 680]);
+    let opened = read(&bytes(&mut doc)).unwrap();
+    assert!(opened.apple[0].is_empty());
+    assert_eq!(
+        opened.apple[1],
+        vec![AppleInk {
+            fingerprint: solstice_pdf::content_hash(b"bplist00 one"),
+            archive: b"bplist00 one".to_vec(),
+            rect: [106.0, 203.0, 604.0, 680.0],
+        }]
+    );
+    assert!(
+        !opened.needs_repair,
+        "Apple's annotations aren't ours to repair"
+    );
+}
+
+#[test]
+fn apples_ink_taken_into_a_page_leaves_with_its_first_save() {
+    let mut doc = plain(1);
+    let page = page_ids(&doc)[0];
+    apple_ink(&mut doc, page, b"bplist00 taken", [10, 10, 100, 100]);
+    apple_ink(&mut doc, page, b"bplist00 untouched", [200, 200, 300, 300]);
+    let taken = solstice_pdf::content_hash(b"bplist00 taken");
+    let pdf = apply(
+        &bytes(&mut doc),
+        &[],
+        &[Edit {
+            page: 0,
+            markup: Some(markup(0)),
+            absorbed: vec![taken.clone()],
+        }],
+    )
+    .unwrap();
+    let left: Vec<_> = read(&pdf).unwrap().apple[0]
+        .iter()
+        .map(|a| a.archive.clone())
+        .collect();
+    assert_eq!(
+        left,
+        vec![b"bplist00 untouched".to_vec()],
+        "only what was taken in goes"
+    );
+    assert_eq!(
+        ours(&load(&pdf))[0].len(),
+        1,
+        "its strokes are in our stamp now"
+    );
+
+    // All of it erased in Solstice: Apple's annotation goes all the same.
+    let mut doc = plain(1);
+    let page = page_ids(&doc)[0];
+    apple_ink(&mut doc, page, b"bplist00 taken", [10, 10, 100, 100]);
+    let pdf = apply(
+        &bytes(&mut doc),
+        &[],
+        &[Edit {
+            page: 0,
+            markup: None,
+            absorbed: vec![taken],
+        }],
+    )
+    .unwrap();
+    assert!(read(&pdf).unwrap().apple[0].is_empty());
+    assert!(ours(&load(&pdf))[0].is_empty());
+}
+
+#[test]
+fn apples_ink_changed_since_it_was_taken_stays() {
+    // Edited in Preview after the iPad read it: a different fingerprint,
+    // so it's left for the next read rather than lost.
+    let mut doc = plain(1);
+    let page = page_ids(&doc)[0];
+    apple_ink(
+        &mut doc,
+        page,
+        b"bplist00 edited in Preview",
+        [10, 10, 100, 100],
+    );
+    let pdf = apply(
+        &bytes(&mut doc),
+        &[],
+        &[Edit {
+            page: 0,
+            markup: Some(markup(0)),
+            absorbed: vec![solstice_pdf::content_hash(b"bplist00 as first read")],
+        }],
+    )
+    .unwrap();
+    assert_eq!(read(&pdf).unwrap().apple[0].len(), 1);
 }
 
 /// A real file: `SOLSTICE_PDF=<path> cargo test -p solstice-pdf --release
