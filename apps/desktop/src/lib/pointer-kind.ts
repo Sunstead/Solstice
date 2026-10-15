@@ -9,8 +9,8 @@
  * the Pencil and a trackpad their hover, and keeps a finger's tap from
  * leaving a highlight stuck behind it.
  */
-export function trackPointerKind(): void {
-  if (typeof window === 'undefined') return;
+export function trackPointerKind(): () => void {
+  if (typeof window === 'undefined') return () => {};
   const root = document.documentElement;
   const note = (event: PointerEvent) => {
     const kind = event.pointerType === 'touch' || event.pointerType === 'pen' ? event.pointerType : 'mouse';
@@ -18,7 +18,11 @@ export function trackPointerKind(): void {
   };
   // `pointerover` comes before the `:hover` it causes, and the Pencil
   // hovering over the screen sends it without touching.
-  for (const type of ['pointerover', 'pointerdown', 'pointermove'] as const) {
+  const types = ['pointerover', 'pointerdown', 'pointermove'] as const;
+  for (const type of types) {
     window.addEventListener(type, note, { capture: true, passive: true });
   }
+  return () => {
+    for (const type of types) window.removeEventListener(type, note, { capture: true });
+  };
 }
