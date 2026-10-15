@@ -2,20 +2,22 @@ import PencilKit
 import UIKit
 import os
 
-/// Ink as vector: each stroke's visible parts (an eraser can cut it into
-/// several) as outlines whose width follows the pressure, textures aside.
-/// What every other reader sees of Solstice's ink, in a drawing's SVG and a
-/// PDF's stamp, so it stays sharp at any zoom: PaperKit's own rendering of
-/// ink is a bitmap.
+/// Ink as vector, drawn as PencilKit draws it: a round nib swept along each
+/// stroke's visible parts (an eraser can cut it into several), its width
+/// following the pressure, textures aside. What every other reader sees of
+/// Solstice's ink, in a drawing's SVG and a PDF's stamp, so it stays sharp
+/// and smooth at any zoom: PaperKit's own rendering of ink is a bitmap.
 ///
-/// How wide and how opaque a stroke draws isn't in its points (a pen draws
-/// about half its points' size, a pencil wider and grainy, depending on the
-/// ink), so each stroke is drawn once by PencilKit and measured (`Look`).
+/// How wide a stroke draws at each point isn't in its points (a pen draws
+/// about half its points' size, thinner where it's pressed lightly, a pencil
+/// wider and grainy), so each stroke is drawn once by PencilKit and measured
+/// across at every point (`Look`).
 enum InkOutline {
-  /// One visible part of a stroke: its centre line, each point with its
-  /// radius, in the markup's coordinates.
+  /// One visible part of a stroke, as runs of curve each stroked at one
+  /// width (the width steps where the pressure changes), in the markup's
+  /// coordinates.
   struct Part {
-    let points: [(CGPoint, CGFloat)]
+    let runs: [(path: CGPath, width: CGFloat)]
     let color: UIColor
     /// How opaque it draws, all told.
     let opacity: CGFloat
@@ -23,13 +25,21 @@ enum InkOutline {
     let multiply: Bool
   }
 
-  /// A stroke as PencilKit draws it: its width as a share of its points'
-  /// sizes, and its mean opacity (a pencil's grain, a marker's wash).
+  /// A stroke as PencilKit draws it: each part's radius at each of its
+  /// points (`step` apart), and its mean opacity (a pencil's grain, a
+  /// marker's wash). Empty radii: drawn from the points' sizes.
   struct Look: Sendable {
-    var width: CGFloat = 1
+    var radii: [[Float]] = []
     var opacity: CGFloat = 1
   }
 
+  /// Between the points the nib is swept through.
+  private static let step: CGFloat = 1.5
+  /// A pen draws about this share of its points' size, for a stroke that
+  /// couldn't be measured.
+  private static let usualShare: CGFloat = 0.55
+  /// A run's width stays within this share of where it started.
+  private static let widthStep: CGFloat = 0.04
   /// Ink at least this opaque is drawn as it is: overlaps can't be seen.
   private static let opaque: CGFloat = 0.95
 
@@ -40,75 +50,107 @@ enum InkOutline {
   }
 
   static func parts(of stroke: PKStroke, _ look: Look) -> [Part] {
-    let transform = stroke.transform
-    let scale = sqrt(abs(transform.a * transform.d - transform.b * transform.c))
     let color = stroke.ink.color
-    return stroke.maskedPathRanges.compactMap { range in
-      let points = Array(stroke.path.interpolatedPoints(in: range, by: .distance(1.5)))
+    return centres(of: stroke).enumerated().compactMap { index, points in
       guard !points.isEmpty else { return nil }
+      let measured = look.radii[safe: index].flatMap { $0.count == points.count ? $0 : nil }
+      let line = points.enumerated().map { i, p in (p.0, measured.map { CGFloat($0[i]) } ?? p.1 * usualShare) }
       return Part(
-        points: points.map { ($0.location.applying(transform), $0.size.width * scale / 2 * look.width) },
-        color: color.withAlphaComponent(1),
-        opacity: color.cgColor.alpha * look.opacity,
-        multiply: stroke.ink.inkType == .marker)
+        runs: runs(line), color: color.withAlphaComponent(1),
+        opacity: color.cgColor.alpha * look.opacity, multiply: stroke.ink.inkType == .marker)
     }
   }
 
-  /// Fills `stroke`'s outline in `context`, in the markup's coordinates.
+  /// Strokes `stroke` in `context`, in the markup's coordinates.
   static func draw(_ stroke: PKStroke, _ look: Look, in context: CGContext) {
     for part in parts(of: stroke, look) {
       context.saveGState()
       if part.multiply { context.setBlendMode(.multiply) }
-      // Translucent ink (pencil, marker) is drawn whole, then faded: its caps
-      // overlap its body, which would show through each other drawn one by
-      // one. Pen ink is all but opaque, and needs no layer (each is a form
-      // in the PDF).
+      // Translucent ink (pencil, marker) is drawn whole, then faded: its
+      // runs overlap where they meet. Pen ink is all but opaque, and needs
+      // no layer (each is a form in the PDF).
       let layered = part.opacity < opaque
       if layered {
         context.setAlpha(part.opacity)
         context.beginTransparencyLayer(auxiliaryInfo: nil)
       }
-      context.setFillColor(part.color.withAlphaComponent(layered ? 1 : part.opacity).cgColor)
-      fill(part.points, in: context)
+      context.setStrokeColor(part.color.withAlphaComponent(layered ? 1 : part.opacity).cgColor)
+      context.setLineCap(.round)
+      context.setLineJoin(.round)
+      for run in part.runs {
+        context.setLineWidth(run.width)
+        context.addPath(run.path)
+        context.strokePath()
+      }
       if layered { context.endTransparencyLayer() }
       context.restoreGState()
     }
   }
 
-  /// The outline of a line of `(centre, radius)` points: both sides, and a
-  /// round cap at each end.
-  private static func fill(_ points: [(CGPoint, CGFloat)], in context: CGContext) {
-    let cap = { (p: CGPoint, r: CGFloat) in
-      context.fillEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r))
+  // -- Geometry ------------------------------------------------------------
+
+  /// Each visible part's centre line, each point with the radius its size
+  /// gives (before measuring).
+  private static func centres(of stroke: PKStroke) -> [[(CGPoint, CGFloat)]] {
+    let transform = stroke.transform
+    let scale = sqrt(abs(transform.a * transform.d - transform.b * transform.c))
+    return stroke.maskedPathRanges.map { range in
+      stroke.path.interpolatedPoints(in: range, by: .distance(step)).map {
+        ($0.location.applying(transform), $0.size.width * scale / 2)
+      }
     }
-    guard points.count > 1 else { return cap(points[0].0, points[0].1) }
-    let (left, right) = sides(points)
-    context.beginPath()
-    context.move(to: left[0])
-    for p in left.dropFirst() { context.addLine(to: p) }
-    for p in right.reversed() { context.addLine(to: p) }
-    context.closePath()
-    context.fillPath()
-    cap(points[0].0, points[0].1)
-    cap(points[points.count - 1].0, points[points.count - 1].1)
   }
 
-  /// The points either side of the centre line, a radius out.
-  static func sides(_ points: [(CGPoint, CGFloat)]) -> (left: [CGPoint], right: [CGPoint]) {
-    var left: [CGPoint] = []
-    var right: [CGPoint] = []
-    for (i, (p, r)) in points.enumerated() {
-      let a = points[max(i - 1, 0)].0
-      let b = points[min(i + 1, points.count - 1)].0
-      var dx = b.x - a.x
-      var dy = b.y - a.y
-      let length = max(hypot(dx, dy), 0.0001)
-      dx /= length
-      dy /= length
-      left.append(CGPoint(x: p.x - dy * r, y: p.y + dx * r))
-      right.append(CGPoint(x: p.x + dy * r, y: p.y - dx * r))
+  /// The line cut into runs whose width stays within `widthStep`, each a
+  /// smooth curve through its points; consecutive runs share a point, and
+  /// their round caps meet there.
+  private static func runs(_ line: [(CGPoint, CGFloat)]) -> [(path: CGPath, width: CGFloat)] {
+    guard line.count > 1 else {
+      // A dot: a round cap on a line of no length.
+      let (p, r) = line[0]
+      let dot = CGMutablePath()
+      dot.move(to: p)
+      dot.addLine(to: p)
+      return [(dot, 2 * r)]
     }
-    return (left, right)
+    var out: [(path: CGPath, width: CGFloat)] = []
+    var start = 0
+    while start < line.count - 1 {
+      var end = start + 1
+      let r = line[start].1
+      while end < line.count - 1, abs(line[end + 1].1 - r) <= max(r * widthStep, 0.01) { end += 1 }
+      let run = line[start...end]
+      let mean = run.map(\.1).reduce(0, +) / CGFloat(run.count)
+      out.append((curve(through: run.map(\.0)), 2 * mean))
+      start = end
+    }
+    return out
+  }
+
+  /// A smooth curve through every point: each point's tangent from its
+  /// neighbours, scaled by the distance to the next, so it neither kinks
+  /// nor overshoots where points bunch up.
+  static func curve(through points: [CGPoint]) -> CGPath {
+    let path = CGMutablePath()
+    path.move(to: points[0])
+    func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { max(hypot(b.x - a.x, b.y - a.y), 0.0001) }
+    func tangent(_ i: Int) -> CGPoint {
+      let a = points[max(i - 1, 0)]
+      let b = points[min(i + 1, points.count - 1)]
+      let length = distance(a, points[i]) + distance(points[i], b)
+      return CGPoint(x: (b.x - a.x) / length, y: (b.y - a.y) / length)
+    }
+    for i in 0..<(points.count - 1) {
+      let p = points[i]
+      let q = points[i + 1]
+      let h = distance(p, q) / 3
+      let t0 = tangent(i)
+      let t1 = tangent(i + 1)
+      path.addCurve(
+        to: q, control1: CGPoint(x: p.x + t0.x * h, y: p.y + t0.y * h),
+        control2: CGPoint(x: q.x - t1.x * h, y: q.y - t1.y * h))
+    }
+    return path
   }
 
   // -- Measuring -----------------------------------------------------------
@@ -121,51 +163,46 @@ enum InkOutline {
     let ink: String
     let width: CGFloat
     let color: UIColor
+    let transform: [CGFloat]
+    let parts: Int
   }
 
-  private static let measured = OSAllocatedUnfairLock(initialState: [Key: Look]())
-  /// Enough for a long notebook's ink; cleared, not trimmed, past it.
-  private static let remembered = 50_000
+  private static let measured = OSAllocatedUnfairLock(initialState: (looks: [Key: Look](), points: 0))
+  /// Radii kept (4 bytes each): a long notebook's worth. Past it, the cache
+  /// starts again.
+  private static let remembered = 4_000_000
 
   private static func look(_ stroke: PKStroke) -> Look {
+    let t = stroke.transform
     let key = Key(
       created: stroke.path.creationDate, count: stroke.path.count, seed: stroke.randomSeed,
-      ink: stroke.ink.inkType.rawValue, width: stroke.path.first?.size.width ?? 0, color: stroke.ink.color)
-    if let known = measured.withLock({ $0[key] }) { return known }
+      ink: stroke.ink.inkType.rawValue, width: stroke.path.first?.size.width ?? 0, color: stroke.ink.color,
+      transform: [t.a, t.b, t.c, t.d, t.tx, t.ty], parts: stroke.maskedPathRanges.count)
+    if let known = measured.withLock({ $0.looks[key] }) { return known }
     let look = measure(stroke) ?? Look()
+    let size = look.radii.reduce(0) { $0 + $1.count }
     measured.withLock {
-      if $0.count >= remembered { $0.removeAll() }
-      $0[key] = look
+      if $0.points + size > remembered { $0 = ([:], 0) }
+      $0.looks[key] = look
+      $0.points += size
     }
     return look
   }
 
-  /// Draws `stroke` alone with PencilKit and compares what it covers with
-  /// the outline its points make. A pixel at least half covered counts, so
-  /// antialiased edges balance out.
+  /// Draws `stroke` alone with PencilKit and reads, at each point, how far
+  /// the ink reaches either side of the centre line. A pixel at least half
+  /// covered counts, so antialiased edges balance out.
   private static func measure(_ stroke: PKStroke) -> Look? {
-    let points = Array(stroke.path.interpolatedPoints(by: .distance(1.5)))
-    guard points.count > 1 else { return nil }
-    let t = stroke.transform
-    let scale = sqrt(abs(t.a * t.d - t.b * t.c))
-    let centre = points.map { ($0.location.applying(t), $0.size.width * scale / 2) }
-    // The outline's area at width share f: f * body + f² * caps.
-    var body: CGFloat = 0
-    for i in 1..<centre.count {
-      let (a, ra) = centre[i - 1]
-      let (b, rb) = centre[i]
-      body += (ra + rb) * hypot(b.x - a.x, b.y - a.y)
-    }
-    let caps = CGFloat.pi * (pow(centre[0].1, 2) + pow(centre[centre.count - 1].1, 2)) / 2
-
     // Rebuilt from its parts: PKDrawing(strokes:) throws (an Objective-C
     // exception, so a crash) on the strokes PaperKit hands out.
     let fresh = PKStroke(ink: stroke.ink, path: stroke.path, transform: stroke.transform, mask: stroke.mask)
     let bounds = fresh.renderBounds
-    guard bounds.width > 0, bounds.height > 0 else { return nil }
-    let typical = centre.map(\.1).sorted()[centre.count / 2] * 2
-    // About 8 pixels across the line, within a couple of megapixels.
-    let pixels = min(max(2, 8 / max(typical, 0.1)), 12, sqrt(2_000_000 / (bounds.width * bounds.height)))
+    let lines = centres(of: stroke)
+    let sizes = lines.flatMap { $0.map(\.1) }.sorted()
+    guard bounds.width > 0, bounds.height > 0, !sizes.isEmpty else { return nil }
+    // About 10 pixels across the line, within a couple of megapixels.
+    let typical = sizes[sizes.count / 2] * 2 * usualShare
+    let pixels = min(max(2, 10 / max(typical, 0.1)), 16, sqrt(2_000_000 / (bounds.width * bounds.height)))
     guard let image = PKDrawing(strokes: [fresh]).image(from: bounds, scale: pixels).cgImage else { return nil }
     let width = image.width
     let height = image.height
@@ -180,16 +217,61 @@ enum InkOutline {
       return true
     }
     guard drawn else { return nil }
+
+    func inked(_ p: CGPoint) -> Bool {
+      let column = Int((p.x - bounds.minX) * pixels)
+      let row = Int((p.y - bounds.minY) * pixels)
+      return column >= 0 && row >= 0 && column < width && row < height && alpha[row * width + column] >= 128
+    }
+    var radii: [[Float]] = []
+    for line in lines {
+      var found: [CGFloat] = []
+      for (i, (p, size)) in line.enumerated() {
+        let a = line[max(i - 1, 0)].0
+        let b = line[min(i + 1, line.count - 1)].0
+        let length = hypot(b.x - a.x, b.y - a.y)
+        // Across the line; a dot has no direction, so every way round.
+        let across =
+          length > 0.001
+          ? [CGPoint(x: -(b.y - a.y) / length, y: (b.x - a.x) / length)]
+          : [CGPoint(x: 1, y: 0), CGPoint(x: 0, y: 1), CGPoint(x: 0.7071, y: 0.7071), CGPoint(x: 0.7071, y: -0.7071)]
+        let limit = size * 3 + 2
+        func reach(_ direction: CGPoint) -> CGFloat {
+          var d: CGFloat = 0
+          while d < limit, inked(CGPoint(x: p.x + direction.x * d, y: p.y + direction.y * d)) {
+            d += 0.5 / pixels
+          }
+          return d
+        }
+        // The nearer side: across a corner the far side runs into the
+        // stroke's other arm. Ink to the limit is a misreading.
+        let nearest = across.flatMap { [reach($0), reach(CGPoint(x: -$0.x, y: -$0.y))] }.min() ?? 0
+        found.append(inked(p) && nearest < limit ? nearest : 0)
+      }
+      radii.append(cleaned(found, sizes: line.map(\.1)).map(Float.init))
+    }
+
     var covered = 0
     var sum = 0
     for a in alpha {
       sum += Int(a)
       if a >= 128 { covered += 1 }
     }
-    guard covered > 0, body + caps > 0 else { return nil }
-    let area = CGFloat(covered) / (pixels * pixels)
-    let share =
-      caps > 0 ? (-body + sqrt(body * body + 4 * caps * area)) / (2 * caps) : area / body
-    return Look(width: share, opacity: min(1, CGFloat(sum) / CGFloat(covered) / 255))
+    let opacity = covered > 0 ? min(1, CGFloat(sum) / CGFloat(covered) / 255) : 1
+    return Look(radii: radii, opacity: opacity)
+  }
+
+  /// Misreadings out (a loop crossing itself reads too wide, a gap in a
+  /// pencil's grain too narrow), then a little smoothing.
+  private static func cleaned(_ radii: [CGFloat], sizes: [CGFloat]) -> [CGFloat] {
+    let good = radii.filter { $0 > 0 }.sorted()
+    let median = good.isEmpty ? 0 : good[good.count / 2]
+    let fixed = radii.enumerated().map { i, r -> CGFloat in
+      if median == 0 { return sizes[i] * usualShare }
+      return r > 0 && r < median * 1.8 ? r : median
+    }
+    return fixed.indices.map { i in
+      (fixed[max(i - 1, 0)] + fixed[i] + fixed[min(i + 1, fixed.count - 1)]) / 3
+    }
   }
 }

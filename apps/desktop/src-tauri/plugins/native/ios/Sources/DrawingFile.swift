@@ -61,32 +61,38 @@ enum DrawingFile {
 
   // -- Ink ------------------------------------------------------------
 
-  /// A stroke's visible parts, each as a filled outline (`InkOutline`).
+  /// A stroke's visible parts as `InkOutline` sweeps them: runs of curve,
+  /// each stroked at its width, faded together.
   private static func stroke(_ stroke: PKStroke, _ look: InkOutline.Look) -> String {
     var out = ""
     for part in InkOutline.parts(of: stroke, look) {
-      let (fill, alpha) = hex(part.color)
+      let (color, _) = hex(part.color)
+      let opacity = part.opacity < 0.995 ? " opacity=\"\(n(part.opacity))\"" : ""
       let blend = part.multiply ? " style=\"mix-blend-mode:multiply\"" : ""
-      out += "  <path d=\"\(outline(part.points))\" fill=\"\(fill)\" fill-opacity=\"\(n(alpha * part.opacity))\"\(blend)/>\n"
+      out += "  <g fill=\"none\" stroke=\"\(color)\" stroke-linecap=\"round\" stroke-linejoin=\"round\"\(opacity)\(blend)>\n"
+      for run in part.runs {
+        out += "    <path d=\"\(svg(run.path))\" stroke-width=\"\(n(run.width))\"/>\n"
+      }
+      out += "  </g>\n"
     }
     return out
   }
 
-  /// The outline of a line of `(centre, radius)` points: one side, a round
-  /// end, the other side back, a round start.
-  private static func outline(_ points: [(CGPoint, CGFloat)]) -> String {
-    if points.count == 1 {
-      let (p, r) = points[0]
-      return "M\(n(p.x - r)) \(n(p.y))a\(n(r)) \(n(r)) 0 1 0 \(n(2 * r)) 0a\(n(r)) \(n(r)) 0 1 0 \(n(-2 * r)) 0Z"
+  /// A path as SVG path data.
+  private static func svg(_ path: CGPath) -> String {
+    var d = ""
+    path.applyWithBlock { element in
+      let e = element.pointee
+      let p = { (i: Int) in "\(n(e.points[i].x)) \(n(e.points[i].y))" }
+      switch e.type {
+      case .moveToPoint: d += "M\(p(0))"
+      case .addLineToPoint: d += "L\(p(0))"
+      case .addQuadCurveToPoint: d += "Q\(p(0)) \(p(1))"
+      case .addCurveToPoint: d += "C\(p(0)) \(p(1)) \(p(2))"
+      case .closeSubpath: d += "Z"
+      @unknown default: break
+      }
     }
-    let (left, right) = InkOutline.sides(points)
-    let endR = points[points.count - 1].1
-    let startR = points[0].1
-    var d = "M\(n(left[0].x)) \(n(left[0].y))"
-    for p in left.dropFirst() { d += "L\(n(p.x)) \(n(p.y))" }
-    d += "A\(n(endR)) \(n(endR)) 0 0 0 \(n(right[right.count - 1].x)) \(n(right[right.count - 1].y))"
-    for p in right.reversed().dropFirst() { d += "L\(n(p.x)) \(n(p.y))" }
-    d += "A\(n(startR)) \(n(startR)) 0 0 0 \(n(left[0].x)) \(n(left[0].y))Z"
     return d
   }
 
