@@ -5,7 +5,9 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import "@/styles/app.css";
 import { trackPointerKind } from "@/lib/pointer-kind";
-import { touchFirst } from "@/lib/backend/platform";
+import { can, touchFirst } from "@/lib/backend/platform";
+import { getCurrentWindow } from "@/lib/backend/window";
+import { dragThroughOverlays } from "@/lib/window-drag";
 
 // Safari (the web app on an iPad) zooms the page on a pinch whatever the
 // viewport says. Boards and the image viewer pinch with pointer events,
@@ -18,6 +20,9 @@ trackPointerKind();
 // Touch first: the controls a finger hits most grow (sunstead-ui's `touch:`
 // variant). Decided once, so a trackpad coming and going moves nothing.
 if (touchFirst) document.documentElement.dataset.touch = "";
+
+// The title bar still drags the window while a dialog's overlay covers it.
+if (can.windowChrome) dragThroughOverlays(getCurrentWindow);
 
 const router = createRouter({ routeTree });
 
