@@ -107,7 +107,15 @@ export function createEditorFeatures({
 
     frontmatterView,
 
-    $view(imageWithSize.node, () => nodeViewFactory({ component: ImageView })),
+    // A resize handle's press is the image's own: ProseMirror would select or
+    // drag the node with it.
+    $view(imageWithSize.node, () =>
+      nodeViewFactory({
+        component: ImageView,
+        stopEvent: (event) =>
+          Boolean((event.target as HTMLElement | null)?.closest?.('.solstice-image-handle')),
+      }),
+    ),
 
     // The view is built inside the factory so it closes over the editor's own
     // ctx, which transclusion needs for the parser and the schema.

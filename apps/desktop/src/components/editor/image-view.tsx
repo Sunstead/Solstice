@@ -7,17 +7,12 @@ import { PdfPreviewCard } from '@/components/viewer/pdf-preview-card';
 import { useLayout } from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { embedKind } from '@/lib/embed/kind';
+import { resizeGesture } from '@/lib/image/resize-gesture';
 import { resolveAsset } from '@/lib/image/resolve';
 import { getFileNameFromPath } from '@/lib/path-utils';
 import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { cn } from '@/lib/utils';
 import { useEditorNotePath } from './editor-file-context';
-
-/** Narrow enough to still grab the handles, wide enough to stay an image. */
-const MIN_WIDTH = 48;
-
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
 
 /**
  * Node view for images.
@@ -57,22 +52,17 @@ export const ImageView: React.FC = () => {
     const handle = event.currentTarget;
     handle.setPointerCapture(event.pointerId);
 
-    const startX = event.clientX;
-    const startWidth = image.getBoundingClientRect().width;
-    const maxWidth =
-      image.parentElement?.getBoundingClientRect().width ?? Number.MAX_SAFE_INTEGER;
-    let latest = startWidth;
+    const gesture = resizeGesture({
+      startX: event.clientX,
+      startWidth: image.getBoundingClientRect().width,
+      maxWidth:
+        image.parentElement?.getBoundingClientRect().width ?? Number.MAX_SAFE_INTEGER,
+      direction,
+    });
 
-    const move = (moveEvent: PointerEvent) => {
-      latest = clamp(
-        startWidth + (moveEvent.clientX - startX) * direction,
-        MIN_WIDTH,
-        maxWidth,
-      );
-      setDragWidth(latest);
-    };
+    const move = (moveEvent: PointerEvent) => setDragWidth(gesture.move(moveEvent.clientX));
 
-    const finish = () => {
+    const finish = (endEvent: PointerEvent) => {
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', finish);
       handle.removeEventListener('pointercancel', finish);
@@ -80,7 +70,8 @@ export const ImageView: React.FC = () => {
 
       // Height is cleared rather than kept: width alone drives the aspect
       // ratio, and a stale height would stretch the image.
-      setAttrs({ width: Math.round(latest), height: null });
+      const width = gesture.end(endEvent.type === 'pointercancel');
+      if (width !== null) setAttrs({ width, height: null });
     };
 
     handle.addEventListener('pointermove', move);
