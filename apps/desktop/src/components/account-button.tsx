@@ -26,9 +26,9 @@ export function AccountButton() {
   return (
     <DropdownMenu onOpenChange={(open) => open && refresh()}>
       <DropdownMenuTrigger
-        render={<Button variant='ghost' size='icon' className='size-10' />}
+        render={<Button variant='ghost' size='icon' className='size-10 touch:size-12' />}
       >
-        <UserAvatar username={username} attention={attention} className='size-7' />
+        <UserAvatar username={username} attention={attention} className='size-7 touch:size-9' />
         <span className='sr-only'>{username ? `Account: ${username}` : 'Account'}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent side='right' align='end' sideOffset={8} className='min-w-56'>

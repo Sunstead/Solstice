@@ -36,6 +36,7 @@ import { useSourceModeCommand } from '@/hooks/use-source-mode';
 import { KeyboardBar } from '@/components/mobile/keyboard-bar';
 import { SlashMenu } from '@/components/editor/slash-menu';
 import { can } from '@/lib/backend/platform';
+import { railStyle } from '@/lib/sidebar-rail';
 import { usePhoneNav } from '@/lib/stores/phone-nav';
 import { startBackgroundChecks, useUpdates } from '@/lib/stores/updates';
 import { UpdateDialog } from '@/components/updates/update-dialog';
@@ -171,6 +172,7 @@ export const Route = createRootRoute({
             onOpenChange={(open) => setSidebarCollapsed(!open)}
             defaultWidth={`${sidebarWidth}px`}
             onWidthChange={setSidebarWidth}
+            style={railStyle}
             className='flex-col flex-1 min-h-0'
           >
             <AppShell>
