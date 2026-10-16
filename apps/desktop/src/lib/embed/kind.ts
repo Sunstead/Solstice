@@ -59,3 +59,12 @@ export function isDrawing(path: string): boolean {
 export function isVectorImage(path: string): boolean {
   return getFileExtension(path).toLowerCase() === 'svg';
 }
+
+/**
+ * The image viewer's ground under `path`: a drawing is white paper in every
+ * direction, as the iPad draws it; anything else takes the
+ * `viewer.imageBackground` setting.
+ */
+export function canvasGround(path: string): 'paper' | undefined {
+  return isDrawing(path) ? 'paper' : undefined;
+}
