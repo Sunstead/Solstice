@@ -56,6 +56,7 @@ export function PushPane({
   };
 
   const finish = (to: 'open' | 'closed') => {
+    heading.current = to;
     const el = pane.current;
     if (!el) return;
     el.style.transform = to === 'open' ? '' : 'translateX(100%)';
@@ -113,7 +114,9 @@ export function PushPane({
   // Opening mounts it; closing unmounts it once it's slid away (`finish`).
   if (open && !present) setPresent(true);
   const mounted = present || keepMounted;
-  const first = useRef(true);
+  // Only a pane there from the first render starts in place; one mounted by
+  // opening slides in.
+  const first = useRef(mounted);
   useLayoutEffect(() => {
     if (!mounted) return;
     if (first.current) {

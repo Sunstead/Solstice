@@ -1,4 +1,5 @@
 import PencilKit
+import SurfaceCore
 import UIKit
 import os
 
@@ -37,9 +38,7 @@ enum InkOutline {
   private static let step: CGFloat = 1.5
   /// A pen draws about this share of its points' size, for a stroke that
   /// couldn't be measured.
-  private static let usualShare: CGFloat = 0.55
-  /// A run's width stays within this share of where it started.
-  private static let widthStep: CGFloat = 0.04
+  private static let usualShare = InkLine.usualShare
   /// Ink at least this opaque is drawn as it is: overlaps can't be seen.
   private static let opaque: CGFloat = 0.95
 
@@ -54,9 +53,11 @@ enum InkOutline {
     return centres(of: stroke).enumerated().compactMap { index, points in
       guard !points.isEmpty else { return nil }
       let measured = look.radii[safe: index].flatMap { $0.count == points.count ? $0 : nil }
-      let line = points.enumerated().map { i, p in (p.0, measured.map { CGFloat($0[i]) } ?? p.1 * usualShare) }
+      let line = points.enumerated().map { i, p in
+        (point: p.0, radius: measured.map { CGFloat($0[i]) } ?? p.1 * usualShare)
+      }
       return Part(
-        runs: runs(line), color: color.withAlphaComponent(1),
+        runs: InkLine.runs(line).map { (path(of: $0), $0.width) }, color: color.withAlphaComponent(1),
         opacity: color.cgColor.alpha * look.opacity, multiply: stroke.ink.inkType == .marker)
     }
   }
@@ -101,54 +102,21 @@ enum InkOutline {
     }
   }
 
-  /// The line cut into runs whose width stays within `widthStep`, each a
-  /// smooth curve through its points; consecutive runs share a point, and
-  /// their round caps meet there.
-  private static func runs(_ line: [(CGPoint, CGFloat)]) -> [(path: CGPath, width: CGFloat)] {
-    guard line.count > 1 else {
-      // A dot: a round cap on a line of no length.
-      let (p, r) = line[0]
-      let dot = CGMutablePath()
-      dot.move(to: p)
-      dot.addLine(to: p)
-      return [(dot, 2 * r)]
-    }
-    var out: [(path: CGPath, width: CGFloat)] = []
-    var start = 0
-    while start < line.count - 1 {
-      var end = start + 1
-      let r = line[start].1
-      while end < line.count - 1, abs(line[end + 1].1 - r) <= max(r * widthStep, 0.01) { end += 1 }
-      let run = line[start...end]
-      let mean = run.map(\.1).reduce(0, +) / CGFloat(run.count)
-      out.append((curve(through: run.map(\.0)), 2 * mean))
-      start = end
-    }
-    return out
+  /// Across the line at point `i`, from its neighbours; zero at a dot.
+  private static func normal(_ points: [CGPoint], _ i: Int) -> CGPoint {
+    let a = points[max(i - 1, 0)]
+    let b = points[min(i + 1, points.count - 1)]
+    let length = hypot(b.x - a.x, b.y - a.y)
+    return length > 0.001 ? CGPoint(x: -(b.y - a.y) / length, y: (b.x - a.x) / length) : .zero
   }
 
-  /// A smooth curve through every point: each point's tangent from its
-  /// neighbours, scaled by the distance to the next, so it neither kinks
-  /// nor overshoots where points bunch up.
-  static func curve(through points: [CGPoint]) -> CGPath {
+  /// A run as a path; a dot is a round cap on a line of no length.
+  private static func path(of run: InkLine.Run) -> CGPath {
     let path = CGMutablePath()
-    path.move(to: points[0])
-    func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { max(hypot(b.x - a.x, b.y - a.y), 0.0001) }
-    func tangent(_ i: Int) -> CGPoint {
-      let a = points[max(i - 1, 0)]
-      let b = points[min(i + 1, points.count - 1)]
-      let length = distance(a, points[i]) + distance(points[i], b)
-      return CGPoint(x: (b.x - a.x) / length, y: (b.y - a.y) / length)
-    }
-    for i in 0..<(points.count - 1) {
-      let p = points[i]
-      let q = points[i + 1]
-      let h = distance(p, q) / 3
-      let t0 = tangent(i)
-      let t1 = tangent(i + 1)
-      path.addCurve(
-        to: q, control1: CGPoint(x: p.x + t0.x * h, y: p.y + t0.y * h),
-        control2: CGPoint(x: q.x - t1.x * h, y: q.y - t1.y * h))
+    path.move(to: run.start)
+    if run.segments.isEmpty { path.addLine(to: run.start) }
+    for segment in run.segments {
+      path.addCurve(to: segment.to, control1: segment.control1, control2: segment.control2)
     }
     return path
   }
@@ -190,13 +158,16 @@ enum InkOutline {
   }
 
   /// Draws `stroke` alone with PencilKit and reads, at each point, how far
-  /// the ink reaches either side of the centre line. A pixel at least half
-  /// covered counts, so antialiased edges balance out.
+  /// the ink reaches either side of the centre line (`InkLine.read`): to
+  /// where it's half covered, read between pixels, so a thin line isn't a
+  /// pixel short.
   private static func measure(_ stroke: PKStroke) -> Look? {
     // Rebuilt from its parts: PKDrawing(strokes:) throws (an Objective-C
     // exception, so a crash) on the strokes PaperKit hands out.
     let fresh = PKStroke(ink: stroke.ink, path: stroke.path, transform: stroke.transform, mask: stroke.mask)
-    let bounds = fresh.renderBounds
+    // In whole points: from a fractional origin, PencilKit's picture sits a
+    // little off where it's read.
+    let bounds = fresh.renderBounds.insetBy(dx: -1, dy: -1).integral
     let lines = centres(of: stroke)
     let sizes = lines.flatMap { $0.map(\.1) }.sorted()
     guard bounds.width > 0, bounds.height > 0, !sizes.isEmpty else { return nil }
@@ -218,37 +189,59 @@ enum InkOutline {
     }
     guard drawn else { return nil }
 
-    func inked(_ p: CGPoint) -> Bool {
-      let column = Int((p.x - bounds.minX) * pixels)
-      let row = Int((p.y - bounds.minY) * pixels)
-      return column >= 0 && row >= 0 && column < width && row < height && alpha[row * width + column] >= 128
+    // The picture's own size: `pixels` times the bounds, rounded.
+    let across = CGFloat(width) / bounds.width
+    let down = CGFloat(height) / bounds.height
+    /// How covered `p` is, 0 to 255, from the four pixels around it.
+    func cover(_ p: CGPoint) -> CGFloat {
+      let x = (p.x - bounds.minX) * across - 0.5
+      let y = (p.y - bounds.minY) * down - 0.5
+      let column = Int(x.rounded(.down))
+      let row = Int(y.rounded(.down))
+      let fx = x - CGFloat(column)
+      let fy = y - CGFloat(row)
+      func at(_ c: Int, _ r: Int) -> CGFloat {
+        c >= 0 && r >= 0 && c < width && r < height ? CGFloat(alpha[r * width + c]) : 0
+      }
+      let top = at(column, row) * (1 - fx) + at(column + 1, row) * fx
+      let bottom = at(column, row + 1) * (1 - fx) + at(column + 1, row + 1) * fx
+      return top * (1 - fy) + bottom * fy
     }
+    func inked(_ p: CGPoint) -> Bool { cover(p) >= 128 }
     var radii: [[Float]] = []
     for line in lines {
-      var found: [CGFloat] = []
-      for (i, (p, size)) in line.enumerated() {
-        let a = line[max(i - 1, 0)].0
-        let b = line[min(i + 1, line.count - 1)].0
-        let length = hypot(b.x - a.x, b.y - a.y)
-        // Across the line; a dot has no direction, so every way round.
-        let across =
-          length > 0.001
-          ? [CGPoint(x: -(b.y - a.y) / length, y: (b.x - a.x) / length)]
-          : [CGPoint(x: 1, y: 0), CGPoint(x: 0, y: 1), CGPoint(x: 0.7071, y: 0.7071), CGPoint(x: 0.7071, y: -0.7071)]
+      let centre = line.map(\.0)
+      let sides = line.indices.map { i -> (CGFloat, CGFloat) in
+        let (p, size) = line[i]
         let limit = size * 3 + 2
         func reach(_ direction: CGPoint) -> CGFloat {
+          let step = 0.25 / pixels
           var d: CGFloat = 0
-          while d < limit, inked(CGPoint(x: p.x + direction.x * d, y: p.y + direction.y * d)) {
-            d += 0.5 / pixels
+          var last = cover(p)
+          while d < limit {
+            let next = cover(CGPoint(x: p.x + direction.x * (d + step), y: p.y + direction.y * (d + step)))
+            // Half covered somewhere in this step: where, along it.
+            if next < 128 { return d + step * (last - 128) / max(last - next, 1) }
+            last = next
+            d += step
           }
-          return d
+          return limit
         }
-        // The nearer side: across a corner the far side runs into the
-        // stroke's other arm. Ink to the limit is a misreading.
-        let nearest = across.flatMap { [reach($0), reach(CGPoint(x: -$0.x, y: -$0.y))] }.min() ?? 0
-        found.append(inked(p) && nearest < limit ? nearest : 0)
+        guard inked(p) else { return (0, 0) }
+        let side = normal(centre, i)
+        let read: (CGFloat, CGFloat)
+        if side == .zero {
+          // A dot has no direction: its narrowest way round, centred.
+          let ways = [CGPoint(x: 1, y: 0), CGPoint(x: 0, y: 1), CGPoint(x: 0.7071, y: 0.7071), CGPoint(x: 0.7071, y: -0.7071)]
+          let half = ways.map { (reach($0) + reach(CGPoint(x: -$0.x, y: -$0.y))) / 2 }.min() ?? 0
+          read = (half, half)
+        } else {
+          read = (reach(side), reach(CGPoint(x: -side.x, y: -side.y)))
+        }
+        // Ink to the limit is a misreading.
+        return read.0 < limit && read.1 < limit ? read : (0, 0)
       }
-      radii.append(cleaned(found, sizes: line.map(\.1)).map(Float.init))
+      radii.append(InkLine.read(sides, sizes: line.map(\.1)).map(Float.init))
     }
 
     var covered = 0
@@ -259,19 +252,5 @@ enum InkOutline {
     }
     let opacity = covered > 0 ? min(1, CGFloat(sum) / CGFloat(covered) / 255) : 1
     return Look(radii: radii, opacity: opacity)
-  }
-
-  /// Misreadings out (a loop crossing itself reads too wide, a gap in a
-  /// pencil's grain too narrow), then a little smoothing.
-  private static func cleaned(_ radii: [CGFloat], sizes: [CGFloat]) -> [CGFloat] {
-    let good = radii.filter { $0 > 0 }.sorted()
-    let median = good.isEmpty ? 0 : good[good.count / 2]
-    let fixed = radii.enumerated().map { i, r -> CGFloat in
-      if median == 0 { return sizes[i] * usualShare }
-      return r > 0 && r < median * 1.8 ? r : median
-    }
-    return fixed.indices.map { i in
-      (fixed[max(i - 1, 0)] + fixed[i] + fixed[min(i + 1, fixed.count - 1)]) / 3
-    }
   }
 }

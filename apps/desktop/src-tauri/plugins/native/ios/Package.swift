@@ -16,6 +16,7 @@ let package = Package(
   dependencies: [
     .package(name: "Tauri", path: "../.tauri/tauri-api"),
     .package(path: "../ScratchOut"),
+    .package(path: "../SurfaceCore"),
   ],
   targets: [
     .target(
@@ -23,7 +24,13 @@ let package = Package(
       dependencies: [
         .byName(name: "Tauri"),
         .product(name: "ScratchOut", package: "ScratchOut"),
+        .product(name: "SurfaceCore", package: "SurfaceCore"),
       ],
-      path: "Sources")
+      path: "Sources"),
+    // On the iPad simulator only (PencilKit): `xcodebuild test` (see the test).
+    .testTarget(
+      name: "InkOutlineTests",
+      dependencies: ["tauri-plugin-solstice-native"],
+      path: "Tests/InkOutlineTests"),
   ]
 )

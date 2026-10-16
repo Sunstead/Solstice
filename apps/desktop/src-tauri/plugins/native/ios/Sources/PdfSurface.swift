@@ -1,6 +1,7 @@
 import PDFKit
 import PaperKit
 import PencilKit
+import SurfaceCore
 import Tauri
 import UIKit
 import os
@@ -45,9 +46,9 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   private var repairing = false
   /// The wait before a save; a new mark restarts it.
   private var pendingSave: Task<Void, Never>?
-  /// The save being written. Never cancelled: marks made meanwhile are
-  /// saved after it.
-  private var saving: Task<Void, Never>?
+  /// Saves, one at a time. Never cancelled: marks made meanwhile are saved
+  /// after the one under way.
+  private let saves = Saves()
   /// What we last wrote, so our own save (or a copy of it written back by
   /// sync) isn't taken for a change.
   private var written: String?
@@ -157,7 +158,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   /// Marks in hand: unsaved, being saved, or being drawn.
   private var busy: Bool {
-    !unsaved.isEmpty || !inserts.isEmpty || repairing || pendingSave != nil || saving != nil
+    !unsaved.isEmpty || !inserts.isEmpty || repairing || pendingSave != nil || saves.running
       || drewAt.map { -$0.timeIntervalSinceNow < 5 } ?? false
   }
 
@@ -167,7 +168,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     // changed).
     if busy {
       reloadWanted = true
-      if saving == nil, pendingSave == nil {
+      if !saves.running, pendingSave == nil {
         // Only a stroke under way: look again once it's surely done.
         Task { @MainActor [weak self] in
           try? await Task.sleep(for: .seconds(5))
@@ -419,12 +420,10 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   /// Writes what's unsaved, after any save already under way.
   private func save() async {
-    while let saving { await saving.value }
-    guard !unsaved.isEmpty || !inserts.isEmpty || repairing else { return }
-    let task = Task { @MainActor in await self.write() }
-    saving = task
-    await task.value
-    saving = nil
+    await saves.run { [weak self] in
+      guard let self, !self.unsaved.isEmpty || !self.inserts.isEmpty || self.repairing else { return }
+      await self.write()
+    }
     if reloadWanted, !busy { retryReload() }
   }
 

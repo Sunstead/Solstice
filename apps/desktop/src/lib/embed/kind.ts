@@ -54,3 +54,8 @@ export function embedKind(path: string): EmbedKind {
 export function isDrawing(path: string): boolean {
   return path.toLowerCase().endsWith('.drawing.svg');
 }
+
+/** An image drawn from shapes, sharp at any zoom: never shown as pixels. */
+export function isVectorImage(path: string): boolean {
+  return getFileExtension(path).toLowerCase() === 'svg';
+}
