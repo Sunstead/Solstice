@@ -1,6 +1,7 @@
 import CryptoKit
 import PaperKit
 import PencilKit
+import SurfaceCore
 import Tauri
 import UIKit
 
@@ -25,9 +26,9 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   private var unsaved = false
   /// The wait before a save; a new mark restarts it.
   private var pendingSave: Task<Void, Never>?
-  /// The save being written. Never cancelled: marks made meanwhile are
-  /// saved after it.
-  private var saving: Task<Void, Never>?
+  /// Saves, one at a time. Never cancelled: marks made meanwhile are saved
+  /// after the one under way.
+  private let saves = Saves()
   /// What we last wrote, so our own save isn't taken for a change.
   private var written: String?
   /// When a stroke last began: no reload under a moving Pencil.
@@ -137,7 +138,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   /// Marks in hand: unsaved, being saved, or being drawn.
   private var busy: Bool {
-    unsaved || pendingSave != nil || saving != nil || drewAt.map { -$0.timeIntervalSinceNow < 5 } ?? false
+    unsaved || pendingSave != nil || saves.running || drewAt.map { -$0.timeIntervalSinceNow < 5 } ?? false
   }
 
   override func reload() {
@@ -262,12 +263,10 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   /// Writes what's unsaved, after any save already under way.
   private func save() async {
-    while let saving { await saving.value }
-    guard unsaved else { return }
-    let task = Task { @MainActor in await self.write() }
-    saving = task
-    await task.value
-    saving = nil
+    await saves.run { [weak self] in
+      guard let self, self.unsaved else { return }
+      await self.write()
+    }
   }
 
   private func write() async {

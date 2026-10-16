@@ -46,8 +46,10 @@ jobs:
 
       - name: Rust tests
         run: cargo test --locked --workspace
-      # The iPad's scratch-out geometry: plain Swift, so it runs here.
+      # The iPad's plain Swift (scratch-out, saving, ink geometry) runs here.
       - name: Swift tests
-        run: swift test --package-path apps/desktop/src-tauri/plugins/native/ScratchOut
+        run: |
+          swift test --package-path apps/desktop/src-tauri/plugins/native/ScratchOut
+          swift test --package-path apps/desktop/src-tauri/plugins/native/SurfaceCore
       - name: Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
