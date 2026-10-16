@@ -36,6 +36,9 @@ final class Ink: NSObject {
   private override init() {
     super.init()
     picker.stateAutosaveName = "solstice.ink"
+    // The canvases are paper, always light: in dark mode the swatches would
+    // otherwise show black ink as white.
+    picker.colorUserInterfaceStyle = .light
   }
 
   /// The tool in hand, for a canvas just made.
