@@ -4,6 +4,7 @@ import { ImageOff, Minus, Plus } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
 import { useAssetUrl } from '@/lib/viewer/asset';
 import { basename } from '@/lib/wikilink/target';
+import { isVectorImage } from '@/lib/embed/kind';
 import { pinchView, type Viewport } from '@/lib/canvas/viewport';
 import type { Point } from '@/lib/canvas/types';
 import { CanvasGrid } from './canvas-grid';
@@ -35,7 +36,7 @@ const MOUSE_STEP = 1.2;
 /** Below this delta the event came from a trackpad, not a wheel notch. */
 const TOUCHPAD_DELTA = 50;
 
-/** Past this, the image is being inspected pixel by pixel; stop smoothing it. */
+/** Past this, a bitmap is being inspected pixel by pixel; stop smoothing it. */
 const PIXELATE_ABOVE = 2;
 
 /** Stops the zoom buttons step through, in even increments where it matters. */
@@ -414,7 +415,7 @@ export function ImageViewer({ path }: { path: string }) {
                 })
               }
               style={{
-                imageRendering: scale > PIXELATE_ABOVE ? 'pixelated' : 'auto',
+                imageRendering: scale > PIXELATE_ABOVE && !isVectorImage(path) ? 'pixelated' : 'auto',
               }}
             />
           </div>

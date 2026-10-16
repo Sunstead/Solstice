@@ -26,6 +26,11 @@ let package = Package(
         .product(name: "ScratchOut", package: "ScratchOut"),
         .product(name: "SurfaceCore", package: "SurfaceCore"),
       ],
-      path: "Sources")
+      path: "Sources"),
+    // On the iPad simulator only (PencilKit): `xcodebuild test` (see the test).
+    .testTarget(
+      name: "InkOutlineTests",
+      dependencies: ["tauri-plugin-solstice-native"],
+      path: "Tests/InkOutlineTests"),
   ]
 )
