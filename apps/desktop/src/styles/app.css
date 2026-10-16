@@ -84,22 +84,30 @@
        themselves. */
     touch-action: manipulation;
   }
-  @media (pointer: coarse) {
-    /* A long press opens the row's menu, not iOS's text callout. */
-    [data-sidebar='menu-button'] {
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-  }
 
-  /* Nor a tab's, whatever the pointer: an iPad with a trackpad reports a
-     fine one, and the finger and Pencil still hold tabs. Nothing selects a
-     tab's name anyway. */
-  .flexlayout__tab_button {
+  /* The app is chrome, and chrome doesn't select: no stray highlight from a
+     double-click on a label, and on iOS a long press opens a row's or tab's
+     menu, not the text callout. What's written to be read or copied opts
+     back in below, or with `select-text` (error messages, the version). */
+  body {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
+  }
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable='false']),
+  /* Notes and their previews, read-only ones included, and code. */
+  .ProseMirror,
+  .typeset,
+  .cm-editor,
+  /* A PDF's text (pdf.js). */
+  .textLayer,
+  /* What a dialog says. */
+  [data-slot$='dialog-description'] {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
   }
 }
 

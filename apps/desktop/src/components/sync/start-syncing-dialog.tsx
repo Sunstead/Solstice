@@ -127,7 +127,7 @@ function StartSyncingForm({ server, workspace, onDone }: { server: string; works
             versions are kept.
           </p>
         )}
-        {(error ?? loadError) && <p className='text-destructive'>{error ?? loadError}</p>}
+        {(error ?? loadError) && <p className='text-destructive select-text'>{error ?? loadError}</p>}
       </div>
       <DialogFooter>
         <DialogClose render={<Button type='button' variant='outline'>Cancel</Button>} />

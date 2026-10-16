@@ -119,7 +119,7 @@ function NameForm({ operation, onDone }: { operation: EntryOperation; onDone: ()
             </InputGroupAddon>
           )}
         </InputGroup>
-        {error && <p className='text-xs text-destructive'>{error}</p>}
+        {error && <p className='text-xs text-destructive select-text'>{error}</p>}
       </div>
       <DialogFooter>
         <DialogClose render={<Button type='button' variant='outline' />}>Cancel</DialogClose>

@@ -139,7 +139,7 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
           </div>
         )}
 
-        {error && <p className='text-destructive'>{error}</p>}
+        {error && <p className='text-destructive select-text'>{error}</p>}
       </div>
 
       <DialogFooter>

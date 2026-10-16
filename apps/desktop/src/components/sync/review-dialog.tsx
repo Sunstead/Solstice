@@ -65,7 +65,7 @@ export function ReviewDialog({ review, onClose }: { review: SyncReview; onClose:
           </DialogDescription>
         </DialogHeader>
 
-        {error && <p className='text-sm text-destructive'>{error}</p>}
+        {error && <p className='text-sm text-destructive select-text'>{error}</p>}
 
         <div className='grid gap-3 md:grid-cols-3'>
           {columns.map((c) => (

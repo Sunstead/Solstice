@@ -37,7 +37,7 @@ export function AboutPane() {
         <Heading>Solstice</Heading>
         <Card>
           <div className='flex items-center justify-between gap-4'>
-            <div className='flex flex-col gap-0.5'>
+            <div className='flex select-text flex-col gap-0.5'>
               <p>Version {version ?? '…'}</p>
               {can.updates && line && (
                 <p className={status.state === 'error' ? 'text-xs text-warning' : 'text-xs text-muted-foreground'}>

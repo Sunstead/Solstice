@@ -28,10 +28,10 @@ export function WindowControls() {
   }, []);
 
   return (
-    <div className='flex ml-auto select-all text-muted-foreground z-50 order-1 h-full window-controls'>
+    <div className='flex ml-auto select-none text-muted-foreground z-50 order-1 h-full window-controls'>
       {/* Minimize */}
       <Button
-        className='flex items-center justify-center rounded-none w-11 h-full select-all z-50 no-drag'
+        className='flex items-center justify-center rounded-none w-11 h-full select-none z-50 no-drag'
         variant='ghost'
         disabled={!appWindow}
         onClick={() => appWindow!.minimize()}
@@ -55,7 +55,7 @@ export function WindowControls() {
       </Button>
       {/* Maximize / Restore */}
       <Button
-        className='flex items-center justify-center rounded-none w-11 h-full select-all z-50 no-drag'
+        className='flex items-center justify-center rounded-none w-11 h-full select-none z-50 no-drag'
         variant='ghost'
         disabled={!appWindow}
         onClick={() => appWindow!.toggleMaximize()}
@@ -118,7 +118,7 @@ export function WindowControls() {
       </Button>
       {/* Close */}
       <Button
-        className='flex items-center justify-center rounded-none w-11 h-full select-all z-50 no-drag hover:bg-[#dd0623]!'
+        className='flex items-center justify-center rounded-none w-11 h-full select-none z-50 no-drag hover:bg-[#dd0623]!'
         variant='ghost'
         disabled={!appWindow}
         onClick={() => appWindow!.close()}

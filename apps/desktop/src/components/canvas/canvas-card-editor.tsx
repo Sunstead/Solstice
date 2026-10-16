@@ -90,7 +90,7 @@ function FileCardEditor({ id, file }: { id: string; file: string }) {
 
   if (error !== null) {
     return (
-      <div className='p-3 text-sm text-destructive'>Failed to load: {error}</div>
+      <div className='p-3 text-sm text-destructive select-text'>Failed to load: {error}</div>
     );
   }
 

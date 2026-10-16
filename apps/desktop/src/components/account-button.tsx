@@ -44,7 +44,7 @@ export function AccountButton() {
                 <span className='text-sm text-foreground'>{status}</span>
               )}
               {host && <span className='truncate text-xs text-muted-foreground'>{host}</span>}
-              {failure && <span className='text-xs text-destructive'>{failure}</span>}
+              {failure && <span className='text-xs text-destructive select-text'>{failure}</span>}
             </span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>

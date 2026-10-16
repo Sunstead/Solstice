@@ -49,7 +49,7 @@ export function CanvasEditor({ path }: { path: string }) {
   if (loadError !== null) {
     return (
       <ViewerFrame path={path}>
-        <div className='absolute inset-0 p-4 text-sm text-destructive'>
+        <div className='absolute inset-0 p-4 text-sm text-destructive select-text'>
           Failed to load: {loadError}
         </div>
       </ViewerFrame>
