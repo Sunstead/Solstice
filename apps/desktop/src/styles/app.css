@@ -192,3 +192,38 @@ html[data-reduce-motion='true'] *::after {
   max-height: calc(100dvh - var(--keyboard-inset, 0px) - 2rem);
   overflow-y: auto;
 }
+
+/*
+ * Where touch leads, a dialog rises from below the screen and falls back,
+ * as iPadOS's sheets do, rather than zooming in place. `transform` is free to
+ * animate: the centring is the `translate` property. Reduce motion makes it
+ * instant, with everything else.
+ */
+:root[data-touch] :is([data-slot='dialog-content'], [data-slot='alert-dialog-content'])[data-open] {
+  animation: solstice-dialog-rise 380ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root[data-touch] :is([data-slot='dialog-content'], [data-slot='alert-dialog-content'])[data-closed] {
+  animation: solstice-dialog-fall 250ms cubic-bezier(0.32, 0, 0.67, 0) forwards;
+}
+
+:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'])[data-open] {
+  animation-duration: 380ms;
+}
+
+:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'])[data-closed] {
+  animation-duration: 250ms;
+}
+
+/* From and to just past the bottom edge, wherever the dialog is centred. */
+@keyframes solstice-dialog-rise {
+  from {
+    transform: translateY(calc(50dvh + 50%));
+  }
+}
+
+@keyframes solstice-dialog-fall {
+  to {
+    transform: translateY(calc(50dvh + 50%));
+  }
+}
