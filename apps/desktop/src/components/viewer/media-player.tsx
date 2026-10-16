@@ -22,6 +22,7 @@ import {
 } from '@sunstead/ui/components/dropdown-menu';
 import { Slider } from '@sunstead/ui/components/slider';
 import { cn } from '@/lib/utils';
+import { firstFrameSrc } from '@/lib/viewer/first-frame';
 import { ViewerToolbar, ViewerToolbarSeparator } from './viewer-toolbar';
 
 /*
@@ -503,7 +504,7 @@ export function MediaPlayer({
     >
       <video
         ref={mediaRef as React.RefObject<HTMLVideoElement>}
-        src={src}
+        src={firstFrameSrc(src)}
         autoPlay={autoPlay}
         preload='metadata'
         className='max-h-full max-w-full'
