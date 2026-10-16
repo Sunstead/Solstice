@@ -173,7 +173,12 @@ function SettingsSplitDialog() {
             <div className='flex-1 flex-col min-h-0 flex'>
               <ScrollArea className='h-full'>
                 <div className='flex min-h-full flex-col'>
-                  <div className='px-4 py-6 md:px-6 '>
+                  <div
+                    className={cn(
+                      'w-full px-4 py-6 md:px-6',
+                      (query || !section.wide) && 'mx-auto max-w-3xl',
+                    )}
+                  >
                     {query ? (
                       <SettingsSearchResults query={query} />
                     ) : (

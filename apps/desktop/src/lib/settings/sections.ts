@@ -23,6 +23,8 @@ export interface SettingsSection {
   id: string;
   label: string;
   icon: LucideIcon;
+  /** Takes the dialog's full width on a computer; the rest sit in a centred column. */
+  wide?: boolean;
 }
 
 export const settingsSections = [
@@ -38,6 +40,8 @@ export const settingsSections = [
     id: 'typography',
     label: 'Typography',
     icon: Type,
+    // The live preview sits beside the settings.
+    wide: true,
   },
   {
     id: 'editor',
