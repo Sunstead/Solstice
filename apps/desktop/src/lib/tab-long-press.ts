@@ -42,6 +42,13 @@ export function useTabLongPress(open: (request: TabMenuRequest) => void, close: 
     // mousedown and click) would land outside the menu and close it.
     let swallowUntil = 0;
     const swallow = (event: Event) => {
+      // While held, iOS lifts the tab with a mousedown of its own on the way
+      // to `dragstart` (after the menu, if the hold won): the menu would close
+      // for it as a press outside. Stopped but not cancelled, or no drag.
+      if (held && event.type === 'mousedown') {
+        event.stopPropagation();
+        return;
+      }
       if (performance.now() > swallowUntil) return;
       event.preventDefault();
       event.stopPropagation();
