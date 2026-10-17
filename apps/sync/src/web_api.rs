@@ -81,8 +81,10 @@ async fn me(
     // asks this on every load, which keeps an active browser signed in.
     if !headers.contains_key(header::AUTHORIZATION) {
         if let Some(token) = state.cookie.read(&headers) {
-            res.headers_mut()
-                .insert(header::SET_COOKIE, state.cookie.set(&token, SESSION_TTL_SECS));
+            res.headers_mut().insert(
+                header::SET_COOKIE,
+                state.cookie.set(&token, SESSION_TTL_SECS),
+            );
         }
     }
     Ok(res)
@@ -109,7 +111,7 @@ async fn run(
 fn json_reply(reply: WebReply) -> Response {
     match reply {
         WebReply::Json(v) => Json(v).into_response(),
-        WebReply::File { path, bytes } => file_response(&path, bytes),
+        WebReply::File { path, bytes } => file_response(&path, bytes, None),
     }
 }
 
@@ -159,11 +161,17 @@ async fn save_note(
 async fn read_file(
     State(state): State<AppState>,
     who: CurrentUser,
+    headers: HeaderMap,
     Path((id, path)): Path<(String, String)>,
 ) -> Result<Response, AppError> {
-    Ok(json_reply(
-        run(&state, &who, &id, WebOp::ReadFile { path }).await?,
-    ))
+    Ok(
+        match run(&state, &who, &id, WebOp::ReadFile { path }).await? {
+            WebReply::File { path, bytes } => {
+                file_response(&path, bytes, headers.get(header::RANGE))
+            }
+            other => json_reply(other),
+        },
+    )
 }
 
 #[derive(Deserialize)]
@@ -267,10 +275,39 @@ async fn resolve(
 /// A vault file's bytes. A user's HTML or SVG must never run as the app, so
 /// everything but PDFs (which the browser's viewer needs scripts for) is
 /// served sandboxed, and nothing is sniffed into something it isn't.
-fn file_response(path: &str, bytes: Vec<u8>) -> Response {
+///
+/// Honours a single `Range` (206, or 416 past the end): Safari won't play or
+/// seek media from a server that ignores ranges.
+fn file_response(path: &str, bytes: Vec<u8>, range: Option<&HeaderValue>) -> Response {
     let (mime, inline) = content_type(path);
-    let mut res = (StatusCode::OK, bytes).into_response();
+    let total = bytes.len() as u64;
+    let bytes = Bytes::from(bytes);
+    let mut res = match range.and_then(|r| r.to_str().ok()).and_then(parse_range) {
+        None => (StatusCode::OK, bytes).into_response(),
+        Some(spec) => match resolve_range(spec, total) {
+            Some((start, end)) => {
+                let part = bytes.slice(start as usize..=end as usize);
+                let mut res = (StatusCode::PARTIAL_CONTENT, part).into_response();
+                res.headers_mut().insert(
+                    header::CONTENT_RANGE,
+                    HeaderValue::from_str(&format!("bytes {start}-{end}/{total}"))
+                        .expect("digits are a header value"),
+                );
+                res
+            }
+            None => {
+                let mut res = StatusCode::RANGE_NOT_SATISFIABLE.into_response();
+                res.headers_mut().insert(
+                    header::CONTENT_RANGE,
+                    HeaderValue::from_str(&format!("bytes */{total}"))
+                        .expect("digits are a header value"),
+                );
+                res
+            }
+        },
+    };
     let h = res.headers_mut();
+    h.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
     h.insert(header::CONTENT_TYPE, HeaderValue::from_static(mime));
     h.insert(
         header::X_CONTENT_TYPE_OPTIONS,
@@ -293,6 +330,53 @@ fn file_response(path: &str, bytes: Vec<u8>) -> Response {
         );
     }
     res
+}
+
+/// One byte range as asked for: `first-last`, `first-` or `-suffix_len`.
+#[derive(Debug, PartialEq)]
+enum RangeSpec {
+    From(u64, Option<u64>),
+    Suffix(u64),
+}
+
+/// A `Range` header with exactly one `bytes` range. Anything else (other
+/// units, several ranges, nonsense) is ignored, which RFC 9110 allows: the
+/// whole file is sent.
+fn parse_range(value: &str) -> Option<RangeSpec> {
+    let spec = value.trim().strip_prefix("bytes=")?;
+    if spec.contains(',') {
+        return None;
+    }
+    let (first, last) = spec.split_once('-')?;
+    let (first, last) = (first.trim(), last.trim());
+    if first.is_empty() {
+        return Some(RangeSpec::Suffix(last.parse().ok()?));
+    }
+    let first = first.parse().ok()?;
+    let last = if last.is_empty() {
+        None
+    } else {
+        let last: u64 = last.parse().ok()?;
+        if last < first {
+            return None;
+        }
+        Some(last)
+    };
+    Some(RangeSpec::From(first, last))
+}
+
+/// The inclusive byte span of `spec` in a file of `total` bytes, or `None`
+/// when nothing of it is in the file.
+fn resolve_range(spec: RangeSpec, total: u64) -> Option<(u64, u64)> {
+    match spec {
+        RangeSpec::From(first, last) if first < total => {
+            Some((first, last.map_or(total - 1, |l| l.min(total - 1))))
+        }
+        RangeSpec::Suffix(len) if len > 0 && total > 0 => {
+            Some((total.saturating_sub(len), total - 1))
+        }
+        _ => None,
+    }
 }
 
 /// The type to serve a file as, by its extension, and whether it shows in
@@ -467,13 +551,84 @@ mod tests {
             ("application/octet-stream", false)
         );
         assert_eq!(content_type("noext"), ("application/octet-stream", false));
-        let svg = file_response("x.svg", b"<svg/>".to_vec());
+        let svg = file_response("x.svg", b"<svg/>".to_vec(), None);
         assert_eq!(svg.headers()[header::CONTENT_SECURITY_POLICY], "sandbox");
         assert_eq!(svg.headers()[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
-        let pdf = file_response("x.pdf", vec![]);
+        let pdf = file_response("x.pdf", vec![], None);
         assert!(!pdf.headers().contains_key(header::CONTENT_SECURITY_POLICY));
-        let html = file_response("x.html", vec![]);
+        let html = file_response("x.html", vec![], None);
         assert_eq!(html.headers()[header::CONTENT_DISPOSITION], "attachment");
+    }
+
+    async fn ranged(range: Option<&str>) -> (StatusCode, HeaderMap, Vec<u8>) {
+        let range = range.map(|r| HeaderValue::from_str(r).unwrap());
+        let res = file_response("v.mp4", (0..10u8).collect(), range.as_ref());
+        let (parts, body) = res.into_parts();
+        let body = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+        (parts.status, parts.headers, body.to_vec())
+    }
+
+    #[tokio::test]
+    async fn a_full_request_is_whole_and_offers_ranges() {
+        let (status, h, body) = ranged(None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(h[header::ACCEPT_RANGES], "bytes");
+        assert_eq!(h[header::CACHE_CONTROL], "private, no-cache");
+        assert_eq!(h[header::CONTENT_SECURITY_POLICY], "sandbox");
+        assert_eq!(body, (0..10).collect::<Vec<u8>>());
+        // Not understood, so ignored rather than refused.
+        for odd in ["items=0-1", "bytes=0-1,4-5", "bytes=x-y", "bytes=5-2"] {
+            let (status, _, body) = ranged(Some(odd)).await;
+            assert_eq!((status, body.len()), (StatusCode::OK, 10), "{odd}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_byte_range_is_partial() {
+        let (status, h, body) = ranged(Some("bytes=2-4")).await;
+        assert_eq!(status, StatusCode::PARTIAL_CONTENT);
+        assert_eq!(h[header::CONTENT_RANGE], "bytes 2-4/10");
+        assert_eq!(h[header::ACCEPT_RANGES], "bytes");
+        assert_eq!(h[header::CONTENT_SECURITY_POLICY], "sandbox");
+        assert_eq!(body, [2, 3, 4]);
+        // An end past the file is cut to it.
+        let (_, h, body) = ranged(Some("bytes=8-99")).await;
+        assert_eq!(h[header::CONTENT_RANGE], "bytes 8-9/10");
+        assert_eq!(body, [8, 9]);
+    }
+
+    #[tokio::test]
+    async fn an_open_ended_range_runs_to_the_end() {
+        let (status, h, body) = ranged(Some("bytes=7-")).await;
+        assert_eq!(status, StatusCode::PARTIAL_CONTENT);
+        assert_eq!(h[header::CONTENT_RANGE], "bytes 7-9/10");
+        assert_eq!(body, [7, 8, 9]);
+        // Safari's first probe.
+        let (_, h, body) = ranged(Some("bytes=0-1")).await;
+        assert_eq!(h[header::CONTENT_RANGE], "bytes 0-1/10");
+        assert_eq!(body, [0, 1]);
+    }
+
+    #[tokio::test]
+    async fn a_suffix_range_is_the_last_bytes() {
+        let (status, h, body) = ranged(Some("bytes=-3")).await;
+        assert_eq!(status, StatusCode::PARTIAL_CONTENT);
+        assert_eq!(h[header::CONTENT_RANGE], "bytes 7-9/10");
+        assert_eq!(body, [7, 8, 9]);
+        // Longer than the file: all of it.
+        let (_, h, body) = ranged(Some("bytes=-99")).await;
+        assert_eq!(h[header::CONTENT_RANGE], "bytes 0-9/10");
+        assert_eq!(body.len(), 10);
+    }
+
+    #[tokio::test]
+    async fn a_range_outside_the_file_is_refused() {
+        for bad in ["bytes=10-", "bytes=10-20", "bytes=-0"] {
+            let (status, h, body) = ranged(Some(bad)).await;
+            assert_eq!(status, StatusCode::RANGE_NOT_SATISFIABLE, "{bad}");
+            assert_eq!(h[header::CONTENT_RANGE], "bytes */10", "{bad}");
+            assert!(body.is_empty());
+        }
     }
 
     #[test]
