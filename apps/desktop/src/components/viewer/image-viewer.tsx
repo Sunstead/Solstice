@@ -4,7 +4,7 @@ import { ImageOff, Minus, Plus } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
 import { useAssetUrl } from '@/lib/viewer/asset';
 import { basename } from '@/lib/wikilink/target';
-import { isVectorImage } from '@/lib/embed/kind';
+import { canvasGround, isVectorImage } from '@/lib/embed/kind';
 import { pinchView, type Viewport } from '@/lib/canvas/viewport';
 import type { Point } from '@/lib/canvas/types';
 import { CanvasGrid } from './canvas-grid';
@@ -378,6 +378,7 @@ export function ImageViewer({ path }: { path: string }) {
       <div
         ref={containerRef}
         tabIndex={0}
+        data-ground={canvasGround(path)}
         className='solstice-canvas absolute inset-0 cursor-default touch-none overflow-hidden outline-none active:cursor-grabbing'
         onMouseDown={onMouseDown}
         // Right-drag pans, so the OS menu must not open on top of the gesture.

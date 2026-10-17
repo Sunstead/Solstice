@@ -475,7 +475,7 @@ export function PdfViewer({ path }: { path: string }) {
               onLoadError={(cause) => setError(cause.message)}
               loading={<div className='p-4 text-muted-foreground'>Loading…</div>}
               error={
-                <div className='p-4 text-destructive'>This PDF could not be read.</div>
+                <div className='p-4 text-destructive select-text'>This PDF could not be read.</div>
               }
             >
               {/*

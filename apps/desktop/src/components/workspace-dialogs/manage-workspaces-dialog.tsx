@@ -146,7 +146,7 @@ function Row({
         </form>
       )}
 
-      {error && <p className='text-xs text-destructive'>{error}</p>}
+      {error && <p className='text-xs text-destructive select-text'>{error}</p>}
     </div>
   );
 }

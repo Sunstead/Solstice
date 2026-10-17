@@ -54,8 +54,16 @@ export function TabMenu({
   };
 
   return (
-    <DropdownMenu open={request !== null} onOpenChange={(open) => !open && onClose()}>
+    <DropdownMenu
+      open={request !== null}
+      onOpenChange={(open) => !open && onClose()}
+      // From a hold, the tab may be on its way somewhere: a modal menu's
+      // backdrop would take the drag from flexlayout. A right click's menu
+      // stays modal, so a click outside only closes it, as on macOS.
+      modal={!at?.held}
+    >
       <DropdownMenuTrigger
+        nativeButton={false}
         render={
           <span
             aria-hidden

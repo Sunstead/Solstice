@@ -42,6 +42,19 @@
 }
 
 /*
+ * A drawing's paper: white in every direction, as the iPad draws it, whatever
+ * the image background setting says. Its strokes are colours on paper, so no
+ * theme ground or dots belong under them. `:root` outranks the setting's rules.
+ */
+:root .solstice-canvas[data-ground='paper'] {
+  background: #fff;
+}
+
+.solstice-canvas[data-ground='paper'] .solstice-canvas-grid {
+  display: none;
+}
+
+/*
  * The dot grid, drawn on a canvas by `CanvasGrid`.
  *
  * `width`/`height` are load-bearing, not belt-and-braces: an absolutely

@@ -111,7 +111,7 @@ function AccountCard({ onOpenSync }: { onOpenSync: () => void }) {
         <div className='flex min-w-0 flex-1 flex-col'>
           <span className='truncate text-[15px] font-medium'>{username ?? status}</span>
           {host && <span className='truncate text-xs text-muted-foreground'>{host}</span>}
-          {failure && <span className='text-xs text-destructive'>{failure}</span>}
+          {failure && <span className='text-xs text-destructive select-text'>{failure}</span>}
         </div>
         {username ? (
           <Button variant='outline' size='sm' disabled={busy} onClick={() => void signOut()}>

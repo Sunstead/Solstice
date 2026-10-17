@@ -114,7 +114,7 @@ export function SyncPane() {
               </Button>
             )}
           </div>
-          {info && error && <p className='text-destructive'>{error}</p>}
+          {info && error && <p className='text-destructive select-text'>{error}</p>}
         </Card>
       </section>
 

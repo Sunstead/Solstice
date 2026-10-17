@@ -119,7 +119,7 @@ export function EntryInput({
           <Icon />
         </InputGroupAddon>
       </InputGroup>
-      {error && <p className='px-2 pt-1 text-xs text-destructive'>{error}</p>}
+      {error && <p className='px-2 pt-1 text-xs text-destructive select-text'>{error}</p>}
     </div>
   );
 }

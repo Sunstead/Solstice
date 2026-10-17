@@ -30,7 +30,7 @@ export function ReviewBar({ review }: { review: SyncReview }) {
         ) : (
           <GitMerge className='size-4 shrink-0 text-sky-600 dark:text-sky-400' />
         )}
-        <span className='min-w-0 flex-1'>
+        <span className='min-w-0 flex-1 select-text'>
           {restored
             ? 'This note was deleted on another device while it was being edited, so it was kept.'
             : 'Two devices edited the same part of this note while offline. Their edits were merged.'}

@@ -45,7 +45,7 @@ export function FileEditor({ path, source = false }: FileEditorProps) {
 
   if (error) {
     return (
-      <div className='p-4 text-destructive'>
+      <div className='p-4 text-destructive select-text'>
         Failed to load {path}: {error}
       </div>
     );

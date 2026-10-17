@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
 
-/** Where a tab's menu was asked for, and for which tab. */
-export type TabMenuRequest = { tabId: string; x: number; y: number };
+/**
+ * Where a tab's menu was asked for, and for which tab. `held`: by holding the
+ * tab, which may go on into a drag, so the menu mustn't cover the strip.
+ */
+export type TabMenuRequest = { tabId: string; x: number; y: number; held?: boolean };
 
 /** Long enough not to be a tap, short enough not to feel stuck. */
 const HOLD_MS = 500;
@@ -39,6 +42,13 @@ export function useTabLongPress(open: (request: TabMenuRequest) => void, close: 
     // mousedown and click) would land outside the menu and close it.
     let swallowUntil = 0;
     const swallow = (event: Event) => {
+      // While held, iOS lifts the tab with a mousedown of its own on the way
+      // to `dragstart` (after the menu, if the hold won): the menu would close
+      // for it as a press outside. Stopped but not cancelled, or no drag.
+      if (held && event.type === 'mousedown') {
+        event.stopPropagation();
+        return;
+      }
       if (performance.now() > swallowUntil) return;
       event.preventDefault();
       event.stopPropagation();
@@ -52,7 +62,7 @@ export function useTabLongPress(open: (request: TabMenuRequest) => void, close: 
       const { tabId, x, y } = pending;
       cancel();
       held = true;
-      open({ tabId, x, y });
+      open({ tabId, x, y, held: true });
     };
     const moved = (x: number, y: number) =>
       origin !== null && (x !== 0 || y !== 0) && Math.hypot(x - origin.x, y - origin.y) > SLOP_PX;

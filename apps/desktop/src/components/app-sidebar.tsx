@@ -93,9 +93,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       type='button'
                       data-active={view.id === activePrimaryView && (open || isMobile)}
                       onClick={() => handleSelect(view.id)}
-                      className='data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)] flex flex-col items-center gap-0.5 w-full h-full px-2 py-3 text-xs font-medium text-muted-foreground hover:text-foreground data-[active=true]:text-foreground'
+                      className='data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)] flex flex-col items-center gap-0.5 w-full h-full px-2 py-3 touch:py-4 text-xs font-medium text-muted-foreground hover:text-foreground data-[active=true]:text-foreground'
                     >
-                      <view.icon className='size-5' />
+                      <view.icon className='size-5 touch:size-6' />
                     </button>
                   </SidebarMenuItem>
                 ))}
@@ -116,13 +116,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <Button
                     variant='ghost'
                     size='icon'
-                    className='size-10'
+                    className='size-10 touch:size-12'
                     onClick={() => {
                       setOpenMobile(false);
                       openSettings();
                     }}
                   >
-                    <Settings className='size-5' />
+                    <Settings className='size-5 touch:size-6' />
                     <span className='sr-only'>Settings</span>
                   </Button>
                 </SidebarMenuItem>

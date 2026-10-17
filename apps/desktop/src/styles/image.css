@@ -38,6 +38,19 @@
   opacity: 0;
   cursor: ew-resize;
   transition: opacity 120ms ease;
+  /* A finger or the Pencil drags the handle, not the page or the image. */
+  touch-action: none;
+  -webkit-user-drag: none;
+}
+
+/* A fingertip's worth to grab, around the slim strip that shows. */
+:root[data-touch] .solstice-image-handle::before {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 1.5rem;
+  height: 2.75rem;
+  translate: -50% -50%;
 }
 
 .solstice-image-handle[data-edge='left'] {

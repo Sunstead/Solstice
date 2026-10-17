@@ -53,7 +53,7 @@ export function SyncSignIn({ account }: { account: ReturnType<typeof useSyncAcco
           {account.signingIn ? 'Signing in…' : 'Sign in'}
         </Button>
       </div>
-      {account.error && <p className='text-destructive'>{account.error}</p>}
+      {account.error && <p className='text-destructive select-text'>{account.error}</p>}
     </div>
   );
 }

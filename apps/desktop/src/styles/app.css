@@ -84,22 +84,30 @@
        themselves. */
     touch-action: manipulation;
   }
-  @media (pointer: coarse) {
-    /* A long press opens the row's menu, not iOS's text callout. */
-    [data-sidebar='menu-button'] {
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-  }
 
-  /* Nor a tab's, whatever the pointer: an iPad with a trackpad reports a
-     fine one, and the finger and Pencil still hold tabs. Nothing selects a
-     tab's name anyway. */
-  .flexlayout__tab_button {
+  /* The app is chrome, and chrome doesn't select: no stray highlight from a
+     double-click on a label, and on iOS a long press opens a row's or tab's
+     menu, not the text callout. What's written to be read or copied opts
+     back in below, or with `select-text` (error messages, the version). */
+  body {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
+  }
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable='false']),
+  /* Notes and their previews, read-only ones included, and code. */
+  .ProseMirror,
+  .typeset,
+  .cm-editor,
+  /* A PDF's text (pdf.js). */
+  .textLayer,
+  /* What a dialog says. */
+  [data-slot$='dialog-description'] {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
   }
 }
 
@@ -183,4 +191,39 @@ html[data-reduce-motion='true'] *::after {
   top: calc((100dvh - var(--keyboard-inset, 0px)) / 2);
   max-height: calc(100dvh - var(--keyboard-inset, 0px) - 2rem);
   overflow-y: auto;
+}
+
+/*
+ * Where touch leads, a dialog rises from below the screen and falls back,
+ * as iPadOS's sheets do, rather than zooming in place. `transform` is free to
+ * animate: the centring is the `translate` property. Reduce motion makes it
+ * instant, with everything else.
+ */
+:root[data-touch] :is([data-slot='dialog-content'], [data-slot='alert-dialog-content'])[data-open] {
+  animation: solstice-dialog-rise 380ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root[data-touch] :is([data-slot='dialog-content'], [data-slot='alert-dialog-content'])[data-closed] {
+  animation: solstice-dialog-fall 250ms cubic-bezier(0.32, 0, 0.67, 0) forwards;
+}
+
+:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'])[data-open] {
+  animation-duration: 380ms;
+}
+
+:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'])[data-closed] {
+  animation-duration: 250ms;
+}
+
+/* From and to just past the bottom edge, wherever the dialog is centred. */
+@keyframes solstice-dialog-rise {
+  from {
+    transform: translateY(calc(50dvh + 50%));
+  }
+}
+
+@keyframes solstice-dialog-fall {
+  to {
+    transform: translateY(calc(50dvh + 50%));
+  }
 }

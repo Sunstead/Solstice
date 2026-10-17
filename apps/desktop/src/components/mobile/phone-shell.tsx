@@ -201,19 +201,20 @@ function AppFooter() {
 
   if (keyboard) return null;
 
+  // Icons alone, named for screen readers; each a full-height target.
   const item = (id: PhonePage, label: string, icon: React.ReactNode) => (
     <button
       key={id}
       type='button'
+      aria-label={label}
       aria-current={page === id ? 'page' : undefined}
       onClick={() => showPage(id)}
       className={cn(
-        'flex flex-1 flex-col items-center justify-center gap-0.5 pt-1.5 text-[11px] font-medium text-muted-foreground',
+        'flex min-h-12 flex-1 items-center justify-center py-2.5 text-muted-foreground',
         page === id && 'text-foreground',
       )}
     >
       {icon}
-      {label}
     </button>
   );
 
