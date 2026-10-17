@@ -6,5 +6,5 @@ import { touchFirst } from '@/lib/backend/platform';
  * Discord's server list; elsewhere sunstead-ui's 3rem.
  */
 export const railStyle: CSSProperties | undefined = touchFirst
-  ? ({ '--sidebar-width-icon': '4rem' } as CSSProperties)
+  ? ({ '--sidebar-width-icon': '4.5rem' } as CSSProperties)
   : undefined;
