@@ -27,7 +27,7 @@ describe('the icon rail', () => {
     const root = createRoot(container);
     act(() => root.render(h(SidebarProvider, { style: railStyle }, null)));
     const wrapper = container.querySelector<HTMLElement>('[data-slot="sidebar-wrapper"]')!;
-    expect(wrapper.style.getPropertyValue('--sidebar-width-icon')).toBe('4.5rem');
+    expect(wrapper.style.getPropertyValue('--sidebar-width-icon')).toBe('4rem');
     act(() => root.unmount());
   });
 });

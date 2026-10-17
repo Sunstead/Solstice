@@ -17,9 +17,9 @@ describe('appearance.islands', () => {
 });
 
 describe('appearance.islandBorders', () => {
-  it('is on by default, marks <html>, and sits with Islands', () => {
+  it('is off by default, marks <html>, and sits with Islands', () => {
     const borders = settingsRegistry['appearance.islandBorders'];
-    expect(borders.default).toBe(true);
+    expect(borders.default).toBe(false);
     expect(borders.group).toBe(settingsRegistry['appearance.islands'].group);
     expect(borders.domAttr?.name).toBe('data-island-borders');
     expect(borders.domAttr?.format?.(true)).toBe('true');
