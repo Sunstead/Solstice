@@ -69,10 +69,9 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     controller.map(drop)
     let controller = PaperMarkupViewController(markup: markup, supportedFeatureSet: Self.features)
     controller.delegate = self
-    controller.overrideUserInterfaceStyle = .light
     controller.view.frame = bounds
     controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    controller.view.backgroundColor = .white
+    showPaper(on: controller)
     controller.zoomRange = 0.1...8
     controller.isEditable = true
     controller.drawingTool = Ink.shared.tool
@@ -165,6 +164,18 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   private func configure(_ controller: PaperMarkupViewController) {
     controller.directTouchAutomaticallyDraws = Ink.shared.fingerDrawsNow
+  }
+
+  /// The paper: white, or dark with the ink's lightness swapped (the file
+  /// keeps its true colours: `Paper`).
+  private func showPaper(on controller: PaperMarkupViewController) {
+    let dark = Ink.shared.darkPaper
+    controller.overrideUserInterfaceStyle = Paper.style(dark: dark)
+    controller.view.backgroundColor = Paper.colour(dark: dark)
+  }
+
+  override func paperChanged() {
+    controller.map(showPaper)
   }
 
   override func inkChanged() {

@@ -53,8 +53,11 @@ export const nativeSurfaces = {
    * lets the tool picker go until the Pencil touches it again.
    */
   webFocus: (on: boolean) => host({ op: 'webFocus', on }),
-  /** How ink behaves: scratching out with the Pencil erases (`ink.scratchOut`). */
-  ink: (options: { scratchOut: boolean }) => host({ op: 'ink', ...options }),
+  /**
+   * How ink behaves: scratching out with the Pencil erases (`ink.scratchOut`),
+   * and pages and drawings are shown on dark paper (`ink.darkPaper`).
+   */
+  ink: (options: { scratchOut?: boolean; darkPaper?: boolean }) => host({ op: 'ink', ...options }),
   /** A new notebook: an A4 PDF with one page of `template`. */
   createNotebook: (path: string, template: string) =>
     invoke('plugin:solstice-native|host', { op: 'notebook', path, template }),

@@ -12,7 +12,11 @@ vi.hoisted(() => {
 const { webFocus, ink, settings } = vi.hoisted(() => ({
   webFocus: vi.fn(),
   ink: vi.fn(),
-  settings: { scratchOut: true, listeners: new Set<(value: boolean) => void>() },
+  settings: {
+    scratchOut: true,
+    darkPaper: false,
+    listeners: new Map<string, Set<(value: boolean) => void>>(),
+  },
 }));
 vi.mock('@/lib/backend/native', () => ({
   nativeKeyboard: { listen: vi.fn() },
@@ -27,10 +31,12 @@ vi.mock('@/lib/backend/native', () => ({
 vi.mock('@/lib/backend', () => ({ commands: { fileWritten: vi.fn() } }));
 vi.mock('@/lib/backend/platform', () => ({ can: { nativeViews: true } }));
 vi.mock('@/lib/settings/store', () => ({
-  getSetting: () => settings.scratchOut,
-  subscribeToSetting: (_key: string, listener: (value: boolean) => void) => {
-    settings.listeners.add(listener);
-    return () => settings.listeners.delete(listener);
+  getSetting: (key: string) => (key === 'ink.darkPaper' ? settings.darkPaper : settings.scratchOut),
+  subscribeToSetting: (key: string, listener: (value: boolean) => void) => {
+    const listeners = settings.listeners.get(key) ?? new Set();
+    settings.listeners.set(key, listeners);
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   },
 }));
 
@@ -74,25 +80,30 @@ describe('web focus, while surfaces are open', () => {
   });
 });
 
-describe('scratching out ink', () => {
-  const change = (value: boolean) => {
-    settings.scratchOut = value;
-    settings.listeners.forEach((listener) => listener(value));
+describe('ink settings', () => {
+  const change = (key: string, value: boolean) => {
+    if (key === 'ink.darkPaper') settings.darkPaper = value;
+    else settings.scratchOut = value;
+    settings.listeners.get(key)?.forEach((listener) => listener(value));
   };
   beforeEach(() => {
     ink.mockClear();
     settings.scratchOut = true;
+    settings.darkPaper = false;
   });
 
-  it('tells the native side the setting once surfaces open, and as it changes', () => {
-    change(false);
+  it('tells the native side the settings once surfaces open, and as they change', () => {
+    change('ink.scratchOut', false);
     expect(ink).not.toHaveBeenCalled();
     const release = retainHost();
-    expect(ink).toHaveBeenLastCalledWith({ scratchOut: false });
-    change(true);
+    expect(ink).toHaveBeenLastCalledWith({ scratchOut: false, darkPaper: false });
+    change('ink.scratchOut', true);
     expect(ink).toHaveBeenLastCalledWith({ scratchOut: true });
+    change('ink.darkPaper', true);
+    expect(ink).toHaveBeenLastCalledWith({ darkPaper: true });
     release();
-    change(false);
-    expect(ink).toHaveBeenCalledTimes(2);
+    change('ink.scratchOut', false);
+    change('ink.darkPaper', false);
+    expect(ink).toHaveBeenCalledTimes(3);
   });
 });

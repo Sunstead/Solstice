@@ -430,6 +430,16 @@ export const settingsRegistry = {
     visibleWhen: () => can.nativeViews,
   }),
 
+  'ink.darkPaper': defineBoolean({
+    section: 'editor',
+    group: 'Drawings and PDFs',
+    scope: 'global',
+    // Only how pages and drawings are shown (Paper.swift, viewer.css): files
+    // keep their colours. The viewer's Dark Paper button flips it too.
+    label: 'Dark paper (ink colours swap to stay readable)',
+    default: false,
+  }),
+
   'editor.autosave': defineEnum({
     section: 'editor',
     group: 'Saving',

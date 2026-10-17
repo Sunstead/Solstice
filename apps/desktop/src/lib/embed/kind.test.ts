@@ -24,6 +24,15 @@ describe('canvasGround', () => {
     expect(canvasGround('/v/IDEAS.DRAWING.SVG')).toBe('paper');
   });
 
+  it('is dark paper when dark paper is on', () => {
+    expect(canvasGround('/v/Ideas.drawing.svg', true)).toBe('dark-paper');
+    expect(canvasGround('/v/Ideas.drawing.svg', false)).toBe('paper');
+  });
+
+  it('is never dark paper for other images', () => {
+    expect(canvasGround('/v/photo.png', true)).toBeUndefined();
+  });
+
   it('is the setting for other images', () => {
     expect(canvasGround('/v/Logo.svg')).toBeUndefined();
     expect(canvasGround('/v/photo.png')).toBeUndefined();

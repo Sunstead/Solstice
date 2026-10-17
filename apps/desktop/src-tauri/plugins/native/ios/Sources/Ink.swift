@@ -25,6 +25,18 @@ final class Ink: NSObject {
   /// `ink.scratchOut` setting, sent from the web side.
   var scratchOut = true
 
+  /// Pages and drawings are shown on dark paper (`ink.darkPaper`, `Paper`).
+  /// What's saved is the same either way.
+  private(set) var darkPaper = false
+
+  func setDarkPaper(_ on: Bool) {
+    guard on != darkPaper else { return }
+    darkPaper = on
+    PaperPage.dark = on
+    picker.colorUserInterfaceStyle = Paper.style(dark: on)
+    for surface in surfaces.allObjects { surface.paperChanged() }
+  }
+
   /// The surface holding the tools: its canvas is first responder.
   private weak var active: SurfaceView?
   /// The one that last held them, to hand them back to after typing.
@@ -36,9 +48,9 @@ final class Ink: NSObject {
   private override init() {
     super.init()
     picker.stateAutosaveName = "solstice.ink"
-    // The canvases are paper, always light: in dark mode the swatches would
-    // otherwise show black ink as white.
-    picker.colorUserInterfaceStyle = .light
+    // The swatches read colours as the canvases do (`Paper`): on white paper
+    // black ink is black, whatever the system's appearance.
+    picker.colorUserInterfaceStyle = Paper.style(dark: false)
   }
 
   /// The tool in hand, for a canvas just made.

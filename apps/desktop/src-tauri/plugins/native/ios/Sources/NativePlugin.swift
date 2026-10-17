@@ -39,6 +39,7 @@ struct HostArgs: Decodable {
   let menus: [NativeMenu.Menu]?
   let on: Bool?
   let scratchOut: Bool?
+  let darkPaper: Bool?
 }
 
 class NativePlugin: Plugin {
@@ -146,6 +147,7 @@ class NativePlugin: Plugin {
         UITextInputContext.current().isPencilInputExpected = false
       case "ink":
         if let scratchOut = args.scratchOut { Ink.shared.scratchOut = scratchOut }
+        if let darkPaper = args.darkPaper { Ink.shared.setDarkPaper(darkPaper) }
       case "notebook":
         guard let path = args.path else { return invoke.reject("No path.") }
         do {

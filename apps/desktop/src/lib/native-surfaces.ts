@@ -226,14 +226,16 @@ function startHost(): () => void {
   root.dataset.nativeHost = '';
   const listening = nativeSurfaces.listen(onSurfaceEvent);
   const stopFocus = followWebFocus();
-  void nativeSurfaces.ink({ scratchOut: getSetting('ink.scratchOut') });
-  const stopInk = subscribeToSetting('ink.scratchOut', (scratchOut) => void nativeSurfaces.ink({ scratchOut }));
+  void nativeSurfaces.ink({ scratchOut: getSetting('ink.scratchOut'), darkPaper: getSetting('ink.darkPaper') });
+  const stopScratch = subscribeToSetting('ink.scratchOut', (scratchOut) => void nativeSurfaces.ink({ scratchOut }));
+  const stopPaper = subscribeToSetting('ink.darkPaper', (darkPaper) => void nativeSurfaces.ink({ darkPaper }));
   const theme = new MutationObserver(() => refreshers.forEach((refresh) => refresh()));
   theme.observe(root, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
 
   return () => {
     stopFocus();
-    stopInk();
+    stopScratch();
+    stopPaper();
     theme.disconnect();
     void listening.then((listener) => listener.unregister());
     delete root.dataset.nativeHost;

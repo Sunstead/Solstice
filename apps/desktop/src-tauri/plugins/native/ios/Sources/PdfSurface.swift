@@ -116,7 +116,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
         opened = nil
       }
       guard let self else { return }
-      guard let document = PDFDocument(url: URL(fileURLWithPath: path)) else {
+      guard let document = PaperPages.shared.document(at: URL(fileURLWithPath: path)) else {
         self.send("error", ["message": "Couldn't open this PDF."])
         return
       }
@@ -226,9 +226,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     markup.backgroundColor = UIColor.clear.cgColor
     let controller = PaperMarkupViewController(markup: markup, supportedFeatureSet: Self.features)
     controller.delegate = self
-    // A page is paper: ink keeps its colour, where dark mode would turn
-    // black ink white.
-    controller.overrideUserInterfaceStyle = .light
+    // A page is paper (`Paper`): the ink reads as on white, or dark.
+    controller.overrideUserInterfaceStyle = Paper.style(dark: Ink.shared.darkPaper)
     // Made before it's in a window, the canvas would draw at 1x.
     controller.traitOverrides.displayScale = displayScale
     controller.loadViewIfNeeded()
@@ -315,6 +314,22 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     controller.directTouchAutomaticallyDraws = Ink.shared.fingerDrawsNow
   }
 
+  override func paperChanged() {
+    let style = Paper.style(dark: Ink.shared.darkPaper)
+    canvases.values.forEach { $0.controller.overrideUserInterfaceStyle = style }
+    redrawPages()
+  }
+
+  /// PDFKit draws the pages again (its tiles are layers of their own).
+  private func redrawPages() {
+    func invalidate(_ layer: CALayer) {
+      layer.setNeedsDisplay()
+      layer.sublayers?.forEach(invalidate)
+    }
+    invalidate(pdfView.layer)
+    pdfView.layoutDocumentView()
+  }
+
   override func inkChanged() {
     pdfView.fingerDraws = Ink.shared.fingerDrawsNow
     canvases.values.forEach { configure($0.controller) }
@@ -376,7 +391,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     guard
       let data = Notebook.pageData(
         template: Notebook.template(of: document), size: CGRect(origin: .zero, size: size.size)),
-      let page = PDFDocument(data: data)?.page(at: 0)
+      let page = PaperPages.shared.document(data: data)?.page(at: 0)
     else { return }
     let at = (pdfView.currentPage.map { document.index(for: $0) } ?? document.pageCount - 1) + 1
     document.insert(page, at: at)

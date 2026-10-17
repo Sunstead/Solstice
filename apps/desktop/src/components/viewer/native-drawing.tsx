@@ -5,6 +5,7 @@ import { Button } from '@sunstead/ui/components/button';
 import { NativeSurface } from '@/components/native-surface';
 import { nativeSurfaces } from '@/lib/backend/native';
 import { useSurfaceStates } from '@/lib/native-surfaces';
+import { PaperToggle } from './paper-toggle';
 import { ViewerFrame } from './viewer-frame';
 
 /**
@@ -22,16 +23,19 @@ export function NativeDrawing({ path }: { path: string }) {
       path={path}
       find
       leading={
-        <Button
-          variant={fingerDraws ? 'secondary' : 'ghost'}
-          size='icon-sm'
-          aria-pressed={fingerDraws}
-          title='Draw with Finger'
-          onClick={() => void nativeSurfaces.edit(id, !fingerDraws)}
-        >
-          <Hand />
-          <span className='sr-only'>Draw with Finger</span>
-        </Button>
+        <>
+          <Button
+            variant={fingerDraws ? 'secondary' : 'ghost'}
+            size='icon-sm'
+            aria-pressed={fingerDraws}
+            title='Draw with Finger'
+            onClick={() => void nativeSurfaces.edit(id, !fingerDraws)}
+          >
+            <Hand />
+            <span className='sr-only'>Draw with Finger</span>
+          </Button>
+          <PaperToggle />
+        </>
       }
     >
       {error && (
