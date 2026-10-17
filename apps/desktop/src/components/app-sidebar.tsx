@@ -93,7 +93,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       type='button'
                       data-active={view.id === activePrimaryView && (open || isMobile)}
                       onClick={() => handleSelect(view.id)}
-                      className='data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)] flex flex-col items-center gap-0.5 w-full h-full px-2 py-3 touch:py-4 text-xs font-medium text-muted-foreground hover:text-foreground data-[active=true]:text-foreground'
+                      className='data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)] flex aspect-square w-full items-center justify-center text-xs font-medium text-muted-foreground hover:text-foreground data-[active=true]:text-foreground'
                     >
                       <view.icon className='size-5 touch:size-6' />
                     </button>
@@ -104,9 +104,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter className='p-0'>
-          <SidebarGroup>
+          <SidebarGroup className='p-0'>
             <SidebarGroupContent className='px-1.5 md:px-0 text-muted-foreground'>
-              <SidebarMenu className='gap-1 flex flex-col items-center'>
+              <SidebarMenu className='gap-2 items-center py-2'>
                 <SidebarMenuItem>
                   <AccountButton />
                 </SidebarMenuItem>
