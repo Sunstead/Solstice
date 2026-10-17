@@ -149,6 +149,17 @@
   border-top-left-radius: var(--pane-tl);
 }
 
+/* Touch-first (the iPad): the panes have no edge on the right or at the
+   bottom, so the content fills the screen there (app-shell.tsx drops the
+   inset's padding on those sides). Their corners that side are square; the
+   top-left is the rules' above. */
+:root[data-islands='true'][data-touch] .flexlayout-custom .flexlayout__tabset_content,
+:root[data-islands='true'][data-touch] .flexlayout-custom .flexlayout__tab {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 /* The pane: the tab's content, a layer of its own over the tabset, and the
    tabset's empty body under it (seen while a pane has no tab). */
 :root[data-islands='true'] .flexlayout-custom .flexlayout__tab {
@@ -206,6 +217,19 @@
   border-radius: var(--pane-tl) var(--island-radius) var(--island-radius);
   background: var(--background);
   pointer-events: none;
+}
+
+/* Touch-first: the strip is 44px, and the ring has no right or bottom side
+   (the pane runs to the screen's edge there), nor corners on them. */
+:root[data-islands='true'][data-island-borders='true'][data-touch] .flexlayout-custom .flexlayout__tabset::after {
+  inset: 43px 0 0;
+  border-right-width: 0;
+  border-bottom-width: 0;
+  border-radius: var(--pane-tl) 0 0 0;
+}
+
+:root[data-islands='true'][data-island-borders='true'][data-touch] .flexlayout-custom .flexlayout__tab {
+  clip-path: inset(0 round max(0px, calc(var(--pane-tl) - 1px)) 0 0 0);
 }
 
 /* The ring paints the empty pane's colour; the layer paints the tab's. */

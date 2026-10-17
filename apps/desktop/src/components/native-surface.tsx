@@ -26,8 +26,8 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
       const key = `${r.x},${r.y},${r.width},${r.height},${visible}`;
       if (key === last) return false;
       last = key;
-      if (visible) seeThrough(el, r, under);
-      void nativeSurfaces.place(id, { x: r.x, y: r.y, width: r.width, height: r.height }, visible);
+      const backdrop = visible ? seeThrough(el, r, under) : null;
+      void nativeSurfaces.place(id, { x: r.x, y: r.y, width: r.width, height: r.height }, visible, backdrop);
       return true;
     };
     const stopFollowing = follow(el, measure);

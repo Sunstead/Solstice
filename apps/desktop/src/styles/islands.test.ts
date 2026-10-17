@@ -8,6 +8,7 @@ const shell = readFileSync(path.resolve(__dirname, '../components/app-shell.tsx'
 const sidebar = readFileSync(path.resolve(__dirname, '../components/app-sidebar.tsx'), 'utf8');
 const flexlayout = readFileSync(path.resolve(__dirname, 'flexlayout.css'), 'utf8');
 const controls = readFileSync(path.resolve(__dirname, '../components/header-controls.tsx'), 'utf8');
+const surfaces = readFileSync(path.resolve(__dirname, '../lib/native-surfaces.ts'), 'utf8');
 
 // flexlayout sizes its splitters from --splitter-size, so the gap between
 // editor islands is the splitter: dragging it works as it always did.
@@ -115,5 +116,31 @@ describe('islands.css', () => {
     expect(css).toMatch(/flexlayout__tabset:has\(\.flexlayout__tab_button--selected\[data-layout-path\$='\/tb0'\]\) \{\s*--pane-tl: 0px/);
     expect(app).toMatch(/@custom-variant island-borders/);
     expect(sidebar).toMatch(/island-borders:border /);
+  });
+
+  // Touch-first (the iPad): no edge on the right or at the bottom, so the
+  // content runs to the screen's edge there and the corners that side are square.
+  it('runs the panes to the right and bottom edges on touch', () => {
+    expect(shell).toMatch(/islands:touch:pr-0 islands:touch:pb-0/);
+    expect(css).toMatch(
+      /\[data-touch\] \.flexlayout-custom \.flexlayout__tabset_content,[^{]*\.flexlayout__tab \{\s*border-top-right-radius: 0;\s*border-bottom-right-radius: 0;\s*border-bottom-left-radius: 0;/,
+    );
+    // The ring (island borders) follows: the strip is 44px, no right or bottom side.
+    expect(css).toMatch(/\[data-touch\] \.flexlayout-custom \.flexlayout__tabset::after \{\s*inset: 43px 0 0;\s*border-right-width: 0;\s*border-bottom-width: 0;/);
+  });
+
+  // A native view (PDF, drawing) makes the pane and the window behind it
+  // see-through, so the gaps and the pane's rounded corners show the native
+  // host's colour: the window's under Islands, not the notes'.
+  it('paints the window\'s colour behind a native view under Islands', () => {
+    expect(surfaces).toMatch(/dataset\.islands === 'true'/);
+    expect(surfaces).toMatch(/backgroundColor = 'var\(--sidebar\)'/);
+    expect(surfaces).toMatch(/attributeFilter: \['data-theme', 'data-islands'/);
+    // The view's own margins (a PDF's) stay the pane's colour: the surface
+    // gets it as its backdrop, whatever the host paints.
+    expect(surfaces).toMatch(/return background;/);
+    expect(readFileSync(path.resolve(__dirname, '../components/native-surface.tsx'), 'utf8')).toMatch(
+      /visible, backdrop\)/,
+    );
   });
 });

@@ -33,7 +33,8 @@ const host = (args: Record<string, unknown>) =>
 export const nativeSurfaces = {
   open: (id: string, kind: SurfaceKind, path: string) => surface({ op: 'open', id, kind, path }),
   /** Where it is, in CSS pixels from the viewport, and whether it shows. */
-  place: (id: string, rect: Rect, visible: boolean) => surface({ op: 'frame', id, ...rect, visible }),
+  place: (id: string, rect: Rect, visible: boolean, rgb?: number[] | null) =>
+    surface({ op: 'frame', id, ...rect, visible, rgb: rgb ?? undefined }),
   reload: (id: string) => surface({ op: 'reload', id }),
   close: (id: string) => surface({ op: 'close', id }),
   /** Finger drawing, on every surface (the Pencil always draws). */

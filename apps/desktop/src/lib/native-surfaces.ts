@@ -34,9 +34,12 @@ export function unmark(el: Element) {
  * its ancestors, but the siblings stacked beneath it, like flexlayout's
  * tabset, which draws its background apart from the tab's content.
  */
-export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>) {
+export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): number[] | null {
   const found = new Set<Element>();
-  // The colour the surface used to sit on, painted natively in its place.
+  // The colour the surface used to sit on: the surface's own backdrop (a
+  // PDF's margins), and the host's too, except that under Islands the host
+  // shows in the gaps and a pane's rounded corners, which go see-through
+  // with everything else, so it's the window's there.
   let background: number[] | null = null;
   const inset = 2;
   const points = [
@@ -61,7 +64,10 @@ export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>) {
   for (const below of found) if (!under.has(below)) mark(below);
   under.clear();
   for (const below of found) under.add(below);
-  if (background) void nativeSurfaces.background(background);
+  const islands = document.documentElement.dataset.islands === 'true';
+  const host = (islands && windowColour()) || background;
+  if (host) void nativeSurfaces.background(host);
+  return background;
 }
 
 /** Frames with nothing moving before a follow stops polling. */
@@ -230,7 +236,7 @@ function startHost(): () => void {
   const stopScratch = subscribeToSetting('ink.scratchOut', (scratchOut) => void nativeSurfaces.ink({ scratchOut }));
   const stopPaper = subscribeToSetting('ink.darkPaper', (darkPaper) => void nativeSurfaces.ink({ darkPaper }));
   const theme = new MutationObserver(() => refreshers.forEach((refresh) => refresh()));
-  theme.observe(root, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
+  theme.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-islands', 'class', 'style'] });
 
   return () => {
     stopFocus();
@@ -245,6 +251,17 @@ function startHost(): () => void {
       void nativeSurfaces.overlays(false, []);
     }
   };
+}
+
+/** The window's colour under Islands: the sidebar's, whatever the theme. */
+function windowColour(): number[] | null {
+  const probe = document.createElement('div');
+  probe.style.display = 'none';
+  probe.style.backgroundColor = 'var(--sidebar)';
+  document.body.append(probe);
+  const colour = getComputedStyle(probe).backgroundColor;
+  probe.remove();
+  return toRgb(colour);
 }
 
 /** Any CSS colour (themes use oklch) as sRGB, by painting it; none if see-through. */

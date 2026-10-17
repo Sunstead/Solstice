@@ -16,6 +16,7 @@ struct SurfaceArgs: Decodable {
   let width: Double?
   let height: Double?
   let visible: Bool?
+  let rgb: [Double]?
   let query: String?
   let caseSensitive: Bool?
   let wholeWord: Bool?
@@ -102,6 +103,12 @@ class NativePlugin: Plugin {
         surface.frame = self.hostRect(
           x: args.x ?? 0, y: args.y ?? 0, width: args.width ?? 0, height: args.height ?? 0)
         surface.isHidden = !(args.visible ?? false)
+        // What shows round the content (a PDF's margins): the pane's colour,
+        // while the host behind the page may be the window's (Islands).
+        if let rgb = args.rgb, rgb.count >= 3 {
+          surface.backgroundColor = UIColor(
+            red: rgb[0] / 255, green: rgb[1] / 255, blue: rgb[2] / 255, alpha: 1)
+        }
       case "reload":
         host.surfaces[args.id]?.reload()
       case "edit":

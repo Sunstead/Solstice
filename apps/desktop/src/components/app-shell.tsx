@@ -27,6 +27,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <SidebarInset
         className={cn(
           'islands:bg-sidebar islands:p-(--island-gap) islands:pt-0 islands:transition-[padding] islands:duration-200 islands:ease-in-out',
+          // Touch-first: the panes run to the screen's right and bottom
+          // edges (`islands.css` squares their corners there).
+          'islands:touch:pr-0 islands:touch:pb-0',
           state === 'collapsed' && 'islands:pl-0',
         )}
       >
