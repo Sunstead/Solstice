@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sync-server",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "SOLSTICE_DEV_USER=dev",
+        "cargo",
+        "run",
+        "-p",
+        "solstice-sync-server"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:web"
+      ],
+      "port": 1420
+    }
+  ]
+}
