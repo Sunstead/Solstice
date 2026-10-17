@@ -130,7 +130,8 @@ describe("AppSidebar's rail buttons", () => {
     expect(classes).toContain('data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)]');
     expect(classes).toContain('islands:data-[active=true]:shadow-none');
     expect(classes).toContain('islands:data-[active=true]:bg-sidebar-accent');
-    expect(classes).toContain('islands:data-[active=true]:text-sidebar-accent-foreground');
+    expect(classes).toContain('islands:data-[active=true]:hover:bg-sidebar-accent');
+    expect(classes).toContain('data-[active=true]:text-foreground');
     expect(classes).toContain('islands:rounded-md');
   });
 
