@@ -3,11 +3,13 @@ import { ImageOff, Minus, Plus } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { useAssetUrl } from '@/lib/viewer/asset';
+import { useSetting } from '@/lib/settings/store';
 import { basename } from '@/lib/wikilink/target';
-import { canvasGround, isVectorImage } from '@/lib/embed/kind';
+import { canvasGround, isDrawing, isVectorImage } from '@/lib/embed/kind';
 import { pinchView, type Viewport } from '@/lib/canvas/viewport';
 import type { Point } from '@/lib/canvas/types';
 import { CanvasGrid } from './canvas-grid';
+import { PaperToggle } from './paper-toggle';
 import { ViewerFrame } from './viewer-frame';
 import {
   ViewerToolbar,
@@ -57,6 +59,7 @@ const clamp = (value: number, min: number, max: number) =>
  */
 export function ImageViewer({ path }: { path: string }) {
   const asset = useAssetUrl(path);
+  const darkPaper = useSetting('ink.darkPaper');
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -339,6 +342,7 @@ export function ImageViewer({ path }: { path: string }) {
   return (
     <ViewerFrame
       path={path}
+      leading={isDrawing(path) ? <PaperToggle /> : undefined}
       toolbar={
         <ViewerToolbar>
           <Button
@@ -378,7 +382,7 @@ export function ImageViewer({ path }: { path: string }) {
       <div
         ref={containerRef}
         tabIndex={0}
-        data-ground={canvasGround(path)}
+        data-ground={canvasGround(path, darkPaper)}
         className='solstice-canvas absolute inset-0 cursor-default touch-none overflow-hidden outline-none active:cursor-grabbing'
         onMouseDown={onMouseDown}
         // Right-drag pans, so the OS menu must not open on top of the gesture.
@@ -395,7 +399,7 @@ export function ImageViewer({ path }: { path: string }) {
 
         {asset.status === 'ready' && (
           <div
-            className='absolute size-0'
+            className='solstice-canvas-content absolute size-0'
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
               // The whole model rests on this: with a `0 0` origin the

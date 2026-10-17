@@ -55,6 +55,26 @@
 }
 
 /*
+ * Dark paper (`ink.darkPaper`): the ground the iPad's `Paper.ground` is, and
+ * the picture's lightness swapped with its hues kept (strokes are colours on
+ * paper, so black reads light), as PencilKit does on a dark canvas. The file
+ * is untouched. The filter is on the layer holding the image, and it blends
+ * with `lighten` so the SVG's white rect turns into the ground, not black.
+ */
+:root .solstice-canvas[data-ground='dark-paper'] {
+  background: #1c1c1e;
+}
+
+.solstice-canvas[data-ground='dark-paper'] .solstice-canvas-grid {
+  display: none;
+}
+
+.solstice-canvas[data-ground='dark-paper'] .solstice-canvas-content {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9);
+  mix-blend-mode: lighten;
+}
+
+/*
  * The dot grid, drawn on a canvas by `CanvasGrid`.
  *
  * `width`/`height` are load-bearing, not belt-and-braces: an absolutely

@@ -61,10 +61,11 @@ export function isVectorImage(path: string): boolean {
 }
 
 /**
- * The image viewer's ground under `path`: a drawing is white paper in every
- * direction, as the iPad draws it; anything else takes the
- * `viewer.imageBackground` setting.
+ * The image viewer's ground under `path`: a drawing is paper in every
+ * direction, as the iPad draws it, white or dark (`ink.darkPaper`); anything
+ * else takes the `viewer.imageBackground` setting.
  */
-export function canvasGround(path: string): 'paper' | undefined {
-  return isDrawing(path) ? 'paper' : undefined;
+export function canvasGround(path: string, dark = false): 'paper' | 'dark-paper' | undefined {
+  if (!isDrawing(path)) return undefined;
+  return dark ? 'dark-paper' : 'paper';
 }

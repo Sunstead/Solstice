@@ -43,6 +43,9 @@ class SurfaceView: UIView {
   /// `Ink.fingerDraws` changed: set up the canvases for it.
   func inkChanged() {}
 
+  /// Dark paper turned on or off (`Ink.setDarkPaper`): show the paper so.
+  func paperChanged() {}
+
   /// The picker's + button: shapes, text, stickers, and the surface's own.
   func showInsertMenu() {}
 
