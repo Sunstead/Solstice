@@ -5,7 +5,7 @@
  * vault's on the server).
  *
  * Generated colors are mid-tones from OKLCH, where equal steps look equal:
- * a narrow band of lightness and chroma, any hue, so none is washed out or
+ * a narrow band of lightness and a high chroma, any hue, so none is washed out or
  * glaring and white letters read on most.
  */
 
@@ -20,8 +20,8 @@ export function normalizeHex(input: string): string | null {
   return `#${hex.toLowerCase()}`;
 }
 
-const LIGHTNESS = [0.52, 0.64] as const;
-const CHROMA = [0.09, 0.14] as const;
+const LIGHTNESS = [0.52, 0.6] as const;
+const CHROMA = [0.16, 0.21] as const;
 
 /** The color a workspace has until one is picked: seeded by its name. */
 export function defaultWorkspaceColor(name: string): string {
@@ -35,7 +35,7 @@ export function randomWorkspaceColor(random: () => number = Math.random): string
 
 /** The picker's swatches: twelve hues, evenly round the wheel. */
 export const WORKSPACE_SWATCHES: readonly string[] = Array.from({ length: 12 }, (_, i) =>
-  oklchToHex(0.58, 0.12, 25 + i * 30),
+  oklchToHex(0.6, 0.2, 25 + i * 30),
 );
 
 const LIGHT_TEXT = '#ffffff';

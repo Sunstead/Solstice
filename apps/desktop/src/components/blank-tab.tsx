@@ -16,7 +16,7 @@ import React from 'react';
 import { useRecentFiles } from '@/lib/stores/recent-files';
 import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { getFileExtension } from '@/lib/utils';
+import { getIconExtension } from '@/lib/utils';
 import { Keybind } from './keybind';
 
 const actions: { label: string; icon: LucideIcon; commandId: CommandId }[] = [
@@ -104,7 +104,7 @@ function TouchBlankTab() {
                 return (
                   <Row
                     key={path}
-                    icon={getFileIcon(getFileExtension(name))}
+                    icon={getFileIcon(getIconExtension(name))}
                     label={name.replace(/\.md$/, '')}
                     detail={folder && <span className='max-w-[40%] truncate text-xs text-muted-foreground'>{folder}</span>}
                     onClick={() => useLayout.getState().openFile(path, name)}

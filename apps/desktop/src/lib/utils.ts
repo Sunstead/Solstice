@@ -27,3 +27,7 @@ export function getFileExtension(filename: string): string {
   
   return filename.substring(lastDotIndex + 1);
 }
+/** The extension an icon is picked by: a two-part one (`drawing.svg`) where the registry has it. */
+export function getIconExtension(filename: string): string {
+  return /\.drawing\.svg$/i.test(filename) ? 'drawing.svg' : getFileExtension(filename);
+}

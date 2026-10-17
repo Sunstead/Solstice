@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { EntryKind } from '@/lib/stores/entry-input';
-import { cn, getFileExtension } from '@/lib/utils';
+import { cn, getIconExtension } from '@/lib/utils';
 import { getFileIcon, getFolderIcon } from '@/assets/icons';
 import {
   InputGroup,
@@ -40,7 +40,7 @@ export function EntryInput({
 
   const Icon = isFolder
     ? getFolderIcon()
-    : getFileIcon(preset ? preset.extension : getFileExtension(name));
+    : getFileIcon(preset ? preset.extension : getIconExtension(name));
 
   const cancel = () => {
     if (settled.current) return;

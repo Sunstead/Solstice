@@ -26,8 +26,8 @@
   --splitter-active-size: 6px;
   --splitter-handle-visibility: hidden;
 
-  --color-overflow: var(--muted-foreground);
-  --color-icon: var(--muted-foreground);
+  --color-overflow: var(--chrome-fg);
+  --color-icon: var(--chrome-fg);
   --color-focus: var(--ring);
 
   --color-tabset-background: var(--color-1);
@@ -42,7 +42,7 @@
   --color-tab-content: var(--background);
   --color-tab-selected: var(--foreground);
   --color-tab-selected-background: var(--background);
-  --color-tab-unselected: var(--muted-foreground);
+  --color-tab-unselected: var(--chrome-fg);
   --color-tab-unselected-background: transparent;
   --color-tab-textbox: var(--foreground);
   --color-tab-textbox-background: var(--background);
@@ -82,7 +82,7 @@
   );
   --size-mini-scroll-indicator: 4px;
 
-  --color-toolbar-button-hover: var(--color-2);
+  --color-toolbar-button-hover: var(--chrome-press);
   /* Capped, so a very round theme (Bubblegum) keeps tidy tabs. */
   --tab-button-radius: var(--tab-curve-r);
   --border-button-radius: min(var(--radius-md), 10px);
@@ -108,16 +108,12 @@
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  color: var(--color-muted-foreground);
+  color: var(--chrome-fg);
 }
 
 :root:not([data-pointer='touch']) .flexlayout-custom .flexlayout__tab_toolbar_button:hover {
-  background-color: var(--color-muted);
-  color: var(--color-foreground);
-}
-
-:root.dark:not([data-pointer='touch']) .flexlayout-custom .flexlayout__tab_toolbar_button:hover {
-  background-color: color-mix(in oklab, var(--color-muted) 50%, transparent);
+  background-color: var(--chrome-hover);
+  color: var(--foreground);
 }
 
 /* tab button */
@@ -160,7 +156,8 @@
 
 :root:not([data-pointer='touch']) .flexlayout-custom
   .flexlayout__tab_button:hover:not(.flexlayout__tab_button--selected) {
-  background-color: var(--color-muted);
+  background-color: var(--chrome-hover);
+  color: var(--foreground);
   border-radius: min(var(--radius-md), 10px);
   border: none;
 }

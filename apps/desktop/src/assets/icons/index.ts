@@ -7,6 +7,7 @@ import Pdf from './file-types/pdf.svg?react';
 import Image from './file-types/image.svg?react';
 import Video from './file-types/video.svg?react';
 import Audio from './file-types/audio.svg?react';
+import Drawing from './file-types/drawing.svg?react';
 import Folder from './file-types/folder.svg?react';
 import FolderOpen from './file-types/folder_open.svg?react';
 import Default from './file-types/file.svg?react';
@@ -23,8 +24,7 @@ export const fileIconRegistry: Record<string, SvgComponent> = {
   avif: Image,
   bmp: Image,
   svg: Image,
-  // A drawing's preset extension; its files are .svg anyway.
-  'drawing.svg': Image,
+  'drawing.svg': Drawing,
   mp4: Video,
   webm: Video,
   mov: Video,

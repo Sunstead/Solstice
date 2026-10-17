@@ -57,6 +57,39 @@
   );
 }
 
+/*
+ * Controls on the window's colour (the title bar, the sidebar's icon rail,
+ * the tab strip) sit on --sidebar, which the themes don't tune --muted for:
+ * hover was a hair off the surface. Derived from the sidebar's own
+ * foreground, so every theme and both layouts get a step that reads.
+ * `.chrome` rebinds the tokens the primitives use (ghost buttons, menu rows)
+ * to these; --chrome-fg is the tab strip's resting text.
+ */
+:root {
+  --chrome-fg: color-mix(in oklch, var(--foreground) 85%, var(--sidebar));
+  --chrome-hover: color-mix(in oklch, var(--sidebar-foreground) 20%, var(--sidebar));
+  --chrome-press: color-mix(in oklch, var(--sidebar-foreground) 30%, var(--sidebar));
+}
+
+.chrome {
+  --muted: var(--chrome-hover);
+  --accent: var(--chrome-hover);
+  --accent-foreground: var(--foreground);
+}
+
+/* The primitives halve --muted on hover in dark (`dark:hover:bg-muted/50`). */
+:root.dark .chrome {
+  --muted: var(--chrome-press);
+  --accent: var(--chrome-press);
+}
+
+/* The explorer under Islands is a panel of the notes' colour, so its rows'
+   hover and active fills are steps off that, not off the sidebar's: the
+   themes' --sidebar-accent is tuned for the sidebar and reads too light here. */
+:root[data-islands='true'] .island-panel {
+  --sidebar-accent: color-mix(in oklch, var(--foreground) 9%, var(--background));
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

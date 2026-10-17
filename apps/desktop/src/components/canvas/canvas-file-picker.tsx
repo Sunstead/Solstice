@@ -6,7 +6,7 @@ import { FormattedFileName } from '@/components/file-tree';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { getWorkspaceRelativeSegments } from '@/lib/path-utils';
 import { selectAllFiles, useFileIndex } from '@/lib/stores/use-file-index';
-import { getFileExtension } from '@/lib/utils';
+import { getIconExtension } from '@/lib/utils';
 
 /**
  * Picks a workspace file for a new file card, wrapping the same dialog
@@ -44,7 +44,7 @@ export function CanvasFilePicker({
         onOpenChange(false);
       }}
       renderItem={(entry) => {
-        const Icon = getFileIcon(getFileExtension(entry.name));
+        const Icon = getFileIcon(getIconExtension(entry.name));
         const { relative } = getWorkspaceRelativeSegments(
           entry.path,
           workspacePath,

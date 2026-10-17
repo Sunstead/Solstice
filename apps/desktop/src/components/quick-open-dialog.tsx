@@ -5,7 +5,7 @@ import { selectAllFiles, useFileIndex } from '@/lib/stores/use-file-index';
 import { FormattedFileName } from './file-tree';
 import type { FileEntry } from '@/bindings';
 import { getFileIcon } from '@/assets/icons';
-import { getFileExtension } from '@/lib/utils';
+import { getIconExtension } from '@/lib/utils';
 import { getWorkspaceRelativeSegments } from '@/lib/path-utils';
 import { useWorkspace } from '@/hooks/use-workspace';
 
@@ -48,7 +48,7 @@ export function QuickOpenItem({ entry, root }: { entry: Pick<FileEntry, 'name' |
   return (
     <div className='w-full'>
       <div className='flex w-full items-center justify-between gap-2'>
-        {createElement(getFileIcon(getFileExtension(entry.name)))}
+        {createElement(getFileIcon(getIconExtension(entry.name)))}
         <FormattedFileName name={entry.name} />
       </div>
       <p className='text-xs text-muted-foreground truncate max-w-full'>{relative}</p>

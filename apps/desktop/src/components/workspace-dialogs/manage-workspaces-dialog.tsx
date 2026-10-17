@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 
+import { EllipsisVertical, FolderOpen, Trash2 } from 'lucide-react';
+
 import { Button } from '@sunstead/ui/components/button';
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@sunstead/ui/components/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@sunstead/ui/components/dropdown-menu';
 import { Input } from '@sunstead/ui/components/input';
 import { can } from '@/lib/backend/platform';
 import { deleteVault, resolve } from '@/lib/backend/web/vault';
@@ -46,6 +55,7 @@ export function ManageWorkspacesForm({ onDone }: { onDone: () => void }) {
               open={w.path === active}
               confirming={confirming === w.path}
               onConfirm={(on) => setConfirming(on ? w.path : null)}
+              onOpened={onDone}
             />
           </li>
         ))}
@@ -66,11 +76,13 @@ function Row({
   open,
   confirming,
   onConfirm,
+  onOpened,
 }: {
   workspace: KnownWorkspace;
   open: boolean;
   confirming: boolean;
   onConfirm: (on: boolean) => void;
+  onOpened: () => void;
 }) {
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
@@ -123,9 +135,27 @@ function Row({
           <span className='text-xs text-muted-foreground'>Open</span>
         ) : (
           !confirming && (
-            <Button type='button' variant='ghost' size='sm' onClick={() => onConfirm(true)}>
-              {can.localFolders ? 'Remove' : 'Delete…'}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button type='button' variant='ghost' size='icon-sm' aria-label='Workspace options' />}
+              >
+                <EllipsisVertical />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end'>
+                <DropdownMenuItem onClick={() => {
+                    onOpened();
+                    void useWorkspace.getState().setWorkspace(workspace.path);
+                  }}>
+                  <FolderOpen />
+                  Open
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant='destructive' onClick={() => onConfirm(true)}>
+                  <Trash2 />
+                  {can.localFolders ? 'Remove' : 'Delete…'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )
         )}
       </div>

@@ -83,7 +83,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     >
       <Sidebar
         collapsible='none'
-        className='w-(--sidebar-width-icon)! min-w-(--sidebar-width-icon) border-r islands:border-r-0'
+        className='chrome w-(--sidebar-width-icon)! min-w-(--sidebar-width-icon) border-r islands:border-r-0'
       >
         <SidebarContent>
           <SidebarGroup className='p-0'>
@@ -96,7 +96,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       type='button'
                       data-active={view.id === activePrimaryView && (open || isMobile)}
                       onClick={() => handleSelect(view.id)}
-                      className='data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)] flex aspect-square w-full items-center justify-center text-xs font-medium text-muted-foreground hover:text-foreground data-[active=true]:text-foreground islands:rounded-md islands:data-[active=true]:shadow-none islands:data-[active=true]:bg-sidebar-accent islands:data-[active=true]:text-sidebar-accent-foreground'
+                      className='data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)] flex aspect-square w-full items-center justify-center text-xs font-medium text-muted-foreground hover:bg-(--chrome-hover) hover:text-foreground data-[active=true]:text-foreground islands:rounded-md islands:data-[active=true]:shadow-none islands:data-[active=true]:bg-sidebar-accent islands:data-[active=true]:hover:bg-sidebar-accent'
                     >
                       <view.icon className='size-5 touch:size-6' />
                     </button>
@@ -145,7 +145,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           // bar its rim on two sides and the gap on the others. Stretched,
           // not full height, so the gap below it fits in the window and it
           // ends level with the editor's panes.
-          !isMobile && 'islands:h-auto islands:mb-(--island-gap) islands:rounded-(--island-radius) islands:bg-background island-borders:border island-borders:border-(--color-tab-outline)',
+          !isMobile && 'island-panel islands:h-auto islands:mb-(--island-gap) islands:rounded-(--island-radius) islands:bg-background island-borders:border island-borders:border-(--color-tab-outline)',
         )}
       >
         {ActiveSidebarContent && <ActiveSidebarContent />}

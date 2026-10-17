@@ -39,8 +39,8 @@ export function WorkspaceColorPicker({
   return (
     <Popover onOpenChange={(open) => open && (setDraft(color), setError(null))}>
       <PopoverTrigger render={trigger} />
-      <PopoverContent className='w-60 gap-3' align='start'>
-        <div className='grid grid-cols-6 gap-1.5'>
+      <PopoverContent className='flex w-60 flex-col gap-4 p-4' align='start'>
+        <div className='grid grid-cols-6 gap-2'>
           {WORKSPACE_SWATCHES.map((swatch) => (
             <button
               key={swatch}

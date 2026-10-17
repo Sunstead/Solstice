@@ -56,6 +56,23 @@
   box-shadow: none;
 }
 
+/* The strip's room above the tabs (our 4px padding and flexlayout's own 2px
+   transparent border) is the window's drag handle, so only a strip on the
+   window's top edge needs it (those carry data-tauri-drag-region,
+   applyTopEdgeDragRegions): a pane docked below another runs its tabs up to
+   the divider. With island borders the 2px stays, clear of the ring. */
+:root[data-islands='true'] .flexlayout-custom
+  .flexlayout__tabset_tabbar_outer:not([data-tauri-drag-region])
+  .flexlayout__tabset_tabbar_inner_tab_container_top {
+  padding-top: 0;
+}
+
+:root[data-islands='true']:not([data-island-borders='true']) .flexlayout-custom
+  .flexlayout__tabset_tabbar_outer:not([data-tauri-drag-region])
+  .flexlayout__tabset_tabbar_inner_tab_container_top {
+  border-top: 0;
+}
+
 /*
  * The first tab starts at the pane's left edge, with no flare that side, and
  * while it's selected the pane's top-left corner is square under it, so the

@@ -8,14 +8,14 @@ import { getFileIcon } from '@/assets/icons';
 import { useLayout } from '@/hooks/use-layout';
 import { useSetting } from '@/lib/settings/store';
 import { closeTab } from '@/lib/tab-motion';
-import { cn, getFileExtension } from '@/lib/utils';
+import { cn, getIconExtension } from '@/lib/utils';
 import { allTabs, tabTitle } from './tabs';
 
 function TabIcon({ tab }: { tab: TabNode }) {
   if (tab.getComponent() !== 'editor') return <FileText className='size-4 text-muted-foreground' />;
   const config = tab.getConfig() as { path?: string } | undefined;
   // The registry's icons are static; this only looks one up.
-  return <span className='size-4 shrink-0'>{createElement(getFileIcon(getFileExtension(config?.path ?? '')))}</span>;
+  return <span className='size-4 shrink-0'>{createElement(getFileIcon(getIconExtension(config?.path ?? '')))}</span>;
 }
 
 /** Every open tab, as a list to pick from or close; the phone layout's tab strip. */

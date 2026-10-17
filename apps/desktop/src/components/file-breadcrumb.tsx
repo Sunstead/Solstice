@@ -9,7 +9,7 @@ import {
   BreadcrumbSeparator,
 } from '@sunstead/ui/components/breadcrumb';
 import { getFileIcon } from '@/assets/icons';
-import { cn, getFileExtension } from '@/lib/utils';
+import { cn, getIconExtension } from '@/lib/utils';
 import { getWorkspaceRelativeSegments } from '@/lib/path-utils';
 import { FormattedFileName } from './file-tree';
 
@@ -31,7 +31,7 @@ export default function FileBreadcrumb({
   const { workspaceName, normalizedWorkspace, crumbs } =
     getWorkspaceRelativeSegments(filePath, workspacePath);
 
-  const Icon = getFileIcon(getFileExtension(filePath));
+  const Icon = getFileIcon(getIconExtension(filePath));
 
   return (
     <Breadcrumb className={cn('min-w-0 max-w-full', className)}>
