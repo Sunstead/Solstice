@@ -1,0 +1,171 @@
+/*
+ * The Islands layout (`appearance.islands`): the window is the sidebar's
+ * colour, and the explorer and each editor pane are panels of the notes'
+ * colour on it, apart by a gap instead of a border. The shell's own pieces
+ * take `islands:` classes (app-sidebar.tsx, app-shell.tsx, title-bar.tsx);
+ * this is flexlayout's markup, which they don't render.
+ *
+ * The tabs sit on the window, in the title bar's row, as in the classic
+ * layout: only the selected tab is the note's colour, and it runs into its
+ * pane below. So every panel starts under that row and ends one gap above
+ * the window's bottom.
+ */
+
+:root[data-islands='true'] {
+  --island-gap: 6px;
+  --island-radius: var(--radius-lg, 0.625rem);
+  /* A gap being hovered or dragged (the sidebar's rail, the splitters): a
+     thin line in it, not the whole gap. */
+  --island-handle: color-mix(in oklch, var(--primary) 50%, transparent);
+  --island-handle-width: 2px;
+}
+
+/* Splitters are the gaps: flexlayout sizes them from --splitter-size. */
+:root[data-islands='true'] .flexlayout__layout {
+  --splitter-size: var(--island-gap);
+  --color-splitter: transparent;
+  --color-splitter-hover: transparent;
+  --color-background: var(--sidebar);
+}
+
+/* A hovered or dragged splitter draws the line down its middle. */
+:root[data-islands='true']:not([data-pointer='touch']) .flexlayout__splitter:hover,
+:root[data-islands='true'] .flexlayout__splitter_drag {
+  background: linear-gradient(var(--island-handle), var(--island-handle)) center / var(--island-handle-width) 100%
+    no-repeat;
+}
+
+:root[data-islands='true']:not([data-pointer='touch']) .flexlayout__splitter_vert:hover,
+:root[data-islands='true'] .flexlayout__splitter_drag:has(.flexlayout__splitter_handle_vert) {
+  background-size: 100% var(--island-handle-width);
+}
+
+/* The layout fills its own box, inside the inset's gap, not the inset. */
+:root[data-islands='true'] .flexlayout-custom {
+  position: relative;
+}
+
+/* No outlines: the selected tab keeps its curve (the flares fill with the
+   note's colour) and is one piece with its pane. */
+:root[data-islands='true'] .flexlayout-custom .flexlayout__layout {
+  --color-tab-outline: transparent;
+}
+
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset_tabbar_outer {
+  box-shadow: none;
+}
+
+/*
+ * The first tab starts at the pane's left edge, with no flare that side, and
+ * while it's selected the pane's top-left corner is square under it, so the
+ * two are one shape. Content layers are their tab's (`/t0` is a tabset's
+ * first), and only the selected one shows.
+ */
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container {
+  padding-left: 0;
+}
+
+/* The divider flexlayout puts before every tab. A selected tab has no
+   margins, so it lands on the edge; an unselected one keeps its 2px
+   (selecting never changes a tab's room: tab-motion.ts). */
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container > .flexlayout__tabset_tab_spacer:first-child {
+  display: none;
+}
+
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset:not(:has(.header-controls-spacer))
+  .flexlayout__tab_button--selected[data-layout-path$='/tb0']::before {
+  display: none;
+}
+
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tab[data-layout-path$='/t0'] {
+  border-top-left-radius: 0;
+}
+
+/*
+ * Except in the pane the header controls overhang (the top-left one, with
+ * the spacer), as the sidebar collapses: there the tabs start after the
+ * controls, and keep `--tabs-room` from them, the flare's width and then
+ * the pane's corner. That room comes in with the controls rather than at
+ * once: as the first tab leaves the pane's edge its flare grows to full
+ * size, then the corner rounds behind it, so the tabs move as one with the
+ * sidebar and nothing pops in. All of it follows `--overhang`
+ * (header-controls.tsx); the room is in the tabs' padding, inside the strip
+ * that clips the flare.
+ */
+:root[data-islands='true'] .flexlayout-custom .flexlayout__layout {
+  --tabs-room: calc(var(--tab-curve-r) + var(--island-radius));
+  /* How far the first tab is from the pane's edge, and the room's share. */
+  --tabs-offset: max(0px, var(--overhang, -100vw) + var(--tabs-room));
+  --tabs-pad: clamp(0px, var(--overhang, -100vw) + var(--tabs-room), var(--tabs-room));
+}
+
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset:has(.header-controls-spacer)
+  .flexlayout__tabset_tabbar_inner_tab_container {
+  padding-left: var(--tabs-pad);
+}
+
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset:has(.header-controls-spacer)
+  .flexlayout__tab_button--selected[data-layout-path$='/tb0']::before {
+  --flare: min(var(--tabs-offset), var(--tab-curve-r));
+  left: calc(var(--flare) * -1);
+  width: var(--flare);
+  height: var(--flare);
+  background: radial-gradient(
+    circle at top left,
+    transparent calc(var(--flare) - 1px),
+    var(--color-tab-outline) var(--flare),
+    var(--color-tab-selected-background) calc(var(--flare) + 0.571px)
+  );
+}
+
+/* The top-left pane is the first child at every level (findCornerTabset),
+   so a path of only zeros, or else the maximized one, the only one showing.
+   Its corner rounds only past the flare, so the two never meet. */
+:root[data-islands='true'] .flexlayout-custom
+  .flexlayout__tab[data-layout-path$='/ts0/t0']:not([data-layout-path*='1']):not([data-layout-path*='2']):not([data-layout-path*='3']):not([data-layout-path*='4']):not([data-layout-path*='5']):not([data-layout-path*='6']):not([data-layout-path*='7']):not([data-layout-path*='8']):not([data-layout-path*='9']),
+:root[data-islands='true'] .flexlayout-custom
+  .flexlayout__layout:has(.flexlayout__tabset-maximized)
+  .flexlayout__tab[data-layout-path$='/t0'] {
+  border-top-left-radius: clamp(0px, var(--tabs-offset) - var(--tab-curve-r), var(--island-radius));
+}
+
+/* The pane: the tab's content, a layer of its own over the tabset, and the
+   tabset's empty body under it (seen while a pane has no tab). */
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset_content,
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tab {
+  border-radius: var(--island-radius);
+  overflow: hidden;
+  background: var(--background);
+}
+
+/*
+ * The sidebar's rail (its resize handle): centred in the gap beside the
+ * explorer rather than on the explorer's edge, lit as the splitters are, a
+ * line down the gap the panels' height. Collapsed, it sits in the rail's
+ * margin, its line against the editor. The margin moves it: the rail is
+ * positioned by `right`, which sunstead-ui sets per pointer.
+ */
+:root[data-islands='true'] [data-slot='sidebar-rail'] {
+  margin-right: calc(var(--island-gap) / -2);
+}
+
+:root[data-islands='true'] [data-state='collapsed'] [data-slot='sidebar-rail'] {
+  margin-right: calc(var(--island-gap) / 2);
+}
+
+:root[data-islands='true'] [data-slot='sidebar-rail']::after {
+  left: calc(50% - var(--island-handle-width) / 2);
+  width: var(--island-handle-width);
+  bottom: var(--island-gap);
+  border-radius: var(--island-handle-width);
+  transition: background-color 0.1s ease-in 0.05s;
+}
+
+:root[data-islands='true'] [data-state='collapsed'] [data-slot='sidebar-rail']::after {
+  left: calc(50% + var(--island-gap) / 2 - var(--island-handle-width));
+}
+
+:root[data-islands='true']:not([data-pointer='touch']) [data-slot='sidebar-rail']:hover::after,
+:root[data-islands='true'] [data-dragging='true'] [data-slot='sidebar-rail']::after {
+  background-color: var(--island-handle);
+}

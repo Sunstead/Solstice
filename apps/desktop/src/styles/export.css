@@ -1,0 +1,96 @@
+/*
+ * A note exported as a PDF (`lib/export/`): always light, whatever the app's
+ * theme, in the editor's typography (its --editor-* settings come in on
+ * :root). Imported as a string, never into the app.
+ */
+@import './typeset.css';
+@import './math.css';
+@import './callout.css';
+@import './table.css';
+@import './task-list.css';
+@import './highlight.css';
+@import './wikilink.css';
+
+/* Sunstead Light's tokens: what the note stylesheets above read. */
+:root {
+  --background: #ffffff;
+  --foreground: oklch(0.141 0.005 285.823);
+  --color-foreground: var(--foreground);
+  --primary: oklch(0.21 0.006 285.885);
+  --color-primary: var(--primary);
+  --primary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --border: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.705 0.015 286.067);
+  --color-ring: var(--ring);
+  --destructive: oklch(0.577 0.245 27.325);
+  --warning: #a16207;
+  /* Darker than the theme's: a callout's pale accent fades on paper. */
+  --chart-1: oklch(0.552 0.016 285.938);
+  --chart-2: oklch(0.552 0.016 285.938);
+  --chart-3: oklch(0.442 0.017 285.786);
+  --chart-4: oklch(0.37 0.013 285.805);
+  --radius: 0.5rem;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: light;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+html,
+body {
+  margin: 0;
+  /* The app's own font, under the editor's if one is set. */
+  font-family: var(--export-font-ui, system-ui, sans-serif);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.typeset {
+  max-width: none;
+}
+
+/* What the editor shows as a card or a live view, as print. */
+.solstice-export-embed {
+  margin-block: 1em;
+  padding-inline-start: 1em;
+  border-inline-start: 2px solid var(--border);
+}
+
+.solstice-export-file {
+  padding: 0 0.3em;
+  border: 1px solid var(--border);
+  border-radius: 0.3em;
+  font-size: 0.9em;
+}
+
+.typeset img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Code, in classHighlighter's classes (lib/export/sources.ts). */
+.tok-keyword,
+.tok-operatorKeyword,
+.tok-modifier { color: #8839ef; }
+.tok-string,
+.tok-string2 { color: #40a02b; }
+.tok-number,
+.tok-bool,
+.tok-atom { color: #fe640b; }
+.tok-comment { color: #8c8fa1; font-style: italic; }
+.tok-typeName,
+.tok-className,
+.tok-namespace { color: #df8e1d; }
+.tok-definition,
+.tok-function { color: #1e66f5; }
+.tok-propertyName { color: #179299; }
+.tok-variableName.tok-local,
+.tok-variableName2 { color: #d20f39; }
+.tok-meta,
+.tok-macroName { color: #ea76cb; }
+.tok-heading { font-weight: 600; }
+.tok-link,
+.tok-url { text-decoration: underline; }
+.tok-invalid { color: #d20f39; }
