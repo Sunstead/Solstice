@@ -49,9 +49,13 @@ export function RowGroup({ title, children }: { title?: ReactNode; children: Rea
   );
 }
 
-/** One row: an icon, a label, and what's on the right (a chevron when it goes somewhere). */
+/**
+ * One row: an icon (or anything else `leading`, like a workspace's), a label,
+ * and what's on the right (a chevron when it goes somewhere).
+ */
 export function Row({
   icon: Icon,
+  leading,
   label,
   detail,
   chevron = false,
@@ -60,6 +64,7 @@ export function Row({
   onClick,
 }: {
   icon?: ComponentType<{ className?: string }>;
+  leading?: ReactNode;
   label: ReactNode;
   detail?: ReactNode;
   chevron?: boolean;
@@ -77,7 +82,7 @@ export function Row({
         destructive && 'text-destructive',
       )}
     >
-      {Icon && <Icon className={cn('size-5 shrink-0', !destructive && 'text-muted-foreground')} />}
+      {leading ?? (Icon && <Icon className={cn('size-5 shrink-0', !destructive && 'text-muted-foreground')} />)}
       <span className='min-w-0 flex-1 truncate'>{label}</span>
       {detail}
       {chevron && <ChevronRight className='size-4 shrink-0 text-muted-foreground' />}

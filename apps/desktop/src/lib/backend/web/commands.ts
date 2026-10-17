@@ -32,7 +32,9 @@ import {
   refresh,
   resolve,
   rootOf,
+  setVaultColor,
   vaultUrl,
+  vaults,
 } from './vault';
 
 type Result<T> = { status: 'ok'; data: T } | { status: 'error'; error: string };
@@ -47,6 +49,11 @@ async function attempt<T>(run: () => Promise<T>): Promise<Result<T>> {
 
 const desktopOnly = (what: string) =>
   Promise.resolve<Result<never>>({ status: 'error', error: `${what} is only in the desktop app.` });
+
+async function vaultColors(paths: string[], refresh: boolean) {
+  const list = await vaults(refresh).catch(() => []);
+  return paths.map((p) => ({ color: list.find((v) => rootOf(v) === p)?.color ?? null }));
+}
 
 const isNote = (path: string) => path.toLowerCase().endsWith('.md');
 
@@ -236,6 +243,11 @@ export const webCommands: Commands = {
   ensureThemeDir: () => desktopOnly('A themes folder'),
   listSystemFonts: () => Promise.resolve({ status: 'ok', data: [] }),
   syncAccount: () => attempt(async () => (await apiJson<{ username: string }>('/v1/me')).username),
+  // Sharing and PDFs go through the browser (`lib/share/web.ts`, printing).
+  exportTempPath: () => desktopOnly('A file to share'),
+  writeExportFile: () => desktopOnly('A file to share'),
+  renderPdf: () => desktopOnly('Writing a PDF'),
+  shareFiles: () => desktopOnly('The share picker'),
   syncServerInfo: () => desktopOnly('Linking a folder to sync'),
   syncSignIn: () => desktopOnly('Signing in to sync'),
   syncSignOut: () => desktopOnly('Signing out of sync'),
@@ -280,6 +292,14 @@ export const webCommands: Commands = {
     }),
   // Saves carry the base read with the note; nothing to record up front.
   syncEditorOpened: () => Promise.resolve(),
+  // A workspace's color is its vault's.
+  workspaceMeta: (paths) => vaultColors(paths, false),
+  syncPullColors: (paths) => vaultColors(paths, true),
+  setWorkspaceColor: (path, color) =>
+    attempt(async () => {
+      const { vault } = await resolve(path);
+      return { color: (await setVaultColor(vault.id, color)).color ?? null };
+    }),
   // A vault's root is named after it.
   syncVaultNames: async (paths) => {
     const vault = currentVault();

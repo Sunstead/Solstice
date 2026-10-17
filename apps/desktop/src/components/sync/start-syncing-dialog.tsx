@@ -13,7 +13,9 @@ import {
 } from '@sunstead/ui/components/dialog';
 import { commands } from '@/lib/backend';
 import { useServerVaults } from '@/hooks/use-server-vaults';
+import { useWorkspace } from '@/hooks/use-workspace';
 import { useSync } from '@/lib/stores/sync';
+import { useWorkspaceMeta } from '@/lib/stores/workspace-meta';
 import { linkSummary } from './link-summary';
 import { VaultPicker } from './vault-picker';
 
@@ -42,6 +44,7 @@ export function StartSyncingDialog({
 }
 
 function StartSyncingForm({ server, workspace, onDone }: { server: string; workspace: string; onDone: () => void }) {
+  const path = useWorkspace((s) => s.path);
   const { vaults, error: loadError } = useServerVaults(server);
   const [choice, setChoice] = useState('new');
   const [name, setName] = useState(workspace);
@@ -62,7 +65,8 @@ function StartSyncingForm({ server, workspace, onDone }: { server: string; works
     setError(null);
     let vault: SyncVault | undefined = vaults?.find((v) => v.id === choice);
     if (choice === 'new') {
-      const created = await commands.syncCreateVault(server, name.trim());
+      const color = path ? (useWorkspaceMeta.getState().colors[path] ?? null) : null;
+      const created = await commands.syncCreateVault(server, name.trim(), color);
       if (created.status === 'error') {
         setBusy(false);
         return setError(created.error);
@@ -75,6 +79,8 @@ function StartSyncingForm({ server, workspace, onDone }: { server: string; works
     if (result.status === 'error') return setError(result.error);
     setReport(result.data);
     void useSync.getState().refresh();
+    // An existing vault's color comes over, or the folder's goes to it.
+    if (path) void useWorkspaceMeta.getState().load([path]);
   };
 
   if (report) {

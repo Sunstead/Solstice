@@ -183,6 +183,48 @@ async fn eventually(what: &str, check: impl Fn() -> bool) {
 }
 
 #[tokio::test]
+async fn a_vault_keeps_the_color_it_is_given() {
+    let root = tempfile::tempdir().unwrap();
+    let server = start(root.path()).await;
+    let http = reqwest::Client::new();
+
+    let res = http
+        .post(format!("{}/v1/vaults", server.base))
+        .json(&serde_json::json!({ "name": "School", "color": "#ABC" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 201);
+    let vault: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(vault["color"], "#aabbcc");
+    let id = vault["id"].as_str().unwrap();
+
+    let patch = |body: serde_json::Value| {
+        http.patch(format!("{}/v1/vaults/{id}", server.base))
+            .json(&body)
+            .send()
+    };
+    let res = patch(serde_json::json!({ "color": "#4F7CC4" })).await.unwrap();
+    assert_eq!(res.status(), 200);
+    assert_eq!(res.json::<serde_json::Value>().await.unwrap()["color"], "#4f7cc4");
+    assert_eq!(patch(serde_json::json!({ "color": "blue" })).await.unwrap().status(), 400);
+
+    let listed: serde_json::Value = http
+        .get(format!("{}/v1/vaults", server.base))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(listed[0]["color"], "#4f7cc4");
+
+    let res = patch(serde_json::json!({ "color": null })).await.unwrap();
+    assert_eq!(res.json::<serde_json::Value>().await.unwrap()["color"], serde_json::Value::Null);
+    server.stop().await;
+}
+
+#[tokio::test]
 async fn devices_sync_through_the_server_and_its_folder() {
     let tmp = tempfile::tempdir().unwrap();
     let server = start(tmp.path()).await;

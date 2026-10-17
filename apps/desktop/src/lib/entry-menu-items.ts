@@ -1,18 +1,26 @@
 import type { ComponentType } from 'react';
 import { can, shell } from '@/lib/backend/platform';
+import { exportPdf, saveCopy, shareAnchor, shareFile } from '@/lib/share/actions';
+import { fileActions, shareAsLabel, shareLabel, type ShareFormat } from '@/lib/share/targets';
 import {
   ArrowUpRight,
   Clipboard,
   Columns2,
   Copy,
+  Download,
+  File as PlainFile,
   FileCode,
+  FileDown,
+  FileOutput,
   FileSearch,
   FileText,
   FolderInput,
   FolderTree,
   HardDrive,
+  Image as ImageIcon,
   Link,
   PencilLine,
+  Share,
   SquarePlus,
   Trash,
 } from 'lucide-react';
@@ -101,6 +109,8 @@ function useRevealInSystemLabel() {
 }
 
 const separator = (id: string): EntryMenuItem => ({ kind: 'separator', id });
+
+const SHARE_ICONS: Record<ShareFormat, MenuIcon> = { pdf: FileText, file: PlainFile, image: ImageIcon };
 
 /**
  * Opening a dialog or the inline rename input has to wait for the menu to
@@ -251,6 +261,42 @@ export function useEntryMenuItems(
   }
 
   items.push(separator('after-open-external'));
+
+  // Getting the file out: Share (with a choice of what to send, where
+  // there's one), a PDF, a copy.
+  if (!isDir) {
+    const actions = fileActions(path, can);
+    const from = surface === 'tree' ? 'tree' : 'header';
+    const share = (format: ShareFormat) => () => void shareFile(path, format, shareAnchor(path, from));
+    if (actions.share.length === 1) {
+      items.push({ kind: 'item', id: 'share', label: shareLabel(actions.share[0], path), icon: Share, run: share(actions.share[0]) });
+    } else if (actions.share.length > 1) {
+      items.push({
+        kind: 'submenu',
+        id: 'share',
+        label: 'Share',
+        icon: Share,
+        items: actions.share.map((format) => ({
+          kind: 'item' as const,
+          id: `share-${format}`,
+          label: shareAsLabel(format, path),
+          icon: SHARE_ICONS[format],
+          run: share(format),
+        })),
+      });
+    }
+    if (actions.exportPdf) {
+      items.push({ kind: 'item', id: 'export-pdf', label: 'Export as PDF...', icon: FileDown, run: () => void exportPdf(path) });
+    }
+    items.push({
+      kind: 'item',
+      id: 'save-copy',
+      label: shell === 'web' ? 'Download' : 'Save a Copy...',
+      icon: shell === 'web' ? Download : FileOutput,
+      run: () => void saveCopy(path),
+    });
+    items.push(separator('after-share'));
+  }
 
   items.push({
     kind: 'submenu',

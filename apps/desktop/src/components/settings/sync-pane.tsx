@@ -15,6 +15,8 @@ import { useSync } from '@/lib/stores/sync';
 import { SyncStatusLine } from '@/components/sync/status';
 import { StartSyncingDialog } from '@/components/sync/start-syncing-dialog';
 import { UserAvatar } from '@/components/user-avatar';
+import { WorkspaceIcon } from '@/components/workspace-icon';
+import { useWorkspaceMeta, workspaceColor } from '@/lib/stores/workspace-meta';
 import { host } from '@/components/workspace-dialogs/helpers';
 import { Card, Heading } from './pane-parts';
 
@@ -37,6 +39,8 @@ export function SyncPane() {
   const username = useAccount((s) => s.username);
   const linked = useSync((s) => s.info);
   const workspace = useWorkspace((s) => s.path);
+  const stored = useWorkspaceMeta((s) => (workspace ? s.colors[workspace] : null));
+  const color = workspaceColor(workspace ? folderName(workspace) : '', stored);
 
   const show = useCallback((result: { status: 'ok'; data: SyncServerInfo } | { status: 'error'; error: string }) => {
     setInfo(result.status === 'ok' ? result.data : null);
@@ -122,9 +126,9 @@ export function SyncPane() {
         <section>
           <Heading>This workspace</Heading>
           {linked ? (
-            <SyncedWorkspace workspace={folderName(workspace)} busy={busy} run={run} />
+            <SyncedWorkspace workspace={folderName(workspace)} color={color} busy={busy} run={run} />
           ) : (
-            <LocalWorkspace server={server} workspace={folderName(workspace)} />
+            <LocalWorkspace server={server} workspace={folderName(workspace)} color={color} />
           )}
         </section>
       )}
@@ -134,11 +138,12 @@ export function SyncPane() {
   );
 }
 
-function LocalWorkspace({ server, workspace }: { server: string; workspace: string }) {
+function LocalWorkspace({ server, workspace, color }: { server: string; workspace: string; color: string }) {
   const [open, setOpen] = useState(false);
   return (
     <Card>
       <div className='flex items-center gap-3'>
+        <WorkspaceIcon name={workspace} color={color} size='lg' />
         <p className='min-w-0 flex-1'>
           <span className='font-medium'>{workspace}</span> is only on this {deviceNoun}.
         </p>
@@ -153,10 +158,12 @@ function LocalWorkspace({ server, workspace }: { server: string; workspace: stri
 
 function SyncedWorkspace({
   workspace,
+  color,
   busy,
   run,
 }: {
   workspace: string;
+  color: string;
   busy: boolean;
   run: (action: () => Promise<Outcome>) => Promise<void>;
 }) {
@@ -177,11 +184,14 @@ function SyncedWorkspace({
 
   return (
     <Card>
-      <div className='flex flex-col gap-1'>
-        <p>
-          {broken ? 'Linked to' : 'Syncing with'} the vault <span className='font-medium'>{info.vault_name}</span>
-        </p>
-        <SyncStatusLine info={info} />
+      <div className='flex items-center gap-3'>
+        <WorkspaceIcon name={info.vault_name} color={color} size='lg' />
+        <div className='flex min-w-0 flex-col gap-1'>
+          <p>
+            {broken ? 'Linked to' : 'Syncing with'} the vault <span className='font-medium'>{info.vault_name}</span>
+          </p>
+          <SyncStatusLine info={info} />
+        </div>
       </div>
 
       {info.state === 'deleted' && (

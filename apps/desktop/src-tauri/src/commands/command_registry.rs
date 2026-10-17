@@ -57,6 +57,11 @@ command_id! {
     FileRevealInExplorer => "file.reveal_in_explorer",
     FileRevealInSystem => "file.reveal_in_system",
     FileOpenInDefaultApp => "file.open_in_default_app",
+    FileShare => "file.share",
+    FileSharePdf => "file.share_pdf",
+    FileShareImage => "file.share_image",
+    FileExportPdf => "file.export_pdf",
+    FileSaveCopy => "file.save_copy",
     FileCopyPath => "file.copy_path",
     FileCopyRelativePath => "file.copy_relative_path",
     FileCopyWikilink => "file.copy_wikilink",
@@ -149,23 +154,27 @@ fn reveal_in_system_label() -> &'static str {
 }
 
 /// Commands the web app leaves out: it has no folder to open as a workspace
-/// or import a vault into, no file manager to show a file in, and updates
-/// with its server.
-pub const NOT_ON_WEB: [CommandId; 4] = [
+/// or import a vault into, no file manager to show a file in, updates with
+/// its server, and can't make a PDF file (it prints instead).
+pub const NOT_ON_WEB: [CommandId; 5] = [
     CommandId::AppCheckForUpdates,
     CommandId::FileOpenFolder,
     CommandId::FileImportFromSync,
     CommandId::FileRevealInSystem,
+    CommandId::FileSharePdf,
 ];
 
 /// The web app's default where it differs. Browsers keep Ctrl/Cmd+N, T and W
 /// (new window, new tab, close tab) for themselves, so those move to Alt.
+/// Empty: none at all.
 fn web_accelerator(id: CommandId) -> Option<&'static str> {
     match id {
         CommandId::FileNewNote => Some("Alt+N"),
         CommandId::FileNewFolder => Some("Alt+Shift+N"),
         CommandId::FileNewTab => Some("Alt+T"),
         CommandId::FileCloseTab => Some("Alt+W"),
+        // The browser's own Cmd+P prints, which is what Export as PDF does there.
+        CommandId::FileExportPdf => Some(""),
         // Safari's own: Cmd+/ shows its status bar.
         CommandId::ViewToggleSourceMode => Some("Alt+/"),
         // Safari's and Chrome's own tab switching.
@@ -183,7 +192,7 @@ pub fn web_commands() -> Vec<CommandMeta> {
         .filter(|c| !NOT_ON_WEB.contains(&c.id))
         .map(|mut c| {
             if let Some(accelerator) = web_accelerator(c.id) {
-                c.accelerator = Some(accelerator.into());
+                c.accelerator = (!accelerator.is_empty()).then(|| accelerator.into());
             }
             c
         })
@@ -294,6 +303,36 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
         CommandMeta {
             id: CommandId::FileOpenInDefaultApp,
             label: "Open in Default App".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileShare,
+            label: "Share File...".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileSharePdf,
+            label: "Share as PDF...".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileShareImage,
+            label: "Share as Image...".into(),
+            accelerator: None,
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileExportPdf,
+            label: "Export as PDF...".into(),
+            accelerator: Some("CmdOrCtrl+P".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::FileSaveCopy,
+            label: "Save a Copy...".into(),
             accelerator: None,
             is_overridden: false,
         },
@@ -619,5 +658,33 @@ mod canvas_tests {
                 c.id
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod share_tests {
+    use super::*;
+
+    #[test]
+    fn sharing_and_exporting_are_commands() {
+        let commands = default_commands();
+        let get = |id: CommandId| commands.iter().find(|c| c.id == id).unwrap_or_else(|| panic!("no {id}"));
+        assert_eq!(get(CommandId::FileShare).label, "Share File...");
+        assert_eq!(get(CommandId::FileSharePdf).label, "Share as PDF...");
+        assert_eq!(get(CommandId::FileShareImage).label, "Share as Image...");
+        assert_eq!(get(CommandId::FileSaveCopy).label, "Save a Copy...");
+        let export = get(CommandId::FileExportPdf);
+        assert_eq!(export.label, "Export as PDF...");
+        assert_eq!(export.accelerator.as_deref(), Some("CmdOrCtrl+P"));
+        // One key, one command.
+        assert_eq!(commands.iter().filter(|c| c.accelerator.as_deref() == Some("CmdOrCtrl+P")).count(), 1);
+    }
+
+    #[test]
+    fn the_web_prints_with_the_browser_and_cannot_write_pdfs() {
+        let web = web_commands();
+        let export = web.iter().find(|c| c.id == CommandId::FileExportPdf).expect("export is on the web");
+        assert_eq!(export.accelerator, None, "the browser's own Cmd+P prints");
+        assert!(web.iter().all(|c| c.id != CommandId::FileSharePdf));
     }
 }

@@ -74,6 +74,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         // Clipped inside, not on the container: the rail hangs half outside
         // it, and a clipped half takes no touch.
         '*:data-[sidebar=sidebar]:flex-row *:data-[sidebar=sidebar]:overflow-hidden',
+        // Islands: no edge between the sidebar and the editor, only the gap.
+        'islands:border-r-0!',
         isMobile &&
           'data-[side=left]:w-(--sidebar-width) data-[side=left]:max-w-none pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]',
       )}
@@ -81,19 +83,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     >
       <Sidebar
         collapsible='none'
-        className='w-(--sidebar-width-icon)! min-w-(--sidebar-width-icon) border-r'
+        className='w-(--sidebar-width-icon)! min-w-(--sidebar-width-icon) border-r islands:border-r-0'
       >
         <SidebarContent>
           <SidebarGroup className='p-0'>
-            <SidebarGroupContent className='px-1.5 md:px-0'>
-              <SidebarMenu className='gap-0'>
+            {/* With Islands the active view is a filled square, inset from the edges. */}
+            <SidebarGroupContent className='px-1.5 md:px-0 islands:md:px-1.5 islands:pt-1'>
+              <SidebarMenu className='gap-0 islands:gap-1'>
                 {primaryViews.map((view) => (
                   <SidebarMenuItem key={view.id}>
                     <button
                       type='button'
                       data-active={view.id === activePrimaryView && (open || isMobile)}
                       onClick={() => handleSelect(view.id)}
-                      className='data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)] flex aspect-square w-full items-center justify-center text-xs font-medium text-muted-foreground hover:text-foreground data-[active=true]:text-foreground'
+                      className='data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)] flex aspect-square w-full items-center justify-center text-xs font-medium text-muted-foreground hover:text-foreground data-[active=true]:text-foreground islands:rounded-md islands:data-[active=true]:shadow-none islands:data-[active=true]:bg-sidebar-accent islands:data-[active=true]:text-sidebar-accent-foreground'
                     >
                       <view.icon className='size-5 touch:size-6' />
                     </button>
@@ -136,10 +139,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         collapsible='none'
         // Hidden from the keyboard and screen readers while the edge covers it.
         inert={!isMobile && !open}
-        className='flex flex-1 w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]! min-w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]'
+        className={cn(
+          'flex flex-1 w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]! min-w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))]',
+          // An island: the notes' own colour, with the rail and the title
+          // bar its rim on two sides and the gap on the others. Stretched,
+          // not full height, so the gap below it fits in the window and it
+          // ends level with the editor's panes.
+          !isMobile && 'islands:h-auto islands:mb-(--island-gap) islands:rounded-(--island-radius) islands:bg-background',
+        )}
       >
         {ActiveSidebarContent && <ActiveSidebarContent />}
-        <SidebarFooter className='border-t'>
+        <SidebarFooter className='border-t islands:border-t-0'>
           <WorkspaceSwitcher />
         </SidebarFooter>
       </Sidebar>

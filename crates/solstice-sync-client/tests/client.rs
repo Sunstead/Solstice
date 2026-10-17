@@ -38,7 +38,7 @@ async fn start_server(root: &Path) -> Server {
 impl Server {
     async fn create_vault(&self, name: &str) -> String {
         let server = solstice_sync_client::Server::new(&self.url).unwrap();
-        server.create_vault(None, name).await.unwrap().id
+        server.create_vault(None, name, None).await.unwrap().id
     }
 
     async fn stop(self) {
@@ -84,6 +84,19 @@ struct Pair {
     a: PathBuf,
     b: PathBuf,
     vault: String,
+}
+
+#[tokio::test]
+async fn a_vault_color_goes_to_the_server_and_back() {
+    let tmp = tempfile::tempdir().unwrap();
+    let server = start_server(tmp.path()).await;
+    let client = solstice_sync_client::Server::new(&server.url).unwrap();
+    let made = client.create_vault(None, "School", Some("#4f7cc4")).await.unwrap();
+    assert_eq!(made.color.as_deref(), Some("#4f7cc4"));
+    let changed = client.set_vault_color(None, &made.id, Some("#c44f7c")).await.unwrap();
+    assert_eq!(changed.color.as_deref(), Some("#c44f7c"));
+    assert_eq!(client.vaults(None).await.unwrap(), [changed]);
+    server.stop().await;
 }
 
 /// Two folders with some files, linked to one vault (A first).

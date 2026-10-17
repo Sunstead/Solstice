@@ -5,7 +5,7 @@
  */
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { getCurrent as tauriGetCurrent, onOpenUrl as tauriOnOpenUrl } from '@tauri-apps/plugin-deep-link';
-import { message as tauriMessage, open as tauriOpen } from '@tauri-apps/plugin-dialog';
+import { message as tauriMessage, open as tauriOpen, save as tauriSave } from '@tauri-apps/plugin-dialog';
 import {
   openPath as tauriOpenPath,
   openUrl as tauriOpenUrl,
@@ -20,6 +20,8 @@ export const openPath: typeof tauriOpenPath = inTauri ? tauriOpenPath : web.open
 export const revealItemInDir: typeof tauriReveal = inTauri ? tauriReveal : web.revealItemInDir;
 export const message: typeof tauriMessage = inTauri ? tauriMessage : web.message;
 export const open: typeof tauriOpen = inTauri ? tauriOpen : (web.open as typeof tauriOpen);
+/** Where to save a file; the web downloads instead (`lib/share/`). */
+export const save: typeof tauriSave = inTauri ? tauriSave : web.save;
 export const platform: typeof tauriPlatform = inTauri ? tauriPlatform : web.platform;
 export const getCurrent: typeof tauriGetCurrent = inTauri ? tauriGetCurrent : web.getCurrent;
 export const onOpenUrl: typeof tauriOnOpenUrl = inTauri ? tauriOnOpenUrl : web.onOpenUrl;

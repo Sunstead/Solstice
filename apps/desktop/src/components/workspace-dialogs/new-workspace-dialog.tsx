@@ -17,6 +17,10 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { useSync } from '@/lib/stores/sync';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
+import { useWorkspaceMeta } from '@/lib/stores/workspace-meta';
+import { defaultWorkspaceColor } from '@/lib/workspace/color';
+import { WorkspaceColorPicker } from '@/components/workspace-color-picker';
+import { WorkspaceIcon } from '@/components/workspace-icon';
 import { useSyncAccount, useWorkspaceParent } from './helpers';
 import { LocationField, SyncSignIn } from './shared';
 
@@ -24,7 +28,7 @@ import { LocationField, SyncSignIn } from './shared';
  * Makes a workspace, as opposed to opening a folder or importing one from
  * sync. On desktop: a name, where to put it, and whether to sync it (to a new
  * vault of the same name). On the web a workspace is a vault on the server,
- * so only the name.
+ * so only the name. Its icon follows the name until a color is picked.
  */
 export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
   const setWorkspace = useWorkspace((s) => s.setWorkspace);
@@ -33,6 +37,7 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
   const [parent, setParent] = useWorkspaceParent();
 
   const [name, setName] = useState('');
+  const [picked, setPicked] = useState<string | null>(null);
   const [sync, setSync] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +54,7 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
   }
 
   const trimmed = name.trim();
+  const color = picked ?? defaultWorkspaceColor(trimmed);
   const syncing = can.localFolders && sync && signedIn;
   const ready = !!trimmed && !busy && (!can.localFolders || !!parent);
 
@@ -70,13 +76,17 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
     }
     if (can.pickFolders && parent) await useKnownWorkspaces.getState().rememberParent(parent);
     await setWorkspace(made.data);
+    // Only a picked color is stored; otherwise the name's is the same everywhere.
+    if (picked) await useWorkspaceMeta.getState().setColor(made.data, picked);
 
     if (syncing) {
-      const vault = await commands.syncCreateVault(account.server, trimmed);
+      const vault = await commands.syncCreateVault(account.server, trimmed, picked);
       if (vault.status === 'error') return failLink(vault.error);
       const linked = await commands.syncLink(account.server, vault.data.id, vault.data.name);
       if (linked.status === 'error') return failLink(linked.error);
       void useSync.getState().refresh();
+      // The color reached the vault with it: settles the folder's copy.
+      void useWorkspaceMeta.getState().load([made.data]);
     }
     setBusy(false);
     onDone();
@@ -110,14 +120,31 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
       <div className='grid gap-4 text-sm'>
         <div className='grid gap-2'>
           <Label htmlFor='new-workspace-name'>Name</Label>
-          <Input
-            id='new-workspace-name'
-            value={name}
-            autoFocus
-            disabled={linkFailed}
-            placeholder='Notes'
-            onChange={(e) => setName(e.target.value)}
-          />
+          <div className='flex items-center gap-2'>
+            <WorkspaceColorPicker
+              color={color}
+              picked={picked !== null}
+              onChange={setPicked}
+              trigger={
+                <button
+                  type='button'
+                  title='Change color'
+                  disabled={linkFailed}
+                  className='rounded-[28%] outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring'
+                >
+                  <WorkspaceIcon name={trimmed} color={color} size='lg' />
+                </button>
+              }
+            />
+            <Input
+              id='new-workspace-name'
+              value={name}
+              autoFocus
+              disabled={linkFailed}
+              placeholder='Notes'
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
         </div>
 
         {can.pickFolders && <LocationField parent={parent} onParent={setParent} name={trimmed} disabled={linkFailed} />}

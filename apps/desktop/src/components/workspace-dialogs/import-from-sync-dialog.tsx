@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Cloud } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import {
@@ -17,6 +17,8 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { useServerVaults } from '@/hooks/use-server-vaults';
 import { useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { useSync } from '@/lib/stores/sync';
+import { useWorkspaceMeta, workspaceColor } from '@/lib/stores/workspace-meta';
+import { WorkspaceIcon } from '@/components/workspace-icon';
 import { cn } from '@/lib/utils';
 import { host, useSyncAccount, useWorkspaceParent } from './helpers';
 import { can, deviceNoun } from '@/lib/backend/platform';
@@ -66,6 +68,7 @@ export function ImportFromSyncForm({ onDone }: { onDone: () => void }) {
       return setError(`The folder is open, but downloading ${vault.name} failed: ${linked.error}. Try again from Settings > Sync.`);
     }
     void useSync.getState().refresh();
+    void useWorkspaceMeta.getState().load([made.data]);
     setReport(linked.data);
   };
 
@@ -129,7 +132,7 @@ export function ImportFromSyncForm({ onDone }: { onDone: () => void }) {
                       vault?.id === v.id && 'bg-muted',
                     )}
                   >
-                    <Cloud className='size-4 text-muted-foreground' />
+                    <WorkspaceIcon name={v.name} color={workspaceColor(v.name, v.color)} />
                     <span className='flex-1 truncate'>{v.name}</span>
                     {vault?.id === v.id && <Check className='size-4' />}
                   </button>

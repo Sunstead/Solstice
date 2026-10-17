@@ -116,7 +116,7 @@ impl TokenSource for DesktopTokens {
     }
 }
 
-async fn token(server: &str) -> Result<Option<String>, String> {
+pub(crate) async fn token(server: &str) -> Result<Option<String>, String> {
     DesktopTokens::new(server).token().await
 }
 
@@ -217,6 +217,8 @@ pub struct SyncServerInfo {
 pub struct SyncVault {
     pub id: String,
     pub name: String,
+    /// The workspace color, `#rrggbb`, if one was picked.
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -332,15 +334,19 @@ pub async fn sync_account(server: String) -> Result<Option<String>, String> {
 pub async fn sync_vaults(server: String) -> Result<Vec<SyncVault>, String> {
     let token = token(&server).await?;
     let vaults = Server::new(&server).map_err(err)?.vaults(token.as_deref()).await.map_err(err)?;
-    Ok(vaults.into_iter().map(|v| SyncVault { id: v.id, name: v.name }).collect())
+    Ok(vaults.into_iter().map(|v| SyncVault { id: v.id, name: v.name, color: v.color }).collect())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn sync_create_vault(server: String, name: String) -> Result<SyncVault, String> {
+pub async fn sync_create_vault(server: String, name: String, color: Option<String>) -> Result<SyncVault, String> {
     let token = token(&server).await?;
-    let v = Server::new(&server).map_err(err)?.create_vault(token.as_deref(), &name).await.map_err(err)?;
-    Ok(SyncVault { id: v.id, name: v.name })
+    let v = Server::new(&server)
+        .map_err(err)?
+        .create_vault(token.as_deref(), &name, color.as_deref())
+        .await
+        .map_err(err)?;
+    Ok(SyncVault { id: v.id, name: v.name, color: v.color })
 }
 
 /// An API token for Atlas (it can only list vaults and create notes).

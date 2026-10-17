@@ -35,6 +35,9 @@ impl TokenSource for NoTokens {
 pub struct VaultInfo {
     pub id: String,
     pub name: String,
+    /// The workspace color, `#rrggbb` (servers from 0.3.0; older ones have none).
+    #[serde(default)]
+    pub color: Option<String>,
 }
 
 /// How to sign in to a server, from its `/v1/info`.
@@ -194,11 +197,33 @@ impl Server {
         Ok(me.username)
     }
 
-    pub async fn create_vault(&self, token: Option<&str>, name: &str) -> Result<VaultInfo, Error> {
+    pub async fn create_vault(
+        &self,
+        token: Option<&str>,
+        name: &str,
+        color: Option<&str>,
+    ) -> Result<VaultInfo, Error> {
         let req = self
             .http
             .post(self.endpoint("v1/vaults"))
-            .json(&serde_json::json!({ "name": name }));
+            .json(&serde_json::json!({ "name": name, "color": color }));
+        let res = self.send(req, token).await?;
+        res.json()
+            .await
+            .map_err(|e| Error::BadServer(e.to_string()))
+    }
+
+    /// Sets a vault's color, or clears it with `None`.
+    pub async fn set_vault_color(
+        &self,
+        token: Option<&str>,
+        id: &str,
+        color: Option<&str>,
+    ) -> Result<VaultInfo, Error> {
+        let req = self
+            .http
+            .patch(self.endpoint(&format!("v1/vaults/{id}")))
+            .json(&serde_json::json!({ "color": color }));
         let res = self.send(req, token).await?;
         res.json()
             .await
@@ -315,5 +340,14 @@ mod tests {
         ] {
             assert!(Server::new(bad).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn vaults_from_servers_without_colors_still_decode() {
+        let old: VaultInfo = serde_json::from_str(r#"{"id":"v1","name":"Notes"}"#).unwrap();
+        assert_eq!(old.color, None);
+        let new: VaultInfo =
+            serde_json::from_str(r##"{"id":"v1","name":"Notes","color":"#4f7cc4"}"##).unwrap();
+        assert_eq!(new.color.as_deref(), Some("#4f7cc4"));
     }
 }

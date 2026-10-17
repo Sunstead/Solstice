@@ -12,6 +12,7 @@
 @import './prosemirror.css';
 @import './milkdown.css';
 @import './viewer.css';
+@import './islands.css';
 
 @source '../../../../node_modules/@sunstead/ui/src';
 
@@ -21,6 +22,10 @@
    `data-pointer`). Covers @sunstead/ui's classes too, compiled here, and
    `group-hover`/`peer-hover`, built from this. */
 @custom-variant hover (&:where(:root:not([data-pointer='touch']) *):hover);
+
+/* The Islands layout (`appearance.islands`, `islands.css`): panels on the
+   window's colour instead of regions split by borders. */
+@custom-variant islands (&:where([data-islands='true'] *));
 
 @theme inline {
   --font-sans: 'Geist Variable', sans-serif;

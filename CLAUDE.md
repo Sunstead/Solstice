@@ -89,6 +89,8 @@ The workspace dialogs live in [components/workspace-dialogs/](apps/desktop/src/c
 - **Open folder as workspace** (`file.open_folder`, desktop) takes any folder as it is.
 - **Manage workspaces** (`file.manage_workspaces`) removes them. On desktop that only forgets the workspace (`useKnownWorkspaces.forget`); its folder stays. On the web it deletes the vault on the server, after typing its name. The open workspace can't be removed.
 
+**Workspace icons:** every workspace shows its letters (`lib/workspace/initials.ts`: one word's first, else the first two words'; camelCase, `-`, `_`, `.` break words) on its colour, a rounded square (`WorkspaceIcon`), wherever workspaces are listed. A picked colour lives in `.solstice/workspace.json` (`workspace_meta.rs`, flat JSON, unknown keys kept); none picked is one made from the name (`defaultWorkspaceColor`, the same on every device), so nothing is written until someone picks (`WorkspaceColorPicker`: swatches, Shuffle, hex). `.solstice/` never syncs, so a linked folder's colour is its vault's on the server (`vaults.color`, `PATCH /v1/vaults/{id}`): picking pushes it (`colorPending` until the server has it), and `sync_pull_colors` (on launch and when a workspace list opens) adopts one picked elsewhere. `normalize_hex` (`solstice-core`) and `normalizeHex` agree; change both. `lib/stores/workspace-meta.ts` holds them; the web reads them from the vault list.
+
 ### Scoped persistence
 
 Two storage scopes, both backed by `tauri-plugin-store` (JSON files), wired via [src/lib/stores/scoped-storage.ts](apps/desktop/src/lib/stores/scoped-storage.ts):
@@ -126,6 +128,12 @@ Tab/pane layout is [flexlayout-react](https://github.com/caplin/FlexLayout), wra
 
 **One tab at a time** (`layout.tabs`, the default in the iPad app and touch-first browsers) is the same flexlayout, not another view: `applyTabMode` (`lib/flexlayout-utils.ts`) merges every tab into one tabset and turns off dividing, edge docking and maximize, so the strip, tab motion and drag-to-reorder all stay. Open to the Side is hidden and `openFileInNewTab(..., 'right')` opens a tab instead. `view.next_tab`/`view.previous_tab` step through the shown tab's strip in either mode.
 
+### Sharing and export
+
+A file's ⋯ menu, its tree menu, File > Current File and a share button in its header (`ShareButton`) get it out; `lib/share/targets.ts` decides what each file offers. A note shares as PDF or as Markdown, a drawing as a PNG (`drawingPng`) or a PDF, anything else as itself; notes and drawings export as PDF (`file.export_pdf`, Cmd/Ctrl+P); anything saves a copy. `lib/share/actions.ts` does it all and shows errors itself. The share sheet is the iPad's (`Share.swift`, a popover from `shareAnchor`: the tree row or the header's share button), the Mac's `NSSharingServicePicker` (`export/macos.rs`), or on the web the browser's (else a download); Windows and Linux have none (`can.share`).
+
+A PDF is a standalone HTML page built from the note (`lib/export/document.ts`: the static render, with embeds, math, highlighted code, callouts and every image inlined, front matter and comments left out, the editor's typography and fonts carried in, `styles/export.css` always light), printed by the platform: on the Mac a hidden window loads it from the `solstice-export:` scheme and WebKit paginates it to the file (`export/`), on iOS an offscreen WKWebView and `UIPrintPageRenderer` (`PdfPrinter`), elsewhere a hidden iframe and the print dialog (`can.writePdf`). Files made to share go in the cache's `share/` folder, cleared at launch.
+
 ### UI components
 
 **Hover** follows the pointer in use, not `(hover: hover)` (false on an iPad, so nothing hovered under the Apple Pencil): `lib/pointer-kind.ts` sets `data-pointer` (`touch`, `pen`, `mouse`) on `<html>`, and `styles/app.css` redefines Tailwind's `hover` variant (`group-hover` and `peer-hover` follow) to apply unless it's `touch`, so a finger's tap leaves no highlight stuck. Plain CSS `:hover` that only highlights takes the same `:root:not([data-pointer='touch'])` guard.
@@ -148,8 +156,12 @@ The same frontend runs in a browser as the web app, served by the Solstice Sync 
 - A note is read with a `base` and saved against it: the server merges the save with whatever other devices did since, as a synced desktop folder does. Saves go through a journal in IndexedDB (`lib/backend/web/notes.ts`, `journal.ts`), one at a time per file, each with a `save_id` the server applies once, so a lost signal or a closed page never loses or doubles an edit.
 - A failed write never closes the editor: the autosaver keeps the edit, retries (backoff, and when the page, network or sync comes back), and the editor shows `SaveFailedBar`. The autosaver also flushes when the page hides, since iOS rarely fires `beforeunload`.
 - Settings and layout are kept on the server per user (`/v1/web/settings`), not in `.solstice/`; the workspace list is the user's vaults.
-- Shortcuts: browsers keep Ctrl/Cmd+N, T and W, so `registry.json` carries the web's own defaults (Alt+N, Alt+T, Alt+W, Alt+Shift+N; `web_commands()` in `command_registry.rs`) and leaves out what the web can't do (`NOT_ON_WEB`: open a folder, show in the file manager).
+- Shortcuts: browsers keep Ctrl/Cmd+N, T and W, so `registry.json` carries the web's own defaults (Alt+N, Alt+T, Alt+W, Alt+Shift+N; `web_commands()` in `command_registry.rs`) and leaves out what the web can't do (`NOT_ON_WEB`: open a folder, show in the file manager, share as PDF).
 - What needs a computer is hidden or says so: window controls, picking a folder, theme folders, system fonts, showing a file in the file manager, the Sync pane (the web shows the account and Sign out instead). File pickers hand back blob URLs that `importAttachment` uploads. `/open?vault=&path=` is the web's `solstice://open` link.
+
+### Islands
+
+`appearance.islands` (on by default) sets `data-islands` on `<html>`: the window is the sidebar's colour and the explorer and each editor pane are rounded panels of the notes' colour, apart by `--island-gap`, with no borders. Shell components take `islands:` classes (the Tailwind variant in `app.css`); flexlayout's markup is styled in `styles/islands.css` (its splitters are the gaps: flexlayout sizes them from `--splitter-size`). The tabs stay on the window in the title bar's row, as in the classic layout; the selected tab keeps its curve, with no outline, and runs into its pane (the first tab sits on the pane's left edge with no flare that side, the corner square under it; where the header controls overhang the strip, the room it keeps from them, `--tabs-room`, its flare and then the pane's corner grow in with them from `--overhang`, so collapsing never makes the tabs jump), so the explorer and the panes start under that row and end one gap above the window's bottom. Collapsed, the rail's margin is the gap, so the panes start where the explorer does; the sidebar's rail (its resize handle) sits in the gap and lights like the splitters (`--island-handle`). The rail marks the active view with the accent there, the classic layout with the inset bar. The phone layout is the same either way.
 
 ### Window chrome
 

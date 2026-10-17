@@ -44,6 +44,16 @@ export const can = {
    * views: the iOS app (`lib/backend/native.ts`).
    */
   nativeViews: shell === 'mobile' && platform() === 'ios',
+  /**
+   * A share sheet: the iPad's and iPhone's, the Mac's picker, and on the web
+   * the browser's (or a download standing in for it).
+   */
+  share: (shell === 'mobile' && platform() === 'ios') || (shell === 'desktop' && platform() === 'macos') || shell === 'web',
+  /**
+   * Writing a PDF straight to a file. Elsewhere Export as PDF prints, and
+   * the print dialog saves the PDF.
+   */
+  writePdf: (shell === 'mobile' && platform() === 'ios') || (shell === 'desktop' && platform() === 'macos'),
 } as const;
 
 /**

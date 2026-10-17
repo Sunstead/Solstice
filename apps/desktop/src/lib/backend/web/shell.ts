@@ -15,6 +15,11 @@ export async function openPath(path: string): Promise<void> {
   window.open(assetUrl(path), '_blank', 'noopener,noreferrer');
 }
 
+/** No save dialog: files are downloaded (`lib/share/web.ts`). */
+export async function save(): Promise<string | null> {
+  return null;
+}
+
 /** There's no file manager to show it in. */
 export async function revealItemInDir(): Promise<void> {}
 

@@ -13,21 +13,23 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@sunstead/ui/components/resizable-sidebar';
-import { useWorkspaceChoices } from '@/hooks/use-workspace-choices';
+import { refreshWorkspaceColors, useWorkspaceChoices } from '@/hooks/use-workspace-choices';
+import { WorkspaceIcon } from '@/components/workspace-icon';
 
 export function WorkspaceSwitcher() {
-  const { activePath, activeName, workspaces, switchTo, actions, manage } = useWorkspaceChoices();
+  const { activePath, activeName, activeColor, workspaces, switchTo, actions, manage } = useWorkspaceChoices();
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={(open) => open && refreshWorkspaceColors()}>
           <DropdownMenuTrigger
             render={
               <SidebarMenuButton
                 size='default'
                 className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
               >
+                {activeName && activeColor && <WorkspaceIcon name={activeName} color={activeColor} />}
                 <div className='grid flex-1 text-left text-sm leading-tight'>
                   <span className='truncate font-medium'>{activeName ?? 'No workspace open'}</span>
                 </div>
@@ -52,6 +54,7 @@ export function WorkspaceSwitcher() {
                       key={workspace.path}
                       onClick={() => switchTo(workspace.path)}
                     >
+                      <WorkspaceIcon name={workspace.name} color={workspace.color} />
                       <span className='flex-1 truncate'>{workspace.name}</span>
                       {workspace.path === activePath && (
                         <Check className='size-4' />

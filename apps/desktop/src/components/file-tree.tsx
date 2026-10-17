@@ -207,6 +207,8 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
           render={
             <SidebarMenuButton
               ref={nodeRef}
+              // Where a share sheet from its menu points (`shareAnchor`).
+              data-tree-path={node.path}
               isActive={!!activeFilePath && isSamePath(activeFilePath, node.path)}
               className={cn(
                 'data-active:font-normal w-full max-w-full truncate pl-8',

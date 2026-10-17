@@ -89,6 +89,17 @@ export const settingsRegistry = {
     visibleWhen: (get) => get('theme.mode') === 'system',
   }),
 
+  // The explorer and each editor pane as rounded panels on the window, with
+  // gaps instead of borders (`styles/islands.css`). Off is the classic look.
+  'appearance.islands': defineBoolean({
+    section: 'appearance',
+    group: 'Layout',
+    scope: 'global',
+    label: 'Islands',
+    default: true,
+    domAttr: { name: 'data-islands', format: (v) => String(v) },
+  }),
+
   'appearance.reduceMotion': defineBoolean({
     section: 'accessibility',
     scope: 'global',

@@ -9,6 +9,7 @@ import { SettingsSearchResults } from '@/components/settings/settings-search-res
 import { SyncStatusLine } from '@/components/sync/status';
 import { UserAvatar } from '@/components/user-avatar';
 import { useWorkspaceChoices } from '@/hooks/use-workspace-choices';
+import { WorkspaceIcon } from '@/components/workspace-icon';
 import { can } from '@/lib/backend/platform';
 import { getSection, type SectionId } from '@/lib/settings/sections';
 import { usePhoneNav } from '@/lib/stores/phone-nav';
@@ -28,7 +29,7 @@ export function YouPage() {
   const popSection = usePhoneNav((s) => s.popSection);
   const query = useSettingsDialog((s) => s.query.trim());
   const setQuery = useSettingsDialog((s) => s.setQuery);
-  const { activeName } = useWorkspaceChoices();
+  const { activeName, activeColor } = useWorkspaceChoices();
   const [workspacesOpen, setWorkspacesOpen] = useState(false);
   const page = useRef<HTMLDivElement>(null);
 
@@ -50,6 +51,7 @@ export function YouPage() {
             <AccountCard onOpenSync={() => open('sync')} />
             <RowGroup title='Workspace'>
               <Row
+                leading={activeName && activeColor && <WorkspaceIcon name={activeName} color={activeColor} size='lg' />}
                 label={activeName ?? 'No workspace open'}
                 detail={<ChevronsUpDown className='size-4 shrink-0 text-muted-foreground' />}
                 onClick={() => setWorkspacesOpen(true)}

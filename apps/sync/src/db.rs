@@ -91,6 +91,8 @@ const MIGRATIONS: &[&str] = &[
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (user_id, scope)
     ) WITHOUT ROWID;",
+    // 0.3: a vault's color (`#rrggbb`), its workspace icon's on every device.
+    "ALTER TABLE vaults ADD COLUMN color TEXT;",
 ];
 
 /// Thirty days, sliding: each use within the window extends it.
@@ -140,8 +142,21 @@ pub struct User {
 pub struct VaultRow {
     pub id: String,
     pub name: String,
+    /// `#rrggbb`, or none: devices make one from the name.
+    pub color: Option<String>,
     #[serde(skip)]
     pub user_id: i64,
+}
+
+const VAULT_COLUMNS: &str = "id, name, color, user_id";
+
+fn vault_row(r: &rusqlite::Row) -> rusqlite::Result<VaultRow> {
+    Ok(VaultRow {
+        id: r.get(0)?,
+        name: r.get(1)?,
+        color: r.get(2)?,
+        user_id: r.get(3)?,
+    })
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -510,15 +525,9 @@ impl Db {
     pub async fn vaults(&self, user: i64) -> Result<Vec<VaultRow>> {
         self.call(move |c| {
             let mut stmt =
-                c.prepare("SELECT id, name, user_id FROM vaults WHERE user_id = ?1 ORDER BY name")?;
+                c.prepare(&format!("SELECT {VAULT_COLUMNS} FROM vaults WHERE user_id = ?1 ORDER BY name"))?;
             let rows = stmt
-                .query_map([user], |r| {
-                    Ok(VaultRow {
-                        id: r.get(0)?,
-                        name: r.get(1)?,
-                        user_id: r.get(2)?,
-                    })
-                })?
+                .query_map([user], vault_row)?
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(rows)
         })
@@ -530,15 +539,9 @@ impl Db {
         let id = id.to_owned();
         self.call(move |c| {
             c.query_row(
-                "SELECT id, name, user_id FROM vaults WHERE id = ?1 AND user_id = ?2",
+                &format!("SELECT {VAULT_COLUMNS} FROM vaults WHERE id = ?1 AND user_id = ?2"),
                 params![id, user],
-                |r| {
-                    Ok(VaultRow {
-                        id: r.get(0)?,
-                        name: r.get(1)?,
-                        user_id: r.get(2)?,
-                    })
-                },
+                vault_row,
             )
             .optional()?
             .ok_or(DbError::NotFound)
@@ -569,13 +572,21 @@ impl Db {
         .await
     }
 
-    pub async fn create_vault(&self, user: i64, name: &str) -> Result<VaultRow> {
+    /// `color` is already `#rrggbb` (`solstice_core::normalize_hex`).
+    pub async fn create_vault(
+        &self,
+        user: i64,
+        name: &str,
+        color: Option<&str>,
+    ) -> Result<VaultRow> {
         let name = name.to_owned();
+        let color = color.map(str::to_owned);
         self.call(move |c| {
             let id = uuid::Uuid::new_v4().to_string();
             match c.execute(
-                "INSERT INTO vaults (id, user_id, name, created_at) VALUES (?1, ?2, ?3, ?4)",
-                params![id, user, name, now()],
+                "INSERT INTO vaults (id, user_id, name, color, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![id, user, name, color, now()],
             ) {
                 Err(rusqlite::Error::SqliteFailure(e, _))
                     if e.code == rusqlite::ErrorCode::ConstraintViolation =>
@@ -589,10 +600,36 @@ impl Db {
                     Ok(VaultRow {
                         id,
                         name,
+                        color,
                         user_id: user,
                     })
                 }
             }
+        })
+        .await
+    }
+
+    /// Sets (or, with `None`, clears) a vault's color, if it belongs to
+    /// `user`. `color` is already `#rrggbb`.
+    pub async fn set_vault_color(
+        &self,
+        user: i64,
+        id: &str,
+        color: Option<&str>,
+    ) -> Result<VaultRow> {
+        let id = id.to_owned();
+        let color = color.map(str::to_owned);
+        self.call(move |c| {
+            c.query_row(
+                &format!(
+                    "UPDATE vaults SET color = ?1 WHERE id = ?2 AND user_id = ?3
+                     RETURNING {VAULT_COLUMNS}"
+                ),
+                params![color, id, user],
+                vault_row,
+            )
+            .optional()?
+            .ok_or(DbError::NotFound)
         })
         .await
     }
@@ -737,12 +774,12 @@ mod tests {
         let db = Db::open_in_memory().unwrap();
         let a = db.user_for("iss", "a", "alice").await.unwrap();
         let b = db.user_for("iss", "b", "bob").await.unwrap();
-        let v = db.create_vault(a.id, "Notes").await.unwrap();
+        let v = db.create_vault(a.id, "Notes", None).await.unwrap();
         assert!(matches!(
-            db.create_vault(a.id, "Notes").await,
+            db.create_vault(a.id, "Notes", None).await,
             Err(DbError::Conflict(_))
         ));
-        db.create_vault(b.id, "Notes").await.unwrap();
+        db.create_vault(b.id, "Notes", None).await.unwrap();
         assert_eq!(db.vault(a.id, &v.id).await.unwrap(), v);
         assert!(matches!(
             db.vault(b.id, &v.id).await,
@@ -752,10 +789,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn vaults_keep_a_color_only_their_user_can_change() {
+        let db = Db::open_in_memory().unwrap();
+        let a = db.user_for("iss", "a", "alice").await.unwrap();
+        let b = db.user_for("iss", "b", "bob").await.unwrap();
+        let plain = db.create_vault(a.id, "Plain", None).await.unwrap();
+        assert_eq!(plain.color, None);
+        let v = db.create_vault(a.id, "Notes", Some("#4f7cc4")).await.unwrap();
+        assert_eq!(v.color.as_deref(), Some("#4f7cc4"));
+
+        let changed = db.set_vault_color(a.id, &v.id, Some("#c44f7c")).await.unwrap();
+        assert_eq!(changed.color.as_deref(), Some("#c44f7c"));
+        assert_eq!(db.vault(a.id, &v.id).await.unwrap(), changed);
+        assert!(matches!(
+            db.set_vault_color(b.id, &v.id, Some("#000000")).await,
+            Err(DbError::NotFound)
+        ));
+        let cleared = db.set_vault_color(a.id, &v.id, None).await.unwrap();
+        assert_eq!(cleared.color, None);
+        assert_eq!(db.vaults(a.id).await.unwrap(), [cleared, plain]);
+    }
+
+    #[tokio::test]
     async fn saves_and_replaces_documents() {
         let db = Db::open_in_memory().unwrap();
         let a = db.user_for("iss", "a", "alice").await.unwrap();
-        let v = db.create_vault(a.id, "Notes").await.unwrap();
+        let v = db.create_vault(a.id, "Notes", None).await.unwrap();
         db.save_docs(
             &v.id,
             vec![DocRow {
@@ -829,8 +888,8 @@ mod tests {
     async fn deleting_a_vault_forgets_its_state_and_web_settings() {
         let db = Db::open_in_memory().unwrap();
         let a = db.user_for("iss", "a", "alice").await.unwrap();
-        let notes = db.create_vault(a.id, "Notes").await.unwrap();
-        let other = db.create_vault(a.id, "Other").await.unwrap();
+        let notes = db.create_vault(a.id, "Notes", None).await.unwrap();
+        let other = db.create_vault(a.id, "Other", None).await.unwrap();
         for v in [&notes, &other] {
             db.put_web_setting(a.id, &format!("vault.{}.layout", v.id), "{}".into())
                 .await
@@ -843,7 +902,7 @@ mod tests {
         assert!(db.web_setting(a.id, &scope(&other)).await.unwrap().is_some());
         assert!(matches!(db.delete_vault(a.id, &notes.id).await, Err(DbError::NotFound)));
         // The name is free again.
-        db.create_vault(a.id, "Notes").await.unwrap();
+        db.create_vault(a.id, "Notes", None).await.unwrap();
     }
 
     #[tokio::test]

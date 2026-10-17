@@ -18,7 +18,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -38,7 +38,7 @@ pub fn router() -> Router<AppState> {
         .route("/healthz", get(|| async { "ok" }))
         .route("/v1/info", get(info))
         .route("/v1/vaults", get(list_vaults).post(create_vault))
-        .route("/v1/vaults/{id}", delete(delete_vault))
+        .route("/v1/vaults/{id}", patch(update_vault).delete(delete_vault))
         .route("/v1/vaults/{id}/notes", post(create_note))
         .route(
             "/v1/vaults/{id}/blobs/{hash}",
@@ -94,7 +94,7 @@ async fn list_vaults(
             };
             let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
             if is_dir && !names.contains(&name) && check_vault_name(&name).is_ok() {
-                vaults.push(state.db.create_vault(who.user.id, &name).await?);
+                vaults.push(state.db.create_vault(who.user.id, &name, None).await?);
             }
         }
     }
@@ -102,9 +102,22 @@ async fn list_vaults(
     Ok(Json(vaults))
 }
 
+/// A workspace color, as `#rrggbb`.
+fn check_color(color: Option<&str>) -> Result<Option<String>, AppError> {
+    color
+        .map(|c| {
+            solstice_core::normalize_hex(c).ok_or_else(|| {
+                AppError::bad_request(format!("{c:?} isn't a color: use #rrggbb"))
+            })
+        })
+        .transpose()
+}
+
 #[derive(Deserialize)]
 struct NewVault {
     name: String,
+    #[serde(default)]
+    color: Option<String>,
 }
 
 async fn create_vault(
@@ -114,7 +127,8 @@ async fn create_vault(
 ) -> Result<(StatusCode, Json<VaultRow>), AppError> {
     who.require_person()?;
     let name = check_vault_name(&body.name)?;
-    let row = state.db.create_vault(who.user.id, &name).await?;
+    let color = check_color(body.color.as_deref())?;
+    let row = state.db.create_vault(who.user.id, &name, color.as_deref()).await?;
     std::fs::create_dir_all(state.hub.folder(&who.user.username, &name))
         .map_err(AppError::internal)?;
     Ok((StatusCode::CREATED, Json(row)))
@@ -254,6 +268,36 @@ async fn create_token(
         StatusCode::CREATED,
         Json(serde_json::json!({ "token": token, "info": row })),
     ))
+}
+
+#[derive(Deserialize)]
+struct VaultChange {
+    /// Absent leaves it; `null` clears it (back to the one from the name).
+    #[serde(default, deserialize_with = "present")]
+    color: Option<Option<String>>,
+}
+
+/// Tells a field set to `null` from one left out.
+fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(d).map(Some)
+}
+
+/// Changes a vault's color, from any device or the web app.
+async fn update_vault(
+    State(state): State<AppState>,
+    who: CurrentUser,
+    Path(id): Path<String>,
+    Json(body): Json<VaultChange>,
+) -> Result<Json<VaultRow>, AppError> {
+    who.require_person()?;
+    let row = match body.color {
+        Some(color) => {
+            let color = check_color(color.as_deref())?;
+            state.db.set_vault_color(who.user.id, &id, color.as_deref()).await?
+        }
+        None => vault_for(&state, &who, &id).await?,
+    };
+    Ok(Json(row))
 }
 
 /// Deletes a vault (the web app's Delete). Its notes move to the owner's

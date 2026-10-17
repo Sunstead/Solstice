@@ -68,6 +68,30 @@
     },
     {
       "accelerator": null,
+      "id": "file.share",
+      "is_overridden": false,
+      "label": "Share File..."
+    },
+    {
+      "accelerator": null,
+      "id": "file.share_image",
+      "is_overridden": false,
+      "label": "Share as Image..."
+    },
+    {
+      "accelerator": null,
+      "id": "file.export_pdf",
+      "is_overridden": false,
+      "label": "Export as PDF..."
+    },
+    {
+      "accelerator": null,
+      "id": "file.save_copy",
+      "is_overridden": false,
+      "label": "Save a Copy..."
+    },
+    {
+      "accelerator": null,
       "id": "file.copy_path",
       "is_overridden": false,
       "label": "Copy Absolute Path"
@@ -409,6 +433,23 @@
                   "id": "file.open_in_default_app",
                   "is_overridden": false,
                   "label": "Open in Default App"
+                }
+              },
+              "Separator",
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.export_pdf",
+                  "is_overridden": false,
+                  "label": "Export as PDF..."
+                }
+              },
+              {
+                "Command": {
+                  "accelerator": null,
+                  "id": "file.save_copy",
+                  "is_overridden": false,
+                  "label": "Save a Copy..."
                 }
               },
               "Separator",

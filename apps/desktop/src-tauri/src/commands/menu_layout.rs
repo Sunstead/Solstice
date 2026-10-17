@@ -75,6 +75,7 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
     use MenuEntrySpec::*;
     use NativeItem::*;
     use CommandId::*;
+    let share = macos || cfg!(target_os = "ios");
     vec![
         (
             "File",
@@ -101,6 +102,16 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                             Command(FileRevealInSystem),
                             Command(FileOpenInDefaultApp),
                             Separator,
+                        ]
+                        .into_iter()
+                        // Only where there's a share sheet: the Mac's, the iPad's.
+                        .chain(share.then(|| {
+                            Submenu("Share", vec![Command(FileShare), Command(FileSharePdf), Command(FileShareImage)])
+                        }))
+                        .chain([
+                            Command(FileExportPdf),
+                            Command(FileSaveCopy),
+                            Separator,
                             Command(FileCopyPath),
                             Command(FileCopyRelativePath),
                             Command(FileCopyWikilink),
@@ -109,8 +120,9 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                             Command(FileDuplicate),
                             Command(FileMoveTo),
                             Separator,
-                            Command(FileDelete)
-                        ]
+                            Command(FileDelete),
+                        ])
+                        .collect()
                     ),
                     Separator,
                     Command(FileCloseTab)
@@ -390,5 +402,49 @@ mod tests {
         }
         assert!(claimed.contains(&CommandId::FileNewNote));
         assert!(claimed.iter().all(|id| !id.is_canvas()), "{claimed:?}");
+    }
+
+    fn current_file(macos: bool) -> Vec<ResolvedMenuEntry> {
+        let file = menu_layout_on(&default_commands(), macos).into_iter().find(|m| m.title == "File").unwrap();
+        file.entries
+            .into_iter()
+            .find_map(|e| match e {
+                ResolvedMenuEntry::Submenu { title, entries } if title == "Current File" => Some(entries),
+                _ => None,
+            })
+            .unwrap()
+    }
+
+    fn ids(entries: &[ResolvedMenuEntry]) -> Vec<CommandId> {
+        let mut out = Vec::new();
+        for e in entries {
+            match e {
+                ResolvedMenuEntry::Command(c) => out.push(c.id),
+                ResolvedMenuEntry::Submenu { entries, .. } => out.extend(ids(entries)),
+                _ => {}
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn every_platform_exports_and_saves_copies() {
+        for macos in [true, false] {
+            let found = ids(&current_file(macos));
+            assert!(found.contains(&CommandId::FileExportPdf), "macos: {macos}");
+            assert!(found.contains(&CommandId::FileSaveCopy), "macos: {macos}");
+        }
+    }
+
+    #[test]
+    fn only_a_system_with_a_share_sheet_has_share_in_its_menu() {
+        let share = |macos| {
+            current_file(macos).into_iter().any(|e| {
+                matches!(&e, ResolvedMenuEntry::Submenu { title, entries }
+                    if title == "Share" && ids(entries) == [CommandId::FileShare, CommandId::FileSharePdf, CommandId::FileShareImage])
+            })
+        };
+        assert!(share(true));
+        assert!(!share(false) || cfg!(target_os = "ios"));
     }
 }

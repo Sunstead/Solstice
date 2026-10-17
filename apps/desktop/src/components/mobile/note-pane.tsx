@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, ChevronLeft, Ellipsis } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@sunstead/ui/components/sheet';
 import { SyncIndicator } from '@/components/sync/status';
+import { ShareButton } from '@/components/share-button';
 import { targetFromPath } from '@/lib/entry-actions';
 import { useEntryMenuItems, type EntryMenuItem } from '@/lib/entry-menu-items';
 import { getFileNameFromPath } from '@/lib/path-utils';
@@ -38,6 +39,7 @@ export function NoteHeader({ model, shown }: { model: Model; shown: TabNode | nu
           </span>
           <span className='sr-only'>Tabs</span>
         </Button>
+        {tabPath(shown) && <ShareButton path={tabPath(shown)!} />}
         <Button variant='ghost' size='icon' onClick={() => setActionsOpen(true)}>
           <Ellipsis />
           <span className='sr-only'>More</span>
@@ -128,7 +130,8 @@ function FileRows({ path, onDone }: { path: string; onDone: () => void }) {
               <Row
                 key={item.id}
                 icon={item.icon}
-                label={item.label.replace(/\.\.\.$|…$/, '')}
+                // "Share (As PDF...)" reads "Share (As PDF)".
+                label={item.label.replace(/(\.\.\.|…)(?=\)?$)/, '')}
                 destructive={item.destructive}
                 disabled={item.disabled}
                 onClick={() => {

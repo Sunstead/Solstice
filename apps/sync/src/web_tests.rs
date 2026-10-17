@@ -422,7 +422,7 @@ async fn signing_in_on_the_web() {
 
     // Someone else's vault doesn't exist, as far as this session can tell.
     let bob = s.state.db.user_for("iss", "bob", "bob").await.unwrap();
-    let theirs = s.state.db.create_vault(bob.id, "Private").await.unwrap();
+    let theirs = s.state.db.create_vault(bob.id, "Private", None).await.unwrap();
     let res = c
         .get(format!("{}/v1/vaults/{}/tree", s.base, theirs.id))
         .header("cookie", &cookie)

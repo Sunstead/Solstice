@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { commands } from '@/lib/backend';
 import { open } from '@/lib/backend/shell';
 import { rerooted, useKnownWorkspaces } from '@/lib/stores/known-workspaces';
+import { useWorkspaceMeta } from '@/lib/stores/workspace-meta';
 import { shell } from '@/lib/backend/platform';
 import { resetScopedStoreCache } from '@/lib/stores/scoped-storage';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
@@ -55,6 +56,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     if (!get().loading) return;
 
     await useKnownWorkspaces.getState().load();
+    // Icons can show the name's color until this lands; nothing waits on it.
+    void useWorkspaceMeta.getState().load(useKnownWorkspaces.getState().workspaces.map((w) => w.path));
 
     let path = await commands.getWorkspace();
 
@@ -100,6 +103,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       console.error('Failed to watch workspace:', result.error);
     }
     await useKnownWorkspaces.getState().touch(path);
+    void useWorkspaceMeta.getState().load([path]);
     useFiles.getState().reset();
     set({ path });
     await syncScopedStores(path);

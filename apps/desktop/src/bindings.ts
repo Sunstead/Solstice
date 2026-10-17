@@ -92,6 +92,35 @@ export const commands = {
 	 *  where it was.
 	 */
 	setWatchEnabled: (enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_watch_enabled", { enabled })),
+	/**  Each workspace's metadata, open or not. */
+	workspaceMeta: (paths: string[]) => __TAURI_INVOKE<WorkspaceMeta[]>("workspace_meta", { paths }),
+	/**
+	 *  Sets (or, with `None`, clears) a workspace's color, and its vault's if
+	 *  it's linked. Offline, the server catches up on the next `sync_pull_colors`.
+	 */
+	setWorkspaceColor: (path: string, color: string | null) => typedError<WorkspaceMeta, string>(__TAURI_INVOKE("set_workspace_color", { path, color })),
+	/**
+	 *  Brings linked workspaces' colors in step with their vaults (one request
+	 *  per server), then returns every workspace's metadata. Servers that can't
+	 *  be reached leave theirs as they were.
+	 */
+	syncPullColors: (paths: string[]) => __TAURI_INVOKE<WorkspaceMeta[]>("sync_pull_colors", { paths }),
+	/**  Where to write a file made to share, such as a PDF. */
+	exportTempPath: (name: string) => typedError<string, string>(__TAURI_INVOKE("export_temp_path", { name })),
+	/**  Writes a file made to share (a drawing's PNG), and says where. */
+	writeExportFile: (name: string, base64: string) => typedError<string, string>(__TAURI_INVOKE("write_export_file", { name, base64 })),
+	/**  Prints `html` to a PDF at `out_path`, on pages of `page` (macOS). */
+	renderPdf: (html: string, page: PageSpec, outPath: string) => typedError<null, string>(__TAURI_INVOKE("render_pdf", { html, page, outPath })),
+	/**
+	 *  The system's share picker for `paths`, pointing at `anchor` (macOS; the
+	 *  iPad's is the native plugin's).
+	 */
+	shareFiles: (paths: string[], anchor: {
+	x: number | null,
+	y: number | null,
+	width: number | null,
+	height: number | null,
+} | null) => typedError<null, string>(__TAURI_INVOKE("share_files", { paths, anchor })),
 	getCommandRegistry: () => __TAURI_INVOKE<CommandMeta[]>("get_command_registry"),
 	setKeybind: (commandId: CommandId, accelerator: string) => typedError<null, string>(__TAURI_INVOKE("set_keybind", { commandId, accelerator })),
 	/**  Drop a command's override so it falls back to its compiled-in default. */
@@ -136,7 +165,7 @@ export const commands = {
 	/**  Who's signed in to `server`, or `None` when nobody is. */
 	syncAccount: (server: string) => typedError<string | null, string>(__TAURI_INVOKE("sync_account", { server })),
 	syncVaults: (server: string) => typedError<SyncVault[], string>(__TAURI_INVOKE("sync_vaults", { server })),
-	syncCreateVault: (server: string, name: string) => typedError<SyncVault, string>(__TAURI_INVOKE("sync_create_vault", { server, name })),
+	syncCreateVault: (server: string, name: string, color: string | null) => typedError<SyncVault, string>(__TAURI_INVOKE("sync_create_vault", { server, name, color })),
 	/**  An API token for Atlas (it can only list vaults and create notes). */
 	syncCreateToken: (server: string, name: string) => typedError<string, string>(__TAURI_INVOKE("sync_create_token", { server, name })),
 	/**  Links the window's workspace to a vault and starts syncing it. */
@@ -181,7 +210,15 @@ export const events = {
 };
 
 /* Types */
-export type CommandId = "app.settings" | "app.check_for_updates" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.new_workspace" | "file.import_from_sync" | "file.manage_workspaces" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.highlight" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.task_list" | "edit.indent" | "edit.outdent" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "edit.insert_wikilink" | "edit.copy_block_link" | "view.toggle_sidebar" | "view.toggle_source_mode" | "view.next_tab" | "view.previous_tab" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
+/**  Where a share sheet points, in CSS pixels from the webview's top left. */
+export type Anchor = {
+	x: number | null,
+	y: number | null,
+	width: number | null,
+	height: number | null,
+};
+
+export type CommandId = "app.settings" | "app.check_for_updates" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.new_workspace" | "file.import_from_sync" | "file.manage_workspaces" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.share" | "file.share_pdf" | "file.share_image" | "file.export_pdf" | "file.save_copy" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.highlight" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.task_list" | "edit.indent" | "edit.outdent" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "edit.insert_wikilink" | "edit.copy_block_link" | "view.toggle_sidebar" | "view.toggle_source_mode" | "view.next_tab" | "view.previous_tab" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
 
 export type CommandMeta = {
 	id: CommandId,
@@ -248,6 +285,13 @@ export type MenuCommand = CommandId;
  */
 export type NativeItem = "Undo" | "Redo" | "Cut" | "Copy" | "Paste" | "SelectAll";
 
+/**  A page to print on, in points. */
+export type PageSpec = {
+	width: number | null,
+	height: number | null,
+	margin: number | null,
+};
+
 export type ResolvedMenu = {
 	title: string,
 	entries: ResolvedMenuEntry[],
@@ -311,6 +355,8 @@ export type SyncServerInfo = {
 export type SyncVault = {
 	id: string,
 	name: string,
+	/**  The workspace color, `#rrggbb`, if one was picked. */
+	color: string | null,
 };
 
 export type SyncVersions = {
@@ -331,6 +377,11 @@ export type UserThemeFile = {
 	/**  `"workspace"` or `"global"`, for the badge on the theme card. */
 	source: string,
 	contents: string,
+};
+
+export type WorkspaceMeta = {
+	/**  `#rrggbb`, or none: the frontend makes one from the name. */
+	color: string | null,
 };
 
 /* Tauri Specta runtime */

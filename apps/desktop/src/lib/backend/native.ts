@@ -5,7 +5,7 @@
  * `can.nativeViews`.
  */
 import { addPluginListener, invoke } from '@tauri-apps/api/core';
-import type { CommandId, ResolvedMenu } from '@/bindings';
+import type { CommandId, PageSpec, ResolvedMenu } from '@/bindings';
 
 export type SurfaceKind = 'pdf' | 'drawing';
 
@@ -65,6 +65,21 @@ export const nativeSurfaces = {
   background: (rgb: number[]) => host({ op: 'background', rgb }),
   listen: (handler: (event: SurfaceEvent) => void) =>
     addPluginListener('solstice-native', 'surface', handler),
+};
+
+/**
+ * Getting files out (`Share.swift`): the share sheet, the Files picker for a
+ * copy, and an export page printed to a PDF. Failures reach the caller.
+ */
+export const nativeShare = {
+  /** The share sheet; on an iPad a popover from `anchor` (CSS pixels). */
+  share: (paths: string[], anchor: Rect | null) =>
+    invoke<void>('plugin:solstice-native|host', { op: 'share', paths, anchor }),
+  /** Save to Files: whether a copy was saved. */
+  exportFiles: (paths: string[]) =>
+    invoke<{ saved: boolean }>('plugin:solstice-native|host', { op: 'exportFiles', paths }).then((r) => r.saved),
+  pdf: (html: string, page: PageSpec, path: string) =>
+    invoke<void>('plugin:solstice-native|host', { op: 'pdf', html, page, path }),
 };
 
 /**

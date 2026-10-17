@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, ChevronDown, CloudDownload, FolderOpen, Plus } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sunstead/ui/components/sheet';
 import { ExplorerTree } from '@/components/explorer-sidebar';
 import { useCreateActions } from '@/hooks/use-create-actions';
-import { useWorkspaceChoices } from '@/hooks/use-workspace-choices';
+import { refreshWorkspaceColors, useWorkspaceChoices } from '@/hooks/use-workspace-choices';
+import { WorkspaceIcon } from '@/components/workspace-icon';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { can } from '@/lib/backend/platform';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
@@ -83,6 +84,9 @@ export function FilesPage({ hidden }: { hidden: boolean }) {
 /** Every workspace to switch to, and making or managing them. */
 export function WorkspacesSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { activePath, workspaces, switchTo, actions, manage } = useWorkspaceChoices();
+  useEffect(() => {
+    if (open) refreshWorkspaceColors();
+  }, [open]);
   const run = (action: () => void) => () => {
     onOpenChange(false);
     action();
@@ -100,6 +104,7 @@ export function WorkspacesSheet({ open, onOpenChange }: { open: boolean; onOpenC
               {workspaces.map((workspace) => (
                 <Row
                   key={workspace.path}
+                  leading={<WorkspaceIcon name={workspace.name} color={workspace.color} size='lg' />}
                   label={workspace.name}
                   detail={workspace.path === activePath && <Check className='size-4 text-primary' />}
                   onClick={run(() => switchTo(workspace.path))}

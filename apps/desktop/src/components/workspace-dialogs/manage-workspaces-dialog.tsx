@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Cloud, Folder } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@sunstead/ui/components/dialog';
@@ -8,17 +7,25 @@ import { can } from '@/lib/backend/platform';
 import { deleteVault, resolve } from '@/lib/backend/web/vault';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { type KnownWorkspace, useKnownWorkspaces } from '@/lib/stores/known-workspaces';
+import { useWorkspaceMeta, workspaceColor } from '@/lib/stores/workspace-meta';
+import { WorkspaceColorPicker } from '@/components/workspace-color-picker';
+import { WorkspaceIcon } from '@/components/workspace-icon';
+import { refreshWorkspaceColors } from '@/hooks/use-workspace-choices';
 
 /**
  * The workspace list, and taking workspaces off it. On desktop that only
  * forgets the workspace: its folder stays, and since it's no longer open it no
  * longer syncs. On the web a workspace is a vault, so removing it deletes the
- * vault (into the server's trash), after typing its name.
+ * vault (into the server's trash), after typing its name. Each workspace's
+ * icon opens its color picker.
  */
 export function ManageWorkspacesForm({ onDone }: { onDone: () => void }) {
   const workspaces = useKnownWorkspaces((s) => s.workspaces);
   const active = useWorkspace((s) => s.path);
   const [confirming, setConfirming] = useState<string | null>(null);
+
+  // Colors picked on other devices since.
+  useEffect(refreshWorkspaceColors, []);
 
   return (
     <>
@@ -68,7 +75,8 @@ function Row({
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const Icon = can.localFolders ? Folder : Cloud;
+  const stored = useWorkspaceMeta((s) => s.colors[workspace.path] ?? null);
+  const color = workspaceColor(workspace.name, stored);
 
   const remove = async () => {
     setBusy(true);
@@ -88,7 +96,20 @@ function Row({
   return (
     <div className='grid gap-2 p-2'>
       <div className='flex items-center gap-2'>
-        <Icon className='size-4 shrink-0 text-muted-foreground' />
+        <WorkspaceColorPicker
+          color={color}
+          picked={stored !== null}
+          onChange={(next) => useWorkspaceMeta.getState().setColor(workspace.path, next)}
+          trigger={
+            <button
+              type='button'
+              title='Change color'
+              className='rounded-[28%] outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring'
+            >
+              <WorkspaceIcon name={workspace.name} color={color} size='lg' />
+            </button>
+          }
+        />
         <div className='grid min-w-0 flex-1'>
           <span className='truncate font-medium'>{workspace.name}</span>
           {/* Only where the folder was picked: a phone's are all in its Documents. */}

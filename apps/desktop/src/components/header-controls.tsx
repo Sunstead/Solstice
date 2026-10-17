@@ -78,11 +78,16 @@ export function HeaderControlsSpacer() {
 
   useLayoutEffect(() => {
     const el = ref.current;
-    const layout = el?.closest('.flexlayout__layout');
+    const layout = el?.closest<HTMLElement>('.flexlayout__layout');
     if (!el || !layout) return;
     const fit = () => {
-      const width = Math.max(0, useControlsEnd.getState().end - el.getBoundingClientRect().left);
-      el.style.width = `${width}px`;
+      // How far the controls reach past the strip's start, negative while
+      // they don't. The stylesheets size everything from it (on the layout,
+      // so the pane under the tabs can read it too): the spacer's width,
+      // plus the room Islands gives the first tab, which its flare and the
+      // pane's corner grow into, so the tabs move as one with the sidebar.
+      const overhang = useControlsEnd.getState().end - el.getBoundingClientRect().left;
+      layout.style.setProperty('--overhang', `${overhang}px`);
     };
     fit();
     // Fires in the same frame as the resize, before paint.
@@ -92,6 +97,7 @@ export function HeaderControlsSpacer() {
     return () => {
       ro.disconnect();
       unsubscribe();
+      layout.style.removeProperty('--overhang');
     };
   }, []);
 

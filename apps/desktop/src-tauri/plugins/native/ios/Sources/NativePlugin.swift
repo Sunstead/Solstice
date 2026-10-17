@@ -40,6 +40,10 @@ struct HostArgs: Decodable {
   let on: Bool?
   let scratchOut: Bool?
   let darkPaper: Bool?
+  let paths: [String]?
+  let html: String?
+  let page: PageSpec?
+  let anchor: Rect?
 }
 
 class NativePlugin: Plugin {
@@ -126,11 +130,54 @@ class NativePlugin: Plugin {
     }
   }
 
+  /// Where a share sheet points: the CSS rect it came from, in the webview's
+  /// points, or the top middle when there's none.
+  private func shareRect(_ anchor: HostArgs.Rect?, in webview: WKWebView) -> CGRect {
+    let inset = webview.scrollView.adjustedContentInset
+    guard let anchor else { return CGRect(x: webview.bounds.midX, y: inset.top, width: 1, height: 1) }
+    return CGRect(x: anchor.x + inset.left, y: anchor.y + inset.top, width: anchor.width, height: anchor.height)
+  }
+
   @objc public func host(_ invoke: Invoke) throws {
     let args = try invoke.parseArgs(HostArgs.self)
     DispatchQueue.main.async {
       guard let host = self.host else { return invoke.resolve() }
       switch args.op {
+      case "share":
+        guard let paths = args.paths, let webview = self.webview,
+          let presenter = self.manager.viewController
+        else { return invoke.reject("Nothing to share from.") }
+        let rect = self.shareRect(args.anchor, in: webview)
+        // A PDF open here sends with the marks just made.
+        host.flushAll {
+          Share.present(paths.map { URL(fileURLWithPath: $0) }, from: rect, in: webview, by: presenter) {
+            invoke.resolve()
+          }
+        }
+        return
+      case "exportFiles":
+        guard let paths = args.paths, let presenter = self.manager.viewController else {
+          return invoke.reject("Nothing to save from.")
+        }
+        host.flushAll {
+          Share.export(paths.map { URL(fileURLWithPath: $0) }, by: presenter) { saved in
+            invoke.resolve(["saved": saved])
+          }
+        }
+        return
+      case "pdf":
+        guard let html = args.html, let page = args.page, let path = args.path else {
+          return invoke.reject("No page to print.")
+        }
+        Task { @MainActor in
+          do {
+            try await PdfPrinter.render(html: html, page: page, to: URL(fileURLWithPath: path))
+            invoke.resolve()
+          } catch {
+            invoke.reject("Couldn't make the PDF: \(error.localizedDescription)")
+          }
+        }
+        return
       case "overlays":
         host.webModal = args.modal ?? false
         host.webRects = (args.rects ?? []).map {

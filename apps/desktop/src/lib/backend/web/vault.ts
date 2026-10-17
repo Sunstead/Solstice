@@ -11,6 +11,8 @@ import { Emitter } from './emitter';
 export interface Vault {
   id: string;
   name: string;
+  /** The workspace color, `#rrggbb`; none until one is picked. */
+  color?: string | null;
 }
 
 interface TreeFile {
@@ -54,6 +56,14 @@ export async function vaults(refresh = false): Promise<Vault[]> {
 export async function createVault(name: string): Promise<Vault> {
   const vault = await apiJson<Vault>('/v1/vaults', { method: 'POST', json: { name } });
   vaultList = null;
+  return vault;
+}
+
+/** Sets a vault's color, or clears it (back to the one from its name). */
+export async function setVaultColor(id: string, color: string | null): Promise<Vault> {
+  const vault = await apiJson<Vault>(`/v1/vaults/${encodeURIComponent(id)}`, { method: 'PATCH', json: { color } });
+  vaultList = vaultList?.map((v) => (v.id === id ? vault : v)) ?? null;
+  if (current?.id === id) current = { ...current, color: vault.color };
   return vault;
 }
 

@@ -122,6 +122,18 @@ describe("AppSidebar's rail buttons", () => {
     expect(classes).not.toContain('h-full');
   });
 
+  // Classic marks the active view with a bar at its edge; Islands fills it
+  // with the accent, as shadcn's sidebar does, and drops the bar.
+  it('show the active view the way the layout asks', () => {
+    const source = readFileSync(path.resolve(__dirname, 'app-sidebar.tsx'), 'utf8');
+    const classes = source.match(/data-active=\{[\s\S]*?className='([^']*)'/)![1].split(/\s+/);
+    expect(classes).toContain('data-[active=true]:shadow-[inset_2px_0_0_0_var(--color-primary)]');
+    expect(classes).toContain('islands:data-[active=true]:shadow-none');
+    expect(classes).toContain('islands:data-[active=true]:bg-sidebar-accent');
+    expect(classes).toContain('islands:data-[active=true]:text-sidebar-accent-foreground');
+    expect(classes).toContain('islands:rounded-md');
+  });
+
   it('keeps the settings button square too', () => {
     const source = readFileSync(path.resolve(__dirname, 'app-sidebar.tsx'), 'utf8');
     expect(source).toMatch(/className='size-10 touch:size-12'/);

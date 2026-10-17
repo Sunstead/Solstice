@@ -6,6 +6,8 @@ use tauri::utils::config::WindowConfig;
 use tauri_specta::Event as _;
 
 mod workspace;
+mod workspace_meta;
+mod export;
 mod files;
 mod types;
 mod commands;
@@ -47,6 +49,13 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             workspace::get_workspace,
             workspace::allow_asset_path,
             workspace::set_watch_enabled,
+            workspace_meta::workspace_meta,
+            workspace_meta::set_workspace_color,
+            workspace_meta::sync_pull_colors,
+            export::export_temp_path,
+            export::write_export_file,
+            export::render_pdf,
+            export::share_files,
             commands::keymap::get_command_registry,
             commands::keymap::set_keybind,
             commands::keymap::clear_keybind,
@@ -134,6 +143,13 @@ pub fn run() {
     #[cfg(target_os = "ios")]
     let app = app.plugin(tauri_plugin_solstice_native::init());
 
+    // The pages hidden export windows print (`export/`).
+    #[cfg(target_os = "macos")]
+    let app = app.register_asynchronous_uri_scheme_protocol(export::SCHEME, |ctx, request, responder| {
+        let jobs = ctx.app_handle().state::<export::ExportJobs>();
+        responder.respond(jobs.serve(request.uri().path()));
+    });
+
     let app = app
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -145,11 +161,13 @@ pub fn run() {
         .manage(watcher::FsWatcherState::new())
         .manage(sync::SyncState::default())
         .manage(commands::keymap::MenuAccelerators::default())
+        .manage(export::ExportJobs::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             // Registers the event registry so `events.keymapChanged.listen(...)`
             // works on the frontend.
             builder.mount_events(app);
+            export::clear_share_dir(app.handle());
 
             // Installers register `solstice://` on Windows and Linux; this
             // covers dev builds and AppImages. macOS reads it from the bundle.

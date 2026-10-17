@@ -25,7 +25,7 @@ export function ExternalChangeBar({
   const Icon = deleted ? Trash2 : FileWarning;
 
   return (
-    <div className='sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm'>
+    <div className='sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b islands:border-b-0 border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm'>
       <Icon className='size-4 shrink-0 text-amber-600 dark:text-amber-400' />
 
       <span className='min-w-0 flex-1'>

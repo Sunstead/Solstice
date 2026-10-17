@@ -1,8 +1,10 @@
-import { Check, Cloud, Plus } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 
 import { type SyncVault } from '@/bindings';
 import { Input } from '@sunstead/ui/components/input';
+import { workspaceColor } from '@/lib/stores/workspace-meta';
 import { cn } from '@/lib/utils';
+import { WorkspaceIcon } from '@/components/workspace-icon';
 
 function Option({
   selected,
@@ -72,7 +74,7 @@ export function VaultPicker({
           key={v.id}
           selected={choice === v.id}
           onSelect={() => onChoice(v.id)}
-          icon={<Cloud className='size-4 text-muted-foreground' />}
+          icon={<WorkspaceIcon name={v.name} color={workspaceColor(v.name, v.color)} size='sm' />}
         >
           {v.name}
         </Option>

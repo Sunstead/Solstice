@@ -13,7 +13,7 @@ export function SaveFailedBar({ message, onRetry }: { message: string; onRetry: 
     <div
       role='status'
       title={message}
-      className='sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-destructive/40 bg-destructive/10 px-3 py-2 text-sm'
+      className='sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b islands:border-b-0 border-destructive/40 bg-destructive/10 px-3 py-2 text-sm'
     >
       <CloudOff className='size-4 shrink-0 text-destructive' />
       <span className='min-w-0 flex-1 select-text'>Not saved yet. Your changes are kept here and saved when Solstice can.</span>
