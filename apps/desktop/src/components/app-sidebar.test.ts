@@ -108,3 +108,22 @@ describe("AppSidebar's container", () => {
     expect(classes.filter((name) => name === 'overflow-hidden')).toEqual([]);
   });
 });
+
+// With the rail wider on touch, a button sized by padding stops being square.
+describe("AppSidebar's rail buttons", () => {
+  it('stay square at any rail width', () => {
+    const source = readFileSync(path.resolve(__dirname, 'app-sidebar.tsx'), 'utf8');
+    const button = source.match(/data-active=\{[\s\S]*?className='([^']*)'/);
+    expect(button).not.toBeNull();
+    const classes = button![1].split(/\s+/);
+    expect(classes).toContain('aspect-square');
+    expect(classes).toContain('w-full');
+    expect(classes.filter((c) => /^(touch:)?p[yb]?-/.test(c))).toEqual([]);
+    expect(classes).not.toContain('h-full');
+  });
+
+  it('keeps the settings button square too', () => {
+    const source = readFileSync(path.resolve(__dirname, 'app-sidebar.tsx'), 'utf8');
+    expect(source).toMatch(/className='size-10 touch:size-12'/);
+  });
+});

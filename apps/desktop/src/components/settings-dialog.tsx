@@ -17,11 +17,11 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from '@sunstead/ui/components/resizable-sidebar';
-import { ScrollArea } from '@sunstead/ui/components/scroll-area';
 import { cn } from '@/lib/utils';
 import { touchFirst } from '@/lib/backend/platform';
 import { SettingsSectionBody, SettingsSectionList } from './settings/settings-nav';
 import { PushPane } from './mobile/push-pane';
+import { SettingsScroll } from './settings/settings-scroll';
 import { SettingsSearch } from './settings/settings-search';
 import { SettingsSearchResults } from './settings/settings-search-results';
 import {
@@ -171,7 +171,7 @@ function SettingsSplitDialog() {
               )}
             </div>
             <div className='flex-1 flex-col min-h-0 flex'>
-              <ScrollArea className='h-full'>
+              <SettingsScroll page={query ? 'search' : activeSection}>
                 <div className='flex min-h-full flex-col'>
                   <div
                     className={cn(
@@ -186,7 +186,7 @@ function SettingsSplitDialog() {
                     )}
                   </div>
                 </div>
-              </ScrollArea>
+              </SettingsScroll>
             </div>
           </SidebarInset>
         </SidebarProvider>
