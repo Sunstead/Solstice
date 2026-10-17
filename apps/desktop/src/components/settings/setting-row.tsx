@@ -3,11 +3,12 @@ import { RotateCcw } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
 import { Label } from '@sunstead/ui/components/label';
 import { cn } from '@/lib/utils';
-import type { SettingKey } from '@/lib/settings/registry';
+import { isSettingDisabled, type SettingKey } from '@/lib/settings/registry';
 import { hasOpenWorkspace } from '@/lib/stores/scoped-storage';
 import {
   resetSetting,
   setSettingRaw,
+  useSettingReader,
   useSettingWithMeta,
 } from '@/lib/settings/store';
 import { SettingControl } from './setting-control';
@@ -25,7 +26,9 @@ export function SettingRow({ settingKey }: { settingKey: SettingKey }) {
     useSettingWithMeta(settingKey);
 
   const id = `setting-${settingKey}`;
-  const disabled = def.scope === 'workspace' && !hasOpenWorkspace();
+  const read = useSettingReader();
+  const needsWorkspace = def.scope === 'workspace' && !hasOpenWorkspace();
+  const disabled = needsWorkspace || isSettingDisabled(def, read);
   const wide = isWideControl(def);
   // Below `sm` these wrap under their label instead of squeezing it.
   const stack = !wide && stacksOnPhone(def);
@@ -73,7 +76,7 @@ export function SettingRow({ settingKey }: { settingKey: SettingKey }) {
       >
         {def.label}
       </Label>
-      {disabled && (
+      {needsWorkspace && (
         <p className='text-xs text-muted-foreground/80 italic'>
           Open a workspace to change this.
         </p>

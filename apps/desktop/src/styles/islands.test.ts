@@ -76,7 +76,7 @@ describe('islands.css', () => {
     expect(css).toMatch(
       /\.flexlayout__tabset:not\(:has\(\.header-controls-spacer\)\)\s*\.flexlayout__tab_button--selected\[data-layout-path\$='\/tb0'\]::before \{\s*display: none/,
     );
-    expect(css).toMatch(/\.flexlayout__tab\[data-layout-path\$='\/t0'\] \{\s*border-top-left-radius: 0;\s*\}/);
+    expect(css).toMatch(/\.flexlayout__tab\[data-layout-path\$='\/t0'\] \{\s*--pane-tl: 0px;\s*border-top-left-radius: 0;\s*\}/);
   });
 
   // Collapsing moves the tabs with the sidebar: in the pane the header
@@ -90,7 +90,30 @@ describe('islands.css', () => {
     expect(css).toMatch(/:has\(\.header-controls-spacer\)\s*\.flexlayout__tabset_tabbar_inner_tab_container \{\s*padding-left: var\(--tabs-pad\)/);
     expect(css).toMatch(/--flare: min\(var\(--tabs-offset\), var\(--tab-curve-r\)\)/);
     expect(css).toMatch(
-      /\[data-layout-path\$='\/ts0\/t0'\](:not\(\[data-layout-path\*='[1-9]'\]\)){9},[^{]*\{\s*border-top-left-radius: clamp\(0px, var\(--tabs-offset\) - var\(--tab-curve-r\), var\(--island-radius\)\)/,
+      /\[data-layout-path\$='\/ts0\/t0'\](:not\(\[data-layout-path\*='[1-9]'\]\)){9},[^{]*\{\s*--pane-tl: clamp\(0px, var\(--tabs-offset\) - var\(--tab-curve-r\), var\(--island-radius\)\);\s*border-top-left-radius: var\(--pane-tl\)/,
     );
+  });
+
+  // With borders on, the tabs keep the classic tab bar's outlines and line;
+  // without, Islands turns them off.
+  it('keeps the classic tab bar\'s outlines under island borders', () => {
+    expect(css).toMatch(
+      /:root\[data-islands='true'\]:not\(\[data-island-borders='true'\]\) \.flexlayout-custom \.flexlayout__layout \{\s*--color-tab-outline: transparent/,
+    );
+    expect(css).toMatch(
+      /:not\(\[data-island-borders='true'\]\) \.flexlayout-custom \.flexlayout__tabset_tabbar_outer \{\s*box-shadow: none/,
+    );
+    // One ring under the tabs, the tab bar's last pixel row down, so the
+    // selected tab opens into it; the content layer is clipped to its inside.
+    expect(css).toMatch(/\.flexlayout__tabset::after \{[^}]*inset: 39px 0 0;[^}]*border: 1px solid var\(--color-tab-outline\)/);
+    expect(css).toMatch(/border-radius: var\(--pane-tl\) var\(--island-radius\) var\(--island-radius\)/);
+    expect(css).toMatch(/clip-path: inset\(\s*0 1px 1px round max\(0px, calc\(var\(--pane-tl\) - 1px\)\)/);
+    // The first tab's left line is drawn inside it, and the top-left corner is
+    // square while it is selected.
+    expect(css).toMatch(/translate: var\(--tab-edge\) 0;\s*padding-left: calc\(8px \+ 0\.125rem - var\(--tab-edge\)\);\s*padding-right: calc\(4px \+ 0\.125rem \+ var\(--tab-edge\)\)/);
+    expect(flexlayout).toMatch(/box-shadow: 0 0 0 1px var\(--color-tab-outline\)/);
+    expect(css).toMatch(/flexlayout__tabset:has\(\.flexlayout__tab_button--selected\[data-layout-path\$='\/tb0'\]\) \{\s*--pane-tl: 0px/);
+    expect(app).toMatch(/@custom-variant island-borders/);
+    expect(sidebar).toMatch(/island-borders:border /);
   });
 });

@@ -100,6 +100,18 @@ export const settingsRegistry = {
     domAttr: { name: 'data-islands', format: (v) => String(v) },
   }),
 
+  // A border round each island, and the tabs in the classic tab bar's
+  // outlines. Only meaningful with Islands, so it greys out without them.
+  'appearance.islandBorders': defineBoolean({
+    section: 'appearance',
+    group: 'Layout',
+    scope: 'global',
+    label: 'Island borders',
+    default: false,
+    domAttr: { name: 'data-island-borders', format: (v) => String(v) },
+    disabledWhen: (get) => !get('appearance.islands'),
+  }),
+
   'appearance.reduceMotion': defineBoolean({
     section: 'accessibility',
     scope: 'global',
@@ -618,6 +630,10 @@ export const settingKeys = Object.keys(settingsRegistry) as SettingKey[];
 export interface SettingEntry {
   key: SettingKey;
   def: AnySettingDef;
+}
+
+export function isSettingDisabled(def: AnySettingDef, read: SettingReader) {
+  return def.disabledWhen ? def.disabledWhen(read) : false;
 }
 
 export function isSettingVisible(def: AnySettingDef, read: SettingReader) {

@@ -45,13 +45,14 @@
   position: relative;
 }
 
-/* No outlines: the selected tab keeps its curve (the flares fill with the
+/* No outlines (unless `appearance.islandBorders` keeps the classic tab
+   bar's, below): the selected tab keeps its curve (the flares fill with the
    note's colour) and is one piece with its pane. */
-:root[data-islands='true'] .flexlayout-custom .flexlayout__layout {
+:root[data-islands='true']:not([data-island-borders='true']) .flexlayout-custom .flexlayout__layout {
   --color-tab-outline: transparent;
 }
 
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset_tabbar_outer {
+:root[data-islands='true']:not([data-island-borders='true']) .flexlayout-custom .flexlayout__tabset_tabbar_outer {
   box-shadow: none;
 }
 
@@ -78,6 +79,7 @@
 }
 
 :root[data-islands='true'] .flexlayout-custom .flexlayout__tab[data-layout-path$='/t0'] {
+  --pane-tl: 0px;
   border-top-left-radius: 0;
 }
 
@@ -126,16 +128,98 @@
 :root[data-islands='true'] .flexlayout-custom
   .flexlayout__layout:has(.flexlayout__tabset-maximized)
   .flexlayout__tab[data-layout-path$='/t0'] {
-  border-top-left-radius: clamp(0px, var(--tabs-offset) - var(--tab-curve-r), var(--island-radius));
+  --pane-tl: clamp(0px, var(--tabs-offset) - var(--tab-curve-r), var(--island-radius));
+  border-top-left-radius: var(--pane-tl);
 }
 
 /* The pane: the tab's content, a layer of its own over the tabset, and the
    tabset's empty body under it (seen while a pane has no tab). */
+:root[data-islands='true'] .flexlayout-custom .flexlayout__tab {
+  --pane-tl: var(--island-radius);
+}
+
 :root[data-islands='true'] .flexlayout-custom .flexlayout__tabset_content,
 :root[data-islands='true'] .flexlayout-custom .flexlayout__tab {
   border-radius: var(--island-radius);
   overflow: hidden;
   background: var(--background);
+}
+
+/*
+ * Island borders (`appearance.islandBorders`): the tabs keep the classic tab
+ * bar's outlines, and the pane gets a frame of the same line. The frame is
+ * one rounded ring, the tabset's `::after`, drawn under the tabs from the
+ * tab bar's last pixel row (where the classic line was), so the selected tab
+ * and its flares open into it as they always did. The tab bar is clear and
+ * its own line off, so the ring shows through. The pane's content (a layer
+ * above, so the ring is left uncovered) is clipped to the ring's inside. The
+ * top-left corner (`--pane-tl`, on the tabset for the ring and on the layer
+ * for the content, by the same rules as the radius above) is square while
+ * the first tab is selected, one shape with it, and rounds as the controls'
+ * room grows. The explorer's border is its own (`island-borders:`,
+ * app-sidebar.tsx).
+ */
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tabset_tabbar_outer {
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tabset {
+  isolation: isolate;
+  --pane-tl: var(--island-radius);
+}
+
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+  .flexlayout__tabset:has(.flexlayout__tab_button--selected[data-layout-path$='/tb0']) {
+  --pane-tl: 0px;
+}
+
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+  .flexlayout__tabset:has(.header-controls-spacer):has(.flexlayout__tab_button--selected[data-layout-path$='/tb0']) {
+  --pane-tl: clamp(0px, var(--tabs-offset) - var(--tab-curve-r), var(--island-radius));
+}
+
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tabset::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 39px 0 0;
+  box-sizing: border-box;
+  border: 1px solid var(--color-tab-outline);
+  border-radius: var(--pane-tl) var(--island-radius) var(--island-radius);
+  background: var(--background);
+  pointer-events: none;
+}
+
+/* The ring paints the empty pane's colour; the layer paints the tab's. */
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tabset_content {
+  background: transparent;
+}
+
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tab {
+  clip-path: inset(
+    0 1px 1px round max(0px, calc(var(--pane-tl) - 1px)) calc(var(--island-radius) - 1px)
+      calc(var(--island-radius) - 1px)
+  );
+}
+
+/* The first tab at the pane's edge has its ring's left side clipped by the
+   strip, so it stands 1px in, which puts the ring on the pane's own left line.
+   In the pane the controls overhang that gives way as the tab leaves the edge
+   (--tabs-offset), and the flare takes the line. Its padding gives back what
+   the shift moved, so the icon, title and close button stay where they were. */
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+  .flexlayout__tab_button--selected[data-layout-path$='/tb0'] {
+  --tab-edge: 1px;
+  translate: var(--tab-edge) 0;
+  padding-left: calc(8px + 0.125rem - var(--tab-edge));
+  padding-right: calc(4px + 0.125rem + var(--tab-edge));
+}
+
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+  .flexlayout__tabset:has(.header-controls-spacer)
+  .flexlayout__tab_button--selected[data-layout-path$='/tb0'] {
+  --tab-edge: clamp(0px, calc(1px - var(--tabs-offset)), 1px);
 }
 
 /*

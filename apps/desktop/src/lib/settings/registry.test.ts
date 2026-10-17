@@ -15,3 +15,20 @@ describe('appearance.islands', () => {
     expect(islands.domAttr?.format?.(false)).toBe('false');
   });
 });
+
+describe('appearance.islandBorders', () => {
+  it('is on by default, marks <html>, and sits with Islands', () => {
+    const borders = settingsRegistry['appearance.islandBorders'];
+    expect(borders.default).toBe(true);
+    expect(borders.group).toBe(settingsRegistry['appearance.islands'].group);
+    expect(borders.domAttr?.name).toBe('data-island-borders');
+    expect(borders.domAttr?.format?.(true)).toBe('true');
+  });
+
+  it('is disabled, not hidden, while Islands is off', () => {
+    const borders = settingsRegistry['appearance.islandBorders'];
+    expect(borders.disabledWhen?.((k) => k === 'appearance.islands')).toBe(false);
+    expect(borders.disabledWhen?.(() => false)).toBe(true);
+    expect(borders.visibleWhen).toBeUndefined();
+  });
+});

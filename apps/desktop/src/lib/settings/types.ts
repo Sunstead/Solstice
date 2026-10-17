@@ -53,6 +53,8 @@ interface CommonDef<V> {
   default: V;
   /** Hide the row unless this passes, for options that depend on another. */
   visibleWhen?: (get: SettingReader) => boolean;
+  /** Show the row but not let it be changed while this passes. */
+  disabledWhen?: (get: SettingReader) => boolean;
   /** Side effect beyond re-rendering; runs after the value is committed. */
   onChange?: (value: V) => void;
   cssVar?: CssVarBinding<V>;

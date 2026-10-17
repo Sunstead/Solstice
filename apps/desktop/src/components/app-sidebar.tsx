@@ -145,11 +145,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           // bar its rim on two sides and the gap on the others. Stretched,
           // not full height, so the gap below it fits in the window and it
           // ends level with the editor's panes.
-          !isMobile && 'islands:h-auto islands:mb-(--island-gap) islands:rounded-(--island-radius) islands:bg-background',
+          !isMobile && 'islands:h-auto islands:mb-(--island-gap) islands:rounded-(--island-radius) islands:bg-background island-borders:border island-borders:border-(--color-tab-outline)',
         )}
       >
         {ActiveSidebarContent && <ActiveSidebarContent />}
-        <SidebarFooter className='border-t islands:border-t-0'>
+        <SidebarFooter className='border-t islands:border-t-0 island-borders:border-t'>
           <WorkspaceSwitcher />
         </SidebarFooter>
       </Sidebar>

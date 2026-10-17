@@ -26,6 +26,7 @@
 /* The Islands layout (`appearance.islands`, `islands.css`): panels on the
    window's colour instead of regions split by borders. */
 @custom-variant islands (&:where([data-islands='true'] *));
+@custom-variant island-borders (&:where([data-islands='true'][data-island-borders='true'] *));
 
 @theme inline {
   --font-sans: 'Geist Variable', sans-serif;
