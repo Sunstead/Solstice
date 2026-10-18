@@ -6,16 +6,16 @@ import { cn } from '@/lib/utils';
 
 /** How far the page underneath slides left as one comes over it, as iOS does. */
 const PARALLAX = 0.25;
-/** Used where the stylesheet gives no spring (`--sheet-spring`, `app.css`). */
+/** Used where the stylesheet gives no spring (`--push-spring`, `app.css`). */
 const FALLBACK = { ms: 500, easing: 'cubic-bezier(0.2, 0, 0, 1)' };
 
 function spring(): { ms: number; easing: string } {
   if (typeof document === 'undefined') return FALLBACK;
   const style = getComputedStyle(document.documentElement);
   // WebKit hands a custom property back as it normalises it: 640ms as 0.64s.
-  const raw = style.getPropertyValue('--sheet-ms').trim();
+  const raw = style.getPropertyValue('--push-ms').trim();
   const ms = parseFloat(raw) * (raw.endsWith('ms') ? 1 : 1000);
-  const easing = style.getPropertyValue('--sheet-spring').trim();
+  const easing = style.getPropertyValue('--push-spring').trim();
   return ms && easing ? { ms, easing } : FALLBACK;
 }
 
@@ -33,7 +33,7 @@ function spring(): { ms: number; easing: string } {
  * scroll position.
  *
  * Coming in and a Back button are the Web Animations API, on the same spring
- * as sheets. `behind` is the page it covers, which slides a little way left
+ * as sheets, a little quicker (`--push-spring`). `behind` is the page it covers, which slides a little way left
  * under it.
  */
 export function PushPane({
