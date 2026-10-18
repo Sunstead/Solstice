@@ -7,9 +7,6 @@ import { useIsMac } from '@/hooks/use-platform';
 import { can } from '@/lib/backend/platform';
 import { cn } from '@/lib/utils';
 
-/** The height of a `PhoneHeader`, where a page's edge swipe starts below. */
-export const HEADER_HEIGHT = 48;
-
 /**
  * A phone page's top bar. In a desktop window that narrow it's also the
  * title bar: a drag region, clear of the traffic lights, with window controls.

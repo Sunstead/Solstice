@@ -16,7 +16,7 @@ import { usePhoneNav } from '@/lib/stores/phone-nav';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { useSync } from '@/lib/stores/sync';
 import { WorkspacesSheet } from './files-page';
-import { HEADER_HEIGHT, PhoneHeader, PhoneTitle, Row, RowGroup } from './phone-parts';
+import { PhoneHeader, PhoneTitle, Row, RowGroup } from './phone-parts';
 import { PushPane } from './push-pane';
 
 /**
@@ -73,7 +73,7 @@ export function YouPage() {
           </div>
         </div>
       </div>
-      <PushPane open={sections.length > 0} onClose={popSection} behind={page} edgeTop={HEADER_HEIGHT}>
+      <PushPane open={sections.length > 0} onClose={popSection} behind={page}>
         {section && <SectionPage id={section} onBack={popSection} />}
       </PushPane>
       <WorkspacesSheet open={workspacesOpen} onOpenChange={setWorkspacesOpen} />

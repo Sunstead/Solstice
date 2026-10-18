@@ -195,9 +195,6 @@ function SettingsSplitDialog() {
   );
 }
 
-/** Where a page's swipe back starts: below its header, clear of Back. */
-const PAGE_HEADER_HEIGHT = 48;
-
 /** A page's header in the touch dialog: Back (on a section), its title, Close. */
 function PageHeader({ title, onBack }: { title: ReactNode; onBack?: () => void }) {
   return (
@@ -268,7 +265,7 @@ function SettingsPagesDialog() {
               </div>
             </div>
           </div>
-          <PushPane open={page !== null} onClose={popPage} behind={list} edgeTop={PAGE_HEADER_HEIGHT}>
+          <PushPane open={page !== null} onClose={popPage} behind={list}>
             {shown && (
               <>
                 <PageHeader title={getSection(shown).label} onBack={popPage} />

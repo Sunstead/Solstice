@@ -245,7 +245,7 @@ html[data-reduce-motion='true'] *::after {
  * sampled until it is within 0.3% of the end. Reduce motion makes it instant,
  * with everything else.
  */
-:root[data-touch] {
+:root {
   --sheet-ms: 640ms;
   --sheet-spring: linear(0, 0.0131, 0.0468, 0.0943, 0.1504, 0.2113, 0.2741, 0.3366, 0.3974, 0.4555, 0.5102, 0.5612, 0.6083, 0.6514, 0.6906, 0.7261, 0.7581, 0.7868, 0.8125, 0.8354, 0.8557, 0.8737, 0.8896, 0.9036, 0.9159, 0.9268, 0.9363, 0.9446, 0.9519, 0.9583, 0.9638, 0.9687, 0.9729, 0.9765, 0.9797, 0.9825, 0.9849, 0.987, 0.9887, 0.9903, 0.9916, 0.9928, 0.9938, 0.9947, 0.9954, 0.9961, 0.9966, 1);
   --sheet-fall-ms: 485ms;
@@ -391,4 +391,40 @@ html[data-reduce-motion='true'] *::after {
   background: var(--muted-foreground);
   opacity: 0.35;
   pointer-events: none;
+}
+
+/*
+ * A pushed page (components/mobile/push-pane.tsx): a horizontal scroll view,
+ * snapping between the page in view and a screen of nothing to its left, so a
+ * swipe right from anywhere on it is the system's own scrolling and reaching
+ * the left is going back. No rubber band past the page: nothing is beyond it.
+ */
+.solstice-push {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  overflow: scroll hidden;
+  overscroll-behavior-x: none;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.solstice-push::-webkit-scrollbar {
+  display: none;
+}
+
+.solstice-push-dead,
+.solstice-push-page {
+  flex: none;
+  width: 100%;
+  scroll-snap-align: start;
+}
+
+.solstice-push-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background);
+  box-shadow: -8px 0 24px rgb(0 0 0 / 0.12);
 }

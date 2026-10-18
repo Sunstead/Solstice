@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability -- moving a DOM node's own scroll position is this hook's whole job */
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 
@@ -26,7 +27,11 @@ export type PaneAlign = 'center' | 'end' | 'top';
 /** How far from the top is "gone": the dead screen has come all the way down. */
 const GONE = 1;
 
-function usePaneScroll(inside: HTMLDivElement | null, close: React.RefObject<HTMLButtonElement | null>) {
+function usePaneScroll(
+  inside: HTMLDivElement | null,
+  close: React.RefObject<HTMLButtonElement | null>,
+  quiet: React.RefObject<boolean>,
+) {
   useLayoutEffect(() => {
     // The popup's own ref never reaches us (its component merges it away), so
     // the pane is found from the frame inside it.
@@ -37,26 +42,12 @@ function usePaneScroll(inside: HTMLDivElement | null, close: React.RefObject<HTM
     let closing = false;
     let share = 1;
 
-    // At rest before the first paint: the card in view. The popup is still
-    // taking its place as it mounts, and a scroll position set that early
-    // doesn't always hold, so it is kept at rest for a second, or until a finger touches it.
-    let touched = false;
-    let pinning = 0;
-    const settled = performance.now() + 1000;
-    const pin = () => {
-      if (touched || closing || performance.now() > settled) return;
-      if (Math.abs(el.scrollTop - el.clientHeight) > 0.5) el.scrollTop = el.clientHeight;
-      pinning = requestAnimationFrame(pin);
-    };
-    pin();
-    const touch = () => {
-      touched = true;
-      cancelAnimationFrame(pinning);
-    };
-    el.addEventListener('touchstart', touch, { passive: true, once: true });
+    // At rest before the first paint: the card in view.
+    el.scrollTop = el.clientHeight;
 
     const refuse = () => {
       closing = false;
+      quiet.current = false;
       delete el.dataset.swiped;
       el.scrollTo({ top: el.clientHeight, behavior: 'smooth' });
     };
@@ -73,6 +64,7 @@ function usePaneScroll(inside: HTMLDivElement | null, close: React.RefObject<HTM
       // Swiped away. Closing from here has no exit to play: it has left.
       closing = true;
       el.dataset.swiped = '';
+      quiet.current = true;
       close.current?.click();
       // A dialog that wouldn't close (unsaved, busy) is brought back.
       requestAnimationFrame(() =>
@@ -92,12 +84,10 @@ function usePaneScroll(inside: HTMLDivElement | null, close: React.RefObject<HTM
     const frame = requestAnimationFrame(() => requestAnimationFrame(() => (ready = true)));
     return () => {
       cancelAnimationFrame(frame);
-      cancelAnimationFrame(pinning);
-      el.removeEventListener('touchstart', touch);
       observer.disconnect();
       el.removeEventListener('scroll', onScroll);
     };
-  }, [inside, close]);
+  }, [inside, close, quiet]);
 }
 
 /** The popup as a scroll view, with `children` in a card on its frame. */
@@ -120,12 +110,21 @@ export function Pane({
   // state: the scroll logic starts when it is there, before it first paints.
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const close = useRef<HTMLButtonElement>(null);
-  usePaneScroll(frame, close);
+  // A close we made ourselves (a swipe, a press on the dim) reads as a keyboard
+  // one to the popup, which would give focus back to what opened it, ring and
+  // all; a finger's close leaves no ring, and nor should ours.
+  const quiet = useRef(false);
+  usePaneScroll(frame, close, quiet);
 
   return (
     <DialogPrimitive.Popup
       data-slot={slot.replace('content', 'pane')}
       className='solstice-pane'
+      finalFocus={(closeType) => {
+        const ours = quiet.current;
+        quiet.current = false;
+        return !ours && closeType === 'keyboard';
+      }}
       {...popupProps}
     >
       <div className='solstice-pane-dead' aria-hidden />
@@ -135,7 +134,11 @@ export function Pane({
         data-align={align}
         // The dim around the card is part of the scroll view, so a press on
         // it is no longer a press outside the popup: it closes here.
-        onClick={(event) => event.target === event.currentTarget && close.current?.click()}
+        onClick={(event) => {
+          if (event.target !== event.currentTarget) return;
+          quiet.current = true;
+          close.current?.click();
+        }}
       >
         <div data-slot={slot} className={cn('relative', cardClassName)}>
           {children}

@@ -42,7 +42,7 @@ describe('PushPane', () => {
       root.render(h(PushPane, { open, onClose: () => {}, keepMounted, children: h('p', null, 'Appearance') }));
     });
   const page = () => [...container.querySelectorAll('p')].find((p) => p.textContent === 'Appearance');
-  const pane = () => page()?.parentElement as HTMLElement | undefined;
+  const pane = () => container.querySelector<HTMLElement>('.solstice-push') ?? undefined;
 
   it('goes back after being pushed onto a closed list', () => {
     render(false);
@@ -94,5 +94,27 @@ describe('PushPane', () => {
       [{ transform: `translateX(${width}px)` }, { transform: 'translateX(0px)' }],
       expect.anything(),
     );
+  });
+
+  // The pane is a scroll view resting on the page; reaching its left is the
+  // swipe back, so the owner is told once, and the page leaves with no slide.
+  it('goes back when scrolled all the way to the left', () => {
+    const onClose = vi.fn();
+    act(() => {
+      root.render(h(PushPane, { open: true, onClose, keepMounted: true, children: h('p', null, 'Appearance') }));
+    });
+    const el = pane()!;
+    Object.defineProperty(el, 'clientWidth', { value: 400, configurable: true });
+    el.scrollLeft = 200;
+    act(() => {
+      el.dispatchEvent(new Event('scroll'));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    el.scrollLeft = 0;
+    act(() => {
+      el.dispatchEvent(new Event('scroll'));
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(el.style.visibility).toBe('hidden');
   });
 });

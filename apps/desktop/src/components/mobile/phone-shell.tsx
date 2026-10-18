@@ -19,7 +19,6 @@ import { cn } from '@/lib/utils';
 import { FilesPage } from './files-page';
 import { NoteHeader } from './note-pane';
 import { tabPath } from './phone-history';
-import { HEADER_HEIGHT } from './phone-parts';
 import { PushPane } from './push-pane';
 import { SearchPage } from './search-page';
 import { shownTab } from './tabs';
@@ -133,7 +132,7 @@ export function PhoneShell() {
         <AppFooter />
       </div>
       {model && (
-        <PushPane open={noteOpen} onClose={goHome} behind={home} keepMounted edgeTop={HEADER_HEIGHT}>
+        <PushPane open={noteOpen} onClose={goHome} behind={home} keepMounted>
           <NoteHeader model={model} shown={shown} />
           <div className='relative min-h-0 flex-1 bg-background'>
             {shown ? <TabContent key={shownId} node={shown} /> : <BlankTab tabId='' />}
