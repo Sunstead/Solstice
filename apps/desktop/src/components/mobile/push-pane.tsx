@@ -12,7 +12,9 @@ const FALLBACK = { ms: 500, easing: 'cubic-bezier(0.2, 0, 0, 1)' };
 function spring(): { ms: number; easing: string } {
   if (typeof document === 'undefined') return FALLBACK;
   const style = getComputedStyle(document.documentElement);
-  const ms = parseFloat(style.getPropertyValue('--sheet-ms'));
+  // WebKit hands a custom property back as it normalises it: 640ms as 0.64s.
+  const raw = style.getPropertyValue('--sheet-ms').trim();
+  const ms = parseFloat(raw) * (raw.endsWith('ms') ? 1 : 1000);
   const easing = style.getPropertyValue('--sheet-spring').trim();
   return ms && easing ? { ms, easing } : FALLBACK;
 }
