@@ -8,7 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sunstead/ui/components/dialog';
+} from '@/components/ui/dialog';
 import {
   InputGroup,
   InputGroupAddon,

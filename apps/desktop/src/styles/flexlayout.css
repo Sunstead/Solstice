@@ -457,3 +457,50 @@
   align-self: stretch;
   width: max(0px, var(--overhang, -100vw));
 }
+
+/*
+ * With one strip, a held tab is lifted by lib/tab-gesture.ts, not by iOS:
+ * the system's drag must not start under it, or the two would race.
+ */
+:root:is([data-pointer='touch'], [data-pointer='pen']) .flexlayout-custom[data-sole-strip] .flexlayout__tab_button {
+  -webkit-user-drag: none;
+}
+
+/*
+ * The tab lifted under a finger (lib/tab-gesture.ts): a card of its own,
+ * rounded and shadowed like a tab iPadOS has picked up, in the tab's place
+ * until it is put down. Position and lift are the `translate` and `scale`
+ * properties, so the animations don't fight over `transform`.
+ */
+.solstice-tab-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 10px;
+  box-sizing: border-box;
+  border-radius: min(var(--radius-lg), 12px);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow:
+    0 0 0 1px var(--color-tab-outline),
+    0 14px 32px rgb(0 0 0 / 0.28),
+    0 3px 8px rgb(0 0 0 / 0.16);
+  pointer-events: none;
+  white-space: nowrap;
+  will-change: translate, scale;
+}
+
+.solstice-tab-ghost > :not(.solstice-tab-ghost-label) {
+  flex: none;
+}
+
+.solstice-tab-ghost-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

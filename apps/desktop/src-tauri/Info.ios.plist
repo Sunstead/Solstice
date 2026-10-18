@@ -8,6 +8,10 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<!-- iPhone Pros run Core Animation at 120 Hz only when asked (iPads do
+	     already): sheets and tabs animate on the compositor, so they gain. -->
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<!-- The scene lifecycle (tao supports it): iPadOS builds the menu bar, and
 	     windows, around scenes. One scene for now. -->
 	<key>UIApplicationSceneManifest</key>

@@ -56,7 +56,7 @@ const buttonId = (id: string) => 'flexlayout-tabbutton-' + id.replace(/\s/g, '_'
  */
 const before = new WeakMap<Element, number>();
 
-function roomOf(el: Element): number {
+export function roomOf(el: Element): number {
   const style = getComputedStyle(el);
   return el.getBoundingClientRect().width + parseFloat(style.marginLeft) + parseFloat(style.marginRight);
 }

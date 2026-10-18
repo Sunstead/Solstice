@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, ChevronDown, CloudDownload, FolderOpen, Plus } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sunstead/ui/components/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ExplorerTree } from '@/components/explorer-sidebar';
 import { useCreateActions } from '@/hooks/use-create-actions';
 import { refreshWorkspaceColors, useWorkspaceChoices } from '@/hooks/use-workspace-choices';

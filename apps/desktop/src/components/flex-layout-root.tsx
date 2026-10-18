@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { can } from '@/lib/backend/platform';
 import {
   Actions,
@@ -38,6 +38,7 @@ import { TabCloseIcon } from './tab-close-icon';
 import { closeTab, playEnter, watchClosePresses } from '@/lib/tab-motion';
 import { TabMenu } from './tab-menu';
 import { useTabLongPress, type TabMenuRequest } from '@/lib/tab-long-press';
+import { ownsDrag, soleStrip, useTabGesture } from '@/lib/tab-gesture';
 
 /** A tab's name; on mount, it grows its button in if the tab was just opened. */
 function TabLabel({ id, children }: { id: string; children: string }) {
@@ -172,7 +173,11 @@ export default function FlexLayoutRoot() {
   // A tab's menu: right click, or holding it with a finger or the Pencil.
   const [tabMenu, setTabMenu] = useState<TabMenuRequest | null>(null);
   const closeTabMenu = useCallback(() => setTabMenu(null), []);
-  useTabLongPress(setTabMenu, closeTabMenu);
+  // With one strip a hold lifts the tab itself (lib/tab-gesture.ts); with
+  // panes, the system's drag and the older hold stay.
+  const ownsHold = useCallback((tabId: string) => ownsDrag(model, tabId), [model]);
+  useTabLongPress(setTabMenu, closeTabMenu, ownsHold);
+  useTabGesture(model, setTabMenu, tabMenu !== null);
   const handleContextMenu = (node: TabNode | TabSetNode | BorderNode, event: React.MouseEvent) => {
     if (!(node instanceof TabNode)) return;
     event.preventDefault();
@@ -186,7 +191,12 @@ export default function FlexLayoutRoot() {
     return undefined;
   };
 
+  // Marks the container while there's one strip, so touch can leave the
+  // tab's drag to the hold (styles/flexlayout.css).
+  const sole = soleStrip(model);
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
   const handleModelChange = useLayoutSession(() => {
+    if (soleStrip(model) !== sole) rerender();
     syncDrag();
     requestAnimationFrame(applyDragRegions);
   });
@@ -239,7 +249,7 @@ export default function FlexLayoutRoot() {
   if (!model) return null;
 
   return (
-    <div ref={containerRef} className='flexlayout-custom h-full w-full'>
+    <div ref={containerRef} className='flexlayout-custom h-full w-full' data-sole-strip={sole || undefined}>
       <Layout
         ref={layoutRef}
         model={model}

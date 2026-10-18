@@ -3,7 +3,7 @@ import type { Model, TabNode } from 'flexlayout-react';
 import { ArrowLeft, ArrowRight, ChevronLeft, Ellipsis } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@sunstead/ui/components/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { SyncIndicator } from '@/components/sync/status';
 import { ShareButton } from '@/components/share-button';
 import { targetFromPath } from '@/lib/entry-actions';

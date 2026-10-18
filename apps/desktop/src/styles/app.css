@@ -223,46 +223,172 @@ html[data-reduce-motion='true'] *::after {
   background: transparent !important;
 }
 
-/* Dialogs centre in what's visible: above the on-screen keyboard rather than
-   behind it (`--keyboard-inset`, `lib/keyboard.ts`). */
-[data-slot='dialog-content'],
-[data-slot='alert-dialog-content'] {
+/* A desktop dialog centres in what's visible: above the on-screen keyboard
+   rather than behind it (`--keyboard-inset`, `lib/keyboard.ts`). On a touch
+   screen its card is in a pane, which does the centring (below). */
+:root:not([data-touch]) :is([data-slot='dialog-content'], [data-slot='alert-dialog-content']),
+:root[data-touch] [data-slot='alert-dialog-content'] {
   top: calc((100dvh - var(--keyboard-inset, 0px)) / 2);
   max-height: calc(100dvh - var(--keyboard-inset, 0px) - 2rem);
   overflow-y: auto;
 }
 
 /*
- * Where touch leads, a dialog rises from below the screen and falls back,
- * as iPadOS's sheets do, rather than zooming in place. `transform` is free to
- * animate: the centring is the `translate` property. Reduce motion makes it
- * instant, with everything else.
+ * Where touch leads, dialogs and bottom sheets are panes (components/ui/
+ * touch-pane.tsx): the popup is a transparent, full-screen scroll view that
+ * snaps between the card in view and the card gone, so a swipe down is the
+ * system's own scrolling (followed on the compositor, flicked at the finger's
+ * speed, rubber-banded) and a swipe far enough closes it. Open and close are a
+ * slide of the whole pane on the spring UIKit's sheets use (critically damped;
+ * 0.5s perceptual in, 0.38s out), written as `linear()` so it runs on the
+ * compositor like any easing: position 1 - (1 + wt) * e^(-wt), w = 2pi / duration,
+ * sampled until it is within 0.3% of the end. Reduce motion makes it instant,
+ * with everything else.
  */
-:root[data-touch] :is([data-slot='dialog-content'], [data-slot='alert-dialog-content'])[data-open] {
-  animation: solstice-dialog-rise 380ms cubic-bezier(0.32, 0.72, 0, 1);
+:root[data-touch] {
+  --sheet-ms: 640ms;
+  --sheet-spring: linear(0, 0.0131, 0.0468, 0.0943, 0.1504, 0.2113, 0.2741, 0.3366, 0.3974, 0.4555, 0.5102, 0.5612, 0.6083, 0.6514, 0.6906, 0.7261, 0.7581, 0.7868, 0.8125, 0.8354, 0.8557, 0.8737, 0.8896, 0.9036, 0.9159, 0.9268, 0.9363, 0.9446, 0.9519, 0.9583, 0.9638, 0.9687, 0.9729, 0.9765, 0.9797, 0.9825, 0.9849, 0.987, 0.9887, 0.9903, 0.9916, 0.9928, 0.9938, 0.9947, 0.9954, 0.9961, 0.9966, 1);
+  --sheet-fall-ms: 485ms;
+  --sheet-fall: linear(0, 0.013, 0.0465, 0.0938, 0.1497, 0.2104, 0.273, 0.3353, 0.396, 0.454, 0.5087, 0.5596, 0.6067, 0.6498, 0.6891, 0.7247, 0.7567, 0.7855, 0.8112, 0.8342, 0.8546, 0.8726, 0.8886, 0.9027, 0.9151, 0.9261, 0.9356, 0.944, 0.9514, 0.9578, 0.9634, 0.9683, 0.9725, 0.9762, 0.9794, 0.9822, 0.9846, 0.9867, 0.9886, 0.9901, 0.9915, 0.9927, 0.9937, 0.9946, 0.9953, 0.996, 0.9965, 1);
 }
 
-:root[data-touch] :is([data-slot='dialog-content'], [data-slot='alert-dialog-content'])[data-closed] {
-  animation: solstice-dialog-fall 250ms cubic-bezier(0.32, 0, 0.67, 0) forwards;
+.solstice-pane {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden scroll;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  background: transparent;
+  outline: none;
 }
 
-:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'])[data-open] {
-  animation-duration: 380ms;
+.solstice-pane::-webkit-scrollbar {
+  display: none;
 }
 
-:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'])[data-closed] {
-  animation-duration: 250ms;
+/* A screen of nothing above the card's: where it goes when pulled away. */
+.solstice-pane-dead,
+.solstice-pane-frame {
+  height: 100%;
+  scroll-snap-align: start;
 }
 
-/* From and to just past the bottom edge, wherever the dialog is centred. */
-@keyframes solstice-dialog-rise {
+.solstice-pane-frame {
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+  padding-bottom: var(--keyboard-inset, 0px);
+}
+
+.solstice-pane-frame[data-align='center'] {
+  align-items: center;
+}
+
+.solstice-pane-frame[data-align='end'] {
+  align-items: flex-end;
+}
+
+.solstice-pane-frame[data-align='top'] {
+  align-items: flex-start;
+  padding-top: 12dvh;
+}
+
+/* The card keeps to what's visible and scrolls within itself. */
+.solstice-pane [data-slot='dialog-content'] {
+  max-height: calc(100dvh - var(--keyboard-inset, 0px) - 2rem);
+  overflow-y: auto;
+}
+
+:root[data-touch] .solstice-pane[data-open] {
+  animation: solstice-pane-rise var(--sheet-ms) var(--sheet-spring);
+}
+
+:root[data-touch] .solstice-pane[data-closed] {
+  animation: solstice-pane-fall var(--sheet-fall-ms) var(--sheet-fall) forwards;
+}
+
+/* Swiped away, it has already left: nothing to play. */
+:root[data-touch] .solstice-pane[data-swiped] {
+  animation: none;
+  visibility: hidden;
+}
+
+@keyframes solstice-pane-rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes solstice-pane-fall {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* An alert is not pulled away; it rises and falls in place on the same spring. */
+:root[data-touch] [data-slot='alert-dialog-content'][data-open] {
+  animation: solstice-alert-rise var(--sheet-ms) var(--sheet-spring);
+}
+
+:root[data-touch] [data-slot='alert-dialog-content'][data-closed] {
+  animation: solstice-alert-fall var(--sheet-fall-ms) var(--sheet-fall) forwards;
+}
+
+@keyframes solstice-alert-rise {
   from {
     transform: translateY(calc(50dvh + 50%));
   }
 }
 
-@keyframes solstice-dialog-fall {
+@keyframes solstice-alert-fall {
   to {
     transform: translateY(calc(50dvh + 50%));
   }
+}
+
+/*
+ * The backdrop is a plain dim, as UIKit's is, not a blur: a blurred layer
+ * whose opacity changes is re-blurred every frame, and a pulled pane changes
+ * it on every scroll.
+ */
+:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'], [data-slot='sheet-overlay']) {
+  background: rgb(0 0 0 / 0.32);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'])[data-open] {
+  animation-duration: var(--sheet-ms);
+  animation-timing-function: var(--sheet-spring);
+}
+
+:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='alert-dialog-overlay'])[data-closed] {
+  animation-duration: var(--sheet-fall-ms);
+  animation-timing-function: var(--sheet-fall);
+  /* Held at its end: otherwise the backdrop shows again at the opacity it had
+     for the frame before it unmounts. */
+  animation-fill-mode: forwards;
+}
+
+/* A sheet's backdrop fades by transition. */
+:root[data-touch] [data-slot='sheet-overlay'] {
+  transition-duration: var(--sheet-fall-ms);
+  transition-timing-function: var(--sheet-fall);
+}
+
+/* The grabber of a bottom sheet: the pill iOS draws to say it can be pulled. */
+:root[data-touch] [data-slot='sheet-content']::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 36px;
+  height: 5px;
+  translate: -50% 0;
+  border-radius: 999px;
+  background: var(--muted-foreground);
+  opacity: 0.35;
+  pointer-events: none;
 }

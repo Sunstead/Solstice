@@ -8,7 +8,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@sunstead/ui/components/command';
+} from '@/components/ui/command';
 import { FileEntry } from '@/bindings';
 
 type FileSearchDialogProps = {

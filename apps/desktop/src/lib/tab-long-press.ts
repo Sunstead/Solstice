@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * Where a tab's menu was asked for, and for which tab. `held`: by holding the
@@ -29,7 +29,16 @@ function tabAt(target: EventTarget | null): { button: HTMLElement; tabId: string
  * touch (`dragstart`, then only drag events): the menu opens at that lift,
  * or after `HOLD_MS` if no lift comes.
  */
-export function useTabLongPress(open: (request: TabMenuRequest) => void, close: () => void) {
+export function useTabLongPress(
+  open: (request: TabMenuRequest) => void,
+  close: () => void,
+  /** Tabs whose hold is `tab-gesture.ts`'s, not this. */
+  owns?: (tabId: string) => boolean,
+) {
+  const ownsRef = useRef(owns);
+  useEffect(() => {
+    ownsRef.current = owns;
+  }, [owns]);
   useEffect(() => {
     let timer = 0;
     /** A hold in progress: where it started, on which tab. */
@@ -74,7 +83,7 @@ export function useTabLongPress(open: (request: TabMenuRequest) => void, close: 
       origin = null;
       if (event.pointerType === 'mouse') return;
       const tab = tabAt(event.target);
-      if (!tab) return;
+      if (!tab || ownsRef.current?.(tab.tabId)) return;
       origin = { x: event.clientX, y: event.clientY };
       pending = { ...tab, x: event.clientX, y: event.clientY };
       timer = window.setTimeout(openNow, HOLD_MS);

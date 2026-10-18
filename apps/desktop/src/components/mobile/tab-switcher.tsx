@@ -3,7 +3,7 @@ import { Actions, type Model, type TabNode } from 'flexlayout-react';
 import { FileText, Plus, X } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@sunstead/ui/components/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { getFileIcon } from '@/assets/icons';
 import { useLayout } from '@/hooks/use-layout';
 import { useSetting } from '@/lib/settings/store';

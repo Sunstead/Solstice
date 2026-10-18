@@ -8,7 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sunstead/ui/components/dialog';
+} from '@/components/ui/dialog';
 import { Input } from '@sunstead/ui/components/input';
 import { Label } from '@sunstead/ui/components/label';
 import { commands } from '@/lib/backend';

@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sunstead/ui/components/dialog';
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useSync } from '@/lib/stores/sync';
 

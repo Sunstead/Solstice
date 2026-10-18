@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sunstead/ui/components/dialog';
+} from '@/components/ui/dialog';
 import { commands } from '@/lib/backend';
 import { useServerVaults } from '@/hooks/use-server-vaults';
 import { useWorkspace } from '@/hooks/use-workspace';

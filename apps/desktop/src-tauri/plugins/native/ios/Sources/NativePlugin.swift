@@ -45,6 +45,7 @@ struct HostArgs: Decodable {
   let html: String?
   let page: PageSpec?
   let anchor: Rect?
+  let kind: String?
 }
 
 class NativePlugin: Plugin {
@@ -195,6 +196,9 @@ class NativePlugin: Plugin {
       case "webFocus":
         // Web text took focus (typing wins the tools), or lost it.
         Ink.shared.webFocus(args.on ?? false)
+      case "haptic":
+        // Feedback for a gesture the web drives; no `kind` only warms the engine.
+        if let kind = args.kind { Haptics.play(kind) } else { Haptics.prepare() }
       case "expectTyping":
         // A finger tapped text to type: the keyboard, not Scribble's
         // seconds of waiting for the Pencil.

@@ -6,7 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sunstead/ui/components/dialog';
+} from '@/components/ui/dialog';
 import { Progress } from '@sunstead/ui/components/progress';
 import { useAppVersion } from '@/hooks/use-app-version';
 import { useUpdates } from '@/lib/stores/updates';

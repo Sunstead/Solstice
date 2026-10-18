@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from '@sunstead/ui/components/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
 import { ImportFromSyncForm } from './import-from-sync-dialog';
 import { ManageWorkspacesForm } from './manage-workspaces-dialog';

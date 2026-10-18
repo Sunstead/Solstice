@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { EllipsisVertical, FolderOpen, Trash2 } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@sunstead/ui/components/dialog';
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,

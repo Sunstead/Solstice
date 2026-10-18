@@ -110,3 +110,15 @@ export const nativeKeyboard = {
    */
   expectTyping: () => host({ op: 'expectTyping' }),
 };
+
+/**
+ * The Taptic Engine (`Haptics.swift`), for gestures that lift, drop or
+ * cross a slot. Fire and forget: a missed tick is only a missed tick.
+ */
+export type HapticKind = 'lift' | 'drop' | 'tick' | 'dismiss' | 'warning';
+
+export const nativeHaptics = {
+  /** Wakes the engine before a tick that may follow (a press that may lift). */
+  prepare: () => host({ op: 'haptic' }),
+  play: (kind: HapticKind) => host({ op: 'haptic', kind }),
+};
