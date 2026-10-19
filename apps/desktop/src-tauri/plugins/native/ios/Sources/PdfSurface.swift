@@ -8,7 +8,7 @@ import os
 
 /// A PDF, in PDFKit (Apple's scrolling, zoom and text selection), marked up
 /// with PaperKit as in Preview and Files: a markup canvas over each page, the
-/// system tool picker, and the marks written into the PDF itself
+/// app's own tools (`Ink`), and the marks written into the PDF itself
 /// (`PdfMarkup`, `PdfStore`), so every device and every reader shows them.
 ///
 /// The Pencil draws from its first touch; a finger scrolls, zooms and
@@ -24,7 +24,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   private static let signposts = OSSignposter(subsystem: "app.solstice", category: "PdfSurface")
 
   private let pdfView = MarkupPDFView()
-  private var toolPicker: PKToolPicker { Ink.shared.picker }
+  /// It holds the tools (`Ink`): the page in view's canvas is first responder.
+  private var hasTools = false
   /// The canvas over each page PDFKit is showing (or that has unsaved marks).
   private var canvases:
     [ObjectIdentifier: (page: PDFPage, controller: PaperMarkupViewController, host: CanvasHost)] = [:]
@@ -75,12 +76,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     // The host's colour (what was under the tab) shows around the pages.
     pdfView.backgroundColor = .clear
     pdfView.pageOverlayViewProvider = self
-    pdfView.fingerDraws = Ink.shared.fingerDrawsNow
+    pdfView.fingerDraws = Ink.shared.fingerDraws
     addSubview(pdfView)
-
-    // Squeeze, barrel roll and the + menu come with Apple's tool picker.
-    pencilKitResponderState.activeToolPicker = toolPicker
-    pencilKitResponderState.toolPickerVisibility = .hidden
 
     // The Pencil on a page: that page's canvas takes the tools.
     let pencil = UILongPressGestureRecognizer(target: self, action: #selector(pencilDown(_:)))
@@ -150,6 +147,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     }
     dropCanvases()
     pdfView.document = document
+    Ink.letFingerDraw(Ink.shared.fingerDraws, in: pdfView)
     if opened?.needsRepair == true {
       repairing = true
       scheduleSave(after: .zero)
@@ -235,9 +233,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     controller.scrollConfiguration.isScrollEnabled = false
     controller.zoomRange = 0.1...Self.maximumZoom
     controller.isEditable = true
-    controller.drawingTool = Ink.shared.tool
-    configure(controller)
-    toolPicker.addObserver(controller)
+    Ink.shared.configure(controller)
     if let parent = plugin?.manager.viewController {
       parent.addChild(controller)
       controller.didMove(toParent: parent)
@@ -310,10 +306,6 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     view.subviews.forEach(clear)
   }
 
-  private func configure(_ controller: PaperMarkupViewController) {
-    controller.directTouchAutomaticallyDraws = Ink.shared.fingerDrawsNow
-  }
-
   override func paperChanged() {
     let style = Paper.style(dark: Ink.shared.darkPaper)
     canvases.values.forEach { $0.controller.overrideUserInterfaceStyle = style }
@@ -331,17 +323,21 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }
 
   override func inkChanged() {
-    pdfView.fingerDraws = Ink.shared.fingerDrawsNow
-    canvases.values.forEach { configure($0.controller) }
+    pdfView.fingerDraws = Ink.shared.fingerDraws
+    // PDFKit's own scrolling too: two fingers while one draws.
+    Ink.letFingerDraw(Ink.shared.fingerDraws, in: pdfView)
+    canvases.values.forEach { Ink.shared.configure($0.controller) }
   }
 
+  override var undoTarget: UndoManager? { current?.undoManager }
+
   override func takeTools() {
-    pencilKitResponderState.toolPickerVisibility = .visible
+    hasTools = true
     current?.becomeFirstResponder()
   }
 
   override func dropTools() {
-    pencilKitResponderState.toolPickerVisibility = .hidden
+    hasTools = false
     canvases.values.forEach { $0.controller.resignFirstResponder() }
     flush()
   }
@@ -355,7 +351,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
     guard gesture.state == .began else { return }
     Ink.shared.activate(self, touched: true)
-    // The page under the Pencil holds the tools, so the picker stays.
+    // The page under the Pencil holds the tools.
     let point = gesture.location(in: pdfView)
     if let page = pdfView.page(for: point, nearest: true),
       let controller = canvases[ObjectIdentifier(page)]?.controller, !controller.isFirstResponder
@@ -366,21 +362,107 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   @objc private func pageChanged() {
     // A new page in view: its canvas takes the tools, if this has them.
-    guard pencilKitResponderState.toolPickerVisibility == .visible, let current, !current.isFirstResponder
-    else { return }
+    guard hasTools, let current, !current.isFirstResponder else { return }
     current.becomeFirstResponder()
+    Ink.shared.sendUndo()
   }
 
-  override func showInsertMenu() {
-    guard let controller = current, let parent = plugin?.manager.viewController else { return }
-    let addPage = UIAction(title: "Add Page", image: UIImage(systemName: "doc.badge.plus")) {
-      [weak self] _ in self?.addPage()
+  override func insert(_ item: String, shape: String?) {
+    if item == "addPage" { return addPage() }
+    guard let page = pdfView.currentPage, let controller = canvases[ObjectIdentifier(page)]?.controller else { return }
+    MarkupInsert.insert(
+      item, shape: shape, into: controller, features: Self.features, centre: visibleCentre(of: page),
+      presenter: plugin?.manager.viewController)
+  }
+
+  /// The middle of what shows of `page`, in its markup's space (y down).
+  private func visibleCentre(of page: PDFPage) -> CGPoint {
+    let box = page.bounds(for: .cropBox)
+    let shown = pdfView.convert(pdfView.bounds, to: page).intersection(box)
+    let area = shown.isNull || shown.isEmpty ? box : shown
+    return CGPoint(x: area.midX - box.minX, y: box.maxY - area.midY)
+  }
+
+  // -- Pages ----------------------------------------------------------------
+
+  override var pages: (count: Int, current: Int) {
+    guard let document = pdfView.document else { return (0, 0) }
+    return (document.pageCount, pdfView.currentPage.map { document.index(for: $0) } ?? 0)
+  }
+
+  override func thumbnail(_ index: Int, width: CGFloat) async -> String? {
+    guard let page = pdfView.document?.page(at: index) else { return nil }
+    let box = page.bounds(for: .cropBox)
+    guard box.width > 0 else { return nil }
+    let size = CGSize(width: width, height: width * box.height / box.width)
+    let markup = marks(of: page)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = displayScale
+    format.opaque = true
+    let renderer = UIGraphicsImageRenderer(size: size, format: format)
+    // The page as PDFKit draws it (white, light whatever the paper), then
+    // the marks on it, as every reader shows them.
+    var art: CGImage?
+    if let markup {
+      art = await PdfMarkup.picture(of: markup, size: size, scale: displayScale)
     }
-    let menu = MarkupEditViewController(supportedFeatureSet: Self.features, additionalActions: [addPage])
-    menu.delegate = controller
-    menu.modalPresentationStyle = .popover
-    menu.popoverPresentationController?.sourceItem = toolPicker.accessoryItem
-    parent.present(menu, animated: true)
+    let image = renderer.image { context in
+      UIColor.white.setFill()
+      context.fill(CGRect(origin: .zero, size: size))
+      let cg = context.cgContext
+      cg.saveGState()
+      cg.translateBy(x: 0, y: size.height)
+      cg.scaleBy(x: size.width / box.width, y: -size.height / box.height)
+      cg.translateBy(x: -box.minX, y: -box.minY)
+      page.draw(with: .cropBox, to: cg)
+      cg.restoreGState()
+      if let art { UIImage(cgImage: art).draw(in: CGRect(origin: .zero, size: size)) }
+    }
+    guard let jpeg = image.jpegData(compressionQuality: 0.8) else { return nil }
+    return "data:image/jpeg;base64," + jpeg.base64EncodedString()
+  }
+
+  override func goToPage(_ index: Int) {
+    guard let page = pdfView.document?.page(at: index) else { return }
+    pdfView.go(to: page)
+  }
+
+  override func arrangePages(_ order: [Int]) async -> String? {
+    guard !encrypted else { return "Pages of an encrypted PDF can't be rearranged here." }
+    // Everything pending goes to the file first, so its pages are the ones
+    // shown and the order counts the same pages.
+    await save()
+    guard let document = pdfView.document else { return "The PDF isn't open." }
+    let count = document.pageCount
+    guard !order.isEmpty, Set(order).count == order.count, order.allSatisfy({ (0..<count).contains($0) }) else {
+      return "That isn't an order of this PDF's pages."
+    }
+    let before = (0..<count).compactMap { document.page(at: $0) }
+    // Pages that go take their marks with them.
+    for (index, page) in before.enumerated() where !order.contains(index) {
+      let key = ObjectIdentifier(page)
+      dropCanvas(key, keep: false)
+      unsaved.remove(key)
+      stored[key] = nil
+      cached[key] = nil
+      appleInks[key] = nil
+    }
+    for index in stride(from: count - 1, through: 0, by: -1) { document.removePage(at: index) }
+    for (place, index) in order.enumerated() { document.insert(before[index], at: place) }
+    pdfView.layoutDocumentView()
+
+    var failure: String?
+    await saves.run { [weak self] in
+      guard let self else { return }
+      do {
+        self.written = try await PdfStore.save(self.path, PdfStore.Request(order: order)).hash
+        self.send("saved")
+      } catch {
+        failure = "Couldn't save the pages: \(error.localizedDescription)"
+      }
+    }
+    if let failure { send("error", ["message": failure]) }
+    return failure
   }
 
   /// A page after the one in view, with the document's background (a
@@ -521,7 +603,6 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     guard let entry = canvases.removeValue(forKey: key) else { return }
     scratchers[key] = nil
     if keep, let markup = entry.controller.markup { cached[key] = markup }
-    toolPicker.removeObserver(entry.controller)
     let wasResponder = entry.controller.isFirstResponder
     entry.controller.willMove(toParent: nil)
     entry.controller.removeFromParent()

@@ -16,6 +16,9 @@ struct SaveRequest {
     inserts: Vec<InsertJson>,
     #[serde(default)]
     edits: Vec<EditJson>,
+    /// The pages' final order, after the inserts (`apply_arranged`).
+    #[serde(default)]
+    order: Option<Vec<usize>>,
 }
 
 #[derive(Deserialize)]
@@ -117,7 +120,7 @@ pub fn save(path: &Path, request: &str) -> Result<String> {
         .collect::<Result<Vec<_>>>()?;
 
     let original = std::fs::read(path).map_err(|e| e.to_string())?;
-    let written = crate::apply(&original, &inserts, &edits)?;
+    let written = crate::apply_arranged(&original, &inserts, request.order.as_deref(), &edits)?;
     let hash = crate::write_atomically(path, &written).map_err(|e| e.to_string())?;
     serde_json::to_string(&Saved {
         hash,

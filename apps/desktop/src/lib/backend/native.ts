@@ -6,16 +6,16 @@
  */
 import { addPluginListener, invoke } from '@tauri-apps/api/core';
 import type { CommandId, PageSpec, ResolvedMenu } from '@/bindings';
+import type { InsertItem, InsertShape } from '@/lib/ink/insert';
+import type { PencilGesture, toNative } from '@/lib/ink/toolbox';
 
-export type SurfaceKind = 'pdf' | 'drawing';
+export type SurfaceKind = 'pdf' | 'drawing' | 'image';
 
 export type SurfaceEvent = {
   id: string;
-  type: 'saved' | 'dirty' | 'error' | 'editing';
+  type: 'saved' | 'dirty' | 'error';
   path: string;
   message?: string;
-  /** For `editing`: whether a finger draws too (on every surface). */
-  on?: boolean;
 };
 
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -37,8 +37,6 @@ export const nativeSurfaces = {
     surface({ op: 'frame', id, ...rect, visible, rgb: rgb ?? undefined }),
   reload: (id: string) => surface({ op: 'reload', id }),
   close: (id: string) => surface({ op: 'close', id }),
-  /** Finger drawing, on every surface (the Pencil always draws). */
-  edit: (id: string, on: boolean) => surface({ op: 'edit', id, on }),
   /** Highlights the matches and shows the first; an empty query clears them. */
   find: (id: string, query: string, caseSensitive: boolean, wholeWord: boolean) =>
     surface<{ count: number; active: number }>({ op: 'find', id, query, caseSensitive, wholeWord }),
@@ -66,6 +64,52 @@ export const nativeSurfaces = {
   background: (rgb: number[]) => host({ op: 'background', rgb }),
   listen: (handler: (event: SurfaceEvent) => void) =>
     addPluginListener('solstice-native', 'surface', handler),
+};
+
+/** What the native side says about the tools (`Ink.swift`). */
+export type InkEvent =
+  /**
+   * A double tap or squeeze, with what Settings asks of it, where the Pencil
+   * hovers (CSS pixels) and which way its barrel leans (radians, as `atan2` on screen).
+   */
+  | ({ type: 'pencil'; x?: number; y?: number; azimuth?: number } & PencilGesture)
+  /** Whether the canvas in front can undo or redo. */
+  | { type: 'undo'; canUndo: boolean; canRedo: boolean }
+  /** Apple's colour picker chose a colour; `final` once it settles. */
+  | { type: 'color'; color: string; opacity: number; final: boolean };
+
+/**
+ * The ink tools (`lib/ink/toolbox.ts`), applied to every canvas: the ribbon
+ * and squeeze palette are the web's, the drawing is the native side's.
+ */
+export const nativeInk = {
+  setTool: (tool: ReturnType<typeof toNative>) => host({ op: 'tool', tool }),
+  setRuler: (on: boolean) => host({ op: 'ruler', on }),
+  /** A finger draws too, on every surface (the Pencil always draws). */
+  setFingerDraws: (on: boolean) => host({ op: 'fingerDraws', on }),
+  undo: () => host({ op: 'undo' }),
+  redo: () => host({ op: 'redo' }),
+  /** Asks for an `undo` event now. */
+  undoState: () => host({ op: 'undoState' }),
+  /** Into the canvas in view (`lib/ink/insert.ts`): text, a shape, a line, a loupe, an image, or a PDF page. */
+  insert: (item: InsertItem['id'], shape?: InsertShape) => host({ op: 'insert', item, shape }),
+  /** The PDF in front's pages: how many, and which is in view. */
+  pages: () =>
+    invoke<{ count: number; current: number }>('plugin:solstice-native|host', { op: 'pages' }).catch(() => ({
+      count: 0,
+      current: 0,
+    })),
+  /** Page `index` with its marks, `width` points across, as a data URL ('' if it can't). */
+  thumbnail: (index: number, width: number) =>
+    invoke<{ url: string }>('plugin:solstice-native|host', { op: 'thumbnail', index, width })
+      .then((r) => r.url)
+      .catch(() => ''),
+  goToPage: (index: number) => host({ op: 'goToPage', index }),
+  /** Puts the pages in `order` (`lib/ink/pages.ts`), deleting those left out. Fails with why. */
+  arrangePages: (order: number[]) => invoke<void>('plugin:solstice-native|host', { op: 'arrangePages', order }),
+  /** Apple's full colour picker, a popover from `anchor`: answers with `color` events. */
+  pickColor: (anchor: Rect) => host({ op: 'pickColor', anchor }),
+  listen: (handler: (event: InkEvent) => void) => addPluginListener('solstice-native', 'ink', handler),
 };
 
 /**

@@ -41,7 +41,9 @@ enum PdfStore {
   struct Request: Encodable {
     var inserts: [Insert] = []
     var edits: [Edit] = []
-    var isEmpty: Bool { inserts.isEmpty && edits.isEmpty }
+    /// The pages' final order, after the inserts; pages left out are deleted.
+    var order: [Int]? = nil
+    var isEmpty: Bool { inserts.isEmpty && edits.isEmpty && order == nil }
   }
 
   /// A page added at `at`, from a one-page PDF.

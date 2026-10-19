@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { create } from 'zustand';
 import { commands } from '@/lib/backend';
 import { nativeSurfaces, type SurfaceEvent } from '@/lib/backend/native';
+import { followInkTools } from '@/lib/ink/native-sync';
 import { useEditingFocus } from '@/lib/keyboard';
 import { getSetting, subscribeToSetting } from '@/lib/settings/store';
 
@@ -178,14 +179,11 @@ export function retainHost(): () => void {
 }
 
 /** What each surface reports, by its id. */
-export const useSurfaceStates = create<Record<string, { editing: boolean; error?: string }>>(() => ({}));
+export const useSurfaceStates = create<Record<string, { error?: string }>>(() => ({}));
 
 function onSurfaceEvent(event: SurfaceEvent) {
-  const state = useSurfaceStates.getState()[event.id] ?? { editing: false };
+  const state = useSurfaceStates.getState()[event.id] ?? {};
   switch (event.type) {
-    case 'editing':
-      useSurfaceStates.setState({ [event.id]: { ...state, editing: !!event.on } });
-      break;
     case 'saved':
       // Its own save: not a change from outside to reload.
       void commands.fileWritten(event.path);
@@ -232,6 +230,7 @@ function startHost(): () => void {
   root.dataset.nativeHost = '';
   const listening = nativeSurfaces.listen(onSurfaceEvent);
   const stopFocus = followWebFocus();
+  const stopInk = followInkTools();
   void nativeSurfaces.ink({ scratchOut: getSetting('ink.scratchOut'), darkPaper: getSetting('ink.darkPaper') });
   const stopScratch = subscribeToSetting('ink.scratchOut', (scratchOut) => void nativeSurfaces.ink({ scratchOut }));
   const stopPaper = subscribeToSetting('ink.darkPaper', (darkPaper) => void nativeSurfaces.ink({ darkPaper }));
@@ -240,6 +239,7 @@ function startHost(): () => void {
 
   return () => {
     stopFocus();
+    stopInk();
     stopScratch();
     stopPaper();
     theme.disconnect();

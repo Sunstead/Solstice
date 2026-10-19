@@ -8,6 +8,8 @@ import { embedKind, isDrawing } from '@/lib/embed/kind';
 import { can } from '@/lib/backend/platform';
 import { NativePdf } from '@/components/viewer/native-pdf';
 import { NativeDrawing } from '@/components/viewer/native-drawing';
+import { NativeImage } from '@/components/viewer/native-image';
+import { isMarkableImage } from '@/lib/ink/insert';
 
 /**
  * Chooses what a tab actually shows.
@@ -30,7 +32,8 @@ export const FileView: React.FC<{ path: string; source?: boolean }> = ({ path, s
       // Keyed, so another file or mode starts afresh.
       return <FileEditor key={`${source ? 'source' : 'rich'}:${path}`} path={path} source={source} />;
     case 'image':
-      return <ImageViewer path={path} />;
+      // On iOS a bitmap is marked up in place, as in Preview.
+      return can.nativeViews && isMarkableImage(path) ? <NativeImage path={path} /> : <ImageViewer path={path} />;
     case 'video':
       return <MediaViewer path={path} kind='video' />;
     case 'audio':

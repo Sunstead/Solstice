@@ -20,6 +20,13 @@ const { webFocus, ink, settings } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/backend/native', () => ({
   nativeKeyboard: { listen: vi.fn() },
+  nativeInk: {
+    listen: vi.fn(() => Promise.resolve({ unregister: vi.fn() })),
+    setTool: vi.fn(),
+    setRuler: vi.fn(),
+    setFingerDraws: vi.fn(),
+    undoState: vi.fn(),
+  },
   nativeSurfaces: {
     listen: vi.fn(() => Promise.resolve({ unregister: vi.fn() })),
     webFocus,
@@ -29,6 +36,9 @@ vi.mock('@/lib/backend/native', () => ({
   },
 }));
 vi.mock('@/lib/backend', () => ({ commands: { fileWritten: vi.fn() } }));
+vi.mock('@/lib/stores/scoped-storage', () => ({
+  createScopedStorage: () => ({ getItem: () => null, setItem: () => {}, removeItem: () => {} }),
+}));
 vi.mock('@/lib/backend/platform', () => ({ can: { nativeViews: true } }));
 vi.mock('@/lib/settings/store', () => ({
   getSetting: (key: string) => (key === 'ink.darkPaper' ? settings.darkPaper : settings.scratchOut),
