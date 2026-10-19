@@ -1,3 +1,4 @@
+import SurfaceCore
 import Tauri
 import UIKit
 import WebKit
@@ -46,6 +47,15 @@ struct HostArgs: Decodable {
   let page: PageSpec?
   let anchor: Rect?
   let kind: String?
+  /// For `tool`: the slot in hand (`toNative` in `lib/ink/toolbox.ts`).
+  let tool: ToolSpec?
+  /// For `insert`: what (`InsertItem` in `lib/ink/insert.ts`), and which shape.
+  let item: String?
+  let shape: String?
+  /// For the page sheet: a page, a thumbnail's width, the pages' new order.
+  let index: Int?
+  let width: Double?
+  let order: [Int]?
 }
 
 class NativePlugin: Plugin {
@@ -59,6 +69,8 @@ class NativePlugin: Plugin {
     DispatchQueue.main.async {
       self.host = SurfaceHost.install(under: webview)
       self.fit = WebviewFit(webview, plugin: self)
+      Ink.shared.plugin = self
+      if let parent = webview.superview { Ink.shared.listen(in: parent) }
     }
     let center = NotificationCenter.default
     center.addObserver(
@@ -84,6 +96,14 @@ class NativePlugin: Plugin {
     return webview.convert(rect, to: host)
   }
 
+  /// A point in `view`, in the webview's CSS pixels: `hostRect`'s inverse.
+  func cssPoint(_ point: CGPoint, from view: UIView) -> CGPoint? {
+    guard let webview else { return nil }
+    let inset = webview.scrollView.adjustedContentInset
+    let local = view.convert(point, to: webview)
+    return CGPoint(x: local.x - inset.left, y: local.y - inset.top)
+  }
+
   @objc public func surface(_ invoke: Invoke) throws {
     let args = try invoke.parseArgs(SurfaceArgs.self)
     DispatchQueue.main.async {
@@ -97,6 +117,7 @@ class NativePlugin: Plugin {
         switch args.kind {
         case "pdf": host.add(PdfSurface(id: args.id, path: path, plugin: self))
         case "drawing": host.add(DrawingSurface(id: args.id, path: path, plugin: self))
+        case "image": host.add(ImageSurface(id: args.id, path: path, plugin: self))
         default: return invoke.reject("No such surface: \(args.kind ?? "")")
         }
       case "frame":
@@ -112,9 +133,6 @@ class NativePlugin: Plugin {
         }
       case "reload":
         host.surfaces[args.id]?.reload()
-      case "edit":
-        // Finger drawing, on every surface.
-        Ink.shared.setFingerDraws(args.on ?? false)
       case "find":
         // Reading handwriting takes a moment: answered when it's done.
         let surface = host.surfaces[args.id]
@@ -203,6 +221,48 @@ class NativePlugin: Plugin {
         // A finger tapped text to type: the keyboard, not Scribble's
         // seconds of waiting for the Pencil.
         UITextInputContext.current().isPencilInputExpected = false
+      case "tool":
+        // The ribbon's slot in hand, on every canvas.
+        if let tool = args.tool { Ink.shared.setTool(tool) }
+      case "ruler":
+        Ink.shared.setRuler(args.on ?? false)
+      case "fingerDraws":
+        Ink.shared.setFingerDraws(args.on ?? false)
+      case "undo":
+        Ink.shared.undo()
+      case "redo":
+        Ink.shared.redo()
+      case "undoState":
+        Ink.shared.sendUndo(force: true)
+      case "insert":
+        // The ribbon's +: text, shapes, lines, a loupe, an image (Add Page in a PDF).
+        Ink.shared.current?.insert(args.item ?? "", shape: args.shape)
+      case "pages":
+        // The page sheet: how many, and which is in view.
+        let pages = Ink.shared.current?.pages ?? (count: 0, current: 0)
+        return invoke.resolve(["count": pages.count, "current": pages.current])
+      case "thumbnail":
+        let surface = Ink.shared.current
+        Task { @MainActor in
+          let url = await surface?.thumbnail(args.index ?? 0, width: CGFloat(args.width ?? 160))
+          invoke.resolve(["url": url ?? ""])
+        }
+        return
+      case "goToPage":
+        Ink.shared.current?.goToPage(args.index ?? 0)
+      case "arrangePages":
+        guard let surface = Ink.shared.current, let order = args.order else { break }
+        Task { @MainActor in
+          if let failure = await surface.arrangePages(order) {
+            invoke.reject(failure)
+          } else {
+            invoke.resolve()
+          }
+        }
+        return
+      case "pickColor":
+        guard let webview = self.webview, let presenter = self.manager.viewController else { break }
+        Ink.shared.pickColor(from: self.shareRect(args.anchor, in: webview), in: webview, by: presenter)
       case "ink":
         if let scratchOut = args.scratchOut { Ink.shared.scratchOut = scratchOut }
         if let darkPaper = args.darkPaper { Ink.shared.setDarkPaper(darkPaper) }

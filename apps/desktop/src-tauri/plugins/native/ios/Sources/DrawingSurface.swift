@@ -6,7 +6,7 @@ import Tauri
 import UIKit
 
 /// An infinite drawing (`*.drawing.svg`), as in Freeform: one PaperKit
-/// canvas you pan and zoom, Apple's tool picker, the Pencil drawing from its
+/// canvas you pan and zoom, Solstice's tools (`Ink`), the Pencil drawing from its
 /// first touch (a finger pans, or draws too with finger drawing on: `Ink`).
 /// Saved as an SVG (`DrawingFile`) whose markup is read back here.
 final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
@@ -22,7 +22,8 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }()
 
   private var controller: PaperMarkupViewController?
-  private var toolPicker: PKToolPicker { Ink.shared.picker }
+  /// It holds the tools (`Ink`): its canvas is first responder.
+  private var hasTools = false
   private var unsaved = false
   /// The wait before a save; a new mark restarts it.
   private var pendingSave: Task<Void, Never>?
@@ -40,8 +41,6 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   override init(id: String, path: String, plugin: NativePlugin) {
     super.init(id: id, path: path, plugin: plugin)
-    pencilKitResponderState.activeToolPicker = toolPicker
-    pencilKitResponderState.toolPickerVisibility = .hidden
 
     let pencil = UILongPressGestureRecognizer(target: self, action: #selector(pencilDown(_:)))
     pencil.minimumPressDuration = 0
@@ -74,9 +73,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     showPaper(on: controller)
     controller.zoomRange = 0.1...8
     controller.isEditable = true
-    controller.drawingTool = Ink.shared.tool
-    configure(controller)
-    toolPicker.addObserver(controller)
+    Ink.shared.configure(controller)
     if let parent = plugin?.manager.viewController {
       parent.addChild(controller)
       addSubview(controller.view)
@@ -92,7 +89,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     }
     opening = markup
     setNeedsLayout()
-    if pencilKitResponderState.toolPickerVisibility == .visible {
+    if hasTools {
       DispatchQueue.main.async { controller.becomeFirstResponder() }
     }
   }
@@ -162,10 +159,6 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   // -- Editing ------------------------------------------------------------
 
-  private func configure(_ controller: PaperMarkupViewController) {
-    controller.directTouchAutomaticallyDraws = Ink.shared.fingerDrawsNow
-  }
-
   /// The paper: white, or dark with the ink's lightness swapped (the file
   /// keeps its true colours: `Paper`).
   private func showPaper(on controller: PaperMarkupViewController) {
@@ -179,16 +172,18 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }
 
   override func inkChanged() {
-    controller.map(configure)
+    controller.map(Ink.shared.configure)
   }
 
+  override var undoTarget: UndoManager? { controller?.undoManager }
+
   override func takeTools() {
-    pencilKitResponderState.toolPickerVisibility = .visible
+    hasTools = true
     controller?.becomeFirstResponder()
   }
 
   override func dropTools() {
-    pencilKitResponderState.toolPickerVisibility = .hidden
+    hasTools = false
     controller?.resignFirstResponder()
     flush()
   }
@@ -201,13 +196,12 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     drewAt = Date()
   }
 
-  override func showInsertMenu() {
-    guard let controller, let parent = plugin?.manager.viewController else { return }
-    let menu = MarkupEditViewController(supportedFeatureSet: Self.features)
-    menu.delegate = controller
-    menu.modalPresentationStyle = .popover
-    menu.popoverPresentationController?.sourceItem = toolPicker.accessoryItem
-    parent.present(menu, animated: true)
+  override func insert(_ item: String, shape: String?) {
+    guard let controller else { return }
+    let visible = controller.contentVisibleFrame
+    MarkupInsert.insert(
+      item, shape: shape, into: controller, features: Self.features, centre: CGPoint(x: visible.midX, y: visible.midY),
+      presenter: plugin?.manager.viewController)
   }
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
@@ -313,7 +307,6 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }
 
   private func drop(_ controller: PaperMarkupViewController) {
-    toolPicker.removeObserver(controller)
     controller.willMove(toParent: nil)
     controller.view.removeFromSuperview()
     controller.removeFromParent()

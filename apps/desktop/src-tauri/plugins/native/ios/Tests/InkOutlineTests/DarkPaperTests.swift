@@ -14,15 +14,6 @@ final class DarkPaperTests: XCTestCase {
     Ink.shared.setDarkPaper(false)
   }
 
-  // -- The picker -------------------------------------------------------------
-
-  func testThePickerShowsColoursAsOnThePaper() {
-    Ink.shared.setDarkPaper(true)
-    XCTAssertEqual(Ink.shared.picker.colorUserInterfaceStyle, .dark)
-    Ink.shared.setDarkPaper(false)
-    XCTAssertEqual(Ink.shared.picker.colorUserInterfaceStyle, .light)
-  }
-
   // -- Ink --------------------------------------------------------------------
 
   private func blackStroke() -> PKStroke {

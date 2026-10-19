@@ -6,6 +6,8 @@ type ViewerFrameProps = {
   find?: boolean;
   /** Extra controls for the header's left cell. */
   leading?: React.ReactNode;
+  /** A strip under the header, outside the content (the ink tools). */
+  ribbon?: React.ReactNode;
   /** Floating panel, centred over the bottom of the content. */
   toolbar?: React.ReactNode;
   className?: string;
@@ -24,6 +26,7 @@ export function ViewerFrame({
   path,
   find,
   leading,
+  ribbon,
   toolbar,
   className,
   children,
@@ -32,6 +35,7 @@ export function ViewerFrame({
   return (
     <div className='flex h-full w-full flex-col overflow-hidden' {...props}>
       <ViewerHeader path={path} find={find} leading={leading} />
+      {ribbon}
 
       <div className={cn('relative min-h-0 flex-1', className)}>
         {children}

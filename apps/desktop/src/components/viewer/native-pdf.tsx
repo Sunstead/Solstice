@@ -1,21 +1,21 @@
 import { useId } from 'react';
-import { Hand } from 'lucide-react';
 
-import { Button } from '@sunstead/ui/components/button';
+import { InkRibbon } from '@/components/ink/ink-ribbon';
+import { RibbonToggle } from '@/components/ink/ribbon-toggle';
 import { NativeSurface } from '@/components/native-surface';
-import { nativeSurfaces } from '@/lib/backend/native';
 import { useSurfaceStates } from '@/lib/native-surfaces';
+import { useSetting } from '@/lib/settings/store';
 import { PaperToggle } from './paper-toggle';
 import { ViewerFrame } from './viewer-frame';
 
 /**
- * A PDF in the iOS app: PDFKit, marked up with Apple's tools. The Pencil
- * draws from its first touch; the button lets a finger draw too, on every
- * PDF and drawing.
+ * A PDF in the iOS app: PDFKit, marked up with PaperKit and Solstice's own
+ * ink tools, pinned under the header (`InkRibbon`). The Pencil draws from
+ * its first touch.
  */
 export function NativePdf({ path }: { path: string }) {
   const id = useId();
-  const fingerDraws = useSurfaceStates((s) => s[id]?.editing ?? false);
+  const ribbon = useSetting('ink.ribbon');
   const error = useSurfaceStates((s) => s[id]?.error);
 
   return (
@@ -24,19 +24,11 @@ export function NativePdf({ path }: { path: string }) {
       find
       leading={
         <>
-          <Button
-            variant={fingerDraws ? 'secondary' : 'ghost'}
-            size='icon-sm'
-            aria-pressed={fingerDraws}
-            title='Draw with Finger'
-            onClick={() => void nativeSurfaces.edit(id, !fingerDraws)}
-          >
-            <Hand />
-            <span className='sr-only'>Draw with Finger</span>
-          </Button>
+          <RibbonToggle />
           <PaperToggle />
         </>
       }
+      ribbon={ribbon && <InkRibbon surface='pdf' />}
     >
       {error && (
         <div className='absolute inset-x-0 top-0 z-10 bg-destructive/90 px-3 py-1.5 text-sm text-white'>

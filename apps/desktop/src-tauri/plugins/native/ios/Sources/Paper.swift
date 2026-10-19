@@ -3,7 +3,7 @@ import UIKit
 /// The paper PDFs, notebooks and drawings are on: white, or dark (`ink.darkPaper`),
 /// as in Notes and Preview. Dark paper changes how things are *shown* and
 /// nothing that's saved: PencilKit keeps an ink's colour as drawn and swaps
-/// its lightness when its canvas (and the tool picker) read colours as dark,
+/// its lightness when its canvas reads colours as dark,
 /// so black ink is white on screen and black in the file.
 enum Paper {
   /// The dark paper's colour (a page, an infinite drawing's ground).

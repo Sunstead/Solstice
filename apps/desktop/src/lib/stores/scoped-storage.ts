@@ -67,22 +67,22 @@ export function resetScopedStoreCache() {
 
 /**
  * A zustand StateStorage backed by `<workspace>/.solstice/<fileName>` when a
- * workspace is open, or the app data dir otherwise. The zustand `name` (e.g.
+ * workspace is open (and `scope` is 'workspace'), or the app data dir otherwise. The zustand `name` (e.g.
  * "workspace-ui") is the single key inside that file.
  */
-export function createScopedStorage(fileName: string): StateStorage {
+export function createScopedStorage(fileName: string, scope: StoreScope = 'workspace'): StateStorage {
   return {
     getItem: async (name) => {
-      const store = await getScopedStore(fileName);
+      const store = await getScopedStore(fileName, scope);
       const value = await store.get(name);
       return value ? JSON.stringify(value) : null;
     },
     setItem: async (name, value) => {
-      const store = await getScopedStore(fileName);
+      const store = await getScopedStore(fileName, scope);
       await store.set(name, JSON.parse(value));
     },
     removeItem: async (name) => {
-      const store = await getScopedStore(fileName);
+      const store = await getScopedStore(fileName, scope);
       await store.delete(name);
     },
   };

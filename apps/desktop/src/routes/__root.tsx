@@ -35,6 +35,8 @@ import {
 import { useSourceModeCommand } from '@/hooks/use-source-mode';
 import { KeyboardBar } from '@/components/mobile/keyboard-bar';
 import { SlashMenu } from '@/components/editor/slash-menu';
+import { SqueezePalette } from '@/components/ink/squeeze-palette';
+import { PageSheet } from '@/components/ink/page-sheet';
 import { can } from '@/lib/backend/platform';
 import { railStyle } from '@/lib/sidebar-rail';
 import { usePhoneNav } from '@/lib/stores/phone-nav';
@@ -199,6 +201,8 @@ export const Route = createRootRoute({
         />
 
         <SlashMenu />
+        {can.nativeViews && <SqueezePalette />}
+        {can.nativeViews && <PageSheet />}
 
         <WorkspaceDialogs />
 

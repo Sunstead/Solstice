@@ -34,20 +34,39 @@ class SurfaceView: UIView {
     didSet { if oldValue != isHidden { Ink.shared.visibilityChanged(self) } }
   }
 
-  /// Takes the tool picker: its canvas becomes first responder (`Ink`).
+  /// Takes the tools: its canvas becomes first responder (`Ink`).
   func takeTools() {}
 
-  /// Lets the tool picker go.
+  /// Lets the tools go.
   func dropTools() {}
 
-  /// `Ink.fingerDraws` changed: set up the canvases for it.
+  /// The tool in hand, the ruler or finger drawing changed (`Ink`): give
+  /// the canvases them.
   func inkChanged() {}
+
+  /// What the ribbon's Undo and Redo act on: the canvas in view's.
+  var undoTarget: UndoManager? { nil }
 
   /// Dark paper turned on or off (`Ink.setDarkPaper`): show the paper so.
   func paperChanged() {}
 
-  /// The picker's + button: shapes, text, stickers, and the surface's own.
-  func showInsertMenu() {}
+  /// The ribbon's + menu (`MarkupInsert`): `item` into the canvas in view.
+  func insert(_ item: String, shape: String?) {}
+
+  // -- Pages (a PDF's; the page sheet) ----------------------------------------
+
+  /// How many pages, and which is in view (zero-based).
+  var pages: (count: Int, current: Int) { (0, 0) }
+
+  /// Page `index` with its marks, `width` points across, as a JPEG data URL.
+  func thumbnail(_ index: Int, width: CGFloat) async -> String? { nil }
+
+  /// Shows page `index`.
+  func goToPage(_ index: Int) {}
+
+  /// Puts the pages in `order` (indices of the pages as they are); pages
+  /// left out are deleted. An error message if it couldn't.
+  func arrangePages(_ order: [Int]) async -> String? { "This file has no pages to arrange." }
 
   /// Highlights `query`'s matches and shows the first; how many there are.
   func find(_ query: String, caseSensitive: Bool, wholeWord: Bool) async -> Int { 0 }

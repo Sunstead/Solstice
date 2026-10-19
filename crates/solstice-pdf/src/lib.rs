@@ -159,12 +159,27 @@ pub fn read(pdf: &[u8]) -> Result<Opened> {
 /// `pdf` with `inserts` added, then `edits` made, written compactly.
 /// Marks of ours an old save wrote badly are put right on the way.
 pub fn apply(pdf: &[u8], inserts: &[Insert], edits: &[Edit]) -> Result<Vec<u8>> {
+    apply_arranged(pdf, inserts, None, edits)
+}
+
+/// As [`apply`], with the pages then put in `order`: indices of the pages
+/// after the inserts, each at most once; pages left out are deleted (the
+/// iPad's page sheet). `edits` count pages in the new order.
+pub fn apply_arranged(
+    pdf: &[u8],
+    inserts: &[Insert],
+    order: Option<&[usize]>,
+    edits: &[Edit],
+) -> Result<Vec<u8>> {
     let mut doc = load(pdf)?;
     if doc.is_encrypted() || doc.was_encrypted() {
         return Err(ENCRYPTED.into());
     }
     for insert in inserts {
         insert_page(&mut doc, insert)?;
+    }
+    if let Some(order) = order {
+        arrange(&mut doc, order)?;
     }
     let pages: Vec<ObjectId> = doc.get_pages().into_values().collect();
     for &page in &pages {
@@ -696,6 +711,47 @@ fn insert_page(doc: &mut Document, insert: &Insert) -> Result<()> {
         dict.set("Count", count + 1);
         node = dict.get(b"Parent").and_then(Object::as_reference).ok();
     }
+    Ok(())
+}
+
+/// Puts the pages in `order` (indices into the pages as they are) as the
+/// root's only kids: a flat tree, each page carrying what it inherited from
+/// the nodes that go. Pages left out are no longer reached, and pruned.
+fn arrange(doc: &mut Document, order: &[usize]) -> Result<()> {
+    let pages: Vec<ObjectId> = doc.get_pages().into_values().collect();
+    if order.is_empty() {
+        return Err("A PDF needs at least one page.".into());
+    }
+    let mut seen = HashSet::new();
+    for &i in order {
+        if i >= pages.len() || !seen.insert(i) {
+            return Err(format!("No page {} to put there.", i + 1));
+        }
+    }
+    let root = doc
+        .catalog()
+        .and_then(|c| c.get(b"Pages"))
+        .and_then(Object::as_reference)
+        .map_err(|_| "The page tree is damaged.".to_string())?;
+    let mut kids = Vec::with_capacity(order.len());
+    for &i in order {
+        let page = pages[i];
+        let carried: Vec<(&[u8], Object)> = [b"MediaBox".as_slice(), b"CropBox", b"Resources", b"Rotate"]
+            .into_iter()
+            .filter(|key| doc.get_dictionary(page).is_ok_and(|d| !d.has(key)))
+            .filter_map(|key| inherited(doc, page, key).map(|value| (key, value.clone())))
+            .collect();
+        let dict = doc.get_dictionary_mut(page).map_err(|e| e.to_string())?;
+        for (key, value) in carried {
+            dict.set(key, value);
+        }
+        dict.set("Parent", root);
+        kids.push(Object::Reference(page));
+    }
+    let count = kids.len() as i64;
+    let node = doc.get_dictionary_mut(root).map_err(|e| e.to_string())?;
+    node.set("Kids", kids);
+    node.set("Count", count);
     Ok(())
 }
 

@@ -453,6 +453,17 @@ export const settingsRegistry = {
     visibleWhen: () => can.nativeViews,
   }),
 
+  'ink.ribbon': defineBoolean({
+    section: 'editor',
+    group: 'Drawings and PDFs',
+    scope: 'global',
+    // The ink tools under a drawing's or PDF's header (`InkRibbon`); the
+    // header's Tools button flips it too. The Pencil draws either way.
+    label: 'Show the ink tools',
+    default: true,
+    visibleWhen: () => can.nativeViews,
+  }),
+
   'ink.darkPaper': defineBoolean({
     section: 'editor',
     group: 'Drawings and PDFs',

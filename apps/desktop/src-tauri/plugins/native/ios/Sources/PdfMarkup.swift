@@ -119,6 +119,24 @@ enum PdfMarkup {
     return data as Data
   }
 
+  /// The marks as a picture `size` across (a page's thumbnail), drawn by
+  /// PaperKit in their true colours, on nothing.
+  static func picture(of markup: PaperMarkup, size: CGSize, scale: CGFloat) async -> CGImage? {
+    let width = Int(size.width * scale)
+    let height = Int(size.height * scale)
+    guard width > 0, height > 0, markup.bounds.width > 0,
+      let context = CGContext(
+        data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return nil }
+    // Markup space is y down; PaperKit draws in it whatever the frame, so
+    // the context moves instead.
+    context.translateBy(x: 0, y: CGFloat(height))
+    context.scaleBy(x: CGFloat(width) / markup.bounds.width, y: -CGFloat(height) / markup.bounds.height)
+    await markup.draw(in: context, frame: markup.bounds, options: RenderingOptions(darkUserInterfaceStyle: false))
+    return context.makeImage()
+  }
+
   // -- Encrypted PDFs ------------------------------------------------------
   // `PdfStore` won't write an encrypted PDF (it would drop the encryption),
   // so PDFKit writes those, in the old form: the markup as a base64 string.
