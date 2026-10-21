@@ -35,6 +35,13 @@ function Sample() {
  * ordinary registry UI; the pane exists only to put the result on screen next
  * to the sliders that change it.
  *
+ * The arrangement keys off the container, not the viewport: the same pane is
+ * handed a narrow card on touch (a `sm:max-w-lg` dialog) and a wide one on the
+ * desktop, so a `lg:` breakpoint sized the preview to the window and let it
+ * spill over the settings on an iPad in landscape. Below `@xl` (36rem) the
+ * preview stacks on top at full width instead, which is also where a phone
+ * wants it.
+ *
  * The preview is `sticky` against the dialog's scroll area and is deliberately
  * not a scroll container itself: nesting one here meant the wheel stopped
  * moving the settings the moment the pointer crossed into the preview.
@@ -43,8 +50,8 @@ function Sample() {
  */
 export function TypographyPane() {
   return (
-    <div className='flex flex-col gap-8 lg:flex-row-reverse lg:items-start lg:gap-10'>
-      <aside className='lg:sticky lg:top-6 lg:w-[23rem] lg:shrink-0'>
+    <div className='@container flex flex-col gap-8 @xl:flex-row-reverse @xl:items-start @xl:gap-10'>
+      <aside className='@xl:sticky @xl:top-6 @xl:w-[23rem] @xl:shrink-0'>
         <h3 className='pb-1.5 text-xs font-medium text-muted-foreground'>
           Preview
         </h3>

@@ -55,14 +55,17 @@
 }
 
 /*
- * Dark paper (`ink.darkPaper`): the ground the iPad's `Paper.ground` is, and
- * the picture's lightness swapped with its hues kept (strokes are colours on
- * paper, so black reads light), as PencilKit does on a dark canvas. The file
- * is untouched. The filter is on the layer holding the image, and it blends
- * with `lighten` so the SVG's white rect turns into the ground, not black.
+ * Dark paper (`ink.darkPaper`): the theme's own ground, so a drawing sits on
+ * the colour the app around it is (the iPad paints the same with
+ * `Paper.ground`, which the web side sends the theme's `--background` in
+ * `native-surfaces.ts`), and the picture's lightness swapped with its hues
+ * kept (strokes are colours on paper, so black reads light), as PencilKit
+ * does on a dark canvas. The file is untouched. The filter is on the layer
+ * holding the image, and it blends with `lighten` so the SVG's white rect
+ * turns into the ground, not black.
  */
 :root .solstice-canvas[data-ground='dark-paper'] {
-  background: #1c1c1e;
+  background: var(--background);
 }
 
 .solstice-canvas[data-ground='dark-paper'] .solstice-canvas-grid {

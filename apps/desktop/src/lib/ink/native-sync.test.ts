@@ -19,7 +19,7 @@ import { defaultToolbox, selectedSlot, toNative } from './toolbox';
 
 beforeEach(() => {
   useInkTools.setState(defaultToolbox());
-  useInkUi.setState({ canUndo: false, canRedo: false, palette: null });
+  useInkUi.setState({ canUndo: false, canRedo: false, palette: null, paletteAt: null });
   vi.clearAllMocks();
 });
 
@@ -62,6 +62,17 @@ describe('onInkEvent', () => {
       y: window.innerHeight / 2,
       page: 'colors',
     });
+  });
+
+  // The Pencil's position is only reported while it hovers; a squeeze off the
+  // screen says nothing, and the menu should go back to where it last was.
+  it('reopens where it was last seen when the squeeze reports no position', () => {
+    onInkEvent({ type: 'pencil', gesture: 'squeeze', phase: 'ended', preference: 'showContextualPalette', x: 10, y: 20 });
+    expect(useInkUi.getState().palette).toMatchObject({ x: 10, y: 20 });
+    onInkEvent({ type: 'pencil', gesture: 'squeeze', phase: 'ended', preference: 'showContextualPalette' });
+    expect(useInkUi.getState().palette).toBeNull();
+    onInkEvent({ type: 'pencil', gesture: 'squeeze', phase: 'ended', preference: 'showContextualPalette' });
+    expect(useInkUi.getState().palette).toMatchObject({ x: 10, y: 20, page: 'tools' });
   });
 
   it("takes Apple's picker's colour, keeping only where it settles", () => {

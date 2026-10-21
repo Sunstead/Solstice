@@ -51,9 +51,17 @@ export function onInkEvent(event: InkEvent) {
         useInkUi.setState({ palette: null });
         break;
       }
-      const x = event.x ?? window.innerWidth / 2;
-      const y = event.y ?? window.innerHeight / 2;
-      useInkUi.setState({ palette: { x, y, azimuth: event.azimuth, page: result.page } });
+      // The position is known only while the Pencil hovers; keep the last one
+      // seen so a squeeze that reports none opens where the menu was, not in
+      // the middle of the screen.
+      const known = event.x != null && event.y != null ? { x: event.x, y: event.y } : null;
+      const at = known ?? useInkUi.getState().paletteAt;
+      const x = at?.x ?? window.innerWidth / 2;
+      const y = at?.y ?? window.innerHeight / 2;
+      useInkUi.setState({
+        palette: { x, y, azimuth: event.azimuth, page: result.page },
+        ...(known ? { paletteAt: known } : {}),
+      });
       break;
     }
   }

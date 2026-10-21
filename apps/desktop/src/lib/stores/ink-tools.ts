@@ -52,6 +52,12 @@ export const useInkUi = create<{
   canRedo: boolean;
   /** The squeeze palette, open at `x`, `y` (CSS pixels) on `page`, the Pencil leaning `azimuth`. */
   palette: { x: number; y: number; azimuth?: number; page: PalettePage } | null;
+  /**
+   * Where the palette was last seen, for when the Pencil's position is not
+   * known: a squeeze while it is far off the screen reports no coordinates,
+   * and the menu should return to where it was rather than to the centre.
+   */
+  paletteAt: { x: number; y: number } | null;
   /** The page sheet (`PageSheet`) is open. */
   pages: boolean;
-}>(() => ({ canUndo: false, canRedo: false, palette: null, pages: false }));
+}>(() => ({ canUndo: false, canRedo: false, palette: null, paletteAt: null, pages: false }));

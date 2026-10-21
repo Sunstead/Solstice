@@ -49,6 +49,17 @@ final class Ink: NSObject {
     for surface in surfaces.allObjects { surface.paperChanged() }
   }
 
+  /// The theme's ground (`--background`, from the web side): what dark paper
+  /// is painted with, so drawings and pages take the theme's colour.
+  func setPaper(_ rgb: [Double]) {
+    guard rgb.count >= 3 else { return }
+    let colour = UIColor(
+      red: CGFloat(rgb[0]) / 255, green: CGFloat(rgb[1]) / 255, blue: CGFloat(rgb[2]) / 255, alpha: 1)
+    guard colour != Paper.ground else { return }
+    Paper.ground = colour
+    for surface in surfaces.allObjects { surface.paperChanged() }
+  }
+
   /// The surface holding the tools: its canvas is first responder.
   private weak var active: SurfaceView?
   /// The one that last held them, to hand them back to after typing.

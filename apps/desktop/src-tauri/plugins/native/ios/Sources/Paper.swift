@@ -6,8 +6,11 @@ import UIKit
 /// its lightness when its canvas reads colours as dark,
 /// so black ink is white on screen and black in the file.
 enum Paper {
-  /// The dark paper's colour (a page, an infinite drawing's ground).
-  static let ground = UIColor(red: 0.11, green: 0.11, blue: 0.118, alpha: 1)
+  /// The dark paper's colour (a page, an infinite drawing's ground): the
+  /// theme's own `--background`, sent from the web side (`Ink.setPaper`), so
+  /// dark paper matches the app around it. Until it is, the near-black every
+  /// dark theme paints.
+  static var ground = UIColor(red: 0.11, green: 0.11, blue: 0.118, alpha: 1)
   /// What white text becomes on a dark page: not harsher than the ground allows.
   static let text = UIColor(white: 0.9, alpha: 1)
 

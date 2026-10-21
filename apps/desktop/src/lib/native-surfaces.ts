@@ -231,10 +231,19 @@ function startHost(): () => void {
   const listening = nativeSurfaces.listen(onSurfaceEvent);
   const stopFocus = followWebFocus();
   const stopInk = followInkTools();
-  void nativeSurfaces.ink({ scratchOut: getSetting('ink.scratchOut'), darkPaper: getSetting('ink.darkPaper') });
+  void nativeSurfaces.ink({
+    scratchOut: getSetting('ink.scratchOut'),
+    darkPaper: getSetting('ink.darkPaper'),
+    paper: themeGround() ?? undefined,
+  });
   const stopScratch = subscribeToSetting('ink.scratchOut', (scratchOut) => void nativeSurfaces.ink({ scratchOut }));
   const stopPaper = subscribeToSetting('ink.darkPaper', (darkPaper) => void nativeSurfaces.ink({ darkPaper }));
-  const theme = new MutationObserver(() => refreshers.forEach((refresh) => refresh()));
+  const theme = new MutationObserver(() => {
+    // The ground follows the theme (`Paper.ground`), like the host's colour.
+    const ground = themeGround();
+    if (ground) void nativeSurfaces.ink({ paper: ground });
+    refreshers.forEach((refresh) => refresh());
+  });
   theme.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-islands', 'class', 'style'] });
 
   return () => {
@@ -255,9 +264,19 @@ function startHost(): () => void {
 
 /** The window's colour under Islands: the sidebar's, whatever the theme. */
 function windowColour(): number[] | null {
+  return cssColour('--sidebar');
+}
+
+/** The ground dark paper takes (`ink.darkPaper`): the theme's own background. */
+function themeGround(): number[] | null {
+  return cssColour('--background');
+}
+
+/** A theme variable as sRGB, by painting it with it; none if it doesn't resolve. */
+function cssColour(variable: string): number[] | null {
   const probe = document.createElement('div');
   probe.style.display = 'none';
-  probe.style.backgroundColor = 'var(--sidebar)';
+  probe.style.backgroundColor = `var(${variable})`;
   document.body.append(probe);
   const colour = getComputedStyle(probe).backgroundColor;
   probe.remove();

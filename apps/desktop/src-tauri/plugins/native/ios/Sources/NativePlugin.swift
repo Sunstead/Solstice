@@ -42,6 +42,8 @@ struct HostArgs: Decodable {
   let on: Bool?
   let scratchOut: Bool?
   let darkPaper: Bool?
+  /// For `ink`: the theme's ground (`--background`) dark paper is painted with.
+  let paper: [Double]?
   let paths: [String]?
   let html: String?
   let page: PageSpec?
@@ -266,6 +268,7 @@ class NativePlugin: Plugin {
       case "ink":
         if let scratchOut = args.scratchOut { Ink.shared.scratchOut = scratchOut }
         if let darkPaper = args.darkPaper { Ink.shared.setDarkPaper(darkPaper) }
+        if let paper = args.paper { Ink.shared.setPaper(paper) }
       case "notebook":
         guard let path = args.path else { return invoke.reject("No path.") }
         do {

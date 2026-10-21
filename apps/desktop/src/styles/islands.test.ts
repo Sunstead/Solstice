@@ -127,6 +127,22 @@ describe('islands.css', () => {
     );
     // The ring (island borders) follows: the strip is 44px, no right or bottom side.
     expect(css).toMatch(/\[data-touch\] \.flexlayout-custom \.flexlayout__tabset::after \{\s*inset: 43px 0 0;\s*border-right-width: 0;\s*border-bottom-width: 0;/);
+    // The pane header is a layer over the ring, so it is held 1px off the
+    // ring's left side and does not paint out the border there.
+    expect(css).toMatch(
+      /\[data-touch\] \.flexlayout-custom \.flexlayout__tab \{\s*clip-path: inset\(0 0 0 1px round max\(0px, calc\(var\(--pane-tl\) - 1px\)\)/,
+    );
+  });
+
+  // Under a native view the ring's fill would cover the surface: it is a
+  // pseudo-element, which `seeThrough()` cannot mark transparent, so the ring
+  // clears its own background the moment the tabset is `data-native-under`.
+  it('lets a native view show through the ring\'s fill', () => {
+    expect(css).toMatch(
+      /:root\[data-islands='true'\]\[data-island-borders='true'\] \.flexlayout-custom\s*\.flexlayout__tabset\[data-native-under\]::after \{\s*background: transparent;/,
+    );
+    // app.css's own `data-native-under` rule only reaches elements.
+    expect(app).toMatch(/\[data-native-under\] \{[^}]*background: transparent !important/);
   });
 
   // A native view (PDF, drawing) makes the pane and the window behind it
@@ -134,11 +150,15 @@ describe('islands.css', () => {
   // host's colour: the window's under Islands, not the notes'.
   it('paints the window\'s colour behind a native view under Islands', () => {
     expect(surfaces).toMatch(/dataset\.islands === 'true'/);
-    expect(surfaces).toMatch(/backgroundColor = 'var\(--sidebar\)'/);
+    expect(surfaces).toMatch(/cssColour\('--sidebar'\)/);
     expect(surfaces).toMatch(/attributeFilter: \['data-theme', 'data-islands'/);
     // The view's own margins (a PDF's) stay the pane's colour: the surface
     // gets it as its backdrop, whatever the host paints.
     expect(surfaces).toMatch(/return background;/);
+    // Dark paper takes the theme's own background, told to the native side as
+    // `paper` alongside the host's colour.
+    expect(surfaces).toMatch(/cssColour\('--background'\)/);
+    expect(surfaces).toMatch(/paper: themeGround\(\) \?\? undefined/);
     expect(readFileSync(path.resolve(__dirname, '../components/native-surface.tsx'), 'utf8')).toMatch(
       /visible, backdrop\)/,
     );

@@ -54,9 +54,12 @@ export const nativeSurfaces = {
   webFocus: (on: boolean) => host({ op: 'webFocus', on }),
   /**
    * How ink behaves: scratching out with the Pencil erases (`ink.scratchOut`),
-   * and pages and drawings are shown on dark paper (`ink.darkPaper`).
+   * pages and drawings are shown on dark paper (`ink.darkPaper`), and the
+   * theme's ground dark paper is painted with (`paper`, `--background` as
+   * sRGB, so the native paper matches the app around it).
    */
-  ink: (options: { scratchOut?: boolean; darkPaper?: boolean }) => host({ op: 'ink', ...options }),
+  ink: (options: { scratchOut?: boolean; darkPaper?: boolean; paper?: number[] }) =>
+    host({ op: 'ink', ...options }),
   /** A new notebook: an A4 PDF with one page of `template`. */
   createNotebook: (path: string, template: string) =>
     invoke('plugin:solstice-native|host', { op: 'notebook', path, template }),

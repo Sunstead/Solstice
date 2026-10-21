@@ -220,7 +220,10 @@
 }
 
 /* Touch-first: the strip is 44px, and the ring has no right or bottom side
-   (the pane runs to the screen's edge there), nor corners on them. */
+   (the pane runs to the screen's edge there), nor corners on them. The pane
+   header is a layer above the ring and would otherwise paint over the ring's
+   left side, so the tab is held 1px off that edge — the same standoff the
+   content has — and the border shows. */
 :root[data-islands='true'][data-island-borders='true'][data-touch] .flexlayout-custom .flexlayout__tabset::after {
   inset: 43px 0 0;
   border-right-width: 0;
@@ -229,7 +232,17 @@
 }
 
 :root[data-islands='true'][data-island-borders='true'][data-touch] .flexlayout-custom .flexlayout__tab {
-  clip-path: inset(0 round max(0px, calc(var(--pane-tl) - 1px)) 0 0 0);
+  clip-path: inset(0 0 0 1px round max(0px, calc(var(--pane-tl) - 1px)) 0 0 0);
+}
+
+/* Under a native surface (PDF or drawing) the ring is a pseudo-element, which
+   `seeThrough()` can never mark transparent — only elements can carry
+   `data-native-under` — so its fill is cleared here, or it sits on top of the
+   native layer and hides it. The border stays: it is the island's own edge.
+   Specificity has to outrank the ring rule above, hence the full prefix. */
+:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+  .flexlayout__tabset[data-native-under]::after {
+  background: transparent;
 }
 
 /* The ring paints the empty pane's colour; the layer paints the tab's. */
