@@ -75,8 +75,16 @@ export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): nu
 const SETTLE_FRAMES = 10;
 
 /**
+ * Whether an animation finishes. One that never does (a spinner) moves
+ * nothing, and would keep `follow` measuring every frame while it spun.
+ */
+function ends(animation: Animation): boolean {
+  return animation.effect?.getTiming().iterations !== Infinity;
+}
+
+/**
  * Calls `measure` every frame while anything could be moving it (a resize, a
- * scroll, an animation, an overlay opening), and stops once it has been still
+ * scroll, an animation that ends, an overlay opening), and stops once it has been still
  * for a few frames, so an idle page costs nothing.
  */
 export function follow(el: HTMLElement, measure: () => boolean): () => void {
@@ -85,7 +93,7 @@ export function follow(el: HTMLElement, measure: () => boolean): () => void {
   const tick = () => {
     const moved = measure();
     checkOverlays();
-    still = moved || document.getAnimations().length > 0 ? 0 : still + 1;
+    still = moved || document.getAnimations().some(ends) ? 0 : still + 1;
     frame = still < SETTLE_FRAMES ? requestAnimationFrame(tick) : 0;
   };
   const kick = () => {
@@ -185,8 +193,9 @@ function onSurfaceEvent(event: SurfaceEvent) {
   const state = useSurfaceStates.getState()[event.id] ?? {};
   switch (event.type) {
     case 'saved':
-      // Its own save: not a change from outside to reload.
-      void commands.fileWritten(event.path);
+      // Its own save: not a change from outside to reload. Synced soon, or
+      // at once when the file was left.
+      void commands.fileWritten(event.path, event.final ?? false);
       if (state.error) useSurfaceStates.setState({ [event.id]: { ...state, error: undefined } });
       break;
     case 'error':

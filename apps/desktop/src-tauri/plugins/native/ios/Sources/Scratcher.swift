@@ -39,7 +39,12 @@ final class Scratcher {
     guard ScratchOut.isScratch(path) else { return false }
     let others = strokes.filter { $0.id != scratch.id }
     let width = scratch.path.map { $0.size.width }.reduce(0, +) / CGFloat(max(1, scratch.path.count))
-    let hit = ScratchOut.covered(by: path, reach: max(2, width), strokes: others.map(Self.points))
+    let reach = max(2, width)
+    // Only strokes near it are looked at point by point: all of them, in a
+    // big drawing, made scratching out slow.
+    let near = ScratchOut.nearby(path, reach: reach, bounds: others.map(\.renderBounds))
+    let hit = ScratchOut.covered(by: path, reach: reach, strokes: near.map { Self.points(of: others[$0]) })
+      .map { near[$0] }
     guard !hit.isEmpty else { return false }
 
     // Once PaperKit is done taking the stroke: changed from inside its own

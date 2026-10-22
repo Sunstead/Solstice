@@ -195,11 +195,21 @@ pub fn saved(app: &AppHandle, path: &str, contents: &str) {
     }
 }
 
-/// A file in a synced folder was written outside the editors' saves (the iOS
-/// app's PDF and drawing editors): sync it now.
+/// A file in a synced folder changed outside the note editors' saves (the
+/// iOS app's folder poller saw it): sync it now.
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
 pub fn changed(app: &AppHandle, path: &str) {
     if let Some((client, _)) = client_for_path(app, Path::new(path)) {
         client.folder_changed();
+    }
+}
+
+/// An editor that writes its own file (the iOS app's PDFs and drawings)
+/// saved it: synced soon, at most every 30 seconds while it keeps saving,
+/// or at once (`now`) when it was left.
+pub fn editor_wrote(app: &AppHandle, path: &str, now: bool) {
+    if let Some((client, _)) = client_for_path(app, Path::new(path)) {
+        client.editor_wrote(now);
     }
 }
 

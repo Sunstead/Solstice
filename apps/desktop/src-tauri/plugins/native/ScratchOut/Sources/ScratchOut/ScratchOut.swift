@@ -37,6 +37,29 @@ public enum ScratchOut {
     }
   }
 
+  /// The indices of strokes, by their `bounds`, that the scratch could
+  /// cover: those meeting its own bounds, `reach` around them. Only these
+  /// need their points looked at (`covered`), not every stroke in a drawing.
+  public static func nearby(_ scratch: [CGPoint], reach: CGFloat, bounds: [CGRect]) -> [Int] {
+    guard let first = scratch.first else { return [] }
+    var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
+    for p in scratch {
+      minX = min(minX, p.x)
+      maxX = max(maxX, p.x)
+      minY = min(minY, p.y)
+      maxY = max(maxY, p.y)
+    }
+    let reached = (minX: minX - reach, maxX: maxX + reach, minY: minY - reach, maxY: maxY + reach)
+    var found: [Int] = []
+    // By origin and size: Foundation alone (Linux, in CI) has no minX.
+    for (i, b) in bounds.enumerated() {
+      let across = b.origin.x <= reached.maxX && b.origin.x + b.size.width >= reached.minX
+      let down = b.origin.y <= reached.maxY && b.origin.y + b.size.height >= reached.minY
+      if across && down { found.append(i) }
+    }
+    return found
+  }
+
   // -- Sweeps --
 
   /// A unit direction. (Not CGVector: Foundation on Linux, where CI runs

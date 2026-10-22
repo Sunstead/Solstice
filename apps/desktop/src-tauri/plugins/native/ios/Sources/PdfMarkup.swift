@@ -103,11 +103,7 @@ enum PdfMarkup {
     context.beginPDFPage(nil)
     context.translateBy(x: 0, y: size.height)
     context.scaleBy(x: 1, y: -1)
-    var rest = markup
-    for id in markup.subelements.ids {
-      if case .stroke = id { _ = rest.subelements.removeElement(for: id) }
-    }
-    if !rest.subelements.ids.isEmpty {
+    if let rest = markup.withoutInk {
       await rest.draw(in: context, frame: mediaBox, options: RenderingOptions(darkUserInterfaceStyle: false))
     }
     let strokes = Array(markup.subelements.strokes)

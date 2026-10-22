@@ -11,8 +11,10 @@ export const commands = {
 	/**
 	 *  A file the app wrote outside these commands (the iOS app's native views
 	 *  save PDFs themselves), so the watcher doesn't take it for an outside change.
+	 *  `now`: the last save before its editor was left, synced at once rather
+	 *  than with the next of the folder's changes.
 	 */
-	fileWritten: (path: string) => __TAURI_INVOKE<void>("file_written", { path }),
+	fileWritten: (path: string, now: boolean) => __TAURI_INVOKE<void>("file_written", { path, now }),
 	createFile: (path: string) => typedError<null, string>(__TAURI_INVOKE("create_file", { path })),
 	createDirectory: (path: string) => typedError<null, string>(__TAURI_INVOKE("create_directory", { path })),
 	renamePath: (oldPath: string, newPath: string) => typedError<null, string>(__TAURI_INVOKE("rename_path", { oldPath, newPath })),

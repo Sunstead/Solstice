@@ -43,9 +43,10 @@ enum InkOutline {
   private static let opaque: CGFloat = 0.95
 
   /// Each stroke's look, measured off the main thread (a few milliseconds
-  /// a stroke), and only once for a stroke already measured.
+  /// a stroke), and only once for a stroke already measured. Below the
+  /// canvas's own drawing in priority: a save can wait, the ink on screen can't.
   static func looks(of strokes: [PKStroke]) async -> [Look] {
-    await Task.detached(priority: .userInitiated) { strokes.map(look) }.value
+    await Task.detached(priority: .utility) { strokes.map(look) }.value
   }
 
   static func parts(of stroke: PKStroke, _ look: Look) -> [Part] {
@@ -123,16 +124,28 @@ enum InkOutline {
 
   // -- Measuring -----------------------------------------------------------
 
-  /// A stroke, as far as its look goes.
-  private struct Key: Hashable {
+  /// A stroke, as far as its look goes. Not where it is: moving a stroke
+  /// (the lasso, the canvas growing) doesn't change how it's drawn.
+  struct Key: Hashable, Sendable {
     let created: Date
     let count: Int
     let seed: UInt32
     let ink: String
     let width: CGFloat
     let color: UIColor
+    /// The transform's scale and rotation.
     let transform: [CGFloat]
-    let parts: Int
+    /// What an eraser left of it, as ranges of its path.
+    let parts: [CGFloat]
+  }
+
+  static func key(of stroke: PKStroke) -> Key {
+    let t = stroke.transform
+    return Key(
+      created: stroke.path.creationDate, count: stroke.path.count, seed: stroke.randomSeed,
+      ink: stroke.ink.inkType.rawValue, width: stroke.path.first?.size.width ?? 0, color: stroke.ink.color,
+      transform: [t.a, t.b, t.c, t.d],
+      parts: stroke.maskedPathRanges.flatMap { [$0.lowerBound, $0.upperBound] })
   }
 
   private static let measured = OSAllocatedUnfairLock(initialState: (looks: [Key: Look](), points: 0))
@@ -141,11 +154,7 @@ enum InkOutline {
   private static let remembered = 4_000_000
 
   private static func look(_ stroke: PKStroke) -> Look {
-    let t = stroke.transform
-    let key = Key(
-      created: stroke.path.creationDate, count: stroke.path.count, seed: stroke.randomSeed,
-      ink: stroke.ink.inkType.rawValue, width: stroke.path.first?.size.width ?? 0, color: stroke.ink.color,
-      transform: [t.a, t.b, t.c, t.d, t.tx, t.ty], parts: stroke.maskedPathRanges.count)
+    let key = key(of: stroke)
     if let known = measured.withLock({ $0.looks[key] }) { return known }
     let look = measure(stroke) ?? Look()
     let size = look.radii.reduce(0) { $0 + $1.count }

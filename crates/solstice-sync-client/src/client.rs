@@ -19,6 +19,7 @@ use tokio_tungstenite::tungstenite::Message;
 
 use crate::net::{Server, Socket, TokenSource};
 use crate::store::{key_from_name, Link, Store, OWN};
+use crate::throttle::Throttle;
 use crate::Error;
 
 const SAVE_AFTER: Duration = Duration::from_secs(2);
@@ -39,6 +40,9 @@ const MAX_WRITE_RETRY: Duration = Duration::from_secs(5 * 60);
 /// Access tokens are refreshed when older than this (Authentik's last 10
 /// minutes; the WebSocket only needs one at connect).
 const TOKEN_AGE: Duration = Duration::from_secs(4 * 60);
+/// While an editor keeps saving (a drawing or PDF drawn on), the folder is
+/// looked at, and what changed uploaded, at most this often (`Throttle`).
+const EDITOR_EVERY: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
@@ -93,6 +97,10 @@ enum Cmd {
         text: String,
     },
     FolderChanged,
+    EditorWrote {
+        /// Look now, not after a while (the editor was left).
+        now: bool,
+    },
     Reconnect,
     Reviews {
         reply: oneshot::Sender<Vec<ReviewInfo>>,
@@ -177,6 +185,7 @@ impl Client {
             connected_at: None,
             save_at: None,
             settle_at: None,
+            editor: Throttle::new(SETTLE, EDITOR_EVERY),
             fetch_at: None,
             write_at: None,
             write_backoff: WRITE_RETRY,
@@ -228,10 +237,18 @@ impl Client {
         });
     }
 
-    /// A file in the folder changed and the caller knows it (the iOS app's
-    /// PDF and drawing editors): sync it now, not when the watcher notices.
+    /// A file in the folder changed and the caller knows it: sync it now,
+    /// not when the watcher notices.
     pub fn folder_changed(&self) {
         let _ = self.tx.send(Cmd::FolderChanged);
+    }
+
+    /// An editor that saves the file itself (the iOS app's PDFs and
+    /// drawings) wrote it: sync it soon, and while it keeps saving, at most
+    /// every 30 seconds, since each sync reads and uploads the whole file.
+    /// `now` when the editor was left: sync it at once.
+    pub fn editor_wrote(&self, now: bool) {
+        let _ = self.tx.send(Cmd::EditorWrote { now });
     }
 
     /// Try connecting now (after signing in, or when the network returns).
@@ -307,6 +324,8 @@ struct Actor {
     connected_at: Option<Instant>,
     save_at: Option<Instant>,
     settle_at: Option<Instant>,
+    /// When to look at the folder after an editor wrote to it.
+    editor: Throttle,
     /// Downloads that failed are tried again then.
     fetch_at: Option<Instant>,
     /// Writing the folder out failed: it's tried again then.
@@ -370,6 +389,7 @@ impl Actor {
                     self.write_at = None;
                     self.write_out();
                 }
+                _ = until(self.editor.due()) => self.absorb(&mut socket).await,
                 _ = until(self.settle_at) => {
                     self.settle_at = None;
                     if socket.is_some() {
@@ -636,6 +656,7 @@ impl Actor {
                 }
             }
             Cmd::FolderChanged => self.absorb(socket).await,
+            Cmd::EditorWrote { now } => self.editor.changed(Instant::now(), now),
             Cmd::Reconnect => {
                 let stopped = matches!(*self.status.borrow(), Status::Relink | Status::Deleted);
                 if socket.is_none() && !stopped {
@@ -704,6 +725,8 @@ impl Actor {
     }
 
     async fn absorb(&mut self, socket: &mut Option<Socket>) {
+        // Whatever an editor wrote is taken in now too.
+        self.editor.fired(Instant::now());
         match self.dir.absorb(&mut self.vault) {
             Ok(msgs) => {
                 if self.dir.write_pending() {

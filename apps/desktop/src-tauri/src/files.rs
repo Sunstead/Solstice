@@ -1,7 +1,7 @@
 use std::{ fs, io::{ Read, Write }, path::{ Path, PathBuf } };
 
 use crate::types::FileEntry;
-use crate::watcher::note_self_write;
+use crate::watcher::{note_editor_write, note_self_write};
 
 // Every mutating command below records what it touched via `note_self_write`,
 // so the watcher can tell the app's own writes apart from someone else's and
@@ -60,11 +60,13 @@ pub fn write_file(app: tauri::AppHandle, path: String, contents: String) -> Resu
 
 /// A file the app wrote outside these commands (the iOS app's native views
 /// save PDFs themselves), so the watcher doesn't take it for an outside change.
+/// `now`: the last save before its editor was left, synced at once rather
+/// than with the next of the folder's changes.
 #[tauri::command]
 #[specta::specta]
-pub fn file_written(app: tauri::AppHandle, path: String) {
-    note_self_write(&app, Path::new(&path));
-    crate::sync::changed(&app, &path);
+pub fn file_written(app: tauri::AppHandle, path: String, now: bool) {
+    note_editor_write(&app, Path::new(&path));
+    crate::sync::editor_wrote(&app, &path, now);
 }
 
 #[tauri::command]

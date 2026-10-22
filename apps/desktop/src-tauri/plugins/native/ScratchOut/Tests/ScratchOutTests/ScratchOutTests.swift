@@ -125,4 +125,42 @@ final class ScratchOutTests: XCTestCase {
     let edge = polyline([CGPoint(x: 5, y: -1), CGPoint(x: 60, y: -1)])
     XCTAssertEqual(ScratchOut.covered(by: scratch, reach: 3, strokes: [edge]), [0])
   }
+
+  // -- Only what's near it --
+
+  private func bounds(_ points: [CGPoint]) -> CGRect {
+    let xs = points.map(\.x), ys = points.map(\.y)
+    return CGRect(origin: CGPoint(x: xs.min()!, y: ys.min()!), size: CGSize(width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!))
+  }
+
+  /// Scratching out slowed as a drawing grew: every stroke in it was looked
+  /// at, point by point, on the main thread.
+  func testOnlyStrokesNearTheScratchAreLookedAt() {
+    let scratch = zigzag(at: .zero, width: 100, sweeps: 8, drift: 3)
+    let strokes = [
+      polyline([CGPoint(x: 10, y: 5), CGPoint(x: 20, y: 30)]),
+      polyline([CGPoint(x: 300, y: 300), CGPoint(x: 320, y: 310)]),
+      polyline([CGPoint(x: 102, y: -50), CGPoint(x: 102, y: -2)]),
+      polyline([CGPoint(x: -2000, y: 10), CGPoint(x: -1900, y: 10)]),
+    ]
+    XCTAssertEqual(ScratchOut.nearby(scratch, reach: 3, bounds: strokes.map(bounds)), [0, 2])
+  }
+
+  func testWhatItErasesIsTheSameForTheNearbyOnes() {
+    let scratch = zigzag(at: CGPoint(x: -5, y: -5), width: 110, sweeps: 10, drift: 4)
+    var strokes: [[CGPoint]] = []
+    for row in 0..<20 {
+      for column in 0..<20 {
+        let x = CGFloat(column) * 40 - 200
+        let y = CGFloat(row) * 30 - 200
+        strokes.append(polyline([CGPoint(x: x, y: y), CGPoint(x: x + 12, y: y + 20)]))
+      }
+    }
+    let near = ScratchOut.nearby(scratch, reach: 3, bounds: strokes.map(bounds))
+    XCTAssertLessThan(near.count, strokes.count / 10)
+    let all = ScratchOut.covered(by: scratch, reach: 3, strokes: strokes)
+    let found = ScratchOut.covered(by: scratch, reach: 3, strokes: near.map { strokes[$0] }).map { near[$0] }
+    XCTAssertFalse(all.isEmpty)
+    XCTAssertEqual(found, all)
+  }
 }

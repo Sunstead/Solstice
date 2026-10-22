@@ -89,7 +89,8 @@ enum PdfStore {
 
   static func save(_ path: String, _ request: Request) async throws -> Saved {
     let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
-    return try await Task.detached(priority: .userInitiated) {
+    // Below the canvases' own drawing: a save can wait.
+    return try await Task.detached(priority: .utility) {
       try decode(
         Saved.self,
         path.withCString { path in json.withCString { solstice_pdf_save(path, $0) } })
