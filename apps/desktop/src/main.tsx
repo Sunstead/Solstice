@@ -8,6 +8,7 @@ import { trackPointerKind } from "@/lib/pointer-kind";
 import { can, touchFirst } from "@/lib/backend/platform";
 import { getCurrentWindow } from "@/lib/backend/window";
 import { dragThroughOverlays } from "@/lib/window-drag";
+import { followPencilTaps } from "@/lib/pencil-taps";
 
 // Safari (the web app on an iPad) zooms the page on a pinch whatever the
 // viewport says. Boards and the image viewer pinch with pointer events,
@@ -23,6 +24,9 @@ if (touchFirst) document.documentElement.dataset.touch = "";
 
 // The title bar still drags the window while a dialog's overlay covers it.
 if (can.windowChrome) dragThroughOverlays(getCurrentWindow);
+
+// Quick Pencil taps a system gesture kept from WebKit still land.
+if (can.nativeViews) followPencilTaps();
 
 const router = createRouter({ routeTree });
 

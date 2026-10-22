@@ -161,6 +161,15 @@ export const nativeKeyboard = {
 };
 
 /**
+ * Pencil taps that reached the window but not the page (`PencilTaps.swift`),
+ * in CSS pixels.
+ */
+export const nativePencilTaps = {
+  listen: (handler: (tap: { x: number; y: number }) => void) =>
+    addPluginListener<{ x: number; y: number }>('solstice-native', 'pencilTap', handler),
+};
+
+/**
  * The Taptic Engine (`Haptics.swift`), for gestures that lift, drop or
  * cross a slot. Fire and forget: a missed tick is only a missed tick.
  */

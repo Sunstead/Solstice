@@ -64,6 +64,7 @@ class NativePlugin: Plugin {
   let auth = AuthenticationSheet()
   private var host: SurfaceHost?
   private var fit: WebviewFit?
+  private var pencilTaps: PencilTaps?
   private weak var webview: WKWebView?
 
   override func load(webview: WKWebView) {
@@ -71,6 +72,10 @@ class NativePlugin: Plugin {
     DispatchQueue.main.async {
       self.host = SurfaceHost.install(under: webview)
       self.fit = WebviewFit(webview, plugin: self)
+      self.pencilTaps = PencilTaps(webview) { [weak self] at in
+        guard let self, let webview = self.webview, let point = self.cssPoint(at, from: webview) else { return }
+        self.trigger("pencilTap", data: ["x": Double(point.x), "y": Double(point.y)])
+      }
       Ink.shared.plugin = self
       if let parent = webview.superview { Ink.shared.listen(in: parent) }
     }
