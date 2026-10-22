@@ -1,12 +1,11 @@
 import { useShallow } from 'zustand/react/shallow';
 
-import { getFileIcon } from '@/assets/icons';
+import { getFileIconFor } from '@/assets/icons';
 import { FileSearchDialog } from '@/components/file-search-dialog';
 import { FormattedFileName } from '@/components/file-tree';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { getWorkspaceRelativeSegments } from '@/lib/path-utils';
 import { selectAllFiles, useFileIndex } from '@/lib/stores/use-file-index';
-import { getIconExtension } from '@/lib/utils';
 
 /**
  * Picks a workspace file for a new file card, wrapping the same dialog
@@ -44,7 +43,7 @@ export function CanvasFilePicker({
         onOpenChange(false);
       }}
       renderItem={(entry) => {
-        const Icon = getFileIcon(getIconExtension(entry.name));
+        const Icon = getFileIconFor(entry.name);
         const { relative } = getWorkspaceRelativeSegments(
           entry.path,
           workspacePath,

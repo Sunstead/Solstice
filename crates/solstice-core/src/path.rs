@@ -2,9 +2,10 @@
 
 use std::fmt;
 
-/// Extensions a link may leave off (`[[todo]]` for `todo.md`). Mirrors
-/// `FILE_TYPE_PRESETS` in the desktop app.
-pub const IMPLICIT_EXTENSIONS: &[&str] = &["md", "canvas", "pdf"];
+/// Extensions a link may leave off (`[[todo]]` for `todo.md`), two-part ones
+/// (`[[Shop]]` for `Shop.task.md`) whole. Mirrors `FILE_TYPE_PRESETS` in the
+/// desktop app.
+pub const IMPLICIT_EXTENSIONS: &[&str] = &["md", "canvas", "pdf", "task.md", "drawing.svg"];
 
 /// A path inside a vault, relative to its root, with `/` separators.
 ///
@@ -123,11 +124,21 @@ pub fn is_hidden(path: &str) -> bool {
 pub fn strip_implicit_extension(path: &str) -> &str {
     let name_start = path.rfind('/').map_or(0, |i| i + 1);
     let name = &path[name_start..];
-    match name.rfind('.') {
-        Some(dot) if dot > 0 && IMPLICIT_EXTENSIONS.contains(&&name[dot + 1..]) => {
-            &path[..name_start + dot]
-        }
-        _ => path,
+    let lower = name.to_ascii_lowercase();
+    // Like `getPresetForName`: a two-part one first, in any case, so
+    // `Shop.task.md` loses `.task.md` and not `.md`; else the last exactly.
+    let stem = IMPLICIT_EXTENSIONS
+        .iter()
+        .filter(|ext| ext.contains('.'))
+        .find(|ext| lower.len() > ext.len() + 1 && lower.ends_with(&format!(".{ext}")))
+        .map(|ext| name.len() - ext.len() - 1)
+        .or_else(|| match name.rfind('.') {
+            Some(dot) if dot > 0 && IMPLICIT_EXTENSIONS.contains(&&name[dot + 1..]) => Some(dot),
+            _ => None,
+        });
+    match stem {
+        Some(len) => &path[..name_start + len],
+        None => path,
     }
 }
 
@@ -192,6 +203,13 @@ mod tests {
         assert_eq!(strip_implicit_extension("board.canvas"), "board");
         assert_eq!(strip_implicit_extension("paper.pdf"), "paper");
         assert_eq!(strip_implicit_extension("photo.png"), "photo.png");
+        assert_eq!(
+            strip_implicit_extension("boards/Shop.task.md"),
+            "boards/Shop"
+        );
+        assert_eq!(strip_implicit_extension("Idea.drawing.svg"), "Idea");
+        assert_eq!(strip_implicit_extension("logo.svg"), "logo.svg");
+        assert_eq!(strip_implicit_extension(".task.md"), ".task");
         assert_eq!(strip_implicit_extension("v1.2/notes"), "v1.2/notes");
         assert_eq!(strip_implicit_extension(".md"), ".md");
     }

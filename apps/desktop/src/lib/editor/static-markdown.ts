@@ -104,6 +104,8 @@ export function rewriteStaticFragment(
   for (const link of Array.from(fragment.querySelectorAll('[data-wikilink]'))) {
     const raw = link.textContent ?? '';
     const target = raw.slice(2, -2);
+    // Kept, for a surface that opens links on a click (a task board's cards).
+    link.setAttribute('data-static-wikilink', target);
     link.textContent = wikilinkLabel(parseWikilinkTarget(target).path);
     link.classList.add('wikilink', 'wikilink-resolved');
   }

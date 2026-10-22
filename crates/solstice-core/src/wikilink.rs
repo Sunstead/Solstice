@@ -264,7 +264,12 @@ mod tests {
         );
         let p = parse_target("notes/spec#^a1b2|Alias");
         assert_eq!(
-            (p.path.as_str(), p.heading, p.block.as_deref(), p.suffix.as_deref()),
+            (
+                p.path.as_str(),
+                p.heading,
+                p.block.as_deref(),
+                p.suffix.as_deref()
+            ),
             ("notes/spec", None, Some("a1b2"), Some("Alias"))
         );
         assert_eq!(parse_target("todo#^").block, None);
@@ -307,6 +312,8 @@ mod tests {
             "archive/ideas.md",
             "boards/plan.canvas",
             "images/diagram.png",
+            "boards/Groceries.task.md",
+            "sketches/Idea.drawing.svg",
         ])
     }
 
@@ -325,6 +332,15 @@ mod tests {
         assert_eq!(index.resolve("archive/ideas"), resolved("archive/ideas.md"));
         assert_eq!(index.resolve("boards/plan"), resolved("boards/plan.canvas"));
         assert_eq!(index.resolve("todo"), resolved("todo.md"));
+        assert_eq!(
+            index.resolve("Groceries"),
+            resolved("boards/Groceries.task.md")
+        );
+        assert_eq!(
+            index.resolve("boards/Groceries"),
+            resolved("boards/Groceries.task.md")
+        );
+        assert_eq!(index.resolve("Idea"), resolved("sketches/Idea.drawing.svg"));
         assert_eq!(index.resolve("plan"), resolved("boards/plan.canvas"));
         assert_eq!(
             index.resolve("ideas"),
@@ -343,5 +359,9 @@ mod tests {
         let index = index();
         assert_eq!(index.shortest_target("notes/Spec.md"), "Spec");
         assert_eq!(index.shortest_target("notes/ideas.md"), "notes/ideas");
+        assert_eq!(
+            index.shortest_target("boards/Groceries.task.md"),
+            "Groceries"
+        );
     }
 }

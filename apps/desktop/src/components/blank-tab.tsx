@@ -5,7 +5,7 @@ import { Button } from '@sunstead/ui/components/button';
 import { ScrollArea } from '@sunstead/ui/components/scroll-area';
 import { useSidebar } from '@sunstead/ui/components/resizable-sidebar';
 import MonochromeIcon from '@/assets/icons/app/icon_transparent.svg?react';
-import { getFileIcon } from '@/assets/icons';
+import { getFileIconFor } from '@/assets/icons';
 import type { CommandId } from '@/bindings';
 import { useLayout } from '@/hooks/use-layout';
 import { allTabs } from '@/components/mobile/tabs';
@@ -16,7 +16,6 @@ import React from 'react';
 import { useRecentFiles } from '@/lib/stores/recent-files';
 import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { getIconExtension } from '@/lib/utils';
 import { Keybind } from './keybind';
 
 const actions: { label: string; icon: LucideIcon; commandId: CommandId }[] = [
@@ -104,7 +103,7 @@ function TouchBlankTab() {
                 return (
                   <Row
                     key={path}
-                    icon={getFileIcon(getIconExtension(name))}
+                    icon={getFileIconFor(name)}
                     label={name.replace(/\.md$/, '')}
                     detail={folder && <span className='max-w-[40%] truncate text-xs text-muted-foreground'>{folder}</span>}
                     onClick={() => useLayout.getState().openFile(path, name)}

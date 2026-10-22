@@ -29,8 +29,7 @@ import {
   syncTopEdgeTabsetDrag,
 } from '@/lib/flexlayout-utils';
 import { HeaderControlsSpacer } from './header-controls';
-import { getFileIcon } from '@/assets/icons';
-import { getIconExtension } from '@/lib/utils';
+import { getFileIconFor } from '@/assets/icons';
 import { Button } from '@sunstead/ui/components/button';
 import { stripPresetExtension } from '@/lib/stores/entry-input';
 import { useSetting } from '@/lib/settings/store';
@@ -296,7 +295,7 @@ export default function FlexLayoutRoot() {
             // handleExternalDrag), since more than one such tab can now
             // point at the same file.
             const config = node.getConfig() as { path?: string } | undefined;
-            const Icon = getFileIcon(getIconExtension(config?.path ?? ''));
+            const Icon = getFileIconFor(config?.path ?? '');
             renderValues.leading = (
               <div className='size-4'>
                 <Icon />

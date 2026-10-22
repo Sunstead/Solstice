@@ -10,6 +10,8 @@ const index = buildSnapshot([
   'archive/ideas.md',
   'boards/plan.canvas',
   'images/diagram.png',
+  'boards/Groceries.task.md',
+  'sketches/Idea.drawing.svg',
 ]);
 
 describe('resolveWikilink', () => {
@@ -26,6 +28,12 @@ describe('resolveWikilink', () => {
   it('resolves a bare name while it is unique', () => {
     expect(resolveWikilink('todo', index)).toEqual({ status: 'resolved', path: 'todo.md' });
     expect(resolveWikilink('plan', index)).toEqual({ status: 'resolved', path: 'boards/plan.canvas' });
+  });
+
+  it('drops a two-part extension whole', () => {
+    expect(resolveWikilink('Groceries', index)).toEqual({ status: 'resolved', path: 'boards/Groceries.task.md' });
+    expect(resolveWikilink('boards/Groceries', index)).toEqual({ status: 'resolved', path: 'boards/Groceries.task.md' });
+    expect(resolveWikilink('Idea', index)).toEqual({ status: 'resolved', path: 'sketches/Idea.drawing.svg' });
   });
 
   it('reports a bare name two files share as ambiguous, in path order', () => {
@@ -55,5 +63,6 @@ describe('shortestWikilinkTarget', () => {
   it('uses the bare name where unique, the path otherwise', () => {
     expect(shortestWikilinkTarget('notes/Spec.md', index)).toBe('Spec');
     expect(shortestWikilinkTarget('notes/ideas.md', index)).toBe('notes/ideas');
+    expect(shortestWikilinkTarget('boards/Groceries.task.md', index)).toBe('Groceries');
   });
 });

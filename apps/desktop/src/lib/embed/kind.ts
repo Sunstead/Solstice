@@ -52,7 +52,18 @@ export function embedKind(path: string): EmbedKind {
  * the iOS app opens it to draw on.
  */
 export function isDrawing(path: string): boolean {
-  return path.toLowerCase().endsWith('.drawing.svg');
+  return hasTypeExtension(path, 'drawing.svg');
+}
+
+/** A note shown as a board (`*.task.md`, `lib/task-board/`). */
+export function isTaskBoard(path: string): boolean {
+  return hasTypeExtension(path, 'task.md');
+}
+
+/** Whether the file name ends in `.extension` with a name before it. */
+function hasTypeExtension(path: string, extension: string): boolean {
+  const name = path.slice(path.search(/[^\\/]*$/)).toLowerCase();
+  return name.length > extension.length + 1 && name.endsWith(`.${extension}`);
 }
 
 /** An image drawn from shapes, sharp at any zoom: never shown as pixels. */

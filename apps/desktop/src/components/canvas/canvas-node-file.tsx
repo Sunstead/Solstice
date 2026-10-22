@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, ImageOff } from 'lucide-react';
 
-import { getFileIcon } from '@/assets/icons';
+import { getFileIconFor } from '@/assets/icons';
 import { FormattedFileName } from '@/components/file-tree';
 import { MediaPlayer } from '@/components/viewer/media-player';
 import { PdfPreviewCard } from '@/components/viewer/pdf-preview-card';
@@ -14,7 +14,6 @@ import {
   subscribeToEmbedSources,
 } from '@/lib/embed/source';
 import type { FileNode } from '@/lib/canvas/types';
-import { getIconExtension } from '@/lib/utils';
 import { useAssetUrl } from '@/lib/viewer/asset';
 import { basename, joinWorkspacePath } from '@/lib/wikilink/target';
 import { StaticMarkdown } from './static-markdown';
@@ -70,7 +69,7 @@ export function FileCardHeader({
 }) {
   // The icon and name formatting a tab and the breadcrumb use, including
   // `explorer.showFileExtensions`, which `FormattedFileName` reads.
-  const Icon = getFileIcon(getIconExtension(name));
+  const Icon = getFileIconFor(name);
 
   return (
     <div
@@ -252,7 +251,7 @@ function MediaBody({
 }
 
 function Fallback({ file }: { file: string }) {
-  const Icon = getFileIcon(getIconExtension(file));
+  const Icon = getFileIconFor(file);
 
   return (
     <div className='flex h-full flex-col items-center justify-center gap-2 px-2 text-center'>

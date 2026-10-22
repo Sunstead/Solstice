@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getPresetForName, stripPresetExtension } from '@/lib/stores/entry-input';
-import { isDrawing } from '@/lib/embed/kind';
+import { isDrawing, isTaskBoard } from '@/lib/embed/kind';
 
 describe('presets by name', () => {
   it('finds a two-part extension before its last part', () => {
@@ -26,5 +26,20 @@ describe('isDrawing', () => {
     expect(isDrawing('/v/Ideas.drawing.svg')).toBe(true);
     expect(isDrawing('/v/Ideas.DRAWING.SVG')).toBe(true);
     expect(isDrawing('/v/logo.svg')).toBe(false);
+  });
+});
+
+describe('task boards', () => {
+  it('are notes with a two-part extension', () => {
+    expect(getPresetForName('Groceries.task.md')?.id).toBe('task');
+    expect(getPresetForName('Groceries.md')?.id).toBe('markdown');
+    expect(stripPresetExtension('Groceries.task.md')).toMatchObject({ name: 'Groceries' });
+  });
+
+  it('are known by path', () => {
+    expect(isTaskBoard('/v/Groceries.task.md')).toBe(true);
+    expect(isTaskBoard('/v/Groceries.TASK.MD')).toBe(true);
+    expect(isTaskBoard('/v/task.md')).toBe(false);
+    expect(isTaskBoard('/v/Groceries.md')).toBe(false);
   });
 });

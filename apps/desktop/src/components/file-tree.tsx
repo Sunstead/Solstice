@@ -22,8 +22,8 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
 } from '@sunstead/ui/components/resizable-sidebar';
-import { cn, getIconExtension } from '@/lib/utils';
-import { getFileIcon, getFolderIcon } from '@/assets/icons';
+import { cn } from '@/lib/utils';
+import { getFileIconFor, getFolderIcon } from '@/assets/icons';
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { useIsMac } from '@/hooks/use-platform';
@@ -103,7 +103,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const children = useDirectoryChildren(node.path);
 
   const FolderIcon = getFolderIcon(node.expanded);
-  const FileIcon = getFileIcon(getIconExtension(node.name));
+  const FileIcon = getFileIconFor(node.name);
 
   const isRenaming =
     !touchFirst && operation?.mode === 'rename' && operation.path === node.path;

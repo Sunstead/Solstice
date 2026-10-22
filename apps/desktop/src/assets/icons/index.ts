@@ -1,4 +1,5 @@
 import { SvgComponent } from '@/lib/views/types';
+import { typeExtension } from '@/lib/utils';
 
 import Markdown from './file-types/markdown.svg?react';
 import Json from './file-types/json.svg?react';
@@ -8,6 +9,7 @@ import Image from './file-types/image.svg?react';
 import Video from './file-types/video.svg?react';
 import Audio from './file-types/audio.svg?react';
 import Drawing from './file-types/drawing.svg?react';
+import Task from './file-types/task.svg?react';
 import Folder from './file-types/folder.svg?react';
 import FolderOpen from './file-types/folder_open.svg?react';
 import Default from './file-types/file.svg?react';
@@ -25,6 +27,7 @@ export const fileIconRegistry: Record<string, SvgComponent> = {
   bmp: Image,
   svg: Image,
   'drawing.svg': Drawing,
+  'task.md': Task,
   mp4: Video,
   webm: Video,
   mov: Video,
@@ -42,4 +45,9 @@ export function getFolderIcon(open: boolean = false) {
 
 export function getFileIcon(ext: string) {
   return fileIconRegistry[ext.toLowerCase()] ?? Default;
+}
+
+/** The icon for a file name, by a two-part extension the registry has (`task.md`) or its last. */
+export function getFileIconFor(filename: string) {
+  return getFileIcon(typeExtension(filename, Object.keys(fileIconRegistry)));
 }

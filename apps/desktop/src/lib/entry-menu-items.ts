@@ -21,6 +21,7 @@ import {
   Link,
   PencilLine,
   Share,
+  SquareKanban,
   SquarePlus,
   Trash,
 } from 'lucide-react';
@@ -36,6 +37,7 @@ import { runCommand } from '@/lib/commands';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { useSetting } from '@/lib/settings/store';
 import { useLayout } from '@/hooks/use-layout';
+import { isTaskBoard } from '@/lib/embed/kind';
 
 /** Whether the focused tab shows its note as source (`view.toggle_source_mode`). */
 function inSourceMode(): boolean {
@@ -182,21 +184,26 @@ export function useEntryMenuItems(
     items.push(separator('after-new'));
   }
 
-  if (surface === 'editor') {
-    items.push({
-      kind: 'item',
-      id: 'find',
-      label: 'Find...',
-      icon: FileSearch,
-      run: () => entryActions.find(path),
-    });
+  // A board (`*.task.md`) shows as a board or its source, never rich text,
+  // and only its source has find.
+  const board = isTaskBoard(path);
+  if (surface === 'editor' || (surface === 'viewer' && board)) {
+    const source = inSourceMode();
+    if (surface === 'editor' && (!board || source)) {
+      items.push({
+        kind: 'item',
+        id: 'find',
+        label: 'Find...',
+        icon: FileSearch,
+        run: () => entryActions.find(path),
+      });
+    }
     if (path.toLowerCase().endsWith('.md')) {
-      const source = inSourceMode();
       items.push({
         kind: 'item',
         id: 'source-mode',
-        label: source ? 'Show Rich Text' : 'Show Source',
-        icon: source ? FileText : FileCode,
+        label: source ? (board ? 'Show Board' : 'Show Rich Text') : 'Show Source',
+        icon: source ? (board ? SquareKanban : FileText) : FileCode,
         run: () => void runCommand('view.toggle_source_mode'),
       });
     }

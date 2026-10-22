@@ -1,8 +1,7 @@
 import { useDragLayer, type XYCoord } from 'react-dnd';
 import { FILE_TREE_ITEM_TYPE } from '@/hooks/use-file-tree-dnd';
 import type { MovableEntry } from '@/lib/file-operations';
-import { getFileIcon, getFolderIcon } from '@/assets/icons';
-import { getIconExtension } from '@/lib/utils';
+import { getFileIconFor, getFolderIcon } from '@/assets/icons';
 
 function previewStyle(offset: XYCoord | null): React.CSSProperties {
   if (!offset) return { display: 'none' };
@@ -31,7 +30,7 @@ export function FileTreeDragLayer() {
 
   const Icon = item.is_dir
     ? getFolderIcon(false)
-    : getFileIcon(getIconExtension(item.name));
+    : getFileIconFor(item.name);
 
   return (
     <div className='pointer-events-none fixed inset-0 z-50 overflow-hidden'>

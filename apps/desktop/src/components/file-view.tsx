@@ -4,7 +4,8 @@ import { ImageViewer } from '@/components/viewer/image-viewer';
 import { MediaViewer } from '@/components/viewer/media-viewer';
 import { PdfViewer } from '@/components/viewer/pdf-viewer';
 import { UnsupportedViewer } from '@/components/viewer/unsupported-viewer';
-import { embedKind, isDrawing } from '@/lib/embed/kind';
+import { embedKind, isDrawing, isTaskBoard } from '@/lib/embed/kind';
+import { TaskBoardView } from '@/components/task-board/task-board-view';
 import { can } from '@/lib/backend/platform';
 import { NativePdf } from '@/components/viewer/native-pdf';
 import { NativeDrawing } from '@/components/viewer/native-drawing';
@@ -29,6 +30,8 @@ export const FileView: React.FC<{ path: string; source?: boolean }> = ({ path, s
 
   switch (embedKind(path)) {
     case 'markdown':
+      // A board's other mode is its source, never rich text.
+      if (isTaskBoard(path) && !source) return <TaskBoardView key={`board:${path}`} path={path} />;
       // Keyed, so another file or mode starts afresh.
       return <FileEditor key={`${source ? 'source' : 'rich'}:${path}`} path={path} source={source} />;
     case 'image':

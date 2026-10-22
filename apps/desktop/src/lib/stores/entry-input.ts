@@ -35,6 +35,15 @@ export const FILE_TYPE_PRESETS: Record<string, FileTypePreset> = {
     initialContents: '{\n  "nodes": [],\n  "edges": []\n}\n',
     creatable: true,
   },
+  // A note shown as a Kanban board: `##` columns, checkbox cards
+  // (`lib/task-board/`).
+  task: {
+    id: 'task',
+    label: 'Task Board',
+    extension: 'task.md',
+    initialContents: '## To Do\n\n## Doing\n\n## Done\n',
+    creatable: true,
+  },
   pdf: { id: 'pdf', label: 'PDF', extension: 'pdf' },
   // An infinite canvas to draw on, in the iOS app (`DrawingFile.swift`); an
   // SVG picture everywhere else.

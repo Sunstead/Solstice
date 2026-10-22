@@ -15,11 +15,12 @@ import { openPath } from '@/lib/backend/shell';
 import { FileWarning, Link2Off, RefreshCcw } from 'lucide-react';
 
 import { CanvasPreviewCard } from '@/components/canvas/canvas-preview-card';
+import { BoardPreview } from '@/components/task-board/board-preview';
 import { MediaPlayer } from '@/components/viewer/media-player';
 import { PdfPreviewCard } from '@/components/viewer/pdf-preview-card';
 
 import { useWorkspace } from '@/hooks/use-workspace';
-import { embedKind } from '@/lib/embed/kind';
+import { embedKind, isTaskBoard } from '@/lib/embed/kind';
 import {
   loadEmbedSource,
   sliceBlock,
@@ -91,6 +92,8 @@ export function createEmbedView(ctx: Ctx): React.FC {
     }
 
     const url = asset.status === 'resolved' ? asset.url : '';
+    // A whole board shows as one; a section or block of it, as note text.
+    const board = kind === 'markdown' && absolutePath !== null && isTaskBoard(absolutePath) && !parts.heading && !parts.block;
 
     return (
       <span
@@ -123,7 +126,9 @@ export function createEmbedView(ctx: Ctx): React.FC {
           <CanvasPreviewCard path={absolutePath} height={height ?? undefined} />
         )}
 
-        {kind === 'markdown' && absolutePath && (
+        {board && absolutePath && <BoardPreview path={absolutePath} />}
+
+        {kind === 'markdown' && !board && absolutePath && (
           <EmbedChainContext.Provider value={[...chain, absolutePath]}>
             <Transclusion
               ctx={ctx}
