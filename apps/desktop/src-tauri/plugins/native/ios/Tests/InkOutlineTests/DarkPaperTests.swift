@@ -48,9 +48,9 @@ final class DarkPaperTests: XCTestCase {
     var markup = PaperMarkup(bounds: CGRect(x: 0, y: 0, width: 400, height: 300))
     markup.append(contentsOf: PKDrawing(strokes: [blackStroke()]))
 
-    let light = try await DrawingFile.write(markup)
+    let light = try await DrawingFile.Writer().write(markup, text: "")
     Ink.shared.setDarkPaper(true)
-    let dark = try await DrawingFile.write(markup)
+    let dark = try await DrawingFile.Writer().write(markup, text: "")
 
     XCTAssertEqual(light, dark)
     XCTAssertTrue(dark.contains("stroke=\"#000000\""))

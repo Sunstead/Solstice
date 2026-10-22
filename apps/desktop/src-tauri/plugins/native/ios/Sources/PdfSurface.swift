@@ -23,11 +23,11 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }()
   private static let signposts = OSSignposter(subsystem: "app.solstice", category: "PdfSurface")
 
-  private let pdfView = MarkupPDFView()
+  let pdfView = MarkupPDFView()
   /// It holds the tools (`Ink`): the page in view's canvas is first responder.
   private var hasTools = false
   /// The canvas over each page PDFKit is showing (or that has unsaved marks).
-  private var canvases:
+  private(set) var canvases:
     [ObjectIdentifier: (page: PDFPage, controller: PaperMarkupViewController, host: CanvasHost)] = [:]
   /// Each page's markup as the file holds it, until its canvas is made.
   private var stored: [ObjectIdentifier: Data] = [:]
@@ -55,6 +55,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   private var written: String?
   /// When a stroke last began: no reload under a moving Pencil.
   private var drewAt: Date?
+  /// Which canvases PDFKit has on their pages: only those it let go of go.
+  private var onPages = PageCanvases<ObjectIdentifier>()
   /// Each canvas's scratching out (`Scratcher`), by page.
   private var scratchers: [ObjectIdentifier: Scratcher] = [:]
   /// A change from outside came while marks were in hand: look again after.
@@ -180,6 +182,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
       // Our own save, or the same bytes written back: nothing new to show.
       if let written = self.written, await PdfStore.hash(self.path) == written { return }
       guard !self.busy else { return self.reloadWanted = true }
+      surfaceLog.info("reload \(self.id, privacy: .public): changed on disk")
       self.reloadShowingTheSamePlace()
     }
   }
@@ -216,6 +219,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   func pdfView(_ view: PDFView, overlayViewFor page: PDFPage) -> UIView? {
     let key = ObjectIdentifier(page)
+    onPages.shown(key)
     if let existing = canvases[key] { return existing.host }
 
     let size = page.bounds(for: .cropBox).size
@@ -246,6 +250,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
       guard let self, let controller, self.canvases[key]?.controller === controller else { return }
       self.paperMarkupViewControllerDidChangeMarkup(controller)
     }
+    surfaceLog.debug("canvas made: page \(page.document?.index(for: page) ?? -1)")
     // Made after this took the tools (still loading, or scrolled to).
     DispatchQueue.main.async { [weak self] in self?.pageChanged() }
     return host
@@ -268,7 +273,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   func pdfView(_ pdfView: PDFView, willEndDisplayingOverlayView overlayView: UIView, for page: PDFPage) {
     // Kept until saved when it has unsaved marks.
     let key = ObjectIdentifier(page)
-    if !unsaved.contains(key) { dropCanvas(key) }
+    if onPages.ended(key, unsaved: unsaved.contains(key)) { dropCanvas(key) }
   }
 
   // -- Zoom ------------------------------------------------------------
@@ -283,8 +288,17 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   private var displayScale: CGFloat { window?.screen.scale ?? plugin?.manager.viewController?.view.window?.screen.scale ?? 2 }
 
-  /// The zoom the canvases draw at: PDFKit's.
-  private var zoom: CGFloat { min(max(pdfView.scaleFactor, 0.1), Self.maximumZoom) }
+  /// The zooms a page's canvas draws at. Drawing at another zoom draws the
+  /// whole canvas afresh (the ink blinks), so it's redrawn only as PDFKit's
+  /// zoom passes one of these, not after every pinch and resize.
+  private static let zoomSteps: [CGFloat] = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, maximumZoom]
+
+  /// The zoom the canvases draw at: the step at or above PDFKit's, so the
+  /// ink is never softer than the page.
+  private var zoom: CGFloat {
+    let scale = pdfView.scaleFactor
+    return Self.zoomSteps.first { $0 >= scale - 0.001 } ?? Self.maximumZoom
+  }
 
   private var rezoom: DispatchWorkItem?
 
@@ -456,7 +470,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
       guard let self else { return }
       do {
         self.written = try await PdfStore.save(self.path, PdfStore.Request(order: order)).hash
-        self.send("saved")
+        self.saved()
       } catch {
         failure = "Couldn't save the pages: \(error.localizedDescription)"
       }
@@ -493,8 +507,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     scheduleSave()
   }
 
-  private func scheduleSave(after wait: Duration = .seconds(1)) {
-    send("dirty")
+  private func scheduleSave(after wait: Duration = saveAfter) {
+    dirty()
     pendingSave?.cancel()
     pendingSave = Task { @MainActor [weak self] in
       try? await Task.sleep(for: wait)
@@ -511,8 +525,16 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     pendingSave = nil
     Task { @MainActor in
       await self.save()
+      self.leave()
       done()
     }
+  }
+
+  override func close() {
+    super.close()
+    // Out of the app's view controller now; kept here until the save
+    // under way has read their marks.
+    canvases.values.forEach { detach($0.controller) }
   }
 
   /// Writes what's unsaved, after any save already under way.
@@ -567,15 +589,17 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     if saved {
       // Apple's ink on these pages is Solstice's now, in the file too.
       if !encrypted { for entry in pages { appleInks[entry.key] = nil } }
-      send("saved")
+      self.saved()
     } else {
       // Kept to try again with the next change.
       for entry in pages { unsaved.insert(entry.key) }
       self.inserts = inserts + self.inserts
     }
-    // Canvases scrolled away while unsaved can go now.
-    for entry in pages where !unsaved.contains(entry.key) && !pdfView.visiblePages.contains(entry.page) {
-      dropCanvas(entry.key)
+    // Canvases PDFKit let go of while unsaved can go now; one it still has
+    // on its page (just off screen) stays, or it would go on showing there
+    // with no tools and nothing saved.
+    for key in onPages.afterSave(pages.map(\.key), unsaved: unsaved) {
+      dropCanvas(key)
     }
   }
 
@@ -601,6 +625,8 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// scrolled away, not reloaded).
   private func dropCanvas(_ key: ObjectIdentifier, keep: Bool = true) {
     guard let entry = canvases.removeValue(forKey: key) else { return }
+    surfaceLog.debug("canvas let go: page \(entry.page.document?.index(for: entry.page) ?? -1)")
+    onPages.forget(key)
     scratchers[key] = nil
     if keep, let markup = entry.controller.markup { cached[key] = markup }
     let wasResponder = entry.controller.isFirstResponder

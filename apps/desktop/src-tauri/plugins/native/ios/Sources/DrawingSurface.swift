@@ -4,17 +4,19 @@ import PencilKit
 import SurfaceCore
 import Tauri
 import UIKit
+import os
 
 /// An infinite drawing (`*.drawing.svg`), as in Freeform: one PaperKit
 /// canvas you pan and zoom, Solstice's tools (`Ink`), the Pencil drawing from its
 /// first touch (a finger pans, or draws too with finger drawing on: `Ink`).
 /// Saved as an SVG (`DrawingFile`) whose markup is read back here.
 final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
-  /// The canvas starts this big, the content in its middle, and grows when
-  /// drawing nears an edge.
+  /// The canvas starts this big, the content in its middle, and grows by
+  /// half again (at least `growBy`) when drawing nears an edge.
   private static let side: CGFloat = 16384
   private static let growBy: CGFloat = 8192
   private static let nearEdge: CGFloat = 2048
+  private static let signposts = OSSignposter(subsystem: "app.solstice", category: "DrawingSurface")
   private static let features: FeatureSet = {
     var features = FeatureSet.latest
     features.colorMaximumLinearExposure = 1
@@ -32,6 +34,10 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   private let saves = Saves()
   /// What we last wrote, so our own save isn't taken for a change.
   private var written: String?
+  /// Makes the file, keeping what it can from one save to the next.
+  private let writer = DrawingFile.Writer()
+  /// The handwriting recognised for the file's `<desc>`, and when to again.
+  private var recognition = Recognition()
   /// When a stroke last began: no reload under a moving Pencil.
   private var drewAt: Date?
   /// Whether the last touch to land was the Pencil's: what drew the stroke
@@ -65,7 +71,8 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     markup.backgroundColor = UIColor.clear.cgColor
     grow(&markup)
 
-    controller.map(drop)
+    controller.map(detach)
+    recognition = Recognition()
     let controller = PaperMarkupViewController(markup: markup, supportedFeatureSet: Self.features)
     controller.delegate = self
     controller.view.frame = bounds
@@ -126,10 +133,27 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
       content.minX - b.minX < Self.nearEdge || content.minY - b.minY < Self.nearEdge
       || b.maxX - content.maxX < Self.nearEdge || b.maxY - content.maxY < Self.nearEdge
     guard near else { return .zero }
-    let shift = CGPoint(x: Self.growBy / 2, y: Self.growBy / 2)
+    let by = max(Self.growBy, b.width / 2)
+    let shift = CGPoint(x: by / 2, y: by / 2)
     markup.transformContent(CGAffineTransform(translationX: shift.x, y: shift.y))
-    markup.bounds = CGRect(x: b.minX, y: b.minY, width: b.width + Self.growBy, height: b.height + Self.growBy)
+    markup.bounds = CGRect(x: b.minX, y: b.minY, width: b.width + by, height: b.height + by)
     return shift
+  }
+
+  /// Grows the canvas once a stroke has taken it near an edge, the view
+  /// kept on the same place. PaperKit draws a new markup afresh (the canvas
+  /// blinks), so it's done seldom and as the stroke ends, never mid-save
+  /// while the drawing is being looked over.
+  private func growIfNeeded() {
+    DispatchQueue.main.async { [weak self] in
+      guard let self, let controller = self.controller, var markup = controller.markup else { return }
+      let shift = self.grow(&markup)
+      guard shift != .zero else { return }
+      let visible = controller.contentVisibleFrame
+      controller.markup = markup
+      controller.setContentVisibleFrame(visible.offsetBy(dx: shift.x, dy: shift.y), animated: false)
+      surfaceLog.info("grew \(self.id, privacy: .public) to \(Int(markup.bounds.width))")
+    }
   }
 
   /// Marks in hand: unsaved, being saved, or being drawn.
@@ -146,6 +170,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
       // Our own save, or the same bytes written back: nothing new to show.
       if let written = self.written, await PdfStore.hash(self.path) == written { return }
       guard !self.busy else { return }
+      surfaceLog.info("reload \(self.id, privacy: .public): changed on disk")
       // Back to the same place.
       let visible = self.controller?.contentVisibleFrame
       self.load()
@@ -206,11 +231,13 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
     scratcher?.check(controller, pencil: touchKind.pencil)
+    growIfNeeded()
     unsaved = true
-    send("dirty")
+    recognition.changed()
+    dirty()
     pendingSave?.cancel()
     pendingSave = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .seconds(1))
+      try? await Task.sleep(for: Self.saveAfter)
       guard !Task.isCancelled, let self else { return }
       self.pendingSave = nil
       await self.save()
@@ -261,36 +288,46 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     pendingSave?.cancel()
     pendingSave = nil
     Task { @MainActor in
-      await self.save()
+      await self.save(final: true)
+      self.leave()
       done()
     }
   }
 
-  /// Writes what's unsaved, after any save already under way.
-  private func save() async {
+  override func close() {
+    super.close()
+    controller.map(detach)
+  }
+
+  /// Writes what's unsaved, after any save already under way. `final`: the
+  /// drawing is being left, so its handwriting is recognised afresh if it
+  /// changed, even with nothing else to write.
+  private func save(final: Bool = false) async {
     await saves.run { [weak self] in
-      guard let self, self.unsaved else { return }
-      await self.write()
+      guard let self else { return }
+      guard self.unsaved || (final && self.recognition.isDue(now: Date(), final: true)) else { return }
+      await self.write(final: final)
     }
   }
 
-  private func write() async {
-    guard unsaved, let controller, var markup = controller.markup else { return }
+  private func write(final: Bool) async {
+    guard let controller, let markup = controller.markup else { return }
     unsaved = false
-
-    // Near an edge: a bigger canvas, the view kept where it was.
-    let shift = grow(&markup)
-    if shift != .zero {
-      let visible = controller.contentVisibleFrame
-      controller.markup = markup
-      controller.setContentVisibleFrame(visible.offsetBy(dx: shift.x, dy: shift.y), animated: false)
-    }
+    let state = Self.signposts.beginInterval("save")
+    defer { Self.signposts.endInterval("save", state) }
 
     do {
-      let svg = try await DrawingFile.write(markup)
+      let generation = recognition.generation
+      var text = recognition.text ?? ""
+      if recognition.isDue(now: Date(), final: final) {
+        text = await markup.indexableContent ?? ""
+        recognition.recognised(text, of: generation, at: Date())
+      }
+      let writer = self.writer
+      let svg = try await Task.detached(priority: .utility) { try await writer.write(markup, text: text) }.value
       let path = self.path
       // Written off the main thread, through a temporary file.
-      written = try await Task.detached(priority: .userInitiated) {
+      written = try await Task.detached(priority: .utility) {
         let url = URL(fileURLWithPath: path)
         let temporary = url.deletingLastPathComponent()
           .appendingPathComponent(".\(url.lastPathComponent).saving")
@@ -299,17 +336,11 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
         _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
       }.value
-      send("saved")
+      saved()
     } catch {
       unsaved = true
       send("error", ["message": "Couldn't save this drawing: \(error.localizedDescription)"])
     }
-  }
-
-  private func drop(_ controller: PaperMarkupViewController) {
-    controller.willMove(toParent: nil)
-    controller.view.removeFromSuperview()
-    controller.removeFromParent()
   }
 }
 

@@ -79,6 +79,10 @@ pub struct FsWatcherState {
     /// Paths this app wrote recently. Without it every autosave would look
     /// like an external edit and trigger a full round of index refreshes.
     ledger: Ledger,
+    /// Those of them written by an editor that tells sync itself (the iOS
+    /// app's PDFs and drawings, `file_written`): the poller doesn't, or every
+    /// save would be uploaded at once, however sync paces them.
+    editor_ledger: Ledger,
 }
 
 impl FsWatcherState {
@@ -100,6 +104,13 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 pub fn note_self_write(app: &AppHandle, path: &Path) {
     let state = app.state::<FsWatcherState>();
     lock(&state.ledger).insert(path.to_path_buf(), Instant::now());
+}
+
+/// As [`note_self_write`], for an editor that tells sync of its saves itself.
+pub fn note_editor_write(app: &AppHandle, path: &Path) {
+    note_self_write(app, path);
+    let state = app.state::<FsWatcherState>();
+    lock(&state.editor_ledger).insert(path.to_path_buf(), Instant::now());
 }
 
 /// Starts watching `root` for `label`, replacing any watcher already running
@@ -130,13 +141,17 @@ pub fn watch_workspace(
     {
         let _ = root_canonical;
         let ledger = Arc::clone(&state.ledger);
+        let editor_ledger = Arc::clone(&state.editor_ledger);
         let app = app.clone();
         let root_label = root.to_string();
         let poller = poll::Poller::start(root_given, move |changes, emit| {
             // Sync hears of every change, ours included: it has no watcher
             // of its own here, and creating, renaming or deleting in the app
-            // is only seen this way.
-            crate::sync::changed(&app, &root_label);
+            // is only seen this way. Not of an editor's own saves alone,
+            // which it has heard of, and paces.
+            if tells_sync(changes, &recent_self_writes(&editor_ledger)) {
+                crate::sync::changed(&app, &root_label);
+            }
             if !emit {
                 return;
             }
@@ -215,6 +230,13 @@ pub fn poll_now(state: &FsWatcherState) {
     for poller in lock(&state.watchers).values() {
         poller.poll_now();
     }
+}
+
+/// Whether sync should hear of what the poller found: anything but saves by
+/// an editor that told it already (`note_editor_write`).
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+fn tells_sync(changes: &[(PathBuf, FsChangeKind)], editor_writes: &HashSet<PathBuf>) -> bool {
+    changes.iter().any(|(path, _)| !editor_writes.contains(path))
 }
 
 /// What the poller found, as the frontend's changes: our own writes left
@@ -582,6 +604,22 @@ mod tests {
         );
 
         assert!(changes.is_empty());
+    }
+
+    /// Each drawing or PDF save was uploaded at once when the poller next
+    /// saw it, however sync paced the editor's saves.
+    #[test]
+    fn an_editors_own_save_alone_doesnt_tell_sync() {
+        let drawing = PathBuf::from("/w/a.drawing.svg");
+        let editors: HashSet<PathBuf> = [drawing.clone()].into();
+        let saved = [(drawing.clone(), FsChangeKind::Modified)];
+        assert!(!tells_sync(&saved, &editors));
+        let more = [
+            (drawing, FsChangeKind::Modified),
+            (PathBuf::from("/w/new.md"), FsChangeKind::Created),
+        ];
+        assert!(tells_sync(&more, &editors));
+        assert!(tells_sync(&saved, &HashSet::new()));
     }
 
     #[test]

@@ -64,7 +64,7 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
     // The image, locked under the marks: drawn, never selected or erased.
     markup.subelements.append(ImageMarkup(image: image, frame: imageFrame, allowedInteractions: []))
 
-    controller.map(drop)
+    controller.map(detach)
     let controller = PaperMarkupViewController(markup: markup, supportedFeatureSet: Self.features)
     controller.delegate = self
     controller.view.frame = bounds
@@ -178,10 +178,10 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
     scratcher?.check(controller, pencil: touchKind.pencil)
     marked = true
     unsaved = true
-    send("dirty")
+    dirty()
     pendingSave?.cancel()
     pendingSave = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .seconds(1))
+      try? await Task.sleep(for: Self.saveAfter)
       guard !Task.isCancelled, let self else { return }
       self.pendingSave = nil
       await self.save()
@@ -200,6 +200,7 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
       guard let self else { return }
       if let written = self.written, await PdfStore.hash(self.path) == written { return }
       guard !self.busy else { return }
+      surfaceLog.info("reload \(self.id, privacy: .public): changed on disk")
       self.load()
     }
   }
@@ -209,8 +210,14 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
     pendingSave = nil
     Task { @MainActor in
       await self.save()
+      self.leave()
       done()
     }
+  }
+
+  override func close() {
+    super.close()
+    controller.map(detach)
   }
 
   private func save() async {
@@ -232,14 +239,14 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
     }
     let path = self.path
     do {
-      written = try await Task.detached(priority: .userInitiated) {
+      written = try await Task.detached(priority: .utility) {
         let url = URL(fileURLWithPath: path)
         let temporary = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).saving")
         try data.write(to: temporary)
         _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
       }.value
-      send("saved")
+      saved()
     } catch {
       unsaved = true
       send("error", ["message": "Couldn't save this image: \(error.localizedDescription)"])
@@ -277,12 +284,6 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
     let options: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: 0.92]
     CGImageDestinationAddImage(destination, image, options as CFDictionary)
     return CGImageDestinationFinalize(destination) ? data as Data : nil
-  }
-
-  private func drop(_ controller: PaperMarkupViewController) {
-    controller.willMove(toParent: nil)
-    controller.view.removeFromSuperview()
-    controller.removeFromParent()
   }
 }
 

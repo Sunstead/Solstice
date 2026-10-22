@@ -2,6 +2,11 @@ import ObjectiveC
 import Tauri
 import UIKit
 import WebKit
+import os
+
+/// What the native views did, for Console (subsystem `app.solstice`): opens,
+/// closes, reloads and why, memory warnings, canvases made and let go.
+let surfaceLog = Logger(subsystem: "app.solstice", category: "surface")
 
 /// A native view in a tab: a PDF, a drawing. The webview leaves a see-through
 /// hole where it goes, and keeps its frame in step (`NativeSurface`).
@@ -10,11 +15,22 @@ class SurfaceView: UIView {
   var path: String
   weak var plugin: NativePlugin?
 
+  /// How long a save waits after the last change: not between the strokes
+  /// of a word, and little lost if the app is killed. Leaving the tab or the
+  /// app saves at once (`flush`).
+  static let saveAfter: Duration = .seconds(3)
+
+  /// Changes not yet written have been reported (`dirty`).
+  private var dirtySent = false
+  /// Written since the file was last left (`leave`).
+  private var wroteSinceLeft = false
+
   init(id: String, path: String, plugin: NativePlugin) {
     self.id = id
     self.path = path
     self.plugin = plugin
     super.init(frame: .zero)
+    surfaceLog.info("open \(type(of: self), privacy: .public) \(id, privacy: .public)")
   }
 
   @available(*, unavailable)
@@ -26,6 +42,44 @@ class SurfaceView: UIView {
   /// Writes what's unsaved now (the tab is closing, the app is leaving),
   /// then calls `done`.
   func flush(_ done: @escaping () -> Void = {}) { done() }
+
+  /// The tab closed, or another surface took its id: writes what's unsaved
+  /// and lets go of its canvases. They were children of the app's view
+  /// controller, and stayed there with their marks for as long as the app ran.
+  func close() {
+    surfaceLog.info("close \(type(of: self), privacy: .public) \(self.id, privacy: .public)")
+    flush()
+  }
+
+  /// Takes `controller` out of the app's view controller and this view.
+  func detach(_ controller: UIViewController) {
+    controller.willMove(toParent: nil)
+    controller.view.removeFromSuperview()
+    controller.removeFromParent()
+  }
+
+  /// Something changed that isn't written yet; the web side hears once.
+  func dirty() {
+    guard !dirtySent else { return }
+    dirtySent = true
+    send("dirty")
+  }
+
+  /// A save was written.
+  func saved() {
+    dirtySent = false
+    wroteSinceLeft = true
+    send("saved")
+  }
+
+  /// The file is being left (`flush`): whatever was written since it was
+  /// last left goes to the other devices now (`final`), not with the sync's
+  /// next look at the folder.
+  func leave() {
+    guard wroteSinceLeft else { return }
+    wroteSinceLeft = false
+    send("saved", ["final": true])
+  }
 
   /// Shown in its tab, in a window.
   var isShown: Bool { !isHidden && window != nil }
@@ -99,7 +153,7 @@ final class SurfaceHost: UIView {
   }
 
   func add(_ surface: SurfaceView) {
-    surfaces[surface.id]?.removeFromSuperview()
+    remove(surface.id)
     surfaces[surface.id] = surface
     surface.isHidden = true
     addSubview(surface)
@@ -108,7 +162,7 @@ final class SurfaceHost: UIView {
   func remove(_ id: String) {
     guard let surface = surfaces.removeValue(forKey: id) else { return }
     Ink.shared.deactivate(surface)
-    surface.flush()
+    surface.close()
     surface.removeFromSuperview()
   }
 

@@ -16,8 +16,10 @@ enum DrawingFile {
   static let namespace = "https://sunstead.app/solstice"
   /// Room around the content in the copy.
   private static let margin: CGFloat = 24
-  /// The picture layer's pixels per point.
+  /// The picture layer's pixels per point, at most.
   private static let pictureScale: CGFloat = 3
+  /// The picture layer's pixels, at most: past this it's drawn coarser.
+  static let pictureBudget = 16_000_000
 
   /// The markup in an existing file, or nil for a new one.
   static func read(_ svg: String) -> PaperMarkup? {
@@ -29,41 +31,74 @@ enum DrawingFile {
     return try? PaperMarkup(dataRepresentation: data)
   }
 
-  static func write(_ markup: PaperMarkup) async throws -> String {
-    let data = try await markup.dataRepresentation()
-    let text = await markup.indexableContent
-    let content = markup.contentsRenderFrame
-    let box =
-      content.isNull || content.isEmpty
-      ? CGRect(x: markup.bounds.midX - 512, y: markup.bounds.midY - 384, width: 1024, height: 768)
-      : content.insetBy(dx: -margin, dy: -margin)
-
-    // Paper, as it's drawn on: dark ink stays readable on a dark page.
-    var body = "  <rect x=\"\(n(box.minX))\" y=\"\(n(box.minY))\" width=\"\(n(box.width))\" height=\"\(n(box.height))\" fill=\"#fff\"/>\n"
-    if let picture = await picture(of: markup, in: box) {
-      body += "  <image x=\"\(n(box.minX))\" y=\"\(n(box.minY))\" width=\"\(n(box.width))\" height=\"\(n(box.height))\" href=\"data:image/png;base64,\(picture.base64EncodedString())\"/>\n"
-    }
-    let strokes = Array(markup.subelements.strokes)
-    for (stroke, look) in zip(strokes, await InkOutline.looks(of: strokes)) {
-      body += self.stroke(stroke, look)
+  /// Writes a drawing's file, one save after another. Each save of a
+  /// growing drawing did all of it again: every stroke's outline, and the
+  /// picture layer over all of it. This keeps what it made of each stroke;
+  /// the picture is drawn again each time (PaperKit's markups can't be told
+  /// apart), but only over what's in it.
+  actor Writer {
+    /// A stroke where it is: its look (`InkOutline.Key`) and its place.
+    private struct Placed: Hashable {
+      let look: InkOutline.Key
+      let x: CGFloat
+      let y: CGFloat
     }
 
-    return """
-      <svg xmlns="http://www.w3.org/2000/svg" xmlns:solstice="\(namespace)" \
-      viewBox="\(n(box.minX)) \(n(box.minY)) \(n(box.width)) \(n(box.height))" \
-      width="\(n(box.width))" height="\(n(box.height))">
-        <metadata><solstice:paper version="1">\(data.base64EncodedString())</solstice:paper></metadata>
-        <desc>\(escape(text ?? ""))</desc>
-      \(body)</svg>
+    /// Each stroke's SVG, for the strokes the last save had.
+    private var strokes: [Placed: String] = [:]
+    /// How many strokes' SVG it has made.
+    private(set) var built = 0
 
-      """
+    /// The SVG of `markup`, with `text` as the handwriting recognised in it.
+    func write(_ markup: PaperMarkup, text: String) async throws -> String {
+      let data = try await markup.dataRepresentation()
+      let content = markup.contentsRenderFrame
+      let box =
+        content.isNull || content.isEmpty
+        ? CGRect(x: markup.bounds.midX - 512, y: markup.bounds.midY - 384, width: 1024, height: 768)
+        : content.insetBy(dx: -margin, dy: -margin)
+
+      // Paper, as it's drawn on: dark ink stays readable on a dark page.
+      var body = "  <rect x=\"\(n(box.minX))\" y=\"\(n(box.minY))\" width=\"\(n(box.width))\" height=\"\(n(box.height))\" fill=\"#fff\"/>\n"
+      if let rest = markup.withoutInk { body += await DrawingFile.picture(of: rest) ?? "" }
+      body += await ink(of: Array(markup.subelements.strokes))
+
+      return """
+        <svg xmlns="http://www.w3.org/2000/svg" xmlns:solstice="\(namespace)" \
+        viewBox="\(n(box.minX)) \(n(box.minY)) \(n(box.width)) \(n(box.height))" \
+        width="\(n(box.width))" height="\(n(box.height))">
+          <metadata><solstice:paper version="1">\(data.base64EncodedString())</solstice:paper></metadata>
+          <desc>\(escape(text))</desc>
+        \(body)</svg>
+
+        """
+    }
+
+    /// The strokes' SVG, made afresh only for strokes the last save didn't have.
+    private func ink(of strokes: [PKStroke]) async -> String {
+      let placed = strokes.map { stroke in
+        Placed(look: InkOutline.key(of: stroke), x: stroke.transform.tx, y: stroke.transform.ty)
+      }
+      let missing = placed.indices.filter { self.strokes[placed[$0]] == nil }
+      let looks = await InkOutline.looks(of: missing.map { strokes[$0] })
+      var kept: [Placed: String] = [:]
+      for (i, look) in zip(missing, looks) {
+        kept[placed[i]] = DrawingFile.stroke(strokes[i], look)
+        built += 1
+      }
+      for key in placed where kept[key] == nil {
+        kept[key] = self.strokes[key]
+      }
+      self.strokes = kept
+      return placed.compactMap { kept[$0] }.joined()
+    }
   }
 
   // -- Ink ------------------------------------------------------------
 
   /// A stroke's visible parts as `InkOutline` sweeps them: runs of curve,
   /// each stroked at its width, faded together.
-  private static func stroke(_ stroke: PKStroke, _ look: InkOutline.Look) -> String {
+  static func stroke(_ stroke: PKStroke, _ look: InkOutline.Look) -> String {
     var out = ""
     for part in InkOutline.parts(of: stroke, look) {
       let (color, _) = hex(part.color)
@@ -98,20 +133,21 @@ enum DrawingFile {
 
   // -- Everything else ---------------------------------------------------
 
-  /// Shapes, text, stickers and images, as PaperKit draws them; nil if the
-  /// drawing is only ink.
-  private static func picture(of markup: PaperMarkup, in box: CGRect) async -> Data? {
-    var rest = markup
-    for id in markup.subelements.ids {
-      if case .stroke = id { _ = rest.subelements.removeElement(for: id) }
-    }
-    guard !rest.subelements.ids.isEmpty else { return nil }
+  /// `rest` (shapes, text, stickers and images, no ink) as PaperKit draws
+  /// them, an `<image>` over what they cover; nil if there are none. Within
+  /// `pictureBudget` pixels: drawn over all the content, a text box far from
+  /// the ink made a picture of gigabytes.
+  private static func picture(of rest: PaperMarkup) async -> String? {
+    let frame = rest.contentsRenderFrame
+    guard !frame.isNull, !frame.isEmpty else { return nil }
+    let box = frame.insetBy(dx: -2, dy: -2)
 
     let size = box.size
+    let scale = min(pictureScale, (CGFloat(pictureBudget) / (size.width * size.height)).squareRoot())
     // A bitmap of our own: drawing the markup is async, which
     // UIGraphicsImageRenderer's block can't be.
-    let width = Int(size.width * pictureScale)
-    let height = Int(size.height * pictureScale)
+    let width = Int(size.width * scale)
+    let height = Int(size.height * scale)
     guard width > 0, height > 0,
       let bitmap = CGContext(
         data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
@@ -121,16 +157,16 @@ enum DrawingFile {
     // Top-left origin, as the markup is laid out, with `box` on the image.
     // PaperKit draws in the markup's own coordinates whatever `frame` says.
     bitmap.translateBy(x: 0, y: CGFloat(height))
-    bitmap.scaleBy(x: pictureScale, y: -pictureScale)
+    bitmap.scaleBy(x: CGFloat(width) / size.width, y: -CGFloat(height) / size.height)
     bitmap.translateBy(x: -box.minX, y: -box.minY)
     await rest.draw(in: bitmap, frame: box, options: RenderingOptions(darkUserInterfaceStyle: false))
-    guard let made = bitmap.makeImage() else { return nil }
-    return UIImage(cgImage: made).pngData()
+    guard let made = bitmap.makeImage(), let png = UIImage(cgImage: made).pngData() else { return nil }
+    return "  <image x=\"\(n(box.minX))\" y=\"\(n(box.minY))\" width=\"\(n(box.width))\" height=\"\(n(box.height))\" href=\"data:image/png;base64,\(png.base64EncodedString())\"/>\n"
   }
 
   // -- Text ------------------------------------------------------------
 
-  private static func n(_ value: CGFloat) -> String {
+  static func n(_ value: CGFloat) -> String {
     let rounded = (value * 100).rounded() / 100
     return rounded == rounded.rounded() ? String(Int(rounded)) : String(format: "%.2f", rounded)
   }
@@ -149,9 +185,27 @@ enum DrawingFile {
     return (String(format: "#%02x%02x%02x", byte(r), byte(g), byte(b)), a)
   }
 
-  private static func escape(_ text: String) -> String {
+  static func escape(_ text: String) -> String {
     text.replacingOccurrences(of: "&", with: "&amp;")
       .replacingOccurrences(of: "<", with: "&lt;")
       .replacingOccurrences(of: ">", with: "&gt;")
+  }
+}
+
+extension PaperMarkup {
+  /// Everything but the ink (shapes, text, images, loupes, links), drawn by
+  /// PaperKit as a picture; nil if there's nothing else. A new markup with
+  /// just those: removing the strokes one at a time took seconds in a big
+  /// drawing, on every save (and `removeAll(where:)` leaves some behind).
+  var withoutInk: PaperMarkup? {
+    let other = subelements.filter {
+      if case .stroke = $0.elementID { return false }
+      return true
+    }
+    guard !other.isEmpty else { return nil }
+    var rest = PaperMarkup(bounds: bounds)
+    rest.backgroundColor = backgroundColor
+    rest.subelements.append(contentsOf: other)
+    return rest
   }
 }

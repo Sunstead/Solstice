@@ -77,6 +77,14 @@ class NativePlugin: Plugin {
     let center = NotificationCenter.default
     center.addObserver(
       self, selector: #selector(leaving), name: UIApplication.willResignActiveNotification, object: nil)
+    center.addObserver(
+      self, selector: #selector(memoryWarning), name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
+  }
+
+  /// PencilKit and PDFKit let their drawn tiles go on one: canvases blink
+  /// as they draw again. Logged, so a blink can be told from other causes.
+  @objc private func memoryWarning() {
+    surfaceLog.warning("memory warning, \(self.host?.surfaces.count ?? 0) surfaces open")
   }
 
   /// Saves what the surfaces hold before iOS can suspend the app.

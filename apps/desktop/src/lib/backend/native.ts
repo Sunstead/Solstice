@@ -16,6 +16,8 @@ export type SurfaceEvent = {
   type: 'saved' | 'dirty' | 'error';
   path: string;
   message?: string;
+  /** A `saved` that was the last before the file was left: sync it at once. */
+  final?: boolean;
 };
 
 export type Rect = { x: number; y: number; width: number; height: number };

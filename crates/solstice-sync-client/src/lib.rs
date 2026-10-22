@@ -13,6 +13,7 @@ mod client;
 mod link;
 mod net;
 mod store;
+mod throttle;
 
 pub use client::{Client, ReviewInfo, Status, Versions};
 pub use link::{link, unlink, LinkReport};

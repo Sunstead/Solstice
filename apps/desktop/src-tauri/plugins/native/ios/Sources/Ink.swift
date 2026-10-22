@@ -95,6 +95,7 @@ final class Ink: NSObject {
     tool = Self.tool(for: spec)
     UserDefaults.standard.set(try? JSONEncoder().encode(spec), forKey: Self.toolKey)
     changed()
+    surfaceLog.info("tool \(spec.kind.rawValue, privacy: .public) to \(self.surfaces.count) surfaces")
   }
 
   func setRuler(_ on: Bool) {
