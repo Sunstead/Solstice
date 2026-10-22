@@ -132,6 +132,15 @@ final class Ink: NSObject {
     controller.directTouchMode = fingerDraws ? .drawing : defaultMode
     controller.directTouchAutomaticallyDraws = fingerDraws
     Self.letFingerDraw(fingerDraws, in: controller.view)
+    controller.scrollConfiguration.scrollsToTop = false
+    Self.ignoreStatusBarTap(in: controller.view)
+  }
+
+  /// A tap on the status bar scrolls a scroll view to its top, which on a
+  /// canvas is a blank band far above what was drawn, and the Pencil's hand
+  /// lands there often. No scroll view under `view` answers it.
+  static func ignoreStatusBarTap(in view: UIView) {
+    for scroll in view.subviews(of: UIScrollView.self) { scroll.scrollsToTop = false }
   }
 
   /// PaperKit's drawing gestures take only the Pencil, whatever its touch

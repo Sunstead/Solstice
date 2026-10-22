@@ -46,6 +46,7 @@ final class WebviewFit: NSObject {
     let scroll = webview.scrollView
     scroll.contentInsetAdjustmentBehavior = .never
     scroll.isScrollEnabled = false
+    scroll.scrollsToTop = false
     observation = scroll.observe(\.contentOffset, options: [.new]) { scroll, _ in
       MainActor.assumeIsolated {
         if scroll.contentOffset != .zero { scroll.contentOffset = .zero }

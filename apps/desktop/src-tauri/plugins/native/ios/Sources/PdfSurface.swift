@@ -150,6 +150,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     dropCanvases()
     pdfView.document = document
     Ink.letFingerDraw(Ink.shared.fingerDraws, in: pdfView)
+    Ink.ignoreStatusBarTap(in: pdfView)
     if opened?.needsRepair == true {
       repairing = true
       scheduleSave(after: .zero)
