@@ -16,7 +16,9 @@ export default function TitleBar() {
 
       <div className='flex items-center w-max h-max'>
         <div data-tauri-drag-region className='flex items-center select-none'>
-          <div className='min-w-12 flex items-center justify-center'>
+          {/* As wide as the icon rail, so the logo sits in its middle: 3rem
+              on desktop, 4rem where touch leads (the iPad). */}
+          <div className='min-w-(--sidebar-width-icon) flex items-center justify-center'>
             {can.windowChrome && isMac ? (
               !isFullscreen && <span className='w-20' />
             ) : (
