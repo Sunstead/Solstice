@@ -201,14 +201,59 @@ export const commands = {
 	 *  when the folder is named differently.
 	 */
 	syncVaultNames: (paths: string[]) => __TAURI_INVOKE<(string | null)[]>("sync_vault_names", { paths }),
+	getWindowInit: () => __TAURI_INVOKE<WindowInit>("get_window_init"),
+	listWindows: () => __TAURI_INVOKE<WindowEntry[]>("list_windows"),
+	/**
+	 *  Opens a window, and returns its label. A full window of a workspace that
+	 *  already has one brings that one forward instead.
+	 */
+	openWindow: (request: OpenWindow) => typedError<string, string>(__TAURI_INVOKE("open_window", { request })),
+	focusWindow: (label: string) => __TAURI_INVOKE<void>("focus_window", { label }),
+	/**
+	 *  Brings forward the full window showing `workspace`, if it isn't this one.
+	 *  Returns whether there was one.
+	 */
+	focusFullWindowFor: (workspace: string) => __TAURI_INVOKE<boolean>("focus_full_window_for", { workspace }),
+	/**
+	 *  A tab drag leaves this window: the other windows are told what's coming
+	 *  (a drag carries nothing they can read before the drop), and the button is
+	 *  watched, so the drag ends even when WebKit sends no `dragend`.
+	 */
+	beginTabDrag: (payload: string) => __TAURI_INVOKE<void>("begin_tab_drag", { payload }),
+	/**
+	 *  The page saw its tab drag end (`dragend`). Where it ended, unless the
+	 *  button watch already said so.
+	 */
+	endTabDrag: () => __TAURI_INVOKE<{
+	at: Point,
+	inside: boolean,
+	over: string | null,
+} | null>("end_tab_drag"),
+	/**  Tells `source` its tab landed here, so it lets it go. */
+	tabAdopted: (source: string, tabId: string) => typedError<null, string>(__TAURI_INVOKE("tab_adopted", { source, tabId })),
+	/**  Sends a tab to another window (Move to Window), and brings it forward. */
+	sendTab: (target: string, payload: string) => typedError<null, string>(__TAURI_INVOKE("send_tab", { target, payload })),
+	/**  Tells every other window a settings file changed. */
+	storeChanged: (file: string) => __TAURI_INVOKE<void>("store_changed", { file }),
+	/**  Has every other window save its editors, waiting up to a few seconds. */
+	flushOtherWindows: () => typedError<null, string>(__TAURI_INVOKE("flush_other_windows")),
+	/**  This window saved its editors (`FlushRequested`). */
+	windowsFlushed: (id: number) => __TAURI_INVOKE<void>("windows_flushed", { id }),
 };
 
 /** Events */
 export const events = {
 	fileSystemChanged: makeEvent<FileSystemChanged>("file-system-changed"),
+	flushRequested: makeEvent<FlushRequested>("flush-requested"),
 	keymapChanged: makeEvent<KeymapChanged>("keymap-changed"),
 	menuCommand: makeEvent<MenuCommand>("menu-command"),
+	storeChanged: makeEvent<StoreChanged>("store-changed"),
 	syncChanged: makeEvent<SyncChanged>("sync-changed"),
+	tabAdopted: makeEvent<TabAdopted>("tab-adopted"),
+	tabDrag: makeEvent<TabDrag>("tab-drag"),
+	tabDragEnded: makeEvent<TabDragEnded>("tab-drag-ended"),
+	tabSent: makeEvent<TabSent>("tab-sent"),
+	windowsChanged: makeEvent<WindowsChanged>("windows-changed"),
 };
 
 /* Types */
@@ -220,7 +265,15 @@ export type Anchor = {
 	height: number | null,
 };
 
-export type CommandId = "app.settings" | "app.check_for_updates" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.new_workspace" | "file.import_from_sync" | "file.manage_workspaces" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.share" | "file.share_pdf" | "file.share_image" | "file.export_pdf" | "file.save_copy" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.highlight" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.task_list" | "edit.indent" | "edit.outdent" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "edit.insert_wikilink" | "edit.copy_block_link" | "view.toggle_sidebar" | "view.toggle_source_mode" | "view.next_tab" | "view.previous_tab" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
+/**  A window's frame in logical pixels: outer position, inner size. */
+export type Bounds = {
+	x: number | null,
+	y: number | null,
+	width: number | null,
+	height: number | null,
+};
+
+export type CommandId = "app.settings" | "app.check_for_updates" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.new_workspace" | "file.import_from_sync" | "file.manage_workspaces" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.share" | "file.share_pdf" | "file.share_image" | "file.export_pdf" | "file.save_copy" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.highlight" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.task_list" | "edit.indent" | "edit.outdent" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "edit.insert_wikilink" | "edit.copy_block_link" | "view.toggle_sidebar" | "view.toggle_source_mode" | "view.next_tab" | "view.previous_tab" | "window.new" | "window.move_tab_to_new_window" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
 
 export type CommandMeta = {
 	id: CommandId,
@@ -243,6 +296,11 @@ export type FileEntry = {
 export type FileSystemChanged = {
 	root: string,
 	changes: FsChange[],
+};
+
+/**  Save every open editor now, then say so (`windows_flushed`). */
+export type FlushRequested = {
+	id: number,
 };
 
 export type FsChange = {
@@ -287,11 +345,37 @@ export type MenuCommand = CommandId;
  */
 export type NativeItem = "Undo" | "Redo" | "Cut" | "Copy" | "Paste" | "SelectAll";
 
+export type OpenWindow = {
+	/**  An editor window of the calling window's workspace, else a full one. */
+	editor: boolean,
+	workspace: string | null,
+	tab: string | null,
+	/**  Where on the screen the pointer let go of a torn-off tab. */
+	at: Point | null,
+};
+
 /**  A page to print on, in points. */
 export type PageSpec = {
 	width: number | null,
 	height: number | null,
 	margin: number | null,
+};
+
+export type Point = {
+	x: number | null,
+	y: number | null,
+};
+
+/**
+ *  Where the pointer is as a tab drag ends: on the screen (logical pixels,
+ *  for placing a new window), whether it's over the window the tab left, and
+ *  which other window it's over. Asked of the OS rather than the drag's own
+ *  event, whose coordinates WebKit doesn't keep at the end of a drag.
+ */
+export type PointerSpot = {
+	at: Point,
+	inside: boolean,
+	over: string | null,
 };
 
 export type ResolvedMenu = {
@@ -307,6 +391,11 @@ export type ResolvedMenuEntry = ({ Command: CommandMeta }) & { Native?: never; S
 	title: string,
 	entries: ResolvedMenuEntry[],
 } }) & { Command?: never; Native?: never };
+
+/**  Another window wrote a settings file; read it again. */
+export type StoreChanged = {
+	file: string,
+};
 
 /**  Something about a workspace's sync changed (status, reviews): ask again. */
 export type SyncChanged = {
@@ -368,6 +457,33 @@ export type SyncVersions = {
 	merged: string,
 };
 
+/**  A tab dragged out of this window landed in another: take it out here. */
+export type TabAdopted = {
+	tabId: string,
+};
+
+/**
+ *  A tab is being dragged out of another window (its payload), or no
+ *  longer is (`None`): a drag carries nothing another window can read
+ *  before the drop, so it's told here.
+ */
+export type TabDrag = {
+	payload: string | null,
+};
+
+/**
+ *  A tab drag out of this window ended where the OS saw the button come up
+ *  (WebKit doesn't always send `dragend` when it ends over another app).
+ */
+export type TabDragEnded = {
+	spot: PointerSpot,
+};
+
+/**  A tab sent here from another window's tab menu (`TabPayload` JSON). */
+export type TabSent = {
+	payload: string,
+};
+
 /**
  *  One theme file as found on disk. The contents are handed over unparsed:
  *  validating here would split the rules across two languages, and the
@@ -380,6 +496,31 @@ export type UserThemeFile = {
 	source: string,
 	contents: string,
 };
+
+export type WindowEntry = {
+	label: string,
+	kind: WindowKind,
+	workspace: string | null,
+	bounds: Bounds | null,
+};
+
+/**  What a window shows when it starts. */
+export type WindowInit = {
+	label: string,
+	kind: WindowKind,
+	workspace: string | null,
+	/**  A tab torn off another window, as flexlayout tab JSON. */
+	tab: string | null,
+};
+
+/**
+ *  A full window has the explorer; an editor window is tabs torn off a full
+ *  window of the same workspace, and closes with it.
+ */
+export type WindowKind = { type: "full" } | { type: "editor"; parent: string };
+
+/**  A window opened, closed or changed workspace. */
+export type WindowsChanged = null;
 
 export type WorkspaceMeta = {
 	/**  `#rrggbb`, or none: the frontend makes one from the name. */

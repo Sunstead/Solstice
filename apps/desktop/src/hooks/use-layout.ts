@@ -17,6 +17,8 @@ import { getSetting } from '@/lib/settings/store';
 import { useRecentFiles } from '@/lib/stores/recent-files';
 import { rerooted } from '@/lib/stores/known-workspaces';
 import { shell } from '@/lib/backend/platform';
+import { takeInitialTab } from '@/lib/stores/app-window';
+import { log } from '@/lib/backend/log';
 
 const defaultLayoutJson: IJsonModel = {
   global: {
@@ -195,6 +197,7 @@ function rerootTabs(model: Model, workspace: string) {
 
 let saveTimeout: ReturnType<typeof setTimeout> | undefined;
 let replacingBlankTab = false;
+let loading: { path: string; promise: Promise<void> } | null = null;
 
 export function isReplacingBlankTab(): boolean {
   return replacingBlankTab;
@@ -214,22 +217,42 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
   setRedrawTabContent: (redraw) => set({ redrawTabContent: redraw }),
 
-  loadForWorkspace: async (path) => {
-    const stored = await getStoredLayout();
-    let model = Model.fromJson(stored ?? defaultLayoutJson);
+  loadForWorkspace: (path) => {
+    // Opening a workspace loads it twice (its stores, then the layout
+    // session); the second must not undo the first, which in a new editor
+    // window took the tab it was opened with.
+    if (loading?.path === path) return loading.promise;
+    const promise = (async () => {
+      const stored = await getStoredLayout();
+      let model = Model.fromJson(stored ?? defaultLayoutJson);
 
-    if (collectTabsets(model).length === 0) {
-      model = Model.fromJson(defaultLayoutJson);
-    }
+      if (collectTabsets(model).length === 0) {
+        model = Model.fromJson(defaultLayoutJson);
+      }
 
-    syncTabsetDeletion(model);
-    if (shell === 'mobile') rerootTabs(model, path);
+      // A new editor window starts with the tab torn off another.
+      const torn = takeInitialTab();
+      log.info(`layout: loading ${path}, stored ${stored ? 'yes' : 'no'}, torn-off tab ${torn ? 'yes' : 'no'}`);
+      if (torn) {
+        const first = collectTabsets(model)[0];
+        model.doAction(Actions.addTab(JSON.parse(torn), first.getId(), DockLocation.CENTER, -1));
+        // Saved now, so any later load finds it rather than an empty window.
+        await setStoredLayout(model.toJson());
+      }
 
-    set({
-      model,
-      workspacePath: path,
-      activeTabId: getActiveTabId(model),
+      syncTabsetDeletion(model);
+      if (shell === 'mobile') rerootTabs(model, path);
+
+      set({
+        model,
+        workspacePath: path,
+        activeTabId: getActiveTabId(model),
+      });
+    })().finally(() => {
+      if (loading?.promise === promise) loading = null;
     });
+    loading = { path, promise };
+    return promise;
   },
 
   persistCurrent: () => {

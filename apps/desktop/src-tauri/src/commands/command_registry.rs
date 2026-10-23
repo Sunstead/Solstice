@@ -102,6 +102,9 @@ command_id! {
     ViewNextTab => "view.next_tab",
     ViewPreviousTab => "view.previous_tab",
 
+    WindowNew => "window.new",
+    WindowMoveTabToNewWindow => "window.move_tab_to_new_window",
+
     NavigationBack => "navigation.back",
     NavigationForward => "navigation.forward",
 
@@ -155,13 +158,16 @@ fn reveal_in_system_label() -> &'static str {
 
 /// Commands the web app leaves out: it has no folder to open as a workspace
 /// or import a vault into, no file manager to show a file in, updates with
-/// its server, and can't make a PDF file (it prints instead).
-pub const NOT_ON_WEB: [CommandId; 5] = [
+/// its server, can't make a PDF file (it prints instead), and the browser
+/// has its own windows.
+pub const NOT_ON_WEB: [CommandId; 7] = [
     CommandId::AppCheckForUpdates,
     CommandId::FileOpenFolder,
     CommandId::FileImportFromSync,
     CommandId::FileRevealInSystem,
     CommandId::FileSharePdf,
+    CommandId::WindowNew,
+    CommandId::WindowMoveTabToNewWindow,
 ];
 
 /// The web app's default where it differs. Browsers keep Ctrl/Cmd+N, T and W
@@ -257,6 +263,18 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             id: CommandId::FileCloseTab,
             label: "Close Tab".into(),
             accelerator: Some("CmdOrCtrl+W".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::WindowNew,
+            label: "New Window".into(),
+            accelerator: Some("CmdOrCtrl+Shift+N".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::WindowMoveTabToNewWindow,
+            label: "Move Tab to New Window".into(),
+            accelerator: None,
             is_overridden: false,
         },
         CommandMeta {
@@ -631,6 +649,9 @@ mod web_tests {
         for id in NOT_ON_WEB {
             assert!(web.iter().all(|c| c.id != id), "{id} is on the web");
         }
+        // A browser has its own windows.
+        assert!(NOT_ON_WEB.contains(&"window.new".parse().unwrap()));
+        assert!(NOT_ON_WEB.contains(&"window.move_tab_to_new_window".parse().unwrap()));
         // No browser-reserved accelerator is left anywhere.
         for c in &web {
             let a = c.accelerator.as_deref().unwrap_or_default();

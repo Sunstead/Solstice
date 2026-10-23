@@ -15,7 +15,7 @@ use serde::Deserialize;
 use sha2::{ Digest, Sha256 };
 use std::{ collections::HashMap, sync::LazyLock, time::{ Duration, Instant } };
 use tokio::sync::Mutex;
-use tauri::{ AppHandle, Manager, Runtime };
+use tauri::{ AppHandle, Runtime };
 #[cfg(not(target_os = "ios"))]
 use tauri_plugin_opener::OpenerExt;
 use tokio::{ io::{ AsyncReadExt, AsyncWriteExt }, net::TcpListener };
@@ -203,7 +203,7 @@ pub async fn sign_in<R: Runtime>(
     drop(listener);
 
     // Back to the app, not left behind the browser.
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = crate::windows::current(app) {
         let _ = window.set_focus();
     }
 

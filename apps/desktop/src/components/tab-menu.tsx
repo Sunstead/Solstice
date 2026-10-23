@@ -1,14 +1,20 @@
 import { useState } from 'react';
 import { Actions, TabNode, TabSetNode } from 'flexlayout-react';
-import { ArrowRightToLine, Plus, X } from 'lucide-react';
+import { AppWindow, ArrowRightToLine, Plus, SquareArrowOutUpRight, X } from 'lucide-react';
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@sunstead/ui/components/dropdown-menu';
+import { can } from '@/lib/backend/platform';
+import { getFileNameFromPath } from '@/lib/path-utils';
+import { moveTabToNewWindow, moveTabToWindow, useSiblingWindows } from '@/lib/tab-transfer';
 import { useLayout } from '@/hooks/use-layout';
 import { closeTab } from '@/lib/tab-motion';
 
@@ -38,6 +44,7 @@ export function TabMenu({
   const tab = at && model ? model.getNodeById(at.tabId) : undefined;
   const node = tab instanceof TabNode ? tab : null;
   const after = node ? tabsAfter(node) : [];
+  const siblings = useSiblingWindows();
 
   const newTabToRight = () => {
     if (!node) return;
@@ -82,6 +89,35 @@ export function TabMenu({
           <ArrowRightToLine />
           Close Tabs to the Right
         </DropdownMenuItem>
+        {can.multiWindow && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => model && node && moveTabToNewWindow(model, node.getId())}>
+              <SquareArrowOutUpRight />
+              Move to New Window
+            </DropdownMenuItem>
+            {siblings.length > 0 && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <AppWindow />
+                  Move to Window
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {siblings.map((w, i) => (
+                    <DropdownMenuItem
+                      key={w.label}
+                      onClick={() => model && node && moveTabToWindow(model, node.getId(), w.label)}
+                    >
+                      {w.kind.type === 'full'
+                        ? `${getFileNameFromPath(w.workspace ?? '')} (main window)`
+                        : `Window ${i + 1}`}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={!node?.isEnableClose()}

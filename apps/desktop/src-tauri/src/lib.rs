@@ -1,6 +1,5 @@
 #[allow(unused_imports)]
-use tauri::{ Emitter, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder };
-use tauri::utils::config::WindowConfig;
+use tauri::{ Emitter, Manager };
 // For the menu's events, which only a computer has.
 #[cfg(desktop)]
 use tauri_specta::Event as _;
@@ -13,6 +12,7 @@ mod types;
 mod commands;
 mod watcher;
 mod sync;
+mod windows;
 
 #[cfg(desktop)]
 use commands::command_registry::CommandId;
@@ -81,8 +81,32 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             sync::sync_resolve_review,
             sync::sync_editor_opened,
             sync::sync_vault_names,
+            windows::get_window_init,
+            windows::list_windows,
+            windows::open_window,
+            windows::focus_window,
+            windows::focus_full_window_for,
+            windows::begin_tab_drag,
+            windows::end_tab_drag,
+            windows::tab_adopted,
+            windows::send_tab,
+            windows::store_changed,
+            windows::flush_other_windows,
+            windows::windows_flushed,
         ])
-        .events(tauri_specta::collect_events![KeymapChanged, MenuCommand, FileSystemChanged, sync::SyncChanged])
+        .events(tauri_specta::collect_events![
+            KeymapChanged,
+            MenuCommand,
+            FileSystemChanged,
+            sync::SyncChanged,
+            windows::TabAdopted,
+            windows::TabDrag,
+            windows::TabDragEnded,
+            windows::TabSent,
+            windows::WindowsChanged,
+            windows::StoreChanged,
+            windows::FlushRequested,
+        ])
 }
 
 /// iOS starts an app with room for 256 open files, which a synced vault's
@@ -126,7 +150,7 @@ pub fn run() {
     // `deep-link` feature passes the link on to the deep-link plugin.
     #[cfg(desktop)]
     let app = app.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-        if let Some(window) = app.get_webview_window("main") {
+        if let Some(window) = windows::current(app) {
             let _ = window.unminimize();
             let _ = window.set_focus();
         }
@@ -150,6 +174,14 @@ pub fn run() {
         responder.respond(jobs.serve(request.uri().path()));
     });
 
+    // To the terminal and the app's log folder, from Rust and the page
+    // (`lib/backend/log.ts`).
+    let app = app.plugin(
+        tauri_plugin_log::Builder::new()
+            .level(log::LevelFilter::Info)
+            .build(),
+    );
+
     let app = app
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -162,6 +194,7 @@ pub fn run() {
         .manage(sync::SyncState::default())
         .manage(commands::keymap::MenuAccelerators::default())
         .manage(export::ExportJobs::default())
+        .manage(windows::WindowsState::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             // Registers the event registry so `events.keymapChanged.listen(...)`
@@ -179,36 +212,7 @@ pub fn run() {
                 }
             }
 
-            let config = WindowConfig {
-                label: "main".into(),
-                url: WebviewUrl::default(),
-                drag_drop_enabled: false,
-                ..Default::default()
-            };
-
-            let win_builder = WebviewWindowBuilder::from_config(app, &config)?;
-
-            // A phone's window is the screen; these are a computer's.
-            #[cfg(desktop)]
-            let win_builder = win_builder
-                .title("Solstice")
-                .inner_size(1200.0, 800.0)
-                // Narrow windows get the phone layout; below this it can't help.
-                .min_inner_size(400.0, 500.0);
-
-            #[cfg(target_os = "macos")]
-            let win_builder = {
-                use tauri::TitleBarStyle;
-                win_builder
-                    .title_bar_style(TitleBarStyle::Overlay)
-                    .hidden_title(true)
-                    .traffic_light_position(LogicalPosition::new(16.0, 22.0))
-            };
-
-            #[cfg(all(desktop, not(target_os = "macos")))]
-            let win_builder = win_builder.decorations(false);
-
-            win_builder.build()?;
+            windows::restore(app.handle())?;
 
             #[cfg(target_os = "macos")]
             {
@@ -226,7 +230,9 @@ pub fn run() {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 watcher::unwatch(window.label(), &window.state::<watcher::FsWatcherState>());
                 sync::window_closed(window.app_handle(), window.label());
+                window.state::<workspace::WorkspaceState>().0.lock().unwrap().remove(window.label());
             }
+            windows::on_window_event(window, event);
         });
 
     // Menus are a computer's; a phone has none to click.
@@ -236,13 +242,13 @@ pub fn run() {
             {
                 match event.id().0.as_str() {
                     "debug.reload" => {
-                        if let Some(window) = app.get_webview_window("main") {
+                        if let Some(window) = windows::current(app) {
                             let _ = window.eval("window.location.reload()");
                         }
                         return;
                     }
                     "debug.toggle_devtools" => {
-                        if let Some(window) = app.get_webview_window("main") {
+                        if let Some(window) = windows::current(app) {
                             window.open_devtools();
                         }
                         return;
@@ -253,14 +259,18 @@ pub fn run() {
 
             // Predefined OS items carry ids outside the registry and are
             // already handled natively, so they simply fail to parse here.
-            if let Ok(id) = event.id().0.parse::<CommandId>() {
-                MenuCommand(id).emit(app).ok();
+            // To the window in front only: every window has its own tabs.
+            if let (Ok(id), Some(window)) = (event.id().0.parse::<CommandId>(), windows::current(app)) {
+                MenuCommand(id).emit_to(app, window.label()).ok();
             }
         });
 
     app.build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, _event| {
+            if let tauri::RunEvent::ExitRequested { .. } = _event {
+                windows::quitting(_app);
+            }
             #[cfg(mobile)]
             if let tauri::RunEvent::Resumed = _event {
                 sync::reconnect_all(_app);

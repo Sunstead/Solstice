@@ -85,6 +85,12 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
         Command(FileNewCanvas),
                     Command(FileNewFolder),
                     Command(FileNewTab),
+                ];
+                // A phone or tablet has one window.
+                if cfg!(desktop) {
+                    items.push(Command(WindowNew));
+                }
+                items.extend([
                     Separator,
                     Command(FileOpenFile),
                     Command(FileNewWorkspace),
@@ -125,8 +131,11 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
                         .collect()
                     ),
                     Separator,
-                    Command(FileCloseTab)
-                ];
+                ]);
+                if cfg!(desktop) {
+                    items.push(Command(WindowMoveTabToNewWindow));
+                }
+                items.push(Command(FileCloseTab));
                 // Only macOS has an application menu to put Settings in;
                 // everywhere else it belongs at the bottom of File.
                 if !macos {

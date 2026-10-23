@@ -42,6 +42,7 @@ pub fn set_workspace(
     // Sync runs its own watcher (on iOS, this one's poll tells it), so it
     // starts whatever the setting below says.
     crate::sync::workspace_opened(&app, &label, &path);
+    crate::windows::workspace_set(&app, &label, &path);
 
     watcher::watch_workspace(&app, &label, &path, &watchers)
 }

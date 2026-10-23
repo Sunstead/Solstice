@@ -10,13 +10,21 @@
  * behaves exactly as it did when it called Tauri directly.
  */
 import { isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   commands as tauriCommands,
   events as tauriEvents,
   type FileSystemChanged,
+  type FlushRequested,
   type KeymapChanged,
   type MenuCommand,
+  type StoreChanged,
   type SyncChanged,
+  type TabAdopted,
+  type TabDrag,
+  type TabDragEnded,
+  type TabSent,
+  type WindowsChanged,
 } from '@/bindings';
 import { keymapChanged, webCommands } from './web/commands';
 import { Emitter } from './web/emitter';
@@ -41,17 +49,55 @@ export interface Events {
   keymapChanged: EventSource<KeymapChanged>;
   menuCommand: EventSource<MenuCommand>;
   syncChanged: EventSource<SyncChanged>;
+  // Between the desktop app's windows (`can.multiWindow`).
+  tabAdopted: EventSource<TabAdopted>;
+  tabDrag: EventSource<TabDrag>;
+  tabDragEnded: EventSource<TabDragEnded>;
+  tabSent: EventSource<TabSent>;
+  windowsChanged: EventSource<WindowsChanged>;
+  storeChanged: EventSource<StoreChanged>;
+  flushRequested: EventSource<FlushRequested>;
 }
 
 export const commands: Commands = inTauri ? tauriCommands : webCommands;
+/**
+ * Events one window is sent (`emit_to` it, or to the others) are listened
+ * for on that window: a global listener hears every window's, so a menu
+ * command would run in all of them.
+ */
+function tauriEventsFor(): Events {
+  const own = getCurrentWindow();
+  return {
+    fileSystemChanged: tauriEvents.fileSystemChanged,
+    keymapChanged: tauriEvents.keymapChanged,
+    syncChanged: tauriEvents.syncChanged,
+    windowsChanged: tauriEvents.windowsChanged,
+    menuCommand: tauriEvents.menuCommand(own),
+    tabAdopted: tauriEvents.tabAdopted(own),
+    tabDrag: tauriEvents.tabDrag(own),
+    tabDragEnded: tauriEvents.tabDragEnded(own),
+    tabSent: tauriEvents.tabSent(own),
+    storeChanged: tauriEvents.storeChanged(own),
+    flushRequested: tauriEvents.flushRequested(own),
+  };
+}
+
 export const events: Events = inTauri
-  ? tauriEvents
+  ? tauriEventsFor()
   : {
       fileSystemChanged: fsChanged,
       keymapChanged,
       // The web app has no native menu to send these.
       menuCommand: new Emitter<MenuCommand>(),
       syncChanged,
+      // A browser tab is one window.
+      tabAdopted: new Emitter<TabAdopted>(),
+      tabDrag: new Emitter<TabDrag>(),
+      tabDragEnded: new Emitter<TabDragEnded>(),
+      tabSent: new Emitter<TabSent>(),
+      windowsChanged: new Emitter<WindowsChanged>(),
+      storeChanged: new Emitter<StoreChanged>(),
+      flushRequested: new Emitter<FlushRequested>(),
     };
 
 /** A command's data, or a throw with its error, as a raw `invoke` gives. */
