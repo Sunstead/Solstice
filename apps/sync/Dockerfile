@@ -17,6 +17,9 @@ COPY package.json package-lock.json ./
 COPY apps/desktop/package.json apps/desktop/
 RUN --mount=type=cache,id=solstice-npm,sharing=locked,target=/root/.npm npm ci --no-audit --no-fund
 COPY apps/desktop/ apps/desktop/
+# The desktop tests read search's shared comment cases (comments.json), which
+# tsc needs to type-check them.
+COPY crates/solstice-search/tests/comments.json crates/solstice-search/tests/comments.json
 RUN npm run build -w @solstice/desktop
 
 FROM rust:1-bookworm AS build
