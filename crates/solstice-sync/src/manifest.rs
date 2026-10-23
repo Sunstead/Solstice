@@ -326,8 +326,8 @@ impl Manifest {
         txn.encode_update_v1()
     }
 
-    /// The bookmarks and folder colours, leaving out any a peer wrote with
-    /// a path that isn't a plain, visible vault path or a colour that isn't
+    /// The bookmarks and folder colors, leaving out any a peer wrote with
+    /// a path that isn't a plain, visible vault path or a color that isn't
     /// `#rrggbb`.
     pub fn tree_meta(&self) -> TreeMeta {
         let txn = self.doc.transact();

@@ -138,7 +138,7 @@ async function reviews(): Promise<SyncReview[]> {
 
 const NO_TREE_META: TreeMetaState = { linked: false, bookmarks: [], folder_colors: {} };
 
-/** A vault's bookmarks and folder colours. An older server has none to keep. */
+/** A vault's bookmarks and folder colors. An older server has none to keep. */
 async function treeMeta(root: string, ops?: TreeMetaOp[]): Promise<TreeMetaState> {
   const { vault } = await resolve(root);
   try {

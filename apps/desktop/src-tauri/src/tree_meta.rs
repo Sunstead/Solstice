@@ -1,4 +1,4 @@
-//! A workspace's bookmarks and folder colours. The rules are
+//! A workspace's bookmarks and folder colors. The rules are
 //! `solstice_sync::tree_meta`; this only picks where they're kept. An
 //! unlinked folder keeps them in `.solstice/tree.json`. A linked one keeps
 //! them in its vault's manifest, through its sync client, which mirrors them
@@ -58,7 +58,7 @@ impl From<TreeMetaOp> for TreeOp {
     }
 }
 
-/// A workspace's bookmarks or folder colours changed: ask again.
+/// A workspace's bookmarks or folder colors changed: ask again.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct TreeMetaChanged {
     pub root: String,
@@ -106,7 +106,7 @@ pub async fn tree_meta(app: AppHandle, root: String) -> Result<TreeMetaState, St
     }
 }
 
-/// Changes a workspace's bookmarks or folder colours, and returns them after.
+/// Changes a workspace's bookmarks or folder colors, and returns them after.
 #[tauri::command]
 #[specta::specta]
 pub async fn tree_meta_apply(app: AppHandle, root: String, ops: Vec<TreeMetaOp>) -> Result<TreeMetaState, String> {

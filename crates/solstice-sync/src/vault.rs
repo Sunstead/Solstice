@@ -200,7 +200,7 @@ impl Vault {
         self.manifest.tree_meta()
     }
 
-    /// Bookmark and folder-colour changes; nothing to send if they change
+    /// Bookmark and folder-color changes; nothing to send if they change
     /// nothing.
     pub fn apply_tree_ops(&mut self, ops: &[TreeOp]) -> Result<Vec<Msg>, Error> {
         let target = tree_meta::apply(&self.manifest.tree_meta(), ops)?;
@@ -212,8 +212,8 @@ impl Vault {
     }
 
     /// The first time a folder meets a vault: its own bookmarks (after the
-    /// vault's, unless the vault has the path already) and the colours of
-    /// folders the vault hasn't coloured.
+    /// vault's, unless the vault has the path already) and the colors of
+    /// folders the vault hasn't colored.
     pub fn seed_tree_meta(&mut self, local: &TreeMeta) -> Result<Vec<Msg>, Error> {
         let current = self.manifest.tree_meta();
         let mut ops: Vec<TreeOp> = local
@@ -499,7 +499,7 @@ mod tests {
         assert_eq!(got, [("v", "Shared.md"), ("l2", "Mine.md")]);
         assert_eq!(
             meta.folder_colors["F"], "#111111",
-            "the vault's colour wins"
+            "the vault's color wins"
         );
         assert_eq!(meta.folder_colors["G"], "#333333");
     }

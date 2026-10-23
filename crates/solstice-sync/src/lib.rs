@@ -4,7 +4,7 @@
 //!
 //! - [`NoteDoc`]: one note's markdown as a Yjs text, with history.
 //! - [`Manifest`]: which files a vault has, by stable id, plus reviews,
-//!   bookmarks and folder colours ([`TreeMeta`]).
+//!   bookmarks and folder colors ([`TreeMeta`]).
 //! - [`Vault`]: one replica, with the local operations that produce
 //!   messages for peers.
 //! - [`Session`]: the sync protocol for one connection, either end.
@@ -46,6 +46,6 @@ pub enum Error {
     Hidden(String),
     #[error("not a bookmark id: {0}")]
     BookmarkId(String),
-    #[error("not a colour: {0}")]
+    #[error("not a color: {0}")]
     Color(String),
 }

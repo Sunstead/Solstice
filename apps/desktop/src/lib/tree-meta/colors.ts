@@ -1,4 +1,4 @@
-/** The folder colour menu's presets: fixed hues that read on light and dark themes alike. */
+/** The folder color menu's presets: fixed hues that read on light and dark themes alike. */
 export const FOLDER_COLORS: readonly { name: string; hex: string }[] = [
   { name: 'Red', hex: '#e5484d' },
   { name: 'Orange', hex: '#f76b15' },

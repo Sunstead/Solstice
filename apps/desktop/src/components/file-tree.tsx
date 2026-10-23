@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react';
+import { Bookmark, ChevronRight } from 'lucide-react';
 import { useFiles, FileTreeNode, useDirectoryChildren } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
 import {
@@ -105,6 +105,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const children = useDirectoryChildren(node.path);
 
   const folderColor = useTreeMeta((s) => (node.is_dir ? s.folderColor(node.path) : null));
+  const bookmarked = useTreeMeta((s) => s.isBookmarked(node.path));
   const FileIcon = getFileIconFor(node.name);
 
   const isRenaming =
@@ -223,6 +224,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
             >
               <FileIcon />
               <FormattedFileName name={node.name} />
+              {bookmarked && <BookmarkedMark />}
             </SidebarMenuButton>
           }
         />
@@ -271,6 +273,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
                       />
                       <FolderGlyph open={node.expanded} color={folderColor} className='size-4 min-w-4' />
                       <FormattedFileName name={node.name} />
+                      {bookmarked && <BookmarkedMark />}
                     </SidebarMenuButton>
                   }
                 />
@@ -315,6 +318,13 @@ async function settle(
   if (result.status === 'error') return { status: 'error', error: result.error };
   close();
   return { status: 'ok' };
+}
+
+/** On a bookmarked entry's row, at its end. */
+function BookmarkedMark() {
+  return (
+    <Bookmark aria-label='Bookmarked' className='ml-auto size-3 shrink-0 fill-current text-muted-foreground' />
+  );
 }
 
 export function FormattedFileName({ name }: { name: string }) {

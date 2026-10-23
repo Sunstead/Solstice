@@ -183,7 +183,7 @@ export const Route = createRootRoute({
     // prevents a flash of the defaults -- the `key` below only forces a
     // remount, it does not delay rendering. This is a single store read, so
     // the blank frame is a few milliseconds; the theme class is already on
-    // <html> by then, so the window paints in the right colour.
+    // <html> by then, so the window paints in the right color.
     if (!settingsLoaded || !windowLoaded) return null;
 
     return (
@@ -197,7 +197,7 @@ export const Route = createRootRoute({
             scrolls, so content runs under the home indicator. */}
         <div className='h-dvh bg-sidebar text-foreground flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]'>
           {/* The strip under the status bar (the iPad's menu bar), in the
-              sidebar's colour: an element of its own, since the root goes
+              sidebar's color: an element of its own, since the root goes
               see-through while a PDF or drawing shows through it. */}
           <div aria-hidden className='pointer-events-none fixed inset-x-0 top-0 h-[env(safe-area-inset-top)] bg-sidebar' />
           <SidebarProvider

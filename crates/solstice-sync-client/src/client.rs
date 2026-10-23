@@ -235,7 +235,7 @@ impl Client {
         self.reviews.clone()
     }
 
-    /// Bumps whenever the bookmarks or folder colours changed, here or
+    /// Bumps whenever the bookmarks or folder colors changed, here or
     /// elsewhere.
     pub fn watch_tree_meta(&self) -> watch::Receiver<u64> {
         self.tree_meta.clone()
@@ -249,7 +249,7 @@ impl Client {
         rx.await.map_err(|_| Error::Stopped)
     }
 
-    /// Changes the bookmarks or folder colours, and returns them after.
+    /// Changes the bookmarks or folder colors, and returns them after.
     pub async fn apply_tree_meta(&self, ops: Vec<TreeOp>) -> Result<TreeMeta, Error> {
         let (reply, rx) = oneshot::channel();
         self.tx
@@ -463,7 +463,7 @@ impl Actor {
         self.reviews.send_modify(|n| *n += 1);
     }
 
-    /// Mirrors the bookmarks and folder colours to the folder, and says so,
+    /// Mirrors the bookmarks and folder colors to the folder, and says so,
     /// if they changed. Unlike reviews, only on a real change: the frontend
     /// reloads on every bump.
     fn meta_changed(&mut self) {

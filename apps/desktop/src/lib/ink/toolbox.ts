@@ -1,6 +1,6 @@
 /**
  * The ink tools the ribbon and the squeeze palette show (iOS, `can.nativeViews`):
- * a row of slots, each a tool with its own colour, width and opacity, as
+ * a row of slots, each a tool with its own color, width and opacity, as
  * Notes keeps them. Pure, so the store, the ribbon and the Pencil's gestures
  * share it; Swift only applies the slot in hand (`toNative`, `ToolSpec.swift`).
  */
@@ -27,7 +27,7 @@ export const TOOL_LABELS: Record<ToolKind, string> = {
   marker: 'Highlighter',
   pencil: 'Pencil',
   crayon: 'Crayon',
-  watercolor: 'Watercolour',
+  watercolor: 'Watercolor',
   reed: 'Reed Pen',
   eraser: 'Eraser',
   lasso: 'Lasso',
@@ -51,7 +51,7 @@ export type Toolbox = {
   previous: string | null;
   /** Slot ids, most recent first: the squeeze palette's ring. */
   recents: string[];
-  /** Colours picked that aren't in the palette, most recent first. */
+  /** Colors picked that aren't in the palette, most recent first. */
   recentColors: string[];
   ruler: boolean;
   /** A finger draws too, on every surface. */
@@ -61,7 +61,7 @@ export type Toolbox = {
 export const MAX_RECENT_TOOLS = 6;
 export const MAX_RECENT_COLORS = 8;
 
-/** Ink colours, saved into files as drawn: they don't follow the theme. */
+/** Ink colors, saved into files as drawn: they don't follow the theme. */
 export const INK_PALETTE = [
   '#000000',
   '#8e8e93',
@@ -308,7 +308,7 @@ export type PencilGesture =
   | { gesture: 'tap'; preference: PencilPreference }
   | { gesture: 'squeeze'; phase: 'began' | 'changed' | 'ended' | 'cancelled'; preference: PencilPreference };
 
-/** What the squeeze palette has fanned out: nothing more than its arc, colours, widths, or the rest of the tools. */
+/** What the squeeze palette has fanned out: nothing more than its arc, colors, widths, or the rest of the tools. */
 export type PalettePage = 'tools' | 'colors' | 'width' | 'more';
 export type PencilResult =
   { type: 'toggleEraser' } | { type: 'selectPrevious' } | { type: 'palette'; page: PalettePage } | { type: 'none' };

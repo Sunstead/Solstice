@@ -2,7 +2,7 @@ import type { FsChange, TreeMetaOp } from '@/bindings';
 import { toRel } from './ops';
 
 /**
- * What a batch from the file watcher does to bookmarks and folder colours.
+ * What a batch from the file watcher does to bookmarks and folder colors.
  * Only renames carry them; a removal never forgets one (the view hides it),
  * since a file that vanished here may only be moving.
  *

@@ -24,7 +24,7 @@
 @custom-variant hover (&:where(:root:not([data-pointer='touch']) *):hover);
 
 /* The Islands layout (`appearance.islands`, `islands.css`): panels on the
-   window's colour instead of regions split by borders. */
+   window's color instead of regions split by borders. */
 @custom-variant islands (&:where([data-islands='true'] *));
 @custom-variant island-borders (&:where([data-islands='true'][data-island-borders='true'] *));
 
@@ -42,12 +42,12 @@
 }
 
 /*
- * The colours come from the theme on <html> (`data-theme`, from
+ * The colors come from the theme on <html> (`data-theme`, from
  * @sunstead/ui). A user theme may also set `--border-color` and
  * `--border-opacity` inline; `lib/theme/apply.ts` derives `--border` from them.
  *
  * The tab outline is the border composited over the sidebar, as an opaque
- * colour, so overlapping tabs don't double it up.
+ * color, so overlapping tabs don't double it up.
  */
 :root {
   --color-tab-outline: color-mix(
@@ -58,7 +58,7 @@
 }
 
 /*
- * Controls on the window's colour (the title bar, the sidebar's icon rail,
+ * Controls on the window's color (the title bar, the sidebar's icon rail,
  * the tab strip) sit on --sidebar, which the themes don't tune --muted for:
  * hover was a hair off the surface. Derived from the sidebar's own
  * foreground, so every theme and both layouts get a step that reads.
@@ -83,7 +83,7 @@
   --accent: var(--chrome-press);
 }
 
-/* The explorer under Islands is a panel of the notes' colour, so its rows'
+/* The explorer under Islands is a panel of the notes' color, so its rows'
    hover and active fills are steps off that, not off the sidebar's: the
    themes' --sidebar-accent is tuned for the sidebar and reads too light here. */
 :root[data-islands='true'] .island-panel {
@@ -432,7 +432,7 @@ html[data-reduce-motion='true'] *::after {
   box-shadow: -8px 0 24px rgb(0 0 0 / 0.12);
 }
 
-/* A folder in its colour (`FolderGlyph`). `folder_open.svg` sets its fill
+/* A folder in its color (`FolderGlyph`). `folder_open.svg` sets its fill
    inline, hence `!important`. */
 .folder-tint path {
   fill: var(--folder-tint) !important;

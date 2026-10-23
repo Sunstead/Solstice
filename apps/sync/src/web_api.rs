@@ -13,7 +13,7 @@
 //!   writes a file that isn't a note (`?new=1`: under a free name).
 //! - `POST /v1/vaults/{id}/ops`: create, mkdir, rename, trash, duplicate.
 //! - `GET /v1/vaults/{id}/reviews`, `GET`/`POST .../reviews/{*path}`.
-//! - `GET`/`POST /v1/vaults/{id}/tree-meta`: bookmarks and folder colours;
+//! - `GET`/`POST /v1/vaults/{id}/tree-meta`: bookmarks and folder colors;
 //!   a POST (`{ops}`, `solstice_sync::TreeOp`s) returns them after.
 //! - `GET /v1/web/events?vault=`: a WebSocket of changes to a vault
 //!   (`{tree, notes, meta}`).

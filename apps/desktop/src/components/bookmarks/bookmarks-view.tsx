@@ -80,7 +80,7 @@ export function BookmarksView({ root, header }: { root: string; header?: (trail:
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
       {header?.(crumbs) ?? crumbs}
-      <div className='min-h-0 flex-1 overflow-y-auto px-2 pb-4'>
+      <div className='flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-4'>
         {folder ? (
           <FolderContents
             folder={folder}
@@ -292,18 +292,29 @@ function FolderContents({
     drop(area);
   }, [drop]);
 
+  // Its own empty space is the folder: a right click there is its menu, as
+  // the Explorer's empty space is the workspace's.
+  const self: FileEntry = { path: folder, name: getFileNameFromPath(folder), is_dir: true };
+
   return (
-    <div ref={area} className='min-h-full'>
-      {entries.length === 0 ? (
-        <p className='px-4 py-10 text-center text-sm text-muted-foreground'>This folder is empty.</p>
-      ) : (
-        <CardGrid>
-          {entries.map((entry) => (
-            <FolderEntryCard key={entry.path} entry={entry} onOpen={() => open(entry, onOpenFolder)} />
-          ))}
-        </CardGrid>
-      )}
-    </div>
+    <ContextMenu>
+      <ContextMenuTrigger
+        render={
+          <div ref={area} className='grow'>
+            {entries.length === 0 ? (
+              <p className='px-4 py-10 text-center text-sm text-muted-foreground'>This folder is empty.</p>
+            ) : (
+              <CardGrid>
+                {entries.map((entry) => (
+                  <FolderEntryCard key={entry.path} entry={entry} onOpen={() => open(entry, onOpenFolder)} />
+                ))}
+              </CardGrid>
+            )}
+          </div>
+        }
+      />
+      <FolderEntryMenu entry={self} />
+    </ContextMenu>
   );
 }
 

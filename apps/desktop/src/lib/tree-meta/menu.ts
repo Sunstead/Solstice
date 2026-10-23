@@ -16,7 +16,7 @@ function swatch(hex: string): ComponentType<{ className?: string }> {
 
 const SWATCH_ICONS = new Map(FOLDER_COLORS.map((c) => [c.hex, swatch(c.hex)]));
 
-/** The entry menu's bookmark item, and a folder's Colour submenu. */
+/** The entry menu's bookmark item, and a folder's Color submenu. */
 export function treeMetaMenuItems(
   { isDir, bookmarked, color }: { isDir: boolean; bookmarked: boolean; color: string | null },
   actions: { toggleBookmark: () => void; setColor: (color: string | null) => void; customColor: () => void },
@@ -35,7 +35,7 @@ export function treeMetaMenuItems(
   items.push({
     kind: 'submenu',
     id: 'folder-color',
-    label: 'Colour',
+    label: 'Color',
     icon: Palette,
     items: [
       ...FOLDER_COLORS.map(

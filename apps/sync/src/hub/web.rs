@@ -567,7 +567,7 @@ impl VaultTask {
         json!({ "files": files, "folders": folders })
     }
 
-    /// The bookmarks and folder colours, in the desktop's `TreeMetaState`
+    /// The bookmarks and folder colors, in the desktop's `TreeMetaState`
     /// shape. Always `linked`: a vault is synced by definition.
     fn tree_meta_json(&self) -> serde_json::Value {
         let meta = self.vault.tree_meta();
@@ -580,7 +580,7 @@ impl VaultTask {
     }
 
     /// Tells the web apps watching this vault what changed. `meta` says the
-    /// bookmarks or folder colours did, which only a manifest change can do.
+    /// bookmarks or folder colors did, which only a manifest change can do.
     pub(super) fn notify(&mut self, tree: bool, notes: &BTreeSet<String>) {
         self.watchers.retain(|w| !w.is_closed());
         let meta = tree && {

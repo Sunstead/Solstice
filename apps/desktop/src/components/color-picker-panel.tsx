@@ -7,7 +7,7 @@ import { normalizeHex, textColorFor } from '@/lib/workspace/color';
 import { cn } from '@/lib/utils';
 
 /**
- * A colour picker's body: swatches, any hex, and optionally Shuffle and a
+ * A color picker's body: swatches, any hex, and optionally Shuffle and a
  * reset (`onChoose(null)`). `onChoose` returns an error to show, if saving
  * failed. Mount it afresh to start the hex field over.
  */
@@ -18,7 +18,7 @@ export function ColorPickerPanel({
   shuffle,
   reset,
 }: {
-  /** The colour now; none shows an empty hex field. */
+  /** The color now; none shows an empty hex field. */
   color: string | null;
   swatches: readonly string[];
   onChoose: (color: string | null) => Promise<string | null> | void;

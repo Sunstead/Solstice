@@ -2,7 +2,7 @@ import type { BookmarkEntry, TreeMetaOp, TreeMetaState } from '@/bindings';
 import { normalizeHex } from '@/lib/workspace/color';
 
 /**
- * A workspace's bookmarks and folder colours, by vault path (relative,
+ * A workspace's bookmarks and folder colors, by vault path (relative,
  * `/`-separated). `applyOps` is `solstice_sync::tree_meta::apply` without
  * the order keys, so the app can show a change before the backend answers;
  * both run `crates/solstice-sync/tests/tree_meta_ops.json`, so change both.
@@ -73,7 +73,7 @@ export function applyOps(meta: TreeMetaData, ops: TreeMetaOp[]): TreeMetaData {
           delete folderColors[path];
         } else {
           const hex = normalizeHex(op.color);
-          if (!hex) throw new Error(`not a colour: ${op.color}`);
+          if (!hex) throw new Error(`not a color: ${op.color}`);
           folderColors[path] = hex;
         }
         break;

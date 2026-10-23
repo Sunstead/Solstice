@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-/** The folder whose colour is being picked by hand (the menu's Custom…), if any. */
+/** The folder whose color is being picked by hand (the menu's Custom…), if any. */
 export const useFolderColorDialog = create<{
   path: string | null;
   open: (path: string) => void;

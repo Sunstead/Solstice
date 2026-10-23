@@ -1,4 +1,4 @@
-//! A folder's bookmarks and folder colours on disk: `.solstice/tree.json`.
+//! A folder's bookmarks and folder colors on disk: `.solstice/tree.json`.
 //! Flat JSON, safe to edit by hand (while the folder isn't linked; then the
 //! vault's copy wins and this one only mirrors it), with keys this version
 //! doesn't know kept. Order is the bookmarks' order in the array.

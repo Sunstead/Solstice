@@ -1,4 +1,4 @@
-//! A vault's bookmarks and folder colours: what the desktop keeps in
+//! A vault's bookmarks and folder colors: what the desktop keeps in
 //! `.solstice/tree.json`, and a synced vault in two maps of its manifest.
 //!
 //! [`apply`] is the one place the ops' rules live; the manifest and the
@@ -29,7 +29,7 @@ pub struct TreeMeta {
     pub folder_colors: BTreeMap<String, String>,
 }
 
-/// A change to a vault's bookmarks or folder colours. Paths are
+/// A change to a vault's bookmarks or folder colors. Paths are
 /// vault-relative; the desktop and the web send the same JSON.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
@@ -105,7 +105,7 @@ impl TreeMeta {
     }
 }
 
-/// `meta` with `ops` applied in turn. A bad path, id or colour fails the
+/// `meta` with `ops` applied in turn. A bad path, id or color fails the
 /// whole batch.
 pub fn apply(meta: &TreeMeta, ops: &[TreeOp]) -> Result<TreeMeta, Error> {
     let mut out = meta.clone();

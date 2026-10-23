@@ -5,9 +5,9 @@ const Closed = getFolderIcon(false);
 const Open = getFolderIcon(true);
 
 /**
- * A folder's icon in its colour (`useTreeMeta`'s `folderColor`), or the
+ * A folder's icon in its color (`useTreeMeta`'s `folderColor`), or the
  * default yellow without one. Both folder SVGs paint one fill, so the
- * colour replaces it (`.folder-tint` in `styles/app.css`).
+ * color replaces it (`.folder-tint` in `styles/app.css`).
  */
 export function FolderGlyph({
   open = false,

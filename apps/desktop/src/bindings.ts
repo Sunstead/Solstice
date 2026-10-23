@@ -115,7 +115,7 @@ export const commands = {
 	 */
 	syncPullColors: (paths: string[]) => __TAURI_INVOKE<WorkspaceMeta[]>("sync_pull_colors", { paths }),
 	treeMeta: (root: string) => typedError<TreeMetaState, string>(__TAURI_INVOKE("tree_meta", { root })),
-	/**  Changes a workspace's bookmarks or folder colours, and returns them after. */
+	/**  Changes a workspace's bookmarks or folder colors, and returns them after. */
 	treeMetaApply: (root: string, ops: TreeMetaOp[]) => typedError<TreeMetaState, string>(__TAURI_INVOKE("tree_meta_apply", { root, ops })),
 	/**  Where to write a file made to share, such as a PDF. */
 	exportTempPath: (name: string) => typedError<string, string>(__TAURI_INVOKE("export_temp_path", { name })),
@@ -555,7 +555,7 @@ export type TabSent = {
 	payload: string,
 };
 
-/**  A workspace's bookmarks or folder colours changed: ask again. */
+/**  A workspace's bookmarks or folder colors changed: ask again. */
 export type TreeMetaChanged = {
 	root: string,
 };

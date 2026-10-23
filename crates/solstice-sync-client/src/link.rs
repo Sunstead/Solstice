@@ -123,7 +123,7 @@ pub async fn link(
     // added, the vault's files are written here.
     dir.set_placed(placed);
     let mut msgs = dir.absorb(&mut vault).map_err(Error::io)?;
-    // The folder's bookmarks and colours join the vault's.
+    // The folder's bookmarks and colors join the vault's.
     msgs.extend(vault.seed_tree_meta(&tree_file::read(folder))?);
 
     let mut uploaded = Vec::new();

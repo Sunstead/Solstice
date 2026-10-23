@@ -54,7 +54,7 @@ function Anchor({ at, ...props }: { at: DOMRect | null } & React.ComponentProps<
 
 /**
  * The ink tools, pinned under a drawing's or PDF's header (iOS, in place of
- * Apple's floating picker): undo and redo, the tool slots, colours, and the
+ * Apple's floating picker): undo and redo, the tool slots, colors, and the
  * ruler, finger drawing and the insert menu. Tapping the slot in hand opens its width
  * and opacity; holding a slot opens its menu or drags it along the row.
  */
@@ -159,7 +159,7 @@ export function InkRibbon({ surface }: { surface: MarkupSurface }) {
 
           <Divider />
 
-          <div className='flex shrink-0 items-center gap-1' role='radiogroup' aria-label='Colour'>
+          <div className='flex shrink-0 items-center gap-1' role='radiogroup' aria-label='Color'>
             {colors.map((color) => {
               const on = hasInk(slot.kind) && slot.color === color;
               return (
@@ -181,7 +181,7 @@ export function InkRibbon({ surface }: { surface: MarkupSurface }) {
             })}
             <button
               type='button'
-              title='More Colours'
+              title='More Colors'
               disabled={!hasInk(slot.kind)}
               className='size-6 shrink-0 rounded-full ring-1 ring-foreground/20 disabled:opacity-40'
               style={{
@@ -189,7 +189,7 @@ export function InkRibbon({ surface }: { surface: MarkupSurface }) {
               }}
               onClick={(event) => void nativeInk.pickColor(rectOf(event.currentTarget))}
             >
-              <span className='sr-only'>More Colours</span>
+              <span className='sr-only'>More Colors</span>
             </button>
           </div>
 

@@ -8,7 +8,7 @@ import { applyOps, EMPTY_TREE_META, fromState, toRel, type TreeMetaData } from '
 import { opsFromWatcher } from '@/lib/tree-meta/watcher';
 
 /**
- * The open workspace's bookmarks and folder colours. The backend keeps them
+ * The open workspace's bookmarks and folder colors. The backend keeps them
  * (`tree_meta.rs`: `.solstice/tree.json`, or the vault when it syncs); this
  * shows each change at once and sends them one at a time, so what's shown is
  * always the backend's last answer with the changes still on their way laid

@@ -31,7 +31,7 @@ export type SocketState = 'connecting' | 'synced' | 'offline';
 
 export const fsChanged = new Emitter<FileSystemChanged>();
 export const syncChanged = new Emitter<SyncChanged>();
-/** The open vault's bookmarks or folder colours changed. */
+/** The open vault's bookmarks or folder colors changed. */
 export const treeMetaChanged = new Emitter<TreeMetaChanged>();
 /** The open vault's socket connected: the server's reachable again. */
 export const connected = new Emitter<Vault>();

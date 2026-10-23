@@ -48,7 +48,7 @@
     "after": { "bookmarks": [{ "id": "a", "path": "A" }], "folderColors": {} }
   },
   {
-    "name": "set and clear a folder colour",
+    "name": "set and clear a folder color",
     "before": { "bookmarks": [], "folderColors": { "Old": "#000000" } },
     "ops": [
       { "op": "set_folder_color", "path": "Projects", "color": "#E5484D" },
@@ -96,7 +96,7 @@
     "error": true
   },
   {
-    "name": "a bad colour is refused",
+    "name": "a bad color is refused",
     "before": { "bookmarks": [], "folderColors": {} },
     "ops": [{ "op": "set_folder_color", "path": "A", "color": "red" }],
     "error": true

@@ -179,7 +179,7 @@ fn start(app: &AppHandle, root: &Path) {
 }
 
 /// Tells the frontend whenever a client's status, reviews, bookmarks or
-/// folder colours change.
+/// folder colors change.
 async fn forward_changes(app: AppHandle, root: PathBuf, client: Client) {
     let mut status = client.watch_status();
     let mut reviews = client.watch_reviews();
