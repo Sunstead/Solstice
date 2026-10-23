@@ -12,7 +12,9 @@ use std::path::Path;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use solstice_sync::{decode_snapshot, encode_snapshot, Content, DocKey, Kind, Msg, ReviewKind};
+use solstice_sync::{
+    decode_snapshot, encode_snapshot, Content, DocKey, Kind, Msg, ReviewKind, TreeOp,
+};
 
 use super::VaultTask;
 use crate::error::{AppError, ErrorCode};
@@ -62,6 +64,10 @@ pub enum WebOp {
     Resolve {
         path: String,
         text: Option<String>,
+    },
+    TreeMeta,
+    ApplyTreeMeta {
+        ops: Vec<TreeOp>,
     },
 }
 
@@ -189,6 +195,15 @@ impl VaultTask {
     pub(super) fn web(&mut self, op: WebOp) -> Result<WebReply, AppError> {
         match op {
             WebOp::Tree => Ok(WebReply::Json(self.tree())),
+            WebOp::TreeMeta => Ok(WebReply::Json(self.tree_meta_json())),
+            WebOp::ApplyTreeMeta { ops } => {
+                let msgs = self
+                    .vault
+                    .apply_tree_ops(&ops)
+                    .map_err(|e| AppError::bad_request(e.to_string()))?;
+                self.changed(None, msgs);
+                Ok(WebReply::Json(self.tree_meta_json()))
+            }
             WebOp::ReadNote { path } => {
                 let path = checked(&path)?;
                 let id = self.note_at(&path)?;
@@ -552,15 +567,34 @@ impl VaultTask {
         json!({ "files": files, "folders": folders })
     }
 
-    /// Tells the web apps watching this vault what changed.
+    /// The bookmarks and folder colours, in the desktop's `TreeMetaState`
+    /// shape. Always `linked`: a vault is synced by definition.
+    fn tree_meta_json(&self) -> serde_json::Value {
+        let meta = self.vault.tree_meta();
+        let bookmarks: Vec<_> = meta
+            .bookmarks
+            .iter()
+            .map(|b| json!({ "id": b.id, "path": b.path }))
+            .collect();
+        json!({ "linked": true, "bookmarks": bookmarks, "folder_colors": meta.folder_colors })
+    }
+
+    /// Tells the web apps watching this vault what changed. `meta` says the
+    /// bookmarks or folder colours did, which only a manifest change can do.
     pub(super) fn notify(&mut self, tree: bool, notes: &BTreeSet<String>) {
         self.watchers.retain(|w| !w.is_closed());
+        let meta = tree && {
+            let now = self.vault.tree_meta();
+            let moved = now != self.meta_seen;
+            self.meta_seen = now;
+            moved
+        };
         if self.watchers.is_empty() || (!tree && notes.is_empty()) {
             return;
         }
         let paths = self.paths_by_id();
         let notes: Vec<&String> = notes.iter().filter_map(|id| paths.get(id)).collect();
-        let event = json!({ "tree": tree, "notes": notes }).to_string();
+        let event = json!({ "tree": tree, "notes": notes, "meta": meta }).to_string();
         for w in &self.watchers {
             let _ = w.send(event.clone());
         }

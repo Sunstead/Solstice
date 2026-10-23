@@ -7,7 +7,8 @@ use std::collections::BTreeMap;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use solstice_sync::{
-    decode_snapshot, Content, DocKey, Event, Kind, Msg, ReviewKind, Session, Snapshot, Vault,
+    decode_snapshot, Content, DocKey, Event, Kind, Msg, ReviewKind, Session, Snapshot, TreeMeta,
+    TreeOp, Vault,
 };
 
 struct Device {
@@ -587,4 +588,162 @@ fn a_new_device_joins_the_servers_epoch_and_a_synced_one_relinks() {
     net.connect(0);
     let events = net.pump();
     assert!(events.contains(&(0, Event::Relink)));
+}
+
+// ---------------------------------------------------------------- tree meta
+
+fn add(id: &str, path: &str) -> TreeOp {
+    TreeOp::AddBookmark {
+        id: id.into(),
+        path: path.into(),
+    }
+}
+
+impl Net {
+    fn tree_ops(&mut self, i: usize, ops: &[TreeOp]) {
+        let msgs = self.devices[i].vault.apply_tree_ops(ops).unwrap();
+        self.send(i, msgs);
+    }
+
+    fn assert_tree_meta_converged(&self) -> TreeMeta {
+        let expected = self.server.tree_meta();
+        for (i, d) in self.devices.iter().enumerate() {
+            assert_eq!(d.vault.tree_meta(), expected, "device {i}'s tree meta");
+        }
+        expected
+    }
+}
+
+fn bookmark_paths(meta: &TreeMeta) -> Vec<&str> {
+    meta.bookmarks.iter().map(|b| b.path.as_str()).collect()
+}
+
+#[test]
+fn bookmarks_and_colors_reach_every_device() {
+    let mut net = Net::new(3);
+    net.tree_ops(
+        0,
+        &[
+            add("a", "Plan.md"),
+            add("b", "Projects"),
+            TreeOp::SetFolderColor {
+                path: "Projects".into(),
+                color: Some("#e5484d".into()),
+            },
+        ],
+    );
+    net.pump();
+    let meta = net.assert_tree_meta_converged();
+    assert_eq!(bookmark_paths(&meta), ["Plan.md", "Projects"]);
+    assert_eq!(meta.folder_colors["Projects"], "#e5484d");
+}
+
+#[test]
+fn a_rename_on_one_device_and_a_reorder_on_another_both_land() {
+    let mut net = Net::new(2);
+    let (id, msgs) = net.devices[0].vault.create_note("Plan.md", "").unwrap();
+    net.send(0, msgs);
+    net.tree_ops(0, &[add("a", "Plan.md"), add("b", "Other")]);
+    net.pump();
+    net.disconnect(0);
+    net.disconnect(1);
+    let renamed = net.devices[0].vault.rename(&id, "Plans.md").unwrap();
+    net.send(0, renamed);
+    net.tree_ops(
+        1,
+        &[TreeOp::MoveBookmark {
+            id: "a".into(),
+            after: Some("b".into()),
+        }],
+    );
+    net.sync_all();
+    net.assert_converged();
+    let meta = net.assert_tree_meta_converged();
+    assert_eq!(bookmark_paths(&meta), ["Other", "Plans.md"]);
+}
+
+#[test]
+fn a_delete_seen_elsewhere_keeps_the_bookmark_and_forget_reaches_everyone() {
+    let mut net = Net::new(2);
+    let (id, msgs) = net.devices[0].vault.create_note("Plan.md", "").unwrap();
+    net.send(0, msgs);
+    net.tree_ops(0, &[add("a", "Plan.md")]);
+    net.pump();
+    // The engine never forgets on a delete: only the app that deleted does.
+    let deleted = net.devices[0].vault.delete(&id);
+    net.send(0, deleted);
+    net.pump();
+    assert_eq!(
+        bookmark_paths(&net.assert_tree_meta_converged()),
+        ["Plan.md"]
+    );
+    net.tree_ops(
+        0,
+        &[TreeOp::Forget {
+            path: "Plan.md".into(),
+        }],
+    );
+    net.pump();
+    assert!(net.assert_tree_meta_converged().bookmarks.is_empty());
+}
+
+fn random_tree_op(rng: &mut SmallRng, meta: &TreeMeta) -> TreeOp {
+    const FOLDERS: &[&str] = &["A", "B", "A/C", "D"];
+    let pick = |rng: &mut SmallRng| FOLDERS[rng.random_range(0..FOLDERS.len())].to_string();
+    let some_id = |rng: &mut SmallRng| match meta.bookmarks.len() {
+        0 => "none".to_string(),
+        n => meta.bookmarks[rng.random_range(0..n)].id.clone(),
+    };
+    match rng.random_range(0..6) {
+        0 => TreeOp::AddBookmark {
+            id: format!("b{}", rng.random_range(0..1000)),
+            path: pick(rng),
+        },
+        1 => TreeOp::RemoveBookmark { path: pick(rng) },
+        2 | 3 => TreeOp::MoveBookmark {
+            id: some_id(rng),
+            after: rng.random_bool(0.8).then(|| some_id(rng)),
+        },
+        4 => TreeOp::SetFolderColor {
+            path: pick(rng),
+            color: rng
+                .random_bool(0.7)
+                .then(|| format!("#{:06x}", rng.random_range(0..0xffffff))),
+        },
+        _ => TreeOp::Retarget {
+            from: pick(rng),
+            to: pick(rng),
+        },
+    }
+}
+
+#[test]
+fn random_tree_meta_converges() {
+    for seed in 0..100 {
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut net = Net::new(3);
+        for _ in 0..rng.random_range(5..40) {
+            let i = rng.random_range(0..3);
+            match rng.random_range(0..10) {
+                0 => net.disconnect(i),
+                1 => net.connect(i),
+                _ => {
+                    let op = random_tree_op(&mut rng, &net.devices[i].vault.tree_meta());
+                    // A retarget onto its own subtree can't happen on disk.
+                    if let TreeOp::Retarget { from, to } = &op {
+                        if to.starts_with(&format!("{from}/")) || from == to {
+                            continue;
+                        }
+                    }
+                    net.tree_ops(i, &[op]);
+                }
+            }
+            net.pump();
+        }
+        net.sync_all();
+        let meta = net.server.tree_meta();
+        for (i, d) in net.devices.iter().enumerate() {
+            assert_eq!(d.vault.tree_meta(), meta, "seed {seed}: device {i}");
+        }
+    }
 }

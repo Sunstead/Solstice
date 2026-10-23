@@ -11,8 +11,6 @@ import {
 import { FileTree } from './file-tree';
 import { ContextMenu, ContextMenuTrigger } from '@sunstead/ui/components/context-menu';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
-import { FileActionDialogs } from './file-action-dialogs';
-import { FileTreeDragLayer } from './file-tree-drag-layer';
 import { useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { cn } from '@/lib/utils';
 import { Button } from '@sunstead/ui/components/button';
@@ -70,8 +68,9 @@ export function ExplorerSidebar() {
 }
 
 /**
- * The workspace's file tree, with the menu for its empty space and the
- * dialogs its rows open: the sidebar's body, and the phone's Files page.
+ * The workspace's file tree, with the menu for its empty space: the
+ * sidebar's body, and the phone's Files page. The dialogs its rows open are
+ * the app's, mounted once at the root.
  */
 export function ExplorerTree({ path }: { path: string }) {
   // Dropping onto empty space below the tree (rather than onto a specific
@@ -89,8 +88,6 @@ export function ExplorerTree({ path }: { path: string }) {
 
   return (
     <>
-      <FileTreeDragLayer />
-      <FileActionDialogs />
       <SidebarContent>
         <ContextMenu>
           <ContextMenuTrigger

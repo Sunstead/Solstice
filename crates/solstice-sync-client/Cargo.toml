@@ -7,6 +7,7 @@ description = "A device's side of Solstice Sync: links a folder to a vault and k
 publish = false
 
 [dependencies]
+solstice-core = { path = "../solstice-core" }
 solstice-sync = { path = "../solstice-sync" }
 solstice-sync-fs = { path = "../solstice-sync-fs" }
 tokio = { version = "1", features = ["rt", "macros", "sync", "time", "net"] }

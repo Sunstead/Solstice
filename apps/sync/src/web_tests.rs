@@ -579,3 +579,78 @@ async fn searching_a_vault() {
     let other = c.get(format!("{}/v1/vaults/nope/search?q=x", s.base)).send().await.unwrap();
     assert_eq!(other.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn bookmarks_and_folder_colors_from_the_web() {
+    let s = serve(
+        AuthMode::Dev {
+            username: "pwb".into(),
+        },
+        None,
+    )
+    .await;
+    let c = client();
+    let vault = json_of(
+        web(&c, reqwest::Method::POST, format!("{}/v1/vaults", s.base))
+            .json(&json!({ "name": "Notes" }))
+            .send()
+            .await
+            .unwrap(),
+    )
+    .await;
+    let id = vault["id"].as_str().unwrap();
+    let url = format!("{}/v1/vaults/{id}/tree-meta", s.base);
+    let empty = json_of(web(&c, reqwest::Method::GET, url.clone()).send().await.unwrap()).await;
+    assert_eq!(
+        empty,
+        json!({ "linked": true, "bookmarks": [], "folder_colors": {} })
+    );
+
+    let ws_url = format!("{}/v1/web/events?vault={id}", s.base.replace("http", "ws"));
+    let (mut socket, _) = tokio_tungstenite::connect_async(ws_url).await.unwrap();
+    let apply = |ops: Value| {
+        web(&c, reqwest::Method::POST, url.clone())
+            .json(&json!({ "ops": ops }))
+            .send()
+    };
+    let after = json_of(
+        apply(json!([
+            { "op": "add_bookmark", "id": "a", "path": "Plan.md" },
+            { "op": "add_bookmark", "id": "b", "path": "Projects" },
+            { "op": "move_bookmark", "id": "b", "after": null },
+            { "op": "set_folder_color", "path": "Projects", "color": "#E5484D" }
+        ]))
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        after,
+        json!({
+            "linked": true,
+            "bookmarks": [{ "id": "b", "path": "Projects" }, { "id": "a", "path": "Plan.md" }],
+            "folder_colors": { "Projects": "#e5484d" }
+        })
+    );
+    let event = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if let Some(Ok(tokio_tungstenite::tungstenite::Message::Text(t))) = socket.next().await
+            {
+                break t.to_string();
+            }
+        }
+    })
+    .await
+    .expect("no change event");
+    let event: Value = serde_json::from_str(&event).unwrap();
+    assert_eq!(event["meta"], json!(true));
+    assert_eq!(
+        json_of(web(&c, reqwest::Method::GET, url.clone()).send().await.unwrap()).await,
+        after
+    );
+
+    let bad = apply(json!([{ "op": "add_bookmark", "id": "c", "path": ".solstice/x" }]))
+        .await
+        .unwrap();
+    assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
+}

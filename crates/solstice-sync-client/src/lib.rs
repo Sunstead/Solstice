@@ -14,6 +14,7 @@ mod link;
 mod net;
 mod store;
 mod throttle;
+pub mod tree_file;
 
 pub use client::{Client, ReviewInfo, Status, Versions};
 pub use link::{link, unlink, LinkReport};

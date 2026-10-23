@@ -431,3 +431,9 @@ html[data-reduce-motion='true'] *::after {
   background: var(--background);
   box-shadow: -8px 0 24px rgb(0 0 0 / 0.12);
 }
+
+/* A folder in its colour (`FolderGlyph`). `folder_open.svg` sets its fill
+   inline, hence `!important`. */
+.folder-tint path {
+  fill: var(--folder-tint) !important;
+}

@@ -181,3 +181,70 @@ describe('createSlotGesture in a grid', () => {
     expect(menu).toHaveBeenCalledWith(2, expect.any(DOMRect));
   });
 });
+
+// A 2×2 flow (bookmarks): 100px columns, 50px rows, dragged at once by a mouse.
+describe('createSlotGesture in a flow, with a mouse', () => {
+  let row: HTMLDivElement;
+  let slots: HTMLElement[];
+  let move: ReturnType<typeof vi.fn>;
+  let menu: ReturnType<typeof vi.fn>;
+  let stop: () => void;
+
+  const fire = (target: Element, type: string, x: number, y: number) =>
+    target.dispatchEvent(
+      new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: 'mouse',
+        clientX: x,
+        clientY: y,
+      }),
+    );
+
+  beforeEach(() => {
+    row = document.createElement('div');
+    slots = [0, 1, 2, 3].map((i) => {
+      const slot = document.createElement('div');
+      slot.dataset.slotIndex = String(i);
+      slot.getBoundingClientRect = () => new DOMRect((i % 2) * 100, Math.floor(i / 2) * 50, 100, 50);
+      row.append(slot);
+      return slot;
+    });
+    document.body.append(row);
+    move = vi.fn();
+    menu = vi.fn();
+    stop = createSlotGesture(row, { move, menu, flow: true, mouseDrag: true });
+  });
+
+  afterEach(() => {
+    stop();
+    row.remove();
+    play.mockClear();
+  });
+
+  it('drags at once, the others making way, and drops', () => {
+    fire(slots[0], 'pointerdown', 50, 25);
+    fire(slots[0], 'pointermove', 60, 40);
+    expect(slots[0].dataset.lifted).toBe('');
+    fire(slots[0], 'pointermove', 50, 75);
+    expect(slots[0].style.transform).toBe('translate(0px, 50px)');
+    expect(slots[1].style.transform).toBe('translate(-100px, 0px)');
+    expect(slots[2].style.transform).toBe('translate(100px, -50px)');
+    fire(slots[0], 'pointerup', 50, 75);
+    expect(move).toHaveBeenCalledWith(0, 2);
+    expect(menu).not.toHaveBeenCalled();
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    slots[0].dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+  });
+
+  it('a mouse click is still a click', () => {
+    fire(slots[1], 'pointerdown', 150, 25);
+    fire(slots[1], 'pointerup', 151, 25);
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    slots[1].dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(false);
+    expect(move).not.toHaveBeenCalled();
+  });
+});

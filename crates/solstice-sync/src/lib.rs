@@ -3,7 +3,8 @@
 //! decisions: `docs/sync.md`.
 //!
 //! - [`NoteDoc`]: one note's markdown as a Yjs text, with history.
-//! - [`Manifest`]: which files a vault has, by stable id, plus reviews.
+//! - [`Manifest`]: which files a vault has, by stable id, plus reviews,
+//!   bookmarks and folder colours ([`TreeMeta`]).
 //! - [`Vault`]: one replica, with the local operations that produce
 //!   messages for peers.
 //! - [`Session`]: the sync protocol for one connection, either end.
@@ -16,6 +17,7 @@ pub mod note;
 pub mod overlap;
 pub mod protocol;
 pub mod session;
+pub mod tree_meta;
 pub mod vault;
 
 pub use link::{plan_link, LinkStep, LocalFile};
@@ -24,6 +26,7 @@ pub use note::{decode_snapshot, encode_snapshot, NoteDoc};
 pub use overlap::overlaps;
 pub use protocol::{Body, DocKey, Frame, Msg, PROTOCOL};
 pub use session::{Event, Outcome, Role, Session};
+pub use tree_meta::{Bookmark, TreeMeta, TreeOp};
 pub use vault::{content_hash, is_content_hash, Content, Vault};
 pub use yrs::Snapshot;
 
@@ -41,4 +44,8 @@ pub enum Error {
     Path(#[from] solstice_core::VaultPathError),
     #[error("{0} is hidden, and hidden files don't sync")]
     Hidden(String),
+    #[error("not a bookmark id: {0}")]
+    BookmarkId(String),
+    #[error("not a colour: {0}")]
+    Color(String),
 }

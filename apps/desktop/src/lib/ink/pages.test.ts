@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { gridTarget, identity, movePage, removePages } from './pages';
+import { flowOffsets, gridTarget, identity, movePage, removePages } from './pages';
 
 describe('page order', () => {
   it('starts with every page where it is', () => {
@@ -51,5 +51,33 @@ describe('gridTarget', () => {
 
   it('has no slot in an empty grid', () => {
     expect(gridTarget([], { x: 0, y: 0 })).toBe(-1);
+  });
+});
+
+describe('flowOffsets', () => {
+  // Two columns, 100px apart, two rows 50px apart.
+  const points = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 0, y: 50 },
+    { x: 100, y: 50 },
+  ];
+  it('moves the slots between into the next ones', () => {
+    expect(flowOffsets(points, 0, 2)).toEqual([
+      { x: 0, y: 0 },
+      { x: -100, y: 0 },
+      { x: 100, y: -50 },
+      { x: 0, y: 0 },
+    ]);
+    expect(flowOffsets(points, 3, 1)).toEqual([
+      { x: 0, y: 0 },
+      { x: -100, y: 50 },
+      { x: 100, y: 0 },
+      { x: 0, y: 0 },
+    ]);
+  });
+  it('one column moves them down a row', () => {
+    const column = [0, 1, 2].map((i) => ({ x: 0, y: i * 40 }));
+    expect(flowOffsets(column, 2, 0).map((p) => p.y)).toEqual([40, 40, 0]);
   });
 });

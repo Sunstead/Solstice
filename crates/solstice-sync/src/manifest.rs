@@ -5,6 +5,10 @@
 //! One `Y.Map` named `files` with flat keys `<id>/<field>`, so concurrent
 //! changes to different fields of one file (a rename here, a new hash there)
 //! both survive. Another, `reviews`, holds merges waiting for a human look.
+//! `bookmarks` (flat keys `<id>/path`, `<id>/order`, so a rename and a move
+//! of one bookmark both land) and `folderColors` (folder path → `#rrggbb`)
+//! hold the vault's [`TreeMeta`]; replicas from before them relay them
+//! untouched.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
@@ -13,6 +17,7 @@ use yrs::updates::encoder::Encode;
 use yrs::{Any, Doc, Map, MapRef, Out, ReadTxn, Snapshot, StateVector, Transact};
 
 use crate::note::{self, apply, doc_at};
+use crate::tree_meta::{is_bookmark_id, Bookmark, TreeMeta};
 use crate::Error;
 
 pub type FileId = String;
@@ -94,6 +99,8 @@ pub struct Manifest {
     doc: Doc,
     files: MapRef,
     reviews: MapRef,
+    bookmarks: MapRef,
+    folder_colors: MapRef,
     pub epoch: u32,
 }
 
@@ -129,10 +136,14 @@ impl Manifest {
     fn with_doc(doc: Doc, epoch: u32) -> Self {
         let files = doc.get_or_insert_map("files");
         let reviews = doc.get_or_insert_map("reviews");
+        let bookmarks = doc.get_or_insert_map("bookmarks");
+        let folder_colors = doc.get_or_insert_map("folderColors");
         Self {
             doc,
             files,
             reviews,
+            bookmarks,
+            folder_colors,
             epoch,
         }
     }
@@ -315,6 +326,96 @@ impl Manifest {
         txn.encode_update_v1()
     }
 
+    /// The bookmarks and folder colours, leaving out any a peer wrote with
+    /// a path that isn't a plain, visible vault path or a colour that isn't
+    /// `#rrggbb`.
+    pub fn tree_meta(&self) -> TreeMeta {
+        let txn = self.doc.transact();
+        let ids: BTreeSet<String> = self
+            .bookmarks
+            .keys(&txn)
+            .filter_map(|k| k.strip_suffix("/path"))
+            .filter(|id| is_bookmark_id(id))
+            .map(str::to_string)
+            .collect();
+        let bookmarks = ids
+            .into_iter()
+            .filter_map(|id| {
+                let path = string(self.bookmarks.get(&txn, &key(&id, "path")))
+                    .filter(|p| is_safe_path(p))?;
+                let order =
+                    string(self.bookmarks.get(&txn, &key(&id, "order"))).unwrap_or_default();
+                Some(Bookmark { id, path, order })
+            })
+            .collect();
+        let folder_colors = self
+            .folder_colors
+            .iter(&txn)
+            .filter_map(|(path, value)| {
+                let Out::Any(Any::String(color)) = value else {
+                    return None;
+                };
+                let ok = is_safe_path(path)
+                    && solstice_core::normalize_hex(&color).as_deref() == Some(&*color);
+                ok.then(|| (path.to_string(), color.to_string()))
+            })
+            .collect();
+        let mut meta = TreeMeta {
+            bookmarks,
+            folder_colors,
+        };
+        meta.sort();
+        meta
+    }
+
+    /// Makes the tree meta `target`, writing only the keys that differ, so
+    /// another device's change to anything else survives the merge. `None`
+    /// when it already is.
+    pub fn write_tree_meta(&self, target: &TreeMeta) -> Option<Vec<u8>> {
+        let current = self.tree_meta();
+        if current == *target {
+            return None;
+        }
+        let before: HashMap<&str, &Bookmark> = current
+            .bookmarks
+            .iter()
+            .map(|b| (b.id.as_str(), b))
+            .collect();
+        let kept: BTreeSet<&str> = target.bookmarks.iter().map(|b| b.id.as_str()).collect();
+        let mut txn = self.doc.transact_mut();
+        for id in before.keys().filter(|id| !kept.contains(*id)) {
+            self.bookmarks.remove(&mut txn, &key(id, "path"));
+            self.bookmarks.remove(&mut txn, &key(id, "order"));
+        }
+        for bookmark in &target.bookmarks {
+            let old = before.get(bookmark.id.as_str());
+            if old.is_none_or(|o| o.order != bookmark.order) {
+                self.bookmarks.insert(
+                    &mut txn,
+                    key(&bookmark.id, "order"),
+                    bookmark.order.as_str(),
+                );
+            }
+            // Path last, as in `create`.
+            if old.is_none_or(|o| o.path != bookmark.path) {
+                self.bookmarks
+                    .insert(&mut txn, key(&bookmark.id, "path"), bookmark.path.as_str());
+            }
+        }
+        for path in current.folder_colors.keys() {
+            if !target.folder_colors.contains_key(path) {
+                self.folder_colors.remove(&mut txn, path);
+            }
+        }
+        for (path, color) in &target.folder_colors {
+            if current.folder_colors.get(path) != Some(color) {
+                self.folder_colors
+                    .insert(&mut txn, path.as_str(), color.as_str());
+            }
+        }
+        Some(txn.encode_update_v1())
+    }
+
     /// Where each live file goes on disk: its path, unless another live file
     /// claims the same path (ignoring case, for Windows and macOS), in which
     /// case all but the lowest id get ` 1`, ` 2`... before the extension.
@@ -379,6 +480,7 @@ pub fn numbered(path: &str, n: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tree_meta::{self, TreeOp};
 
     fn sync(a: &Manifest, b: &Manifest) {
         let to_b = a.encode_diff(&b.state_vector()).unwrap();
@@ -498,5 +600,153 @@ mod tests {
         assert_eq!(m.reviews()["note-1"], review);
         m.resolve_review("note-1");
         assert!(m.reviews().is_empty());
+    }
+
+    fn tree(pairs: &[(&str, &str)]) -> TreeMeta {
+        TreeMeta::from_ordered(
+            pairs.iter().map(|(i, p)| (i.to_string(), p.to_string())),
+            BTreeMap::new(),
+        )
+    }
+
+    fn ids(m: &Manifest) -> Vec<String> {
+        m.tree_meta().bookmarks.into_iter().map(|b| b.id).collect()
+    }
+
+    #[test]
+    fn stores_bookmarks_and_folder_colors() {
+        let m = Manifest::new(0);
+        let mut meta = tree(&[("a", "Plan.md"), ("b", "Projects")]);
+        meta.folder_colors
+            .insert("Projects".into(), "#e5484d".into());
+        assert!(m.write_tree_meta(&meta).is_some());
+        assert_eq!(m.tree_meta(), meta);
+        assert!(m.write_tree_meta(&meta).is_none(), "nothing changed");
+        let copy = Manifest::load(&m.encode_state(), 0).unwrap();
+        assert_eq!(copy.tree_meta(), meta);
+        assert!(m.write_tree_meta(&TreeMeta::default()).is_some());
+        assert_eq!(m.tree_meta(), TreeMeta::default());
+    }
+
+    #[test]
+    fn ignores_unsafe_tree_meta() {
+        let m = Manifest::new(0);
+        m.write_tree_meta(&tree(&[("ok", "fine.md")]));
+        {
+            let mut txn = m.doc.transact_mut();
+            for (i, bad) in ["../x", ".solstice/x", "a/.git/b", ""]
+                .into_iter()
+                .enumerate()
+            {
+                m.bookmarks
+                    .insert(&mut txn, key(&format!("bad{i}"), "path"), bad);
+                m.folder_colors.insert(&mut txn, bad, "#ffffff");
+            }
+            m.bookmarks.insert(&mut txn, "a/b/path", "fine.md");
+            m.folder_colors.insert(&mut txn, "Folder", "red");
+            m.folder_colors.insert(&mut txn, "Upper", "#FFFFFF");
+        }
+        let meta = m.tree_meta();
+        assert_eq!(ids(&m), ["ok"]);
+        assert!(meta.folder_colors.is_empty(), "{:?}", meta.folder_colors);
+    }
+
+    #[test]
+    fn concurrent_reorder_and_rename_of_one_bookmark_both_land() {
+        let a = Manifest::new(0);
+        a.write_tree_meta(&tree(&[("x", "X.md"), ("y", "Y.md"), ("z", "Z.md")]));
+        let b = Manifest::load(&a.encode_state(), 0).unwrap();
+        let moved = tree_meta::apply(
+            &a.tree_meta(),
+            &[TreeOp::MoveBookmark {
+                id: "x".into(),
+                after: Some("z".into()),
+            }],
+        )
+        .unwrap();
+        a.write_tree_meta(&moved);
+        let renamed = tree_meta::apply(
+            &b.tree_meta(),
+            &[TreeOp::Retarget {
+                from: "X.md".into(),
+                to: "Renamed.md".into(),
+            }],
+        )
+        .unwrap();
+        b.write_tree_meta(&renamed);
+        sync(&a, &b);
+        assert_eq!(a.tree_meta(), b.tree_meta());
+        assert_eq!(ids(&a), ["y", "z", "x"]);
+        assert_eq!(a.tree_meta().bookmarks[2].path, "Renamed.md");
+    }
+
+    #[test]
+    fn concurrent_moves_into_one_gap_order_alike() {
+        let a = Manifest::new(0);
+        a.write_tree_meta(&tree(&[("p", "P"), ("q", "Q"), ("r", "R"), ("s", "S")]));
+        let b = Manifest::load(&a.encode_state(), 0).unwrap();
+        let after_p = |id: &str| TreeOp::MoveBookmark {
+            id: id.into(),
+            after: Some("p".into()),
+        };
+        a.write_tree_meta(&tree_meta::apply(&a.tree_meta(), &[after_p("r")]).unwrap());
+        b.write_tree_meta(&tree_meta::apply(&b.tree_meta(), &[after_p("s")]).unwrap());
+        sync(&a, &b);
+        assert_eq!(ids(&a), ids(&b));
+        assert_eq!(&ids(&a)[..1], ["p"]);
+        assert_eq!(ids(&a).last().map(String::as_str), Some("q"));
+    }
+
+    #[test]
+    fn writes_only_what_changed() {
+        let a = Manifest::new(0);
+        a.write_tree_meta(&tree(&[("x", "X"), ("y", "Y")]));
+        let b = Manifest::load(&a.encode_state(), 0).unwrap();
+        // A moves x; B renames y. A's write must not put y's old path back.
+        let moved = tree_meta::apply(
+            &a.tree_meta(),
+            &[TreeOp::MoveBookmark {
+                id: "x".into(),
+                after: Some("y".into()),
+            }],
+        )
+        .unwrap();
+        a.write_tree_meta(&moved);
+        b.write_tree_meta(
+            &tree_meta::apply(
+                &b.tree_meta(),
+                &[TreeOp::Retarget {
+                    from: "Y".into(),
+                    to: "Y2".into(),
+                }],
+            )
+            .unwrap(),
+        );
+        sync(&a, &b);
+        let paths: Vec<_> = a
+            .tree_meta()
+            .bookmarks
+            .into_iter()
+            .map(|b| b.path)
+            .collect();
+        assert_eq!(paths, ["Y2", "X"]);
+    }
+
+    #[test]
+    fn relays_maps_it_does_not_know() {
+        // A manifest from before bookmarks: only `files` and `reviews`.
+        let old = Doc::new();
+        old.get_or_insert_map("files");
+        old.get_or_insert_map("reviews");
+        let new = Manifest::new(0);
+        let mut meta = tree(&[("a", "A.md")]);
+        meta.folder_colors.insert("F".into(), "#123456".into());
+        new.write_tree_meta(&meta);
+        apply(&old, &new.encode_state()).unwrap();
+        let relayed = old
+            .transact()
+            .encode_state_as_update_v1(&StateVector::default());
+        let third = Manifest::load(&relayed, 0).unwrap();
+        assert_eq!(third.tree_meta(), meta);
     }
 }

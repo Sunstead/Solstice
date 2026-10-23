@@ -10,6 +10,7 @@ use yrs::{Snapshot, StateVector};
 use crate::manifest::{Deleted, Entry, FileId, Kind, Manifest, Review, ReviewKind};
 use crate::note::{decode_state_vector, NoteDoc};
 use crate::protocol::{Body, DocKey, Msg};
+use crate::tree_meta::{self, TreeMeta, TreeOp};
 use crate::Error;
 use solstice_core::VaultPath;
 
@@ -51,7 +52,7 @@ pub(crate) fn update(doc: DocKey, epoch: u32, update: Vec<u8>) -> Msg {
 }
 
 /// A vault path, normalized; hidden paths (`.solstice/`, `.git/`) never sync.
-fn checked(path: &str) -> Result<String, Error> {
+pub(crate) fn checked(path: &str) -> Result<String, Error> {
     let path = VaultPath::parse(path)?;
     if path.is_hidden() {
         return Err(Error::Hidden(path.to_string()));
@@ -179,10 +180,61 @@ impl Vault {
         vec![self.manifest_msg(self.manifest.set_hash(id, hash))]
     }
 
-    /// Moves a file; onto a taken path, it gets the next free number.
+    /// Moves a file; onto a taken path, it gets the next free number. Its
+    /// bookmark moves with it, here where the rename happened: other
+    /// replicas only see the file vanish and appear.
     pub fn rename(&mut self, id: &str, path: &str) -> Result<Vec<Msg>, Error> {
         let path = self.free_path(&checked(path)?, Some(id));
-        Ok(vec![self.manifest_msg(self.manifest.set_path(id, &path))])
+        let old = self.manifest.entry(id).map(|e| e.path);
+        let mut msgs = vec![self.manifest_msg(self.manifest.set_path(id, &path))];
+        if let Some(old) = old.filter(|old| *old != path) {
+            msgs.extend(self.apply_tree_ops(&[TreeOp::Retarget {
+                from: old,
+                to: path,
+            }])?);
+        }
+        Ok(msgs)
+    }
+
+    pub fn tree_meta(&self) -> TreeMeta {
+        self.manifest.tree_meta()
+    }
+
+    /// Bookmark and folder-colour changes; nothing to send if they change
+    /// nothing.
+    pub fn apply_tree_ops(&mut self, ops: &[TreeOp]) -> Result<Vec<Msg>, Error> {
+        let target = tree_meta::apply(&self.manifest.tree_meta(), ops)?;
+        Ok(self
+            .manifest
+            .write_tree_meta(&target)
+            .map(|m| vec![self.manifest_msg(m)])
+            .unwrap_or_default())
+    }
+
+    /// The first time a folder meets a vault: its own bookmarks (after the
+    /// vault's, unless the vault has the path already) and the colours of
+    /// folders the vault hasn't coloured.
+    pub fn seed_tree_meta(&mut self, local: &TreeMeta) -> Result<Vec<Msg>, Error> {
+        let current = self.manifest.tree_meta();
+        let mut ops: Vec<TreeOp> = local
+            .bookmarks
+            .iter()
+            .map(|b| TreeOp::AddBookmark {
+                id: b.id.clone(),
+                path: b.path.clone(),
+            })
+            .collect();
+        ops.extend(
+            local
+                .folder_colors
+                .iter()
+                .filter(|(path, _)| !current.folder_colors.contains_key(*path))
+                .map(|(path, color)| TreeOp::SetFolderColor {
+                    path: path.clone(),
+                    color: Some(color.clone()),
+                }),
+        );
+        self.apply_tree_ops(&ops)
     }
 
     pub fn delete(&mut self, id: &str) -> Vec<Msg> {
@@ -374,5 +426,81 @@ mod tests {
             vault.copy_path("img/a.png", "other device"),
             "img/a (other device).png"
         );
+    }
+
+    #[test]
+    fn renaming_a_file_carries_its_bookmark() {
+        let mut vault = Vault::new("test");
+        let (plan, _) = vault.create_note("Plan.md", "").unwrap();
+        vault.create_note("Taken.md", "").unwrap();
+        vault
+            .apply_tree_ops(&[TreeOp::AddBookmark {
+                id: "b".into(),
+                path: "Plan.md".into(),
+            }])
+            .unwrap();
+        vault.rename(&plan, "notes/Plan.md").unwrap();
+        assert_eq!(vault.tree_meta().bookmarks[0].path, "notes/Plan.md");
+        vault.rename(&plan, "Taken.md").unwrap();
+        assert_eq!(
+            vault.tree_meta().bookmarks[0].path,
+            "Taken 1.md",
+            "the numbered path"
+        );
+    }
+
+    #[test]
+    fn tree_ops_check_paths_and_say_when_nothing_changed() {
+        let mut vault = Vault::new("test");
+        let add = |path: &str| TreeOp::AddBookmark {
+            id: "b".into(),
+            path: path.into(),
+        };
+        assert!(matches!(
+            vault.apply_tree_ops(&[add(".solstice/x")]),
+            Err(Error::Hidden(_))
+        ));
+        assert!(matches!(
+            vault.apply_tree_ops(&[add("../x")]),
+            Err(Error::Path(_))
+        ));
+        assert_eq!(vault.apply_tree_ops(&[add("A")]).unwrap().len(), 1);
+        assert!(vault.apply_tree_ops(&[add("A")]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn seeding_unions_bookmarks_and_fills_colors() {
+        let mut vault = Vault::new("test");
+        vault
+            .apply_tree_ops(&[
+                TreeOp::AddBookmark {
+                    id: "v".into(),
+                    path: "Shared.md".into(),
+                },
+                TreeOp::SetFolderColor {
+                    path: "F".into(),
+                    color: Some("#111111".into()),
+                },
+            ])
+            .unwrap();
+        let mut local = TreeMeta::from_ordered(
+            [("l1", "Shared.md"), ("l2", "Mine.md")].map(|(i, p)| (i.to_string(), p.to_string())),
+            Default::default(),
+        );
+        local.folder_colors.insert("F".into(), "#222222".into());
+        local.folder_colors.insert("G".into(), "#333333".into());
+        vault.seed_tree_meta(&local).unwrap();
+        let meta = vault.tree_meta();
+        let got: Vec<_> = meta
+            .bookmarks
+            .iter()
+            .map(|b| (b.id.as_str(), b.path.as_str()))
+            .collect();
+        assert_eq!(got, [("v", "Shared.md"), ("l2", "Mine.md")]);
+        assert_eq!(
+            meta.folder_colors["F"], "#111111",
+            "the vault's colour wins"
+        );
+        assert_eq!(meta.folder_colors["G"], "#333333");
     }
 }

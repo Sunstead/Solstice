@@ -23,7 +23,9 @@ import {
   SidebarMenuSub,
 } from '@sunstead/ui/components/resizable-sidebar';
 import { cn } from '@/lib/utils';
-import { getFileIconFor, getFolderIcon } from '@/assets/icons';
+import { getFileIconFor } from '@/assets/icons';
+import { FolderGlyph } from './folder-glyph';
+import { useTreeMeta } from '@/lib/stores/tree-meta';
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { useIsMac } from '@/hooks/use-platform';
@@ -62,7 +64,7 @@ export function FileTree({ path }: FileTreeProps) {
 
   // On a touch screen, naming happens in a dialog (NameEntryDialog).
   const showCreateInput =
-    !touchFirst && operation?.mode === 'create' && operation.parentPath === path;
+    !touchFirst && operation?.mode === 'create' && !operation.dialog && operation.parentPath === path;
 
   return (
     <>
@@ -102,7 +104,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
 
   const children = useDirectoryChildren(node.path);
 
-  const FolderIcon = getFolderIcon(node.expanded);
+  const folderColor = useTreeMeta((s) => (node.is_dir ? s.folderColor(node.path) : null));
   const FileIcon = getFileIconFor(node.name);
 
   const isRenaming =
@@ -112,6 +114,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
     !touchFirst &&
     node.is_dir &&
     operation?.mode === 'create' &&
+    !operation.dialog &&
     operation.parentPath === node.path;
 
   const handleDeleteKeyDown = (event: KeyboardEvent) => {
@@ -266,7 +269,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
                           node.expanded && 'rotate-90',
                         )}
                       />
-                      <FolderIcon className='size-4 min-w-4' />
+                      <FolderGlyph open={node.expanded} color={folderColor} className='size-4 min-w-4' />
                       <FormattedFileName name={node.name} />
                     </SidebarMenuButton>
                   }

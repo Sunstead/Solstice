@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use solstice_sync_client::{link, unlink, Client, NoTokens, Status};
+use solstice_sync::TreeOp;
+use solstice_sync_client::{link, tree_file, unlink, Client, NoTokens, Status};
 use solstice_sync_server::config::{AuthMode, Config};
 use solstice_sync_server::{app, db::Db, AppState};
 
@@ -403,5 +404,115 @@ async fn linking_downloads_only_what_the_folder_lacks() {
     assert_eq!(report.same, 1, "{report:?}");
     // Already in the folder, so neither downloaded nor cached.
     assert_eq!(cached_blobs(&b), 0);
+    server.stop().await;
+}
+
+fn tree_paths(folder: &Path) -> Vec<String> {
+    tree_file::read(folder)
+        .bookmarks
+        .into_iter()
+        .map(|b| b.path)
+        .collect()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bookmarks_sync_and_mirror_to_tree_json() {
+    let (p, ca, cb) = pair().await;
+    let changes = cb.watch_tree_meta();
+    let meta = ca
+        .apply_tree_meta(vec![
+            TreeOp::AddBookmark {
+                id: "plan".into(),
+                path: "From A.md".into(),
+            },
+            TreeOp::SetFolderColor {
+                path: "Folder".into(),
+                color: Some("#e5484d".into()),
+            },
+        ])
+        .await
+        .unwrap();
+    assert_eq!(meta.bookmarks[0].path, "From A.md");
+    assert_eq!(tree_paths(&p.a), ["From A.md"], "mirrored at once");
+    eventually("the bookmark on B", || tree_paths(&p.b) == ["From A.md"]).await;
+    assert_eq!(
+        cb.tree_meta().await.unwrap().folder_colors["Folder"],
+        "#e5484d"
+    );
+    assert!(changes.has_changed().unwrap(), "B was told");
+    // Nothing to send, nothing to say.
+    let mut quiet = ca.watch_tree_meta();
+    quiet.mark_unchanged();
+    ca.apply_tree_meta(vec![TreeOp::AddBookmark {
+        id: "again".into(),
+        path: "From A.md".into(),
+    }])
+    .await
+    .unwrap();
+    assert!(!quiet.has_changed().unwrap());
+    assert!(ca
+        .apply_tree_meta(vec![TreeOp::Forget {
+            path: "../x".into()
+        }])
+        .await
+        .is_err());
+    ca.stop().await;
+    cb.stop().await;
+    p.server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn renaming_on_disk_carries_the_bookmark() {
+    let (p, ca, cb) = pair().await;
+    ca.apply_tree_meta(vec![TreeOp::AddBookmark {
+        id: "plan".into(),
+        path: "From A.md".into(),
+    }])
+    .await
+    .unwrap();
+    eventually("the bookmark on B", || tree_paths(&p.b) == ["From A.md"]).await;
+    std::fs::rename(p.a.join("From A.md"), p.a.join("Renamed.md")).unwrap();
+    ca.folder_changed();
+    eventually("the bookmark following on B", || {
+        tree_paths(&p.b) == ["Renamed.md"] && read(&p.b, "Renamed.md").is_some()
+    })
+    .await;
+    ca.stop().await;
+    cb.stop().await;
+    p.server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn linking_seeds_the_vault_from_tree_json_and_unlinking_keeps_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let server = start_server(tmp.path()).await;
+    let vault = server.create_vault("Notes").await;
+    let (a, b) = (tmp.path().join("a"), tmp.path().join("b"));
+    write(&a, "Plan.md", "plan\n");
+    tree_file::apply_unlinked(
+        &a,
+        &[
+            TreeOp::AddBookmark {
+                id: "plan".into(),
+                path: "Plan.md".into(),
+            },
+            TreeOp::SetFolderColor {
+                path: "Projects".into(),
+                color: Some("#123456".into()),
+            },
+        ],
+    )
+    .unwrap();
+    link(&a, &server.url, &vault, "Notes", "laptop", &NoTokens)
+        .await
+        .unwrap();
+    std::fs::create_dir_all(&b).unwrap();
+    link(&b, &server.url, &vault, "Notes", "desktop", &NoTokens)
+        .await
+        .unwrap();
+    assert_eq!(tree_paths(&b), ["Plan.md"], "B's mirror after linking");
+    assert_eq!(tree_file::read(&b).folder_colors["Projects"], "#123456");
+    unlink(&b).unwrap();
+    assert_eq!(tree_paths(&b), ["Plan.md"], "kept after unlinking");
     server.stop().await;
 }

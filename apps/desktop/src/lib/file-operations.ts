@@ -4,6 +4,7 @@ import type { FileTreeNode } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
 import { joinPath, parentOf } from '@/lib/path-utils';
 import { getPresetForName, type FileTypePreset } from '@/lib/stores/entry-input';
+import { useTreeMeta } from '@/lib/stores/tree-meta';
 
 /**
  * In-app operations apply optimistically through the same reconciler the
@@ -116,6 +117,7 @@ async function rename(path: string, newName: string) {
   }
 
   await applyFsChanges([selfChange('Renamed', newPath, { from: path })]);
+  void useTreeMeta.getState().retarget(path, newPath);
   return result;
 }
 
@@ -144,6 +146,7 @@ async function move(entry: MovableEntry, targetParentPath: string) {
   await applyFsChanges([
     selfChange('Renamed', newPath, { from: entry.path, isDir: entry.is_dir }),
   ]);
+  void useTreeMeta.getState().retarget(entry.path, newPath);
 
   return result;
 }
@@ -163,6 +166,8 @@ async function remove(node: Pick<FileTreeNode, 'path'>) {
   }
 
   await applyFsChanges([selfChange('Removed', node.path)]);
+  // Only here, where it was deleted: elsewhere a file that vanished may only be moving.
+  void useTreeMeta.getState().forget(node.path);
 
   return result;
 }

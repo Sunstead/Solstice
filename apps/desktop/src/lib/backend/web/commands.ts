@@ -13,10 +13,12 @@ import type {
   SyncInfo,
   SyncReview,
   SyncVersions,
+  TreeMetaOp,
+  TreeMetaState,
 } from '@/bindings';
 import type { Commands } from '../index';
 import registry from '../registry.json';
-import { api, apiJson, messageOf } from './api';
+import { api, ApiError, apiJson, messageOf } from './api';
 import { Emitter } from './emitter';
 import { forgetBase, moved, readNote, saveFile } from './notes';
 import { attachmentName } from './shell';
@@ -130,6 +132,24 @@ async function reviews(): Promise<SyncReview[]> {
   );
   // The web app knows notes by path, so a review's id is its path.
   return list.map((r) => ({ id: r.path, path: r.path, kind: r.kind, at: r.at, device: r.device }));
+}
+
+// ---------------------------------------------------------------- tree meta
+
+const NO_TREE_META: TreeMetaState = { linked: false, bookmarks: [], folder_colors: {} };
+
+/** A vault's bookmarks and folder colours. An older server has none to keep. */
+async function treeMeta(root: string, ops?: TreeMetaOp[]): Promise<TreeMetaState> {
+  const { vault } = await resolve(root);
+  try {
+    return await apiJson<TreeMetaState>(
+      vaultUrl(vault, 'tree-meta'),
+      ops ? { method: 'POST', json: { ops } } : undefined,
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404 && !ops) return NO_TREE_META;
+    throw error;
+  }
 }
 
 export const webCommands: Commands = {
@@ -321,6 +341,9 @@ export const webCommands: Commands = {
       const { vault } = await resolve(path);
       return { color: (await setVaultColor(vault.id, color)).color ?? null };
     }),
+  // The server tells the socket, which says `treeMetaChanged`.
+  treeMeta: (root) => attempt(() => treeMeta(root)),
+  treeMetaApply: (root, ops) => attempt(() => treeMeta(root, ops)),
   // A vault's root is named after it.
   syncVaultNames: async (paths) => {
     const vault = currentVault();
