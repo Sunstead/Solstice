@@ -20,6 +20,8 @@ COPY apps/desktop/ apps/desktop/
 # The desktop tests read search's shared comment cases (comments.json), which
 # tsc needs to type-check them.
 COPY crates/solstice-search/tests/comments.json crates/solstice-search/tests/comments.json
+# And the tree-meta op cases (ops.test.ts).
+COPY crates/solstice-sync/tests/tree_meta_ops.json crates/solstice-sync/tests/tree_meta_ops.json
 RUN npm run build -w @solstice/desktop
 
 FROM rust:1-bookworm AS build
