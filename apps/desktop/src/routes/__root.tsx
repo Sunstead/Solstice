@@ -42,6 +42,9 @@ import { railStyle } from '@/lib/sidebar-rail';
 import { usePhoneNav } from '@/lib/stores/phone-nav';
 import { startBackgroundChecks, useUpdates } from '@/lib/stores/updates';
 import { UpdateDialog } from '@/components/updates/update-dialog';
+import { EditorWindowShell } from '@/components/editor-window-shell';
+import { useAppWindows } from '@/hooks/use-app-windows';
+import { loadAppWindow, useAppWindow } from '@/lib/stores/app-window';
 
 export const Route = createRootRoute({
   // Named, so the hooks linter knows it's a component.
@@ -57,6 +60,10 @@ export const Route = createRootRoute({
     // typography would paint at their defaults for a frame before the stored
     // values land.
     const settingsLoaded = useSettingsStore((s) => s.globalLoaded);
+    // Which shell to draw (a full window or an editor window) is known
+    // before the first paint, as the settings are.
+    const windowLoaded = useAppWindow((s) => s.loaded);
+    const editorWindow = useAppWindow((s) => s.kind.type === 'editor');
     const [uiHydrated, setUiHydrated] = useState(
       useWorkspaceUIStore.persist.hasHydrated(),
     );
@@ -79,11 +86,12 @@ export const Route = createRootRoute({
     useSettingsDomBindings();
     useDeepLinks();
     useSyncStatus();
+    useAppWindows();
 
     useEffect(() => {
       // Global settings first: the workspace layer that `init` goes on to load
       // only ever overrides it, never replaces it.
-      void loadGlobalSettings().then(() => useWorkspace.getState().init());
+      void Promise.all([loadGlobalSettings(), loadAppWindow()]).then(() => useWorkspace.getState().init());
       return useWorkspaceUIStore.persist.onFinishHydration(() =>
         setUiHydrated(true),
       );
@@ -156,7 +164,7 @@ export const Route = createRootRoute({
     // remount, it does not delay rendering. This is a single store read, so
     // the blank frame is a few milliseconds; the theme class is already on
     // <html> by then, so the window paints in the right colour.
-    if (!settingsLoaded) return null;
+    if (!settingsLoaded || !windowLoaded) return null;
 
     return (
       <DndProvider backend={HTML5Backend}>
@@ -177,9 +185,15 @@ export const Route = createRootRoute({
             style={railStyle}
             className='flex-col flex-1 min-h-0'
           >
-            <AppShell>
-              <Outlet />
-            </AppShell>
+            {editorWindow ? (
+              <EditorWindowShell>
+                <Outlet />
+              </EditorWindowShell>
+            ) : (
+              <AppShell>
+                <Outlet />
+              </AppShell>
+            )}
           </SidebarProvider>
           <KeyboardBar />
         </div>

@@ -1,14 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window, on a computer",
+  "description": "Capability for every app window, on a computer",
   "platforms": [
     "macOS",
     "windows",
     "linux"
   ],
   "windows": [
-    "main"
+    "main",
+    "w-*"
   ],
   "permissions": [
     "core:default",
@@ -29,6 +30,7 @@
     "core:window:allow-is-maximized",
     "core:window:allow-minimize",
     "core:window:allow-close",
+    "core:window:allow-destroy",
     "os:default",
     "deep-link:default",
     "fs:default",
@@ -71,6 +73,7 @@
       ]
     },
     "store:default",
+    "log:default",
     "dialog:default",
     "updater:default",
     "process:allow-restart"

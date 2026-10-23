@@ -1,3 +1,4 @@
+import { commands } from '@/lib/backend';
 import { create } from 'zustand';
 import { flushAllAutosavers } from '@/lib/autosave';
 import { can } from '@/lib/backend/platform';
@@ -66,7 +67,9 @@ export const useUpdates = create<UpdatesState>((set, get) => ({
     const { update, status } = get();
     if (!update || status.state === 'installing') return;
     set({ status: { state: 'installing', progress: null } });
-    // The app quits under the editors; every edit has to be on disk first.
+    // The app quits under the editors; every edit has to be on disk first,
+    // in every window.
+    await commands.flushOtherWindows();
     if (!(await flushAllAutosavers())) {
       set({
         status: {

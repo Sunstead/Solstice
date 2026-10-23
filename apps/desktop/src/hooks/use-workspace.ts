@@ -3,7 +3,8 @@ import { commands } from '@/lib/backend';
 import { open } from '@/lib/backend/shell';
 import { rerooted, useKnownWorkspaces } from '@/lib/stores/known-workspaces';
 import { useWorkspaceMeta } from '@/lib/stores/workspace-meta';
-import { shell } from '@/lib/backend/platform';
+import { can, shell } from '@/lib/backend/platform';
+import { restoresLastWorkspace, useAppWindow } from '@/lib/stores/app-window';
 import { resetScopedStoreCache } from '@/lib/stores/scoped-storage';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { loadWorkspaceSettings } from '@/lib/settings/store';
@@ -60,6 +61,15 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     void useWorkspaceMeta.getState().load(useKnownWorkspaces.getState().workspaces.map((w) => w.path));
 
     let path = await commands.getWorkspace();
+    const appWindow = useAppWindow.getState();
+
+    // A window opened on a workspace (another window's tab torn off, a
+    // workspace opened in a new window, one restored at launch).
+    if (!path && appWindow.workspace) {
+      path = appWindow.workspace;
+      const result = await commands.setWorkspace(path);
+      if (result.status === 'error') console.error('Failed to watch workspace:', result.error);
+    }
 
     // The shell's own idea of the workspace can predate a move of the app's
     // container too (a reload after a reinstall).
@@ -71,7 +81,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       }
     }
 
-    if (!path) {
+    if (!path && restoresLastWorkspace(appWindow)) {
       const lastOpened =
         useKnownWorkspaces.getState().workspaces[0]?.path ?? null;
       if (lastOpened) {
@@ -98,6 +108,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   setWorkspace: async (path) => {
+    // One window per workspace: one already showing it comes forward.
+    if (can.multiWindow && (await commands.focusFullWindowFor(path))) return;
     const result = await commands.setWorkspace(path);
     if (result.status === 'error') {
       console.error('Failed to watch workspace:', result.error);

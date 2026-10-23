@@ -7,28 +7,39 @@ import { cn } from '@/lib/utils';
 import { HeaderControls } from './header-controls';
 
 export default function TitleBar() {
-  const isFullscreen = useIsFullscreen();
-  const isMac = useIsMac();
-
   return (
     <header className='chrome bg-sidebar w-full h-10 touch:h-11 min-h-9 draggable relative flex items-center border-b islands:border-b-0'>
       <div data-tauri-drag-region className='size-full absolute inset-0' />
 
       <div className='flex items-center w-max h-max'>
-        <div data-tauri-drag-region className='flex items-center select-none'>
-          {/* As wide as the icon rail, so the logo sits in its middle: 3rem
-              on desktop, 4rem where touch leads (the iPad). */}
-          <div className='min-w-(--sidebar-width-icon) flex items-center justify-center'>
-            {can.windowChrome && isMac ? (
-              !isFullscreen && <span className='w-20' />
-            ) : (
-              <SolsticeIcon className='mx-2 size-5 pointer-events-none select-none [-webkit-user-drag:none]' />
-            )}
-          </div>
-          <HeaderControls />
-        </div>
+        <TitleBarLead />
       </div>
     </header>
+  );
+}
+
+/**
+ * The title bar's left end: room for the traffic lights (or the logo), then
+ * the header controls. An editor window lays it over its tab strip
+ * (`EditorWindowShell`).
+ */
+export function TitleBarLead() {
+  const isFullscreen = useIsFullscreen();
+  const isMac = useIsMac();
+
+  return (
+    <div data-tauri-drag-region className='flex items-center select-none'>
+      {/* As wide as the icon rail, so the logo sits in its middle: 3rem
+          on desktop, 4rem where touch leads (the iPad). */}
+      <div className='min-w-(--sidebar-width-icon) flex items-center justify-center'>
+        {can.windowChrome && isMac ? (
+          !isFullscreen && <span className='w-20' />
+        ) : (
+          <SolsticeIcon className='mx-2 size-5 pointer-events-none select-none [-webkit-user-drag:none]' />
+        )}
+      </div>
+      <HeaderControls />
+    </div>
   );
 }
 

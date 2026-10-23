@@ -57,6 +57,8 @@ futures-util = "0.3"
 # the webview. Registered on iOS only; a dependency everywhere so its
 # permissions are known to every build.
 tauri-plugin-solstice-native = { path = "plugins/native" }
+tauri-plugin-log = "2"
+log = "0.4"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
@@ -70,8 +72,13 @@ tauri-plugin-process = "2"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSDictionary", "NSGeometry", "NSObject", "NSString", "NSURL"] }
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPrintInfo", "NSPrintOperation", "NSResponder", "NSSharingService", "NSView", "NSWindow"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPrintInfo", "NSPrintOperation", "NSResponder", "NSEvent", "NSSharingService", "NSView", "NSWindow"] }
 objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "objc2-app-kit", "WKWebView"] }
+
+# Whether the mouse button is down, to see a tab drag end over another app
+# (`windows::pointer_spot`).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
 # Raising the open-file limit at startup (`raise_open_file_limit`).

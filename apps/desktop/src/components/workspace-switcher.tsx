@@ -15,6 +15,8 @@ import {
 } from '@sunstead/ui/components/resizable-sidebar';
 import { refreshWorkspaceColors, useWorkspaceChoices } from '@/hooks/use-workspace-choices';
 import { WorkspaceIcon } from '@/components/workspace-icon';
+import { can } from '@/lib/backend/platform';
+import { openInNewWindow } from '@/lib/stores/app-window';
 
 export function WorkspaceSwitcher() {
   const { activePath, activeName, activeColor, workspaces, switchTo, actions, manage } = useWorkspaceChoices();
@@ -52,7 +54,8 @@ export function WorkspaceSwitcher() {
                   {workspaces.map((workspace) => (
                     <DropdownMenuItem
                       key={workspace.path}
-                      onClick={() => switchTo(workspace.path)}
+                      // Cmd/Ctrl-click opens it in a window of its own.
+                      onClick={(e) => (can.multiWindow && (e.metaKey || e.ctrlKey) ? openInNewWindow(workspace.path) : switchTo(workspace.path))}
                     >
                       <WorkspaceIcon name={workspace.name} color={workspace.color} />
                       <span className='flex-1 truncate'>{workspace.name}</span>

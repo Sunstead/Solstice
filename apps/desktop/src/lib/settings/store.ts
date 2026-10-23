@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { commands } from '@/lib/backend';
 import { useShallow } from 'zustand/shallow';
 import { getScopedStore, hasOpenWorkspace } from '@/lib/stores/scoped-storage';
 import {
@@ -271,6 +272,8 @@ function persist(
         const store = await fileFor(target);
         if (op.type === 'delete') await store.delete(key);
         else await store.set(key, op.value);
+        // Other windows show the same settings.
+        void commands.storeChanged(target);
       } catch (error) {
         console.error(`Failed to persist setting "${key}":`, error);
       }

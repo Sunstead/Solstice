@@ -8,6 +8,9 @@ import { findCornerTabset } from '@/lib/flexlayout-utils';
 import { useNavigationHistory } from '@/lib/stores/navigation-history';
 import { useRecentFiles } from '@/lib/stores/recent-files';
 import { closeTab, isClosing } from '@/lib/tab-motion';
+import { isEditorWindow } from '@/lib/stores/app-window';
+import { getCurrentWindow } from '@/lib/backend/window';
+import { log } from '@/lib/backend/log';
 
 /**
  * What the editor area does whichever way it's drawn (flexlayout's tabs, or
@@ -122,6 +125,13 @@ export function useLayoutSession(afterChange?: () => void) {
     afterRef.current?.();
     layout.normalizeTabsetDeletion();
 
-    if (modelHasNoTabs(changed) && !isReplacingBlankTab()) layout.newBlankTab();
+    if (modelHasNoTabs(changed) && !isReplacingBlankTab()) {
+      // An editor window is its tabs: with the last gone, so is it.
+      if (isEditorWindow()) {
+        log.info(`editor window: no tabs left, closing (${JSON.stringify(changed.toJson().layout)})`);
+        void getCurrentWindow().close();
+      }
+      else layout.newBlankTab();
+    }
   }, []);
 }

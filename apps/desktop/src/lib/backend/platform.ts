@@ -22,6 +22,12 @@ export const can = {
   pickFolders: shell === 'desktop',
   /** A window of its own to draw: controls, drag regions, fullscreen. */
   windowChrome: shell === 'desktop',
+  /**
+   * Windows of its own: more than one workspace at a time, and tabs torn off
+   * into windows of their own (`lib/tab-transfer.ts`). A browser makes its
+   * own; a phone or tablet has one.
+   */
+  multiWindow: shell === 'desktop',
   /** A file manager to show files in, and default apps to open them with. */
   fileManager: shell === 'desktop',
   /** Installed fonts, and folders of user themes. */

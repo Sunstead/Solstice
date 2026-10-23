@@ -209,6 +209,19 @@ export const webCommands: Commands = {
       await open(path);
       return null;
     }),
+  // A browser tab is the only window; the browser makes others.
+  getWindowInit: () => Promise.resolve({ label: 'main', kind: { type: 'full' }, workspace: null, tab: null }),
+  listWindows: () => Promise.resolve([]),
+  openWindow: () => desktopOnly('Opening a window'),
+  focusWindow: () => Promise.resolve(),
+  focusFullWindowFor: () => Promise.resolve(false),
+  beginTabDrag: () => Promise.resolve(),
+  endTabDrag: () => Promise.resolve(null),
+  tabAdopted: () => Promise.resolve({ status: 'ok', data: null }),
+  sendTab: () => desktopOnly('Moving a tab to another window'),
+  storeChanged: () => Promise.resolve(),
+  flushOtherWindows: () => Promise.resolve({ status: 'ok', data: null }),
+  windowsFlushed: () => Promise.resolve(),
   getWorkspace: async () => {
     const vault = currentVault();
     return vault ? rootOf(vault) : null;

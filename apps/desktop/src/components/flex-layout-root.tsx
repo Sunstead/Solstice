@@ -38,6 +38,8 @@ import { closeTab, playEnter, watchClosePresses } from '@/lib/tab-motion';
 import { TabMenu } from './tab-menu';
 import { useTabLongPress, type TabMenuRequest } from '@/lib/tab-long-press';
 import { ownsDrag, soleStrip, useTabGesture } from '@/lib/tab-gesture';
+import { incomingDrag, useTabTransfer } from '@/lib/tab-transfer';
+import { useWorkspace } from '@/hooks/use-workspace';
 
 /** A tab's name; on mount, it grows its button in if the tab was just opened. */
 function TabLabel({ id, children }: { id: string; children: string }) {
@@ -61,6 +63,25 @@ function makeDraggedTabId(): string {
 }
 
 const factory = (node: TabNode) => <TabContent node={node} />;
+
+/**
+ * What follows the pointer while a tab is dragged, even outside the window:
+ * a card with the tab's icon and name, in the theme's colours.
+ */
+function renderTabGhost(node: TabNode) {
+  const config = node.getConfig() as { path?: string } | undefined;
+  const Icon = getFileIconFor(config?.path ?? '');
+  return (
+    <div className='flex h-8 max-w-60 items-center gap-2 rounded-md border bg-popover px-3 text-sm text-popover-foreground shadow-md'>
+      {node.getComponent() === 'editor' && (
+        <div className='size-4 shrink-0'>
+          <Icon />
+        </div>
+      )}
+      <span className='truncate'>{stripPresetExtension(node.getName()).name}</span>
+    </div>
+  );
+}
 
 export default function FlexLayoutRoot() {
   const model = useLayout((s) => s.model);
@@ -93,6 +114,9 @@ export default function FlexLayoutRoot() {
   // drop and creating the tab.
   const externalDrop = useFileTreeExternalDropZone();
   externalDrop(containerRef);
+
+  // Tabs dragged out to a window of their own, or in from another window.
+  useTabTransfer(containerRef, model);
 
   // Stable, so swapping the close icon for a save spinner is driven by
   // TabCloseIcon's own subscription rather than by re-rendering every tab.
@@ -225,7 +249,9 @@ export default function FlexLayoutRoot() {
   const handleExternalDrag = useCallback(
     (_event: React.DragEvent<HTMLElement>) => {
       const entry = useFileTreeDragState.getState().draggedEntry;
-      if (!entry || entry.is_dir) return undefined;
+      // A tab another window is dragging lands wherever it's dropped too.
+      if (!entry) return incomingDrag(useWorkspace.getState().path);
+      if (entry.is_dir) return undefined;
 
       return {
         json: {
@@ -259,6 +285,8 @@ export default function FlexLayoutRoot() {
         onAuxMouseClick={handleAuxMouseClick}
         onContextMenu={handleContextMenu}
         onExternalDrag={handleExternalDrag}
+        // A tabset keeps flexlayout's own.
+        onRenderDragRect={(content, node) => (node instanceof TabNode ? renderTabGhost(node) : content)}
         icons={layoutIcons}
         tabDragSpeed={0.1}
         onRenderTabSet={(node, renderValues) => {
