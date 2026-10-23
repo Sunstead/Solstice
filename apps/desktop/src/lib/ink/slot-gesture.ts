@@ -1,6 +1,6 @@
 import { haptics } from '@/lib/haptics';
 import { shifts, targetIndex } from '@/lib/tab-reorder';
-import { gridTarget, type Point } from './pages';
+import { flowOffsets, gridTarget, type Point } from './pages';
 
 /**
  * Holding a tool slot in the ink ribbon, as holding a tab does
@@ -16,7 +16,11 @@ import { gridTarget, type Point } from './pages';
  *
  * In a `grid` (the page sheet's thumbnails) the lifted item follows the
  * finger both ways and drops on the nearest slot (`data-drop-target`), the
- * others staying put.
+ * others staying put. In a `flow` (bookmarks: a list that may wrap into
+ * columns) it follows both ways too and the others make way, as in a row.
+ *
+ * With `mouseDrag`, a mouse needs no hold: it drags once it moves, as
+ * anything draggable on a computer does, and a click stays a click.
  */
 
 const HOLD_MS = 350;
@@ -33,12 +37,19 @@ export type SlotGestureOptions = {
   menu: (index: number, rect: DOMRect) => void;
   /** A grid rather than a row. */
   grid?: boolean;
+  /** A list that may wrap, rather than a row. */
+  flow?: boolean;
+  /** A mouse drags without holding first. */
+  mouseDrag?: boolean;
 };
 
 const slotAt = (target: EventTarget | null) => (target as Element | null)?.closest?.<HTMLElement>('[data-slot-index]');
 
 /** Everything a hold does, outside React so a test can drive it with events. Returns a stop. */
-export function createSlotGesture(row: HTMLElement, { move, menu, grid = false }: SlotGestureOptions): () => void {
+export function createSlotGesture(
+  row: HTMLElement,
+  { move, menu, grid = false, flow = false, mouseDrag = false }: SlotGestureOptions,
+): () => void {
   let press: {
     slot: HTMLElement;
     index: number;
@@ -52,6 +63,7 @@ export function createSlotGesture(row: HTMLElement, { move, menu, grid = false }
     centres: number[];
     points: Point[];
     width: number;
+    mouse: boolean;
   } | null = null;
   let holdTimer = 0;
   let stillTimer = 0;
@@ -97,29 +109,41 @@ export function createSlotGesture(row: HTMLElement, { move, menu, grid = false }
       centres: [],
       points: [],
       width: 0,
+      mouse: mouseDrag && event.pointerType === 'mouse',
     };
+    // A mouse lifts when it moves (`onMove`); its menu is the right click.
+    if (press.mouse) return;
     holdTimer = window.setTimeout(() => {
       if (!press) return;
-      press.lifted = true;
-      press.points = slots().map((el) => {
-        const r = el.getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-      });
-      press.centres = press.points.map((p) => p.x);
-      const all = slots();
-      press.width = all.length > 1 ? press.centres[1] - press.centres[0] : press.slot.getBoundingClientRect().width;
-      press.slot.dataset.lifted = '';
-      row.setPointerCapture?.(press.pointerId);
+      lift();
       haptics.play('lift');
       stillTimer = window.setTimeout(openMenu, STILL_MS);
     }, HOLD_MS);
   };
 
+  const lift = () => {
+    if (!press) return;
+    press.lifted = true;
+    press.points = slots().map((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    press.centres = press.points.map((p) => p.x);
+    const all = slots();
+    press.width = all.length > 1 ? press.centres[1] - press.centres[0] : press.slot.getBoundingClientRect().width;
+    press.slot.dataset.lifted = '';
+    row.setPointerCapture?.(press.pointerId);
+  };
+
   const onMove = (event: PointerEvent) => {
     if (!press || event.pointerId !== press.pointerId || press.menuOpened) return;
     const dx = event.clientX - press.x;
-    const dy = grid ? event.clientY - press.y : 0;
+    const dy = grid || flow ? event.clientY - press.y : 0;
     const distance = Math.hypot(dx, dy);
+    if (!press.lifted && press.mouse) {
+      if (distance < DRAG_PX) return;
+      lift();
+    }
     if (!press.lifted) {
       if (Math.abs(dx) > SLOP_PX || Math.abs(event.clientY - press.y) > SLOP_PX) reset();
       return;
@@ -138,6 +162,17 @@ export function createSlotGesture(row: HTMLElement, { move, menu, grid = false }
         el.style.transform = i === index ? `translate(${dx}px, ${dy}px)` : '';
         if (i === to && i !== index) el.dataset.dropTarget = '';
         else delete el.dataset.dropTarget;
+      });
+      return;
+    }
+    if (flow) {
+      const to = gridTarget(points, { x: points[index].x + dx, y: points[index].y + dy });
+      if (to !== press.to) haptics.play('tick');
+      press.to = to;
+      const offsets = flowOffsets(points, index, to);
+      slots().forEach((el, i) => {
+        const { x, y } = i === index ? { x: dx, y: dy } : offsets[i];
+        el.style.transform = x || y ? `translate(${x}px, ${y}px)` : '';
       });
       return;
     }

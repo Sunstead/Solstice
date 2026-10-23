@@ -39,3 +39,18 @@ export function gridTarget(centres: Point[], point: Point): number {
   });
   return best;
 }
+
+/**
+ * Where each slot moves while the one at `from` is held over `to`, in a
+ * list that wraps (a grid read row by row): the ones between take the next
+ * slot's place. The held one is left at zero; it follows the finger.
+ */
+export function flowOffsets(points: Point[], from: number, to: number): Point[] {
+  const order = points.map((_, i) => i).filter((i) => i !== from);
+  order.splice(to, 0, from);
+  const offsets = points.map(() => ({ x: 0, y: 0 }));
+  order.forEach((i, slot) => {
+    if (i !== from) offsets[i] = { x: points[slot].x - points[i].x, y: points[slot].y - points[i].y };
+  });
+  return offsets;
+}

@@ -5,8 +5,8 @@ import type { CanvasColor } from '@/lib/canvas/types';
 import { cn } from '@/lib/utils';
 
 /**
- * The six colours JSON Canvas defines, plus a way back to none. Not a setting:
- * a card's colour is document data living in the `.canvas` file.
+ * The six colors JSON Canvas defines, plus a way back to none. Not a setting:
+ * a card's color is document data living in the `.canvas` file.
  */
 export function CanvasColorPicker({
   value,
@@ -21,8 +21,8 @@ export function CanvasColorPicker({
     <div className={cn('flex items-center gap-1 px-1 py-0.5', className)}>
       <button
         type='button'
-        title='No colour'
-        aria-label='No colour'
+        title='No color'
+        aria-label='No color'
         onClick={() => onPick(undefined)}
         className={cn(
           'flex size-5 items-center justify-center rounded-full border text-muted-foreground',

@@ -1,0 +1,110 @@
+[
+  {
+    "name": "add appends",
+    "before": { "bookmarks": [{ "id": "a", "path": "Plan.md" }], "folderColors": {} },
+    "ops": [{ "op": "add_bookmark", "id": "b", "path": "Projects" }],
+    "after": { "bookmarks": [{ "id": "a", "path": "Plan.md" }, { "id": "b", "path": "Projects" }], "folderColors": {} }
+  },
+  {
+    "name": "adding a bookmarked path again does nothing",
+    "before": { "bookmarks": [{ "id": "a", "path": "Plan.md" }], "folderColors": {} },
+    "ops": [{ "op": "add_bookmark", "id": "b", "path": "Plan.md" }],
+    "after": { "bookmarks": [{ "id": "a", "path": "Plan.md" }], "folderColors": {} }
+  },
+  {
+    "name": "add normalizes the path",
+    "before": { "bookmarks": [], "folderColors": {} },
+    "ops": [{ "op": "add_bookmark", "id": "a", "path": "notes\\Plan.md" }],
+    "after": { "bookmarks": [{ "id": "a", "path": "notes/Plan.md" }], "folderColors": {} }
+  },
+  {
+    "name": "remove takes every bookmark at the path",
+    "before": { "bookmarks": [{ "id": "a", "path": "Plan.md" }, { "id": "b", "path": "X" }, { "id": "c", "path": "Plan.md" }], "folderColors": {} },
+    "ops": [{ "op": "remove_bookmark", "path": "Plan.md" }],
+    "after": { "bookmarks": [{ "id": "b", "path": "X" }], "folderColors": {} }
+  },
+  {
+    "name": "move to first",
+    "before": { "bookmarks": [{ "id": "a", "path": "A" }, { "id": "b", "path": "B" }, { "id": "c", "path": "C" }], "folderColors": {} },
+    "ops": [{ "op": "move_bookmark", "id": "c", "after": null }],
+    "after": { "bookmarks": [{ "id": "c", "path": "C" }, { "id": "a", "path": "A" }, { "id": "b", "path": "B" }], "folderColors": {} }
+  },
+  {
+    "name": "move after another",
+    "before": { "bookmarks": [{ "id": "a", "path": "A" }, { "id": "b", "path": "B" }, { "id": "c", "path": "C" }], "folderColors": {} },
+    "ops": [{ "op": "move_bookmark", "id": "a", "after": "b" }],
+    "after": { "bookmarks": [{ "id": "b", "path": "B" }, { "id": "a", "path": "A" }, { "id": "c", "path": "C" }], "folderColors": {} }
+  },
+  {
+    "name": "move after an unknown bookmark goes to the end",
+    "before": { "bookmarks": [{ "id": "a", "path": "A" }, { "id": "b", "path": "B" }], "folderColors": {} },
+    "ops": [{ "op": "move_bookmark", "id": "a", "after": "gone" }],
+    "after": { "bookmarks": [{ "id": "b", "path": "B" }, { "id": "a", "path": "A" }], "folderColors": {} }
+  },
+  {
+    "name": "moving an unknown bookmark does nothing",
+    "before": { "bookmarks": [{ "id": "a", "path": "A" }], "folderColors": {} },
+    "ops": [{ "op": "move_bookmark", "id": "zz", "after": null }],
+    "after": { "bookmarks": [{ "id": "a", "path": "A" }], "folderColors": {} }
+  },
+  {
+    "name": "set and clear a folder color",
+    "before": { "bookmarks": [], "folderColors": { "Old": "#000000" } },
+    "ops": [
+      { "op": "set_folder_color", "path": "Projects", "color": "#E5484D" },
+      { "op": "set_folder_color", "path": "Old", "color": null }
+    ],
+    "after": { "bookmarks": [], "folderColors": { "Projects": "#e5484d" } }
+  },
+  {
+    "name": "retarget carries descendants on a folder boundary",
+    "before": {
+      "bookmarks": [{ "id": "a", "path": "Notes" }, { "id": "b", "path": "Notes/Plan.md" }, { "id": "c", "path": "Notes old/x.md" }],
+      "folderColors": { "Notes": "#111111", "Notes/Sub": "#222222", "Notes old": "#333333" }
+    },
+    "ops": [{ "op": "retarget", "from": "Notes", "to": "Archive/Notes" }],
+    "after": {
+      "bookmarks": [{ "id": "a", "path": "Archive/Notes" }, { "id": "b", "path": "Archive/Notes/Plan.md" }, { "id": "c", "path": "Notes old/x.md" }],
+      "folderColors": { "Archive/Notes": "#111111", "Archive/Notes/Sub": "#222222", "Notes old": "#333333" }
+    }
+  },
+  {
+    "name": "retarget of a file",
+    "before": { "bookmarks": [{ "id": "a", "path": "Plan.md" }], "folderColors": {} },
+    "ops": [{ "op": "retarget", "from": "Plan.md", "to": "Plans.md" }],
+    "after": { "bookmarks": [{ "id": "a", "path": "Plans.md" }], "folderColors": {} }
+  },
+  {
+    "name": "forget removes the path and everything under it",
+    "before": {
+      "bookmarks": [{ "id": "a", "path": "Notes" }, { "id": "b", "path": "Notes/Plan.md" }, { "id": "c", "path": "Notes old" }],
+      "folderColors": { "Notes": "#111111", "Notes/Sub": "#222222", "Notes old": "#333333" }
+    },
+    "ops": [{ "op": "forget", "path": "Notes" }],
+    "after": { "bookmarks": [{ "id": "c", "path": "Notes old" }], "folderColors": { "Notes old": "#333333" } }
+  },
+  {
+    "name": "a hidden path is refused",
+    "before": { "bookmarks": [], "folderColors": {} },
+    "ops": [{ "op": "add_bookmark", "id": "a", "path": ".solstice/tree.json" }],
+    "error": true
+  },
+  {
+    "name": "a path leaving the vault is refused",
+    "before": { "bookmarks": [], "folderColors": {} },
+    "ops": [{ "op": "set_folder_color", "path": "../up", "color": "#ffffff" }],
+    "error": true
+  },
+  {
+    "name": "a bad color is refused",
+    "before": { "bookmarks": [], "folderColors": {} },
+    "ops": [{ "op": "set_folder_color", "path": "A", "color": "red" }],
+    "error": true
+  },
+  {
+    "name": "a bad id is refused",
+    "before": { "bookmarks": [], "folderColors": {} },
+    "ops": [{ "op": "add_bookmark", "id": "a/path", "path": "A" }],
+    "error": true
+  }
+]

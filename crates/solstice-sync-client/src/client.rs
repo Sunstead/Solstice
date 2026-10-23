@@ -10,7 +10,7 @@ use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use solstice_sync::{
     decode_snapshot, Content, DocKey, Event, Frame, Kind, Manifest, Msg, NoteDoc, ReviewKind,
-    Session, Vault,
+    Session, TreeMeta, TreeOp, Vault,
 };
 use solstice_sync_fs::VaultDir;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -20,6 +20,7 @@ use tokio_tungstenite::tungstenite::Message;
 use crate::net::{Server, Socket, TokenSource};
 use crate::store::{key_from_name, Link, Store, OWN};
 use crate::throttle::Throttle;
+use crate::tree_file;
 use crate::Error;
 
 const SAVE_AFTER: Duration = Duration::from_secs(2);
@@ -114,6 +115,13 @@ enum Cmd {
         text: Option<String>,
         reply: oneshot::Sender<Result<(), Error>>,
     },
+    TreeMeta {
+        reply: oneshot::Sender<TreeMeta>,
+    },
+    ApplyTreeMeta {
+        ops: Vec<TreeOp>,
+        reply: oneshot::Sender<Result<TreeMeta, Error>>,
+    },
     BlobFetched {
         hash: String,
         result: Result<Vec<u8>, Error>,
@@ -129,6 +137,7 @@ pub struct Client {
     tx: mpsc::UnboundedSender<Cmd>,
     status: watch::Receiver<Status>,
     reviews: watch::Receiver<u64>,
+    tree_meta: watch::Receiver<u64>,
     link: Link,
     root: PathBuf,
 }
@@ -162,6 +171,8 @@ impl Client {
         let (tx, rx) = mpsc::unbounded_channel();
         let (status_tx, status) = watch::channel(Status::Connecting);
         let (reviews_tx, reviews) = watch::channel(0u64);
+        let (tree_meta_tx, tree_meta) = watch::channel(0u64);
+        let last_meta = tree_file::read(&root);
         let actor = Actor {
             link: saved.link.clone(),
             server,
@@ -179,6 +190,8 @@ impl Client {
             dirty: BTreeSet::new(),
             status: status_tx,
             reviews: reviews_tx,
+            tree_meta: tree_meta_tx,
+            last_meta,
             tx: tx.clone(),
             backoff: Duration::from_secs(1),
             reconnect_at: Some(Instant::now()),
@@ -195,6 +208,7 @@ impl Client {
             tx,
             status,
             reviews,
+            tree_meta,
             link: saved.link,
             root,
         })
@@ -219,6 +233,29 @@ impl Client {
     /// Bumps whenever the list of reviews may have changed.
     pub fn watch_reviews(&self) -> watch::Receiver<u64> {
         self.reviews.clone()
+    }
+
+    /// Bumps whenever the bookmarks or folder colors changed, here or
+    /// elsewhere.
+    pub fn watch_tree_meta(&self) -> watch::Receiver<u64> {
+        self.tree_meta.clone()
+    }
+
+    pub async fn tree_meta(&self) -> Result<TreeMeta, Error> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(Cmd::TreeMeta { reply })
+            .map_err(|_| Error::Stopped)?;
+        rx.await.map_err(|_| Error::Stopped)
+    }
+
+    /// Changes the bookmarks or folder colors, and returns them after.
+    pub async fn apply_tree_meta(&self, ops: Vec<TreeOp>) -> Result<TreeMeta, Error> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(Cmd::ApplyTreeMeta { ops, reply })
+            .map_err(|_| Error::Stopped)?;
+        rx.await.map_err(|_| Error::Stopped)?
     }
 
     /// An editor (re)loaded a note's text. `rel` is vault-relative, `/`-separated.
@@ -316,6 +353,9 @@ struct Actor {
     dirty: BTreeSet<DocKey>,
     status: watch::Sender<Status>,
     reviews: watch::Sender<u64>,
+    tree_meta: watch::Sender<u64>,
+    /// The tree meta last mirrored to `.solstice/tree.json`.
+    last_meta: TreeMeta,
     tx: mpsc::UnboundedSender<Cmd>,
     backoff: Duration,
     reconnect_at: Option<Instant>,
@@ -368,6 +408,7 @@ impl Actor {
         // Whatever changed in the folder while the app was closed.
         let mut socket: Option<Socket> = None;
         self.absorb(&mut socket).await;
+        self.meta_changed();
         // Cached attachments from before they were pruned as they synced.
         self.prune_blobs();
 
@@ -420,6 +461,21 @@ impl Actor {
 
     fn bump_reviews(&self) {
         self.reviews.send_modify(|n| *n += 1);
+    }
+
+    /// Mirrors the bookmarks and folder colors to the folder, and says so,
+    /// if they changed. Unlike reviews, only on a real change: the frontend
+    /// reloads on every bump.
+    fn meta_changed(&mut self) {
+        let now = self.vault.tree_meta();
+        if now == self.last_meta {
+            return;
+        }
+        if let Err(e) = tree_file::write(self.dir.root(), &now) {
+            tracing::warn!(error = %e, "can't write the folder's tree.json");
+        }
+        self.last_meta = now;
+        self.tree_meta.send_modify(|n| *n += 1);
     }
 
     async fn token(&mut self) -> Result<Option<String>, Error> {
@@ -558,6 +614,7 @@ impl Actor {
                 }
                 self.send(socket, replies).await;
                 self.bump_reviews();
+                self.meta_changed();
                 self.schedule_save();
                 if *self.status.borrow() == Status::Syncing {
                     self.settle_at = Some(Instant::now() + SETTLE);
@@ -688,6 +745,18 @@ impl Actor {
                 self.bump_reviews();
                 let _ = reply.send(Ok(()));
             }
+            Cmd::TreeMeta { reply } => {
+                let _ = reply.send(self.vault.tree_meta());
+            }
+            Cmd::ApplyTreeMeta { ops, reply } => match self.vault.apply_tree_ops(&ops) {
+                Ok(msgs) => {
+                    self.local(socket, msgs).await;
+                    let _ = reply.send(Ok(self.vault.tree_meta()));
+                }
+                Err(e) => {
+                    let _ = reply.send(Err(e.into()));
+                }
+            },
             Cmd::BlobFetched { hash, result } => {
                 self.fetching.remove(&hash);
                 match result.and_then(|bytes| self.dir.put_blob(&bytes).map_err(Error::io)) {
@@ -745,6 +814,7 @@ impl Actor {
             return;
         }
         self.dirty.extend(msgs.iter().map(|m| m.doc.clone()));
+        self.meta_changed();
         self.write_out();
         self.schedule_save();
         if socket.is_some() && self.uploaded_or_retry(socket).await {

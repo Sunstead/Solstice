@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
+import { Check } from 'lucide-react';
 
 import type { EntryMenuItem } from '@/lib/entry-menu-items';
 
@@ -59,6 +60,7 @@ export function EntryMenuItems({
             onClick={item.run}
           >
             <Icon /> {item.label}
+            {item.checked && <Check className='ml-auto' />}
           </Item>
         );
       })}

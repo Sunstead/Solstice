@@ -114,6 +114,9 @@ export const commands = {
 	 *  be reached leave theirs as they were.
 	 */
 	syncPullColors: (paths: string[]) => __TAURI_INVOKE<WorkspaceMeta[]>("sync_pull_colors", { paths }),
+	treeMeta: (root: string) => typedError<TreeMetaState, string>(__TAURI_INVOKE("tree_meta", { root })),
+	/**  Changes a workspace's bookmarks or folder colors, and returns them after. */
+	treeMetaApply: (root: string, ops: TreeMetaOp[]) => typedError<TreeMetaState, string>(__TAURI_INVOKE("tree_meta_apply", { root, ops })),
 	/**  Where to write a file made to share, such as a PDF. */
 	exportTempPath: (name: string) => typedError<string, string>(__TAURI_INVOKE("export_temp_path", { name })),
 	/**  Writes a file made to share (a drawing's PNG), and says where. */
@@ -260,6 +263,7 @@ export const events = {
 	tabDrag: makeEvent<TabDrag>("tab-drag"),
 	tabDragEnded: makeEvent<TabDragEnded>("tab-drag-ended"),
 	tabSent: makeEvent<TabSent>("tab-sent"),
+	treeMetaChanged: makeEvent<TreeMetaChanged>("tree-meta-changed"),
 	windowsChanged: makeEvent<WindowsChanged>("windows-changed"),
 };
 
@@ -270,6 +274,12 @@ export type Anchor = {
 	y: number | null,
 	width: number | null,
 	height: number | null,
+};
+
+export type BookmarkEntry = {
+	id: string,
+	/**  Workspace-relative, `/`-separated. */
+	path: string,
 };
 
 /**  A window's frame in logical pixels: outer position, inner size. */
@@ -543,6 +553,23 @@ export type TabDragEnded = {
 /**  A tab sent here from another window's tab menu (`TabPayload` JSON). */
 export type TabSent = {
 	payload: string,
+};
+
+/**  A workspace's bookmarks or folder colors changed: ask again. */
+export type TreeMetaChanged = {
+	root: string,
+};
+
+/**  `TreeOp`, for the frontend's types; the same JSON. */
+export type TreeMetaOp = { op: "add_bookmark"; id: string; path: string } | { op: "remove_bookmark"; path: string } | { op: "move_bookmark"; id: string; after: string | null } | { op: "set_folder_color"; path: string; color: string | null } | { op: "retarget"; from: string; to: string } | { op: "forget"; path: string };
+
+export type TreeMetaState = {
+	/**  Kept in the vault: other devices see changes. */
+	linked: boolean,
+	/**  In order. */
+	bookmarks: BookmarkEntry[],
+	/**  Folder path → `#rrggbb`. */
+	folder_colors: { [key in string]: string },
 };
 
 /**

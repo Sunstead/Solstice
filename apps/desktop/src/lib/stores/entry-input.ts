@@ -103,13 +103,14 @@ export type EntryKind =
   { type: 'folder' } | { type: 'file'; preset: FileTypePreset | null }; // null preset = extension is just part of the name
 
 export type EntryOperation =
-  | { mode: 'create'; parentPath: string; kind: EntryKind }
+  /** `dialog`: named in `NameEntryDialog` even where the tree names inline (the tree isn't in view). */
+  | { mode: 'create'; parentPath: string; kind: EntryKind; dialog?: boolean }
   | { mode: 'rename'; path: string; kind: EntryKind; initialName: string };
 
 interface EntryInputState {
   operation: EntryOperation | null;
-  startCreateFile: (parentPath: string, preset?: FileTypePreset) => void;
-  startCreateFolder: (parentPath: string) => void;
+  startCreateFile: (parentPath: string, preset?: FileTypePreset, options?: { dialog?: boolean }) => void;
+  startCreateFolder: (parentPath: string, options?: { dialog?: boolean }) => void;
   startRename: (node: { path: string; name: string; is_dir: boolean }) => void;
   cancel: () => void;
 }
@@ -119,21 +120,22 @@ export const useEntryInput = create<EntryInputState>((set) => ({
 
   // Each raises the keyboard straight away on a touch screen, while still in
   // the tap that asked: the naming dialog's field comes a moment later.
-  startCreateFile: (parentPath, preset) => {
+  startCreateFile: (parentPath, preset, options) => {
     primeKeyboard();
     set({
       operation: {
         mode: 'create',
         parentPath,
         kind: { type: 'file', preset: preset ?? null },
+        dialog: options?.dialog,
       },
     });
   },
 
-  startCreateFolder: (parentPath) => {
+  startCreateFolder: (parentPath, options) => {
     primeKeyboard();
     set({
-      operation: { mode: 'create', parentPath, kind: { type: 'folder' } },
+      operation: { mode: 'create', parentPath, kind: { type: 'folder' }, dialog: options?.dialog },
     });
   },
 

@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils';
 export function NameEntryDialog() {
   const operation = useEntryInput((s) => s.operation);
   const cancel = useEntryInput((s) => s.cancel);
-  const open = touchFirst && operation !== null;
+  const open = operation !== null && (touchFirst || (operation.mode === 'create' && !!operation.dialog));
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && cancel()}>

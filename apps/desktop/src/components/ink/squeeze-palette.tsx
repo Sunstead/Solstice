@@ -42,7 +42,7 @@ const toggle = (page: PalettePage, current: PalettePage) => setPage(current === 
 /**
  * The Pencil's squeeze palette, Solstice's in place of Apple's: an arc of
  * round buttons beside the Pencil, opening away from the hand (`arcDirection`):
- * undo and redo, the recent tools, More and the colour. The colour, More and
+ * undo and redo, the recent tools, More and the color. The color, More and
  * the tool in hand (its widths) fan their choices out beyond it, the same way
  * round. Under
  * `<body>`, so the webview takes every touch while it's open (`overlays`) and a
@@ -152,7 +152,7 @@ function Arc({ page, direction }: { page: PalettePage; direction: number }) {
       )),
       <Round
         key='more-colors'
-        label='More Colours'
+        label='More Colors'
         style={{
           background: 'conic-gradient(#ff3b30, #ffcc00, #34c759, #0a84ff, #af52de, #ff3b30)',
         }}
@@ -231,7 +231,7 @@ function Arc({ page, direction }: { page: PalettePage; direction: number }) {
           )}
           {item.type === 'colors' && (
             <Round
-              label='Colour'
+              label='Color'
               on={page === 'colors'}
               disabled={!hasInk(slot.kind)}
               onPress={() => toggle('colors', page)}
@@ -331,7 +331,7 @@ function Fanned({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** A slot's icon, with its colour beneath for an ink. */
+/** A slot's icon, with its color beneath for an ink. */
 function SlotFace({ slot }: { slot: ToolSlot }) {
   return (
     <span className='flex flex-col items-center'>

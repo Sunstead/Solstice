@@ -24,11 +24,12 @@ import {
   type TabDrag,
   type TabDragEnded,
   type TabSent,
+  type TreeMetaChanged,
   type WindowsChanged,
 } from '@/bindings';
 import { keymapChanged, webCommands } from './web/commands';
 import { Emitter } from './web/emitter';
-import { fsChanged, syncChanged } from './web/vault';
+import { fsChanged, syncChanged, treeMetaChanged } from './web/vault';
 
 /**
  * Whether the app runs in Tauri: the desktop app, or the mobile one. What
@@ -49,6 +50,7 @@ export interface Events {
   keymapChanged: EventSource<KeymapChanged>;
   menuCommand: EventSource<MenuCommand>;
   syncChanged: EventSource<SyncChanged>;
+  treeMetaChanged: EventSource<TreeMetaChanged>;
   // Between the desktop app's windows (`can.multiWindow`).
   tabAdopted: EventSource<TabAdopted>;
   tabDrag: EventSource<TabDrag>;
@@ -71,6 +73,7 @@ function tauriEventsFor(): Events {
     fileSystemChanged: tauriEvents.fileSystemChanged,
     keymapChanged: tauriEvents.keymapChanged,
     syncChanged: tauriEvents.syncChanged,
+    treeMetaChanged: tauriEvents.treeMetaChanged,
     windowsChanged: tauriEvents.windowsChanged,
     menuCommand: tauriEvents.menuCommand(own),
     tabAdopted: tauriEvents.tabAdopted(own),
@@ -90,6 +93,7 @@ export const events: Events = inTauri
       // The web app has no native menu to send these.
       menuCommand: new Emitter<MenuCommand>(),
       syncChanged,
+      treeMetaChanged,
       // A browser tab is one window.
       tabAdopted: new Emitter<TabAdopted>(),
       tabDrag: new Emitter<TabDrag>(),

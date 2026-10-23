@@ -62,6 +62,11 @@ pub fn reconnect_all(app: &AppHandle) {
     }
 }
 
+/// The client syncing the workspace folder `root`, once it has started.
+pub(crate) fn client_for_root(app: &AppHandle, root: &Path) -> Option<Client> {
+    state(app).clients.lock().unwrap().get(&key(root)).cloned()
+}
+
 /// The client whose folder holds `path`, and `path` relative to it.
 fn client_for_path(app: &AppHandle, path: &Path) -> Option<(Client, String)> {
     let path = key(path);
@@ -173,16 +178,24 @@ fn start(app: &AppHandle, root: &Path) {
     });
 }
 
-/// Tells the frontend whenever a client's status or reviews change.
+/// Tells the frontend whenever a client's status, reviews, bookmarks or
+/// folder colors change.
 async fn forward_changes(app: AppHandle, root: PathBuf, client: Client) {
     let mut status = client.watch_status();
     let mut reviews = client.watch_reviews();
+    let mut tree_meta = client.watch_tree_meta();
     let event = SyncChanged { root: root.to_string_lossy().into_owned() };
+    let meta_event = crate::tree_meta::TreeMetaChanged { root: event.root.clone() };
     let _ = event.emit(&app);
     loop {
         tokio::select! {
             r = status.changed() => if r.is_err() { break },
             r = reviews.changed() => if r.is_err() { break },
+            r = tree_meta.changed() => {
+                if r.is_err() { break }
+                let _ = meta_event.emit(&app);
+                continue;
+            }
         }
         let _ = event.emit(&app);
     }

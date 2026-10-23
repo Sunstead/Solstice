@@ -20,7 +20,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use solstice_sync::{DocKey, Event, Frame, Manifest, Msg, NoteDoc, Session, Vault};
+use solstice_sync::{DocKey, Event, Frame, Manifest, Msg, NoteDoc, Session, TreeMeta, Vault};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::db::{now, Db, DbError, DocRow, VaultRow};
@@ -273,6 +273,8 @@ struct VaultTask {
     watchers: Vec<mpsc::UnboundedSender<String>>,
     dirty: BTreeSet<DocKey>,
     recent_saves: web::RecentSaves,
+    /// The tree meta the web apps were last told about.
+    meta_seen: TreeMeta,
 }
 
 impl VaultTask {
@@ -334,9 +336,11 @@ impl VaultTask {
 
         let msgs = dir.absorb(&mut vault).map_err(|e| e.to_string())?;
         dirty.extend(msgs.into_iter().map(|m| m.doc));
+        let meta_seen = vault.tree_meta();
         let mut task = Self {
             db,
             row,
+            meta_seen,
             vault,
             dir,
             sessions: HashMap::new(),

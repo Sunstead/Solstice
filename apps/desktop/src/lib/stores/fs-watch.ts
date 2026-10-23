@@ -12,6 +12,7 @@ import { isSamePath } from '@/lib/path-utils';
 import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { useSync } from '@/lib/stores/sync';
+import { useTreeMeta } from '@/lib/stores/tree-meta';
 
 /**
  * Bridges the Rust filesystem watcher to `applyFsChanges`, and re-reads the
@@ -45,7 +46,10 @@ function flush() {
   flushTimer = null;
   const batch = queue;
   queue = [];
-  if (batch.length > 0) void applyFsChanges(batch);
+  if (batch.length === 0) return;
+  void applyFsChanges(batch);
+  // Only the watcher's renames: the app's own carry bookmarks themselves.
+  useTreeMeta.getState().fromWatcher(batch);
 }
 
 function enqueue(changes: FsChange[]) {

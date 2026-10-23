@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { SectionId } from '@/lib/settings/sections';
 
 /** The phone layout's home pages, one per footer item. */
-export type PhonePage = 'files' | 'search' | 'you';
+export type PhonePage = 'files' | 'bookmarks' | 'search' | 'you';
 
 const HISTORY = 50;
 

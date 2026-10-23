@@ -38,6 +38,9 @@ import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { useSetting } from '@/lib/settings/store';
 import { useLayout } from '@/hooks/use-layout';
 import { isTaskBoard } from '@/lib/embed/kind';
+import { useTreeMeta } from '@/lib/stores/tree-meta';
+import { useFolderColorDialog } from '@/lib/stores/folder-color-dialog';
+import { treeMetaMenuItems } from '@/lib/tree-meta/menu';
 
 /** Whether the focused tab shows its note as source (`view.toggle_source_mode`). */
 function inSourceMode(): boolean {
@@ -69,6 +72,8 @@ export type EntryMenuItem =
       icon: MenuIcon;
       destructive?: boolean;
       disabled?: boolean;
+      /** A choice in effect, marked with a check. */
+      checked?: boolean;
       run: () => void;
     }
   | { kind: 'separator'; id: string }
@@ -93,6 +98,8 @@ export type EntryMenuOptions = {
   renameEnabled?: boolean;
   deleteEnabled?: boolean;
   moveEnabled?: boolean;
+  /** New entries are named in a dialog: the tree, which names them inline, isn't in view. */
+  nameInDialog?: boolean;
 };
 
 /**
@@ -138,6 +145,7 @@ export function useEntryMenuItems(
     renameEnabled = true,
     deleteEnabled = true,
     moveEnabled = true,
+    nameInDialog = false,
   }: EntryMenuOptions,
 ): EntryMenuItem[] {
   const revealInSystemLabel = useRevealInSystemLabel();
@@ -146,6 +154,9 @@ export function useEntryMenuItems(
   const expandDirectory = useFiles((s) => s.expandDirectory);
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
   const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
+  const treeMetaOpen = useTreeMeta((s) => s.root !== null);
+  const bookmarked = useTreeMeta((s) => s.isBookmarked(target.path));
+  const folderColor = useTreeMeta((s) => (target.is_dir ? s.folderColor(target.path) : null));
 
   const { path, is_dir: isDir } = target;
   const items: EntryMenuItem[] = [];
@@ -163,7 +174,7 @@ export function useEntryMenuItems(
         id: `new-${preset.id}`,
         label: `New ${preset.label.toLocaleLowerCase()}...`,
         icon: getFileIcon(preset.extension),
-        run: createIn(() => startCreateFile(path, preset)),
+        run: createIn(() => startCreateFile(path, preset, { dialog: nameInDialog })),
       });
     }
 
@@ -172,14 +183,14 @@ export function useEntryMenuItems(
       id: 'new-folder',
       label: 'New folder...',
       icon: getFolderIcon(),
-      run: createIn(() => startCreateFolder(path)),
+      run: createIn(() => startCreateFolder(path, { dialog: nameInDialog })),
     });
     items.push({
       kind: 'item',
       id: 'new-file',
       label: 'New file...',
       icon: getFileIcon(''),
-      run: createIn(() => startCreateFile(path)),
+      run: createIn(() => startCreateFile(path, undefined, { dialog: nameInDialog })),
     });
     items.push(separator('after-new'));
   }
@@ -268,6 +279,21 @@ export function useEntryMenuItems(
   }
 
   items.push(separator('after-open-external'));
+
+  if (surface !== 'root' && treeMetaOpen) {
+    const meta = useTreeMeta.getState();
+    items.push(
+      ...treeMetaMenuItems(
+        { isDir, bookmarked, color: folderColor },
+        {
+          toggleBookmark: () => void meta.toggleBookmark(path),
+          setColor: (color) => void meta.setFolderColor(path, color),
+          customColor: deferred(() => useFolderColorDialog.getState().open(path)),
+        },
+      ),
+      separator('after-bookmark'),
+    );
+  }
 
   // Getting the file out: Share (with a choice of what to send, where
   // there's one), a PDF, a copy.

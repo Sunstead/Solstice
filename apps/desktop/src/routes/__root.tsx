@@ -23,6 +23,10 @@ import { useThemeEffect } from '@/hooks/use-theme';
 import { useFileCommands } from '@/hooks/use-file-commands';
 import { useDeepLinks } from '@/hooks/use-deep-links';
 import { useSyncStatus } from '@/lib/stores/sync';
+import { useTreeMetaSync } from '@/lib/stores/tree-meta';
+import { FileActionDialogs } from '@/components/file-action-dialogs';
+import { FileTreeDragLayer } from '@/components/file-tree-drag-layer';
+import { FolderColorDialog } from '@/components/folder-color-dialog';
 import { WorkspaceDialogs } from '@/components/workspace-dialogs';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
 import { answerPick, useNotePicker } from '@/lib/stores/note-picker';
@@ -88,6 +92,7 @@ export const Route = createRootRoute({
     useSettingsDomBindings();
     useDeepLinks();
     useSyncStatus();
+    useTreeMetaSync();
     useAppWindows();
     useSearchWarmup();
 
@@ -178,17 +183,21 @@ export const Route = createRootRoute({
     // prevents a flash of the defaults -- the `key` below only forces a
     // remount, it does not delay rendering. This is a single store read, so
     // the blank frame is a few milliseconds; the theme class is already on
-    // <html> by then, so the window paints in the right colour.
+    // <html> by then, so the window paints in the right color.
     if (!settingsLoaded || !windowLoaded) return null;
 
     return (
       <DndProvider backend={HTML5Backend}>
+        {/* Once for the app: the Explorer, Bookmarks and file menus all ask for them. */}
+        <FileActionDialogs />
+        <FileTreeDragLayer />
+        <FolderColorDialog />
         {/* Insets: a home-screen app draws under the status bar and, in
             landscape, beside the notch. The bottom one is left to what
             scrolls, so content runs under the home indicator. */}
         <div className='h-dvh bg-sidebar text-foreground flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]'>
           {/* The strip under the status bar (the iPad's menu bar), in the
-              sidebar's colour: an element of its own, since the root goes
+              sidebar's color: an element of its own, since the root goes
               see-through while a PDF or drawing shows through it. */}
           <div aria-hidden className='pointer-events-none fixed inset-x-0 top-0 h-[env(safe-area-inset-top)] bg-sidebar' />
           <SidebarProvider

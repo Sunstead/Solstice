@@ -4,7 +4,7 @@
  * path is `/<vault name>`, so paths look like `/Notes/plans/Plan.md`; the
  * part after the vault is what the server calls a vault path.
  */
-import type { FileEntry, FileSystemChanged, FsChange, Query, Results, SyncChanged } from '@/bindings';
+import type { FileEntry, FileSystemChanged, FsChange, Query, Results, SyncChanged, TreeMetaChanged } from '@/bindings';
 import { api, apiJson, encodePath, signIn } from './api';
 import { Emitter } from './emitter';
 
@@ -31,6 +31,8 @@ export type SocketState = 'connecting' | 'synced' | 'offline';
 
 export const fsChanged = new Emitter<FileSystemChanged>();
 export const syncChanged = new Emitter<SyncChanged>();
+/** The open vault's bookmarks or folder colors changed. */
+export const treeMetaChanged = new Emitter<TreeMetaChanged>();
 /** The open vault's socket connected: the server's reachable again. */
 export const connected = new Emitter<Vault>();
 
@@ -228,9 +230,10 @@ function connect() {
     connected.emit(vault);
     // Whatever changed while it was away.
     void applyTreeChange([]);
+    treeMetaChanged.emit({ root: rootOf(vault) });
   };
   ws.onmessage = (e) => {
-    let msg: { notice?: string; tree?: boolean; notes?: string[] };
+    let msg: { notice?: string; tree?: boolean; notes?: string[]; meta?: boolean };
     try {
       msg = JSON.parse(String(e.data));
     } catch {
@@ -246,6 +249,7 @@ function connect() {
       return;
     }
     if (msg.tree || msg.notes?.length) void applyTreeChange(msg.notes ?? [], msg.tree);
+    if (msg.meta && current) treeMetaChanged.emit({ root: rootOf(current) });
   };
   ws.onclose = () => {
     if (socket !== ws) return;

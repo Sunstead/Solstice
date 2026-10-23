@@ -12,6 +12,7 @@ use tokio_tungstenite::tungstenite::Message;
 
 use crate::net::{Server, Socket, TokenSource};
 use crate::store::{is_linked, Link, Store, OWN};
+use crate::tree_file;
 use crate::Error;
 
 /// How long the server may stay quiet before the exchange counts as done.
@@ -121,7 +122,9 @@ pub async fn link(
     // From here on, the folder and vault are compared: new files here are
     // added, the vault's files are written here.
     dir.set_placed(placed);
-    let msgs = dir.absorb(&mut vault).map_err(Error::io)?;
+    let mut msgs = dir.absorb(&mut vault).map_err(Error::io)?;
+    // The folder's bookmarks and colors join the vault's.
+    msgs.extend(vault.seed_tree_meta(&tree_file::read(folder))?);
 
     let mut uploaded = Vec::new();
     for entry in vault.manifest.entries().into_values() {
@@ -142,6 +145,7 @@ pub async fn link(
     send(&mut socket, vault_id, msgs).await?;
     exchange(&mut socket, vault_id, &mut vault, &mut session).await?;
     dir.materialize(&vault).map_err(Error::io)?;
+    tree_file::write(folder, &vault.tree_meta())?;
     let _ = socket.close(None).await;
 
     let link = Link {

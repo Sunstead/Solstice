@@ -6,6 +6,7 @@ use tauri_specta::Event as _;
 
 mod workspace;
 mod workspace_meta;
+mod tree_meta;
 mod export;
 mod files;
 mod search;
@@ -55,6 +56,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             workspace_meta::workspace_meta,
             workspace_meta::set_workspace_color,
             workspace_meta::sync_pull_colors,
+            tree_meta::tree_meta,
+            tree_meta::tree_meta_apply,
             export::export_temp_path,
             export::write_export_file,
             export::render_pdf,
@@ -102,6 +105,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             MenuCommand,
             FileSystemChanged,
             sync::SyncChanged,
+            tree_meta::TreeMetaChanged,
             windows::TabAdopted,
             windows::TabDrag,
             windows::TabDragEnded,

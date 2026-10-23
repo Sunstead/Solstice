@@ -13,7 +13,10 @@
 //!   writes a file that isn't a note (`?new=1`: under a free name).
 //! - `POST /v1/vaults/{id}/ops`: create, mkdir, rename, trash, duplicate.
 //! - `GET /v1/vaults/{id}/reviews`, `GET`/`POST .../reviews/{*path}`.
-//! - `GET /v1/web/events?vault=`: a WebSocket of changes to a vault.
+//! - `GET`/`POST /v1/vaults/{id}/tree-meta`: bookmarks and folder colors;
+//!   a POST (`{ops}`, `solstice_sync::TreeOp`s) returns them after.
+//! - `GET /v1/web/events?vault=`: a WebSocket of changes to a vault
+//!   (`{tree, notes, meta}`).
 //! - `GET`/`PUT /v1/web/settings/{scope}`: settings that follow the user.
 
 use std::time::Duration;
@@ -60,6 +63,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/v1/vaults/{id}/ops", post(ops))
         .route("/v1/vaults/{id}/reviews", get(reviews))
+        .route("/v1/vaults/{id}/tree-meta", get(tree_meta).post(apply_tree_meta))
         .route(
             "/v1/vaults/{id}/reviews/{*path}",
             get(versions).post(resolve),
@@ -269,6 +273,29 @@ async fn ops(
         Op::Trash { path } => WebOp::Trash { path },
         Op::Duplicate { path } => WebOp::Duplicate { path },
     };
+    Ok(json_reply(run(&state, &who, &id, op).await?))
+}
+
+async fn tree_meta(
+    State(state): State<AppState>,
+    who: CurrentUser,
+    Path(id): Path<String>,
+) -> Result<Response, AppError> {
+    Ok(json_reply(run(&state, &who, &id, WebOp::TreeMeta).await?))
+}
+
+#[derive(Deserialize)]
+struct TreeOps {
+    ops: Vec<solstice_sync::TreeOp>,
+}
+
+async fn apply_tree_meta(
+    State(state): State<AppState>,
+    who: CurrentUser,
+    Path(id): Path<String>,
+    Json(body): Json<TreeOps>,
+) -> Result<Response, AppError> {
+    let op = WebOp::ApplyTreeMeta { ops: body.ops };
     Ok(json_reply(run(&state, &who, &id, op).await?))
 }
 

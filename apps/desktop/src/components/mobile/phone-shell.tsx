@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef } from 'react';
-import { Files, Search } from 'lucide-react';
+import { Bookmark, Files, Search } from 'lucide-react';
 
 import { useAccountActions } from '@/hooks/use-account-actions';
 import { BlankTab } from '@/components/blank-tab';
@@ -20,13 +20,14 @@ import { FilesPage } from './files-page';
 import { NoteHeader } from './note-pane';
 import { tabPath } from './phone-history';
 import { PushPane } from './push-pane';
+import { BookmarksPage } from './bookmarks-page';
 import { SearchPage } from './search-page';
 import { shownTab } from './tabs';
 import { YouPage } from './you-page';
 
 /**
  * The app on a phone (and in a desktop window that narrow), the way Discord
- * does it: the files are home, full screen, with Files, Search and You in a
+ * does it: the files are home, full screen, with Files, Bookmarks, Search and You in a
  * footer; a note slides in over them from the right, and goes back by its
  * Back button or a swipe from the left edge.
  *
@@ -126,6 +127,7 @@ export function PhoneShell() {
       <div ref={home} className='absolute inset-0 flex flex-col' {...swipe}>
         <div className='relative min-h-0 flex-1'>
           <FilesPage hidden={page !== 'files'} />
+          {page === 'bookmarks' && <BookmarksPage />}
           {page === 'search' && <SearchPage />}
           {page === 'you' && <YouPage />}
         </div>
@@ -188,10 +190,11 @@ function useSwipeToNote(enabled: boolean) {
 
 const PAGES: { id: PhonePage; label: string; icon: typeof Files }[] = [
   { id: 'files', label: 'Files', icon: Files },
+  { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
   { id: 'search', label: 'Search', icon: Search },
 ];
 
-/** Files, Search and You, along the bottom; hidden while the keyboard's up. */
+/** Files, Bookmarks, Search and You, along the bottom; hidden while the keyboard's up. */
 function AppFooter() {
   const page = usePhoneNav((s) => s.page);
   const showPage = usePhoneNav((s) => s.showPage);

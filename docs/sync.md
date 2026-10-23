@@ -28,7 +28,7 @@ later) through a server on Jupiter. Direction lives in the Sunstead roadmap
 | Deletes | Tombstones that record the note's state vector (or the blob's hash) at deletion. A replica that sees edits the deleter hadn't, restores the file; a restored note is flagged for review. |
 | Lost server state | Each doc has an `epoch`. If the server rebuilds a note from its file, the epoch changes, and a device drops its old history for it: with no changes of its own it adopts the server's; if only it changed the note, it replays its text on the new history; if both did, it keeps its text as `name (this device).md`. Old histories never merge into a new one, which would duplicate text. A new manifest epoch means linking the vault again. |
 | First link | Files on one side are copied over; files on both with different content are kept both ways (the server's keeps the name, this device's becomes `name (this device).ext`). |
-| Scope | Notes and attachments. `.solstice/` (layout, tabs, settings, themes) stays per device. |
+| Scope | Notes and attachments. `.solstice/` (layout, tabs, settings, themes) stays per device. Bookmarks and folder colors (decided 2026-10-22) sync too, in two maps of the manifest, mirrored to `.solstice/tree.json` (below). |
 
 ## Spike results
 
@@ -49,7 +49,7 @@ design for both: raw markdown in one CRDT text, file saves applied by diffing.
 merges:
 
 - Edits to different paragraphs, appends and most edits merge cleanly.
-- Two devices changing the same word offline can garble it: "colour" changed
+- Two devices changing the same word offline can garble it: "color" changed
   to "color" on one side and to "hue" on the other merged to "The he is red."
 - Deleting a line on one side while editing it on the other leaves the other
   side's insertion as a fragment.
@@ -226,7 +226,8 @@ devices get web changes as ordinary sync:
 | `GET`/`PUT /v1/vaults/{id}/files/{*path}` | apps, web | Any file's bytes; a PUT writes a file that isn't a note (`?new=1`: under a free name). |
 | `POST /v1/vaults/{id}/ops` | apps, web | `{op: create_note | create_folder | rename | trash | duplicate, ...}`. |
 | `GET /v1/vaults/{id}/reviews`, `GET`/`POST .../reviews/{*path}` | apps, web | Flagged merges, their versions, and resolving one (`{text?}`). |
-| `GET /v1/web/events?vault=` | apps, web | WebSocket: `{"tree": bool, "notes": [path]}` per change. |
+| `GET`/`POST /v1/vaults/{id}/tree-meta` | apps, web | Bookmarks and folder colors, `{linked, bookmarks: [{id, path}], folder_colors}`; a POST sends `{ops}` (`TreeOp`s) and gets them back. |
+| `GET /v1/web/events?vault=` | apps, web | WebSocket: `{"tree": bool, "notes": [path], "meta": bool}` per change; `meta` when the bookmarks or folder colors did. |
 | `GET`/`PUT /v1/web/settings/{scope}` | apps, web | A JSON object per scope (`global`, `vault.<id>`). |
 
 **Config.** `SOLSTICE_BIND` (default `0.0.0.0:8080`), `SOLSTICE_NOTES_DIR`,
@@ -236,6 +237,35 @@ devices get web changes as ordinary sync:
 (web sign-in), `SOLSTICE_WEB_DIR` (the web app's build, served at `/`;
 without it `/` says the server is running). The server holds no secrets:
 the OIDC client is public.
+
+## Bookmarks and folder colors
+
+A vault's bookmarks and folder colors (`solstice_sync::tree_meta`) live in
+two root maps of the manifest beside `files` and `reviews`:
+
+- `bookmarks`: flat keys `<id>/path` and `<id>/order`, so a rename on one
+  device and a move on another both land. Order is a fractional key
+  (base 62, read as a fraction, sorted by key then id), so a move writes one
+  key and is never rebalanced; neighbours whose keys clash or are broken give
+  every bookmark a fresh one.
+- `folderColors`: folder path → `#rrggbb`.
+
+Paths pass the same rule as files' (`is_safe_path`); anything else a peer
+writes is ignored. `TreeOp`s (add, remove by path, move after an id, set a
+color, retarget a path and what's under it, forget a path and what's under
+it) go through one `apply`, and `Manifest::write_tree_meta` writes only the
+keys that changed. Replicas from before these maps relay them untouched.
+
+A device mirrors them to `.solstice/tree.json` (the client, on every change;
+an unlinked folder keeps them only there), and linking seeds the vault from
+that file: its bookmarks after the vault's, its colors where the vault has
+none. Only the device a change happened on writes it: `Vault::rename` moves a
+renamed file's bookmark (that runs where the rename was seen, an absorb or a
+web rename), the app retargets on its own renames and moves and forgets on its
+own deletes, and a folder renamed whole outside the app is retargeted from the
+watcher. Devices that only see a file vanish change nothing; the app hides a
+bookmark whose target isn't there. Colors are keyed by path, so recoloring a
+folder offline while another device renames it loses the recolor.
 
 ## Devices (`crates/solstice-sync-client`)
 

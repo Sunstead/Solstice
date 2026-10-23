@@ -10,8 +10,11 @@ export type CreateAction = {
   run: () => void;
 };
 
-/** What can be made at the workspace's root: each creatable type, a folder, a file. */
-export function useCreateActions(path: string | null): CreateAction[] {
+/**
+ * What can be made in a folder (the workspace's root, say): each creatable
+ * type, a folder, a file. `dialog`: named in a dialog, where the tree isn't.
+ */
+export function useCreateActions(path: string | null, options?: { dialog?: boolean }): CreateAction[] {
   const startCreateFile = useEntryInput((s) => s.startCreateFile);
   const startCreateFolder = useEntryInput((s) => s.startCreateFolder);
   if (!path) return [];
@@ -22,9 +25,9 @@ export function useCreateActions(path: string | null): CreateAction[] {
         id: preset.id,
         label: preset.label,
         icon: getFileIcon(preset.extension),
-        run: () => startCreateFile(path, preset),
+        run: () => startCreateFile(path, preset, options),
       })),
-    { id: 'folder', label: 'Folder', icon: getFolderIcon(), run: () => startCreateFolder(path) },
-    { id: 'file', label: 'File', icon: getFileIcon(''), run: () => startCreateFile(path) },
+    { id: 'folder', label: 'Folder', icon: getFolderIcon(), run: () => startCreateFolder(path, options) },
+    { id: 'file', label: 'File', icon: getFileIcon(''), run: () => startCreateFile(path, undefined, options) },
   ];
 }
