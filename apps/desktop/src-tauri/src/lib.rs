@@ -8,6 +8,7 @@ mod workspace;
 mod workspace_meta;
 mod export;
 mod files;
+mod search;
 mod types;
 mod commands;
 mod watcher;
@@ -43,6 +44,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             files::save_attachment,
             files::import_attachment,
             files::list_workspace_files_recursive,
+            search::search_workspace,
+            search::warm_search_index,
             workspace::set_workspace,
             workspace::create_workspace,
             workspace::default_workspace_parent,
@@ -191,6 +194,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(workspace::WorkspaceState::new())
         .manage(watcher::FsWatcherState::new())
+        .manage(search::SearchState::default())
         .manage(sync::SyncState::default())
         .manage(commands::keymap::MenuAccelerators::default())
         .manage(export::ExportJobs::default())

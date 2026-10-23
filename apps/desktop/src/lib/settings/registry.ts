@@ -608,6 +608,16 @@ export const settingsRegistry = {
     default: false,
   }),
 
+  // Read by full-text search (`lib/stores/search.ts`), which also leaves out
+  // every dot-folder.
+  'search.exclude': defineText({
+    section: 'explorer',
+    scope: 'workspace',
+    label: 'Folders left out of search',
+    default: '',
+    placeholder: 'Archive, Templates/Old',
+  }),
+
   'explorer.foldersFirst': defineBoolean({
     section: 'explorer',
     scope: 'workspace',

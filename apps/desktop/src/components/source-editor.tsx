@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, selectAll, undo } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
-import { openSearchPanel, search, searchKeymap } from '@codemirror/search';
+import { openSearchPanel, search, SearchQuery, searchKeymap, setSearchQuery } from '@codemirror/search';
 import { Annotation, EditorState } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 
@@ -17,6 +17,7 @@ import { sourceCaretClearance } from '@/lib/editor/caret-clearance';
 import { codeBlockHighlighting } from '@/lib/codeblock/theme';
 import { registerScopedCommand, unregisterScopedCommand, type ScopedCommandId } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
+import { useFindStore } from '@/lib/stores/find';
 import { registerTextSource } from '@/lib/stores/editor-text';
 import { abandonPendingWrites, clearAbandoned } from '@/lib/stores/external-changes';
 import { useSaveFailure } from '@/lib/stores/save-status';
@@ -130,6 +131,29 @@ export function SourceEditor({ path, initialContent }: { path: string; initialCo
       }
     };
   }, [view, instanceId]);
+
+  // A full-text search hit: selected where it is, with the search panel
+  // open on the search's query.
+  const jumpRequest = useFindStore((s) => (s.jump?.path === path ? s.jump : null));
+  useEffect(() => {
+    if (!view || !jumpRequest) return;
+    const taken = useFindStore.getState().takeJump(path);
+    if (taken?.jump.type !== 'line') return;
+    const { doc } = view.state;
+    const line = doc.line(Math.min(taken.jump.line + 1, doc.lines));
+    const from = Math.min(line.from + taken.jump.column, line.to);
+    const to = Math.min(from + taken.length, doc.length);
+    const { query, caseSensitive, wholeWord } = useFindStore.getState();
+    // Opened first: it seeds its query from the selection, which this replaces.
+    openSearchPanel(view);
+    view.dispatch({
+      selection: { anchor: from, head: to },
+      effects: [
+        setSearchQuery.of(new SearchQuery({ search: query, caseSensitive, wholeWord })),
+        EditorView.scrollIntoView(from, { y: 'center' }),
+      ],
+    });
+  }, [view, jumpRequest, path]);
 
   const text = () => view?.state.doc.toString() ?? null;
 

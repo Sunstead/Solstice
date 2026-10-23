@@ -44,6 +44,7 @@ tauri-plugin-deep-link = "2"
 
 # Solstice Sync: the client, and signing in to the server (ported from Cosmos).
 solstice-core = { path = "../../../crates/solstice-core" }
+solstice-search = { path = "../../../crates/solstice-search", features = ["specta"] }
 solstice-sync-client = { path = "../../../crates/solstice-sync-client" }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots"] }

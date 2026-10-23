@@ -69,16 +69,35 @@ function useNativeFind(id: string, path: string) {
   const caseSensitive = useFindStore((s) => s.caseSensitive);
   const wholeWord = useFindStore((s) => s.wholeWord);
   const stepRequest = useFindStore((s) => s.stepRequest);
+  // Asking again (another search hit) searches again, to go to its page.
+  const focusNonce = useFindStore((s) => s.focusNonce);
+
+  // A full-text search hit: the find bar opens on its query, then a PDF's
+  // goes to the hit's page once the view has found its matches.
+  const jumpRequest = useFindStore((s) => (s.jump?.path === path ? s.jump : null));
+  const pendingPage = useRef<{ page: number; ink: boolean } | null>(null);
+  useEffect(() => {
+    if (!jumpRequest) return;
+    const taken = useFindStore.getState().takeJump(path);
+    if (!taken) return;
+    if (taken.jump.type === 'page') pendingPage.current = { page: taken.jump.page, ink: taken.jump.ink };
+    useFindStore.getState().openFor(path);
+  }, [jumpRequest, path]);
 
   useEffect(() => {
     let current = true;
-    void nativeSurfaces.find(id, open ? query : '', caseSensitive, wholeWord).then((found) => {
-      if (current && found && open) useFindStore.getState().reportMatches(found.count, found.active);
+    void nativeSurfaces.find(id, open ? query : '', caseSensitive, wholeWord).then(async (found) => {
+      if (!current || !found || !open) return;
+      let active = found.active;
+      const page = pendingPage.current;
+      pendingPage.current = null;
+      if (page) active = (await nativeSurfaces.findPage(id, page.page, page.ink))?.active ?? active;
+      if (current) useFindStore.getState().reportMatches(found.count, active);
     });
     return () => {
       current = false;
     };
-  }, [id, open, query, caseSensitive, wholeWord]);
+  }, [id, open, query, caseSensitive, wholeWord, focusNonce]);
 
   useEffect(() => {
     if (!open || !stepRequest) return;

@@ -5,6 +5,8 @@
 //!
 //! - `GET /v1/me`
 //! - `GET /v1/vaults/{id}/tree`
+//! - `GET /v1/vaults/{id}/search?q=&case=&word=&exclude=`: full-text search;
+//!   `exclude` is the `search.exclude` setting, comma-separated.
 //! - `GET`/`PUT /v1/vaults/{id}/notes/{*path}`: a note's text and `base`; a
 //!   save sends both back and returns the merged text.
 //! - `GET`/`PUT /v1/vaults/{id}/files/{*path}`: any file's bytes; a PUT
@@ -43,6 +45,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/v1/me", get(me))
         .route("/v1/vaults/{id}/tree", get(tree))
+        .route("/v1/vaults/{id}/search", get(search))
         .route(
             "/v1/vaults/{id}/notes/{*path}",
             get(read_note)
@@ -121,6 +124,41 @@ async fn tree(
     Path(id): Path<String>,
 ) -> Result<Response, AppError> {
     Ok(json_reply(run(&state, &who, &id, WebOp::Tree).await?))
+}
+
+#[derive(Deserialize)]
+struct SearchParams {
+    #[serde(default)]
+    q: String,
+    #[serde(default)]
+    case: bool,
+    #[serde(default)]
+    word: bool,
+    #[serde(default)]
+    exclude: String,
+}
+
+async fn search(
+    State(state): State<AppState>,
+    who: CurrentUser,
+    Path(id): Path<String>,
+    Query(params): Query<SearchParams>,
+) -> Result<Json<solstice_search::Results>, AppError> {
+    who.require_person()?;
+    let vault = vault_for(&state, &who, &id).await?;
+    let folder = state.hub.folder(&who.user.username, &vault.name);
+    let query = solstice_search::Query {
+        text: params.q,
+        case_sensitive: params.case,
+        whole_word: params.word,
+    };
+    let excludes: Vec<String> = params.exclude.split(',').map(str::to_owned).collect();
+    let results = tokio::task::spawn_blocking(move || {
+        state.search.search(&vault.id, folder, &query, &excludes)
+    })
+    .await
+    .map_err(AppError::internal)?;
+    Ok(Json(results))
 }
 
 async fn read_note(

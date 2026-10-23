@@ -14,6 +14,7 @@ path = "src/main.rs"
 solstice-core = { path = "../../crates/solstice-core" }
 solstice-sync = { path = "../../crates/solstice-sync" }
 solstice-sync-fs = { path = "../../crates/solstice-sync-fs" }
+solstice-search = { path = "../../crates/solstice-search" }
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "signal", "fs"] }
 tower-http = { version = "0.6", features = ["trace", "fs"] }

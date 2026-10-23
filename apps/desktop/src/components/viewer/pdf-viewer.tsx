@@ -88,7 +88,25 @@ export function PdfViewer({ path }: { path: string }) {
   const pageNodes = useRef(new Map<number, HTMLDivElement>());
 
   const numPages = pdf?.numPages ?? 0;
-  const { matchesByPage, activeMatch, activePage } = usePdfFind(pdf, path);
+  // A full-text search hit: its page, and the find bar on its query. A text
+  // hit is then made the current match; handwriting has no find here.
+  const jumpRequest = useFindStore((s) => (s.jump?.path === path ? s.jump : null));
+  const [jumpPage, setJumpPage] = useState<number | null>(null);
+  const clearJump = useCallback(() => setJumpPage(null), []);
+  useEffect(() => {
+    if (!pdf || !jumpRequest) return;
+    const taken = useFindStore.getState().takeJump(path);
+    if (taken?.jump.type !== 'page') return;
+    useFindStore.getState().openFor(path);
+    const { page, ink } = taken.jump;
+    // A frame on, once the bar's opening has rendered.
+    requestAnimationFrame(() => {
+      pageNodes.current.get(page + 1)?.scrollIntoView({ block: 'start' });
+      if (!ink) setJumpPage(page);
+    });
+  }, [pdf, jumpRequest, path]);
+
+  const { matchesByPage, activeMatch, activePage } = usePdfFind(pdf, path, jumpPage, clearJump);
 
   // react-pdf reloads the document whenever this changes identity, so it has
   // to survive every unrelated re-render of this component.

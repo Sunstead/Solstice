@@ -55,6 +55,7 @@ import {
 } from '@/lib/canvas/viewport';
 import { warmStaticRenderer } from '@/lib/editor/static-markdown';
 import { getSetting, setSetting, useSetting } from '@/lib/settings/store';
+import { useFindStore } from '@/lib/stores/find';
 import { CanvasContextMenuContent, type TriState } from './canvas-context-menu';
 import { fromEndOf, toEndOf } from '@/lib/canvas/edge-geometry';
 import { CanvasFilePicker } from './canvas-file-picker';
@@ -135,6 +136,17 @@ export function CanvasBoard({ path }: { path: string }) {
     if (ids.size === 0 || !size.width) return;
     setView(fitTo(boundsOfIds(current, ids), size));
   }, [store]);
+
+  // A full-text search hit: its card, selected and in view, once the board
+  // knows its size.
+  const jumpRequest = useFindStore((s) => (s.jump?.path === path ? s.jump : null));
+  useEffect(() => {
+    if (!jumpRequest || !pane.width) return;
+    const jump = useFindStore.getState().takeJump(path)?.jump;
+    if (jump?.type !== 'card' || !store.getState().doc.nodes.some((n) => n.id === jump.id)) return;
+    store.getState().select([jump.id]);
+    zoomToSelection();
+  }, [jumpRequest, pane.width, path, store, zoomToSelection]);
 
   /**
    * Where a new card goes: the middle of the screen, unless the context menu

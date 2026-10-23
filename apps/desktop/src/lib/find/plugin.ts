@@ -24,8 +24,10 @@ export type FindPluginState = FindQuery & {
 type SetQueryMeta = { type: 'query'; value: FindQuery | null };
 /** Moves the active match; the caller separately scrolls it into view. */
 type StepMeta = { type: 'step'; direction: 1 | -1 };
+/** Makes match `index` the active one. */
+type SelectMeta = { type: 'select'; index: number };
 
-type FindMeta = SetQueryMeta | StepMeta;
+type FindMeta = SetQueryMeta | StepMeta | SelectMeta;
 
 const EMPTY: FindQuery = { query: '', caseSensitive: false, wholeWord: false };
 
@@ -97,6 +99,21 @@ export function stepFindMatch(view: EditorView, direction: 1 | -1) {
 }
 
 /**
+ * Makes match `index` current and puts the selection on it, as stepping
+ * does: where a full-text search hit opens the note.
+ */
+export function selectFindMatch(view: EditorView, index: number) {
+  const match = getFindState(view.state)?.matches[index];
+  if (!match) return;
+  view.dispatch(
+    view.state.tr
+      .setMeta(findPluginKey, { type: 'select', index } satisfies FindMeta)
+      .setSelection(TextSelection.create(view.state.doc, match.from, match.to))
+      .scrollIntoView(),
+  );
+}
+
+/**
  * Highlights every match and tracks which one is current. Matches are
  * recomputed when the query changes and remapped -- not re-searched -- while
  * the document is only being edited around them, so highlights survive typing
@@ -127,6 +144,14 @@ export const findPlugin = $prose(
               ...previous,
               activeIndex,
               decorations: decorate(previous.matches, activeIndex, newState.doc),
+            };
+          }
+
+          if (meta?.type === 'select') {
+            return {
+              ...previous,
+              activeIndex: meta.index,
+              decorations: decorate(previous.matches, meta.index, newState.doc),
             };
           }
 

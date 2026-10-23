@@ -37,6 +37,9 @@ const EMPTY: PdfFindState = { matchesByPage: [], activeMatch: -1, activePage: nu
 export function usePdfFind(
   pdf: PDFDocumentProxy | null,
   path: string,
+  /** A page (zero-based) whose first match, or the first after it, to make current; then `jumped`. */
+  jumpPage: number | null = null,
+  jumped: () => void = () => {},
 ): PdfFindState {
   const open = useFindStore((s) => s.openPath === path);
   const query = useFindStore((s) => s.query);
@@ -117,6 +120,16 @@ export function usePdfFind(
       return Math.min(Math.max(current, 0), total - 1);
     });
   }, [total]);
+
+  // A full-text search hit, once the pages up to it have been read: set
+  // while rendering, as React has state adjusted to a change, and `jumped`
+  // clears it at once.
+  if (jumpPage !== null && pdf && (indexed > jumpPage || indexed >= pdf.numPages)) {
+    let before = 0;
+    for (let index = 0; index < jumpPage; index += 1) before += matchesByPage[index]?.count ?? 0;
+    if (before < total) setActiveMatch(before);
+    jumped();
+  }
 
   const lastStep = useRef(0);
   useEffect(() => {

@@ -32,6 +32,7 @@ import {
   refresh,
   resolve,
   rootOf,
+  searchVault,
   setVaultColor,
   vaultUrl,
   vaults,
@@ -201,6 +202,13 @@ export const webCommands: Commands = {
       return writeBytes(`${intoDir}/${attachmentName(from)}`, blob, true);
     }),
   listWorkspaceFilesRecursive: (path) => attempt(() => listRecursive(path)),
+  searchWorkspace: (root, query, excludes) => attempt(() => searchVault(root, query, excludes)),
+  // The server's index warms on its first search, which an empty query skips.
+  warmSearchIndex: (root, excludes) =>
+    attempt(async () => {
+      await searchVault(root, { text: '', case_sensitive: false, whole_word: false }, excludes);
+      return null;
+    }),
   // A workspace on the web is a vault; there's no folder to put it in.
   createWorkspace: (_parent, name) => attempt(async () => rootOf(await createVault(name.trim()))),
   defaultWorkspaceParent: () => Promise.resolve(null),

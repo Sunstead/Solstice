@@ -4917,6 +4917,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "solstice-core",
+ "solstice-search",
  "solstice-sync-client",
  "specta",
  "specta-typescript",
@@ -4956,6 +4957,20 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
+]
+
+[[package]]
+name = "solstice-search"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "lopdf",
+ "serde",
+ "serde_json",
+ "solstice-core",
+ "solstice-pdf",
+ "specta",
  "tempfile",
 ]
 
@@ -5024,6 +5039,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "solstice-core",
+ "solstice-search",
  "solstice-sync",
  "solstice-sync-fs",
  "tempfile",

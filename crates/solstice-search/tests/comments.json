@@ -1,0 +1,9 @@
+[
+  { "input": "Keep %%not this%% this.\n", "stripped": "Keep  this.\n" },
+  { "input": "A\n\n%%\nhidden\n\nstill hidden\n%%\n\nB\n", "stripped": "A\n\n\n\nB\n" },
+  { "input": "`%%` stays %%gone%%\n", "stripped": "`%%` stays \n" },
+  { "input": "```sql\nLIKE '%%'\n```\n%%x%%y\n", "stripped": "```sql\nLIKE '%%'\n```\ny\n" },
+  { "input": "# Title\n\n100% sure\n", "stripped": "# Title\n\n100% sure\n" },
+  { "input": "open %%to the end\nand on\n", "stripped": "open " },
+  { "input": "café %%é%% ✓\n", "stripped": "café  ✓\n" }
+]

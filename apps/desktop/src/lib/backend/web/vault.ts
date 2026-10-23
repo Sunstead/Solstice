@@ -4,7 +4,7 @@
  * path is `/<vault name>`, so paths look like `/Notes/plans/Plan.md`; the
  * part after the vault is what the server calls a vault path.
  */
-import type { FileEntry, FileSystemChanged, FsChange, SyncChanged } from '@/bindings';
+import type { FileEntry, FileSystemChanged, FsChange, Query, Results, SyncChanged } from '@/bindings';
 import { api, apiJson, encodePath, signIn } from './api';
 import { Emitter } from './emitter';
 
@@ -177,6 +177,22 @@ export async function listRecursive(path: string): Promise<FileEntry[]> {
     ...[...allFolders(t)].filter((p) => p.startsWith(prefix)).map((p) => entry(vault, p, true)),
     ...t.files.filter((f) => f.path.startsWith(prefix)).map((f) => entry(vault, f.path, false)),
   ];
+}
+
+/**
+ * Full-text search of the vault at `root`, on the server: its paths come
+ * back relative to the vault, so they're made workspace paths here.
+ */
+export async function searchVault(root: string, query: Query, excludes: string[]): Promise<Results> {
+  const { vault } = await resolve(root);
+  const params = new URLSearchParams({
+    q: query.text,
+    case: String(query.case_sensitive),
+    word: String(query.whole_word),
+    exclude: excludes.join(','),
+  });
+  const results = await apiJson<Results>(`${vaultUrl(vault, 'search')}?${params}`);
+  return { ...results, files: results.files.map((f) => ({ ...f, path: `${rootOf(vault)}/${f.path}` })) };
 }
 
 export async function exists(path: string): Promise<boolean> {
