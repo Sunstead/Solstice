@@ -9,18 +9,22 @@ import { runCommand } from '@/lib/commands';
 import { AppMenubar } from './app-menu-dropdown';
 import { SyncIndicator } from './sync/status';
 import { UpdateIndicator } from './updates/update-indicator';
+import { WorkspaceSwitcher } from './workspace-switcher';
+import { useSetting } from '@/lib/settings/store';
 
 /** Where the controls end, from the window's left edge; the tab strip's spacer reads it. */
 const useControlsEnd = create<{ end: number }>(() => ({ end: 0 }));
 
 /**
- * The menu, Back, Forward and sync buttons. Rendered once, by the title bar,
- * and never moved: with the sidebar open they sit over its empty title area;
- * collapsed, the title bar narrows to the icon rail and they overhang the
- * top-left tab strip, which makes room with `HeaderControlsSpacer`.
+ * The menu, navigation, sync, workspace and update controls. Rendered once,
+ * by the title bar, and never moved: with the sidebar open they sit over its
+ * empty title area; collapsed, the title bar narrows to the icon rail and
+ * they overhang the top-left tab strip, which makes room with
+ * `HeaderControlsSpacer`.
  */
-export function HeaderControls() {
+export function HeaderControls({ showWorkspaceSwitcher = true }: { showWorkspaceSwitcher?: boolean }) {
   const isMac = useIsMac();
+  const workspaceSwitcherLocation = useSetting('appearance.workspaceSwitcherLocation');
   const ref = useRef<HTMLDivElement>(null);
   const canGoBack = useNavigationHistory((s) => s.past.length > 0);
   const canGoForward = useNavigationHistory((s) => s.future.length > 0);
@@ -61,6 +65,9 @@ export function HeaderControls() {
           <span className='sr-only'>Forward</span>
         </Button>
         <SyncIndicator />
+        {showWorkspaceSwitcher && workspaceSwitcherLocation === 'titlebar' && (
+          <WorkspaceSwitcher variant='titlebar' />
+        )}
         <UpdateIndicator />
       </div>
     </div>

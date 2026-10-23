@@ -14,7 +14,7 @@ export function EditorWindowShell({ children }: { children: React.ReactNode }) {
           stacking context would put the controls under the editor
           (`header-controls.tsx` lifts them itself). */}
       <div className='chrome absolute left-0 top-0 flex h-10 touch:h-11 items-center'>
-        <TitleBarLead />
+        <TitleBarLead showWorkspaceSwitcher={false} />
       </div>
     </div>
   );

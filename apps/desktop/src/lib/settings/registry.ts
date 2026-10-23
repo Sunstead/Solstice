@@ -112,6 +112,19 @@ export const settingsRegistry = {
     disabledWhen: (get) => !get('appearance.islands'),
   }),
 
+  'appearance.workspaceSwitcherLocation': defineEnum({
+    section: 'appearance',
+    group: 'Layout',
+    scope: 'global',
+    label: 'Workspace switcher location',
+    options: [
+      { value: 'icon-sidebar', label: 'Icon sidebar' },
+      { value: 'titlebar', label: 'Title bar' },
+      { value: 'explorer-sidebar', label: 'Explorer sidebar' },
+    ],
+    default: 'icon-sidebar',
+  }),
+
   'appearance.reduceMotion': defineBoolean({
     section: 'accessibility',
     scope: 'global',
