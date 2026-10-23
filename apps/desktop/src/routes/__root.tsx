@@ -44,6 +44,8 @@ import { startBackgroundChecks, useUpdates } from '@/lib/stores/updates';
 import { UpdateDialog } from '@/components/updates/update-dialog';
 import { EditorWindowShell } from '@/components/editor-window-shell';
 import { useAppWindows } from '@/hooks/use-app-windows';
+import { useSearchWarmup } from '@/hooks/use-search-warmup';
+import { useSearchStore } from '@/lib/stores/search';
 import { loadAppWindow, useAppWindow } from '@/lib/stores/app-window';
 
 export const Route = createRootRoute({
@@ -87,6 +89,7 @@ export const Route = createRootRoute({
     useDeepLinks();
     useSyncStatus();
     useAppWindows();
+    useSearchWarmup();
 
     useEffect(() => {
       // Global settings first: the workspace layer that `init` goes on to load
@@ -113,6 +116,18 @@ export const Route = createRootRoute({
           usePhoneNav.getState().goHome();
           usePhoneNav.getState().showPage('search');
         } else setQuickOpenOpen(true);
+      });
+      registerCommand('edit.find_in_files', () => {
+        // What's selected, as every editor's Find in Files starts with it.
+        const selected = window.getSelection()?.toString().trim();
+        if (useLayout.getState().openInPlace) {
+          usePhoneNav.getState().goHome();
+          usePhoneNav.getState().showPage('search');
+        } else {
+          useWorkspaceUIStore.getState().setActivePrimaryView('search');
+          useWorkspaceUIStore.getState().setSidebarCollapsed(false);
+        }
+        useSearchStore.getState().focus(selected && !selected.includes('\n') ? selected : undefined);
       });
       registerCommand('app.settings', () =>
         useSettingsDialog.getState().openSettings(),

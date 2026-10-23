@@ -692,6 +692,24 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     return active
   }
 
+  override func findPage(_ page: Int, ink: Bool) -> Int {
+    guard let document = pdfView.document, !matches.isEmpty else { return active }
+    func index(of match: Match) -> (page: Int, ink: Bool) {
+      switch match {
+      case .text(let selection): (selection.pages.first.map { document.index(for: $0) } ?? 0, false)
+      case .ink(let on, _): (document.index(for: on), true)
+      }
+    }
+    let after = matches.indices.filter { index(of: matches[$0]).page >= page }
+    let preferred = after.first { index(of: matches[$0]).page == page && index(of: matches[$0]).ink == ink }
+    guard let first = preferred ?? after.first else {
+      return active
+    }
+    active = first
+    showMatches()
+    return active
+  }
+
   private func showMatches() {
     var selections: [PDFSelection] = []
     for (index, match) in matches.enumerated() {

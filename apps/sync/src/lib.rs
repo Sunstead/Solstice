@@ -10,6 +10,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod hub;
+pub mod search;
 pub mod web;
 pub mod web_api;
 
@@ -25,6 +26,7 @@ pub struct AppState {
     pub auth: Arc<auth::Auth>,
     pub hub: hub::Hub,
     pub notes_dir: PathBuf,
+    pub search: search::Searches,
     /// Where browsers reach the server, for web sign-in.
     pub public_url: Option<url::Url>,
     pub cookie: auth::web::CookieSpec,
@@ -38,6 +40,7 @@ impl AppState {
             auth: Arc::new(auth::Auth::new(&config.auth)),
             db,
             notes_dir: config.notes_dir.clone(),
+            search: search::Searches::new(config.state_dir.join("search")),
             public_url: config.public_url.clone(),
             cookie: auth::web::CookieSpec::for_url(config.public_url.as_ref()),
             web_dir: config.web_dir.clone(),

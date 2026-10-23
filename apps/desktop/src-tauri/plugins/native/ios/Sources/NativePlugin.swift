@@ -22,6 +22,8 @@ struct SurfaceArgs: Decodable {
   let caseSensitive: Bool?
   let wholeWord: Bool?
   let direction: Int?
+  let page: Int?
+  let ink: Bool?
   let on: Bool?
 }
 
@@ -161,6 +163,9 @@ class NativePlugin: Plugin {
         return
       case "findStep":
         let active = host.surfaces[args.id]?.findStep(args.direction ?? 1) ?? -1
+        return invoke.resolve(["active": active])
+      case "findPage":
+        let active = host.surfaces[args.id]?.findPage(args.page ?? 0, ink: args.ink ?? false) ?? -1
         return invoke.resolve(["active": active])
       case "close":
         host.remove(args.id)

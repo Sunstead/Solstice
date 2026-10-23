@@ -56,6 +56,13 @@ export const commands = {
 	importAttachment: (from: string, intoDir: string) => typedError<string, string>(__TAURI_INVOKE("import_attachment", { from, intoDir })),
 	listWorkspaceFilesRecursive: (path: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_workspace_files_recursive", { path })),
 	/**
+	 *  `query` in every file of the workspace at `root`, leaving out dot-folders
+	 *  and `excludes` (folder names, or paths from the root).
+	 */
+	searchWorkspace: (root: string, query: Query, excludes: string[]) => typedError<Results, string>(__TAURI_INVOKE("search_workspace", { root, query, excludes })),
+	/**  Reads the workspace into its index ahead of the first query. */
+	warmSearchIndex: (root: string, excludes: string[]) => typedError<null, string>(__TAURI_INVOKE("warm_search_index", { root, excludes })),
+	/**
 	 *  Opening a workspace is also what starts watching it, so the two can never
 	 *  drift apart. Returns an error if the watcher could not be started -- on
 	 *  Linux a large vault can exhaust the inotify watch limit, and the frontend
@@ -273,7 +280,7 @@ export type Bounds = {
 	height: number | null,
 };
 
-export type CommandId = "app.settings" | "app.check_for_updates" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.new_workspace" | "file.import_from_sync" | "file.manage_workspaces" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.share" | "file.share_pdf" | "file.share_image" | "file.export_pdf" | "file.save_copy" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.highlight" | "edit.find" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.task_list" | "edit.indent" | "edit.outdent" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "edit.insert_wikilink" | "edit.copy_block_link" | "view.toggle_sidebar" | "view.toggle_source_mode" | "view.next_tab" | "view.previous_tab" | "window.new" | "window.move_tab_to_new_window" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
+export type CommandId = "app.settings" | "app.check_for_updates" | "file.new_note" | "file.new_canvas" | "file.open_file" | "file.new_tab" | "file.new_folder" | "file.new_workspace" | "file.import_from_sync" | "file.manage_workspaces" | "file.open_folder" | "file.close_tab" | "file.reveal_in_explorer" | "file.reveal_in_system" | "file.open_in_default_app" | "file.share" | "file.share_pdf" | "file.share_image" | "file.export_pdf" | "file.save_copy" | "file.copy_path" | "file.copy_relative_path" | "file.copy_wikilink" | "file.rename" | "file.duplicate" | "file.move_to" | "file.delete" | "edit.bold" | "edit.italic" | "edit.inline_code" | "edit.strikethrough" | "edit.highlight" | "edit.find" | "edit.find_in_files" | "edit.heading1" | "edit.heading2" | "edit.heading3" | "edit.heading4" | "edit.heading5" | "edit.heading6" | "edit.blockquote" | "edit.bullet_list" | "edit.ordered_list" | "edit.task_list" | "edit.indent" | "edit.outdent" | "edit.code_block" | "edit.hard_break" | "edit.paragraph" | "edit.insert_image" | "edit.insert_wikilink" | "edit.copy_block_link" | "view.toggle_sidebar" | "view.toggle_source_mode" | "view.next_tab" | "view.previous_tab" | "window.new" | "window.move_tab_to_new_window" | "navigation.back" | "navigation.forward" | "canvas.new_text" | "canvas.new_file" | "canvas.new_group" | "canvas.zoom_to_fit" | "canvas.zoom_to_selection" | "canvas.toggle_snap" | "canvas.toggle_minimap";
 
 export type CommandMeta = {
 	id: CommandId,
@@ -290,6 +297,15 @@ export type FileEntry = {
 	name: string,
 	path: string,
 	is_dir: boolean,
+};
+
+export type FileHits = {
+	/**  As the caller named the file. */
+	path: string,
+	kind: Kind,
+	/**  Every hit in the file, including those not in `hits`. */
+	count: number,
+	hits: Hit[],
 };
 
 /**  One debounced batch of changes under `root`. */
@@ -318,12 +334,41 @@ export type FsChange = {
 
 export type FsChangeKind = "Created" | "Modified" | "Removed" | "Renamed";
 
+export type Hit = {
+	/**  The hit's line, cut down around it. */
+	preview: string,
+	/**  The hit in `preview`, `[start, end)` in UTF-16 units. */
+	range: [number, number],
+	jump: Jump,
+};
+
+/**  Where a hit is, as its file's view goes there. */
+export type Jump = 
+/**
+ *  In a note's text, zero-based, the column in UTF-16 units. `ordinal`
+ *  is the hit's index among the rich editor's find matches (which see
+ *  comments but not front matter or link destinations), or `None` when
+ *  the hit is where the rich editor has no text.
+ */
+{ type: "line"; line: number; column: number; ordinal: number | null } | 
+/**  A canvas card. */
+{ type: "card"; id: string } | 
+/**  A PDF page, zero-based. */
+{ type: "page"; page: number; ink: boolean } | 
+/**  A drawing's handwriting. */
+{ type: "handwriting" };
+
 /**
  *  Fired whenever the resolved keymap changes (an override was saved).
  *  Every frontend consumer of the keymap — titlebar, tinykeys, the Milkdown
  *  keymap plugin — listens for this instead of polling.
  */
 export type KeymapChanged = null;
+
+/**  The kinds of file whose insides are searched. */
+export type Kind = 
+/**  Markdown, task boards included. */
+"note" | "canvas" | "drawing" | "pdf";
 
 /**
  *  A registry command was activated from the native menu bar -- either by
@@ -378,6 +423,13 @@ export type PointerSpot = {
 	over: string | null,
 };
 
+/**  What to look for: a literal string, with the find bar's two options. */
+export type Query = {
+	text: string,
+	case_sensitive: boolean,
+	whole_word: boolean,
+};
+
 export type ResolvedMenu = {
 	title: string,
 	entries: ResolvedMenuEntry[],
@@ -391,6 +443,15 @@ export type ResolvedMenuEntry = ({ Command: CommandMeta }) & { Native?: never; S
 	title: string,
 	entries: ResolvedMenuEntry[],
 } }) & { Command?: never; Native?: never };
+
+export type Results = {
+	/**  Most hits first, then by path. */
+	files: FileHits[],
+	/**  Every hit in every file. */
+	total: number,
+	/**  Some hits were left out for `Limits`. */
+	truncated: boolean,
+};
 
 /**  Another window wrote a settings file; read it again. */
 export type StoreChanged = {

@@ -23,7 +23,7 @@ export default function TitleBar() {
  * the header controls. An editor window lays it over its tab strip
  * (`EditorWindowShell`).
  */
-export function TitleBarLead() {
+export function TitleBarLead({ showWorkspaceSwitcher = true }: { showWorkspaceSwitcher?: boolean }) {
   const isFullscreen = useIsFullscreen();
   const isMac = useIsMac();
 
@@ -38,7 +38,7 @@ export function TitleBarLead() {
           <SolsticeIcon className='mx-2 size-5 pointer-events-none select-none [-webkit-user-drag:none]' />
         )}
       </div>
-      <HeaderControls />
+      <HeaderControls showWorkspaceSwitcher={showWorkspaceSwitcher} />
     </div>
   );
 }

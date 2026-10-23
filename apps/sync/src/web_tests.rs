@@ -525,3 +525,57 @@ async fn without_a_public_address_web_sign_in_says_so() {
     assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
     assert!(res.text().await.unwrap().contains("SOLSTICE_PUBLIC_URL"));
 }
+
+#[tokio::test]
+async fn searching_a_vault() {
+    let s = serve(
+        AuthMode::Dev {
+            username: "pwb".into(),
+        },
+        None,
+    )
+    .await;
+    let c = client();
+    let vault = json_of(
+        web(&c, reqwest::Method::POST, format!("{}/v1/vaults", s.base))
+            .json(&json!({ "name": "Notes" }))
+            .send()
+            .await
+            .unwrap(),
+    )
+    .await;
+    let v = format!("{}/v1/vaults/{}", s.base, vault["id"].as_str().unwrap());
+    web(&c, reqwest::Method::POST, format!("{v}/ops"))
+        .json(&json!({ "op": "create_note", "path": "Biology/Cells.md", "text": "The Mitochondria\n" }))
+        .send()
+        .await
+        .unwrap();
+    let folder = s.state.notes_dir.join("pwb/Notes");
+    std::fs::create_dir_all(folder.join("Archive")).unwrap();
+    std::fs::write(folder.join("Archive/Old.md"), "mitochondria, archived").unwrap();
+
+    let search = |query: &str| c.get(format!("{v}/search?{query}")).send();
+    let found = json_of(search("q=mitochondria").await.unwrap()).await;
+    assert_eq!(found["total"], 2, "{found}");
+    let paths: Vec<&str> = found["files"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap()).collect();
+    assert!(paths.contains(&"Biology/Cells.md") && paths.contains(&"Archive/Old.md"), "{paths:?}");
+    let hit = &found["files"][0]["hits"][0];
+    assert_eq!(hit["jump"]["type"], "line");
+
+    // The options and excludes are the find bar's and the setting's.
+    let exact = json_of(search("q=Mitochondria&case=true").await.unwrap()).await;
+    assert_eq!(exact["total"], 1);
+    let kept = json_of(search("q=mitochondria&exclude=Archive").await.unwrap()).await;
+    assert_eq!(kept["total"], 1);
+    assert_eq!(kept["files"][0]["path"], "Biology/Cells.md");
+
+    // An edit in the folder is found by the next search.
+    std::fs::write(folder.join("Biology/Cells.md"), "The Ribosome, edited\n").unwrap();
+    let edited = json_of(search("q=ribosome").await.unwrap()).await;
+    assert_eq!(edited["total"], 1);
+
+    // Nothing for an empty query, and no other vault.
+    assert_eq!(json_of(search("q=").await.unwrap()).await["total"], 0);
+    let other = c.get(format!("{}/v1/vaults/nope/search?q=x", s.base)).send().await.unwrap();
+    assert_eq!(other.status(), StatusCode::NOT_FOUND);
+}

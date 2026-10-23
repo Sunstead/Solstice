@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import cases from '../../../../../crates/solstice-search/tests/comments.json';
 import { stripComments } from './index';
 
 describe('stripComments', () => {
@@ -16,5 +17,13 @@ describe('stripComments', () => {
   it('leaves a note without comments as it is', () => {
     const note = '# Title\n\n100% sure\n';
     expect(stripComments(note)).toBe(note);
+  });
+});
+
+// Search reads comments in Rust (`solstice-search`'s `comment_ranges`), and
+// the two have to agree: both test these cases.
+describe('stripComments, as search reads comments', () => {
+  it.each(cases)('$input', ({ input, stripped }) => {
+    expect(stripComments(input)).toBe(stripped);
   });
 });

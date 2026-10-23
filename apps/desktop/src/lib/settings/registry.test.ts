@@ -32,3 +32,17 @@ describe('appearance.islandBorders', () => {
     expect(borders.visibleWhen).toBeUndefined();
   });
 });
+
+describe('appearance.workspaceSwitcherLocation', () => {
+  it('defaults to the icon sidebar and offers each sidebar and title bar', () => {
+    const location = settingsRegistry['appearance.workspaceSwitcherLocation'];
+    expect(location.default).toBe('icon-sidebar');
+    expect(location.scope).toBe('global');
+    expect(location.section).toBe('appearance');
+    expect(location.options).toEqual([
+      { value: 'icon-sidebar', label: 'Icon sidebar' },
+      { value: 'titlebar', label: 'Title bar' },
+      { value: 'explorer-sidebar', label: 'Explorer sidebar' },
+    ]);
+  });
+});

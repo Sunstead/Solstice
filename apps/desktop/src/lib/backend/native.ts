@@ -44,6 +44,9 @@ export const nativeSurfaces = {
     surface<{ count: number; active: number }>({ op: 'find', id, query, caseSensitive, wholeWord }),
   findStep: (id: string, direction: 1 | -1) =>
     surface<{ active: number }>({ op: 'findStep', id, direction }),
+  /** Makes the first match on `page` (zero-based) or after it current, handwriting or text first as `ink` says. */
+  findPage: (id: string, page: number, ink: boolean) =>
+    surface<{ active: number }>({ op: 'findPage', id, page, ink }),
   /**
    * A web menu or dialog is open (the webview takes every touch), and where
    * web content sits over the surfaces (it takes the touches there).

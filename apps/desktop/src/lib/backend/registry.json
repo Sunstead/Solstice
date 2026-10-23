@@ -169,6 +169,12 @@
       "label": "Find..."
     },
     {
+      "accelerator": "CmdOrCtrl+Shift+F",
+      "id": "edit.find_in_files",
+      "is_overridden": false,
+      "label": "Find in Files..."
+    },
+    {
       "accelerator": "CmdOrCtrl+Alt+1",
       "id": "edit.heading1",
       "is_overridden": false,
@@ -544,6 +550,14 @@
             "id": "edit.find",
             "is_overridden": false,
             "label": "Find..."
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+Shift+F",
+            "id": "edit.find_in_files",
+            "is_overridden": false,
+            "label": "Find in Files..."
           }
         },
         "Separator",

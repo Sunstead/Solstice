@@ -57,7 +57,7 @@ import {
   ProsemirrorAdapterProvider,
   useNodeViewFactory,
 } from '@prosemirror-adapter/react';
-import { CommandId } from '@/bindings';
+import { CommandId, type Jump } from '@/bindings';
 import { createAutosaver, type Autosaver } from '@/lib/autosave';
 import { registerScopedCommand, unregisterScopedCommand } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
@@ -79,7 +79,8 @@ import { SaveFailedBar } from '@/components/save-failed-bar';
 import { ReviewBar } from '@/components/sync/review-bar';
 import { useReviewFor } from '@/lib/stores/sync';
 import { useSaveFailure } from '@/lib/stores/save-status';
-import { findPlugin, getFindState, setFindQuery, stepFindMatch } from '@/lib/find/plugin';
+import { findPlugin, getFindState, selectFindMatch, setFindQuery, stepFindMatch } from '@/lib/find/plugin';
+import { matchIndex } from '@/lib/search/jump';
 import { useFindStore } from '@/lib/stores/find';
 import { useExternalFileChanges } from '@/hooks/use-external-file-changes';
 import { useLayout } from '@/hooks/use-layout';
@@ -864,6 +865,35 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
       );
     });
   }, [loading, anchor, withView]);
+
+  // A full-text search hit: the find bar opens on the search's query, and
+  // the hit's match is made current once the bar's search has run.
+  const jumpRequest = useFindStore((s) => (s.jump?.path === path ? s.jump : null));
+  const pendingJump = useRef<Jump | null>(null);
+  useEffect(() => {
+    if (loading || !jumpRequest) return;
+    const taken = useFindStore.getState().takeJump(path);
+    if (!taken) return;
+    pendingJump.current = taken.jump;
+    // Collapsed first, so opening the bar doesn't take the selection as its query.
+    withView((view) => view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.selection.$from))));
+    useFindStore.getState().openFor(path);
+  }, [loading, jumpRequest, path, withView]);
+
+  useEffect(() => {
+    const jump = pendingJump.current;
+    if (loading || !findOpen || !jump) return;
+    pendingJump.current = null;
+    withView((view) => {
+      const index = matchIndex(jump, getFindState(view.state)?.matches.length ?? 0);
+      if (index < 0) return;
+      selectFindMatch(view, index);
+      // As for an anchor: a note just opened is still being laid out.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => view.dom.querySelector('.find-match-active')?.scrollIntoView({ block: 'center' })),
+      );
+    });
+  }, [loading, withView, findOpen, findQuery, findCaseSensitive, findWholeWord, findFocusNonce]);
 
   // Opening over a selection searches for it, the way every editor does.
   // Owned here rather than by the bar because only the editor can read the

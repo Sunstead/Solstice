@@ -112,6 +112,19 @@ export const settingsRegistry = {
     disabledWhen: (get) => !get('appearance.islands'),
   }),
 
+  'appearance.workspaceSwitcherLocation': defineEnum({
+    section: 'appearance',
+    group: 'Layout',
+    scope: 'global',
+    label: 'Workspace switcher location',
+    options: [
+      { value: 'icon-sidebar', label: 'Icon sidebar' },
+      { value: 'titlebar', label: 'Title bar' },
+      { value: 'explorer-sidebar', label: 'Explorer sidebar' },
+    ],
+    default: 'icon-sidebar',
+  }),
+
   'appearance.reduceMotion': defineBoolean({
     section: 'accessibility',
     scope: 'global',
@@ -606,6 +619,16 @@ export const settingsRegistry = {
     scope: 'workspace',
     label: 'Always show file extensions',
     default: false,
+  }),
+
+  // Read by full-text search (`lib/stores/search.ts`), which also leaves out
+  // every dot-folder.
+  'search.exclude': defineText({
+    section: 'explorer',
+    scope: 'workspace',
+    label: 'Folders left out of search',
+    default: '',
+    placeholder: 'Archive, Templates/Old',
   }),
 
   'explorer.foldersFirst': defineBoolean({

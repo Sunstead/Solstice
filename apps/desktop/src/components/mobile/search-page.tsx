@@ -1,37 +1,21 @@
-import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@sunstead/ui/components/command';
 import { QuickOpenItem } from '@/components/quick-open-dialog';
+import { SearchView } from '@/components/search/search-view';
 import { useLayout } from '@/hooks/use-layout';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { getFileNameFromPath } from '@/lib/path-utils';
 import { useRecentFiles } from '@/lib/stores/recent-files';
-import { selectAllFiles, useFileIndex } from '@/lib/stores/use-file-index';
+import { useFileIndex } from '@/lib/stores/use-file-index';
 import { PhoneHeader, PhoneTitle } from './phone-parts';
 
-const ITEM = 'min-h-12 rounded-lg px-3';
-
 /**
- * Quick open as a page: the field at the top (the keyboard comes up with it)
- * and the matches below, or the files opened lately before anything's typed.
+ * Search as a page: the sidebar's Search view, with the files opened lately
+ * before anything's typed. Quick open on a phone too, since files whose names
+ * match come first.
  */
 export function SearchPage() {
   const root = useWorkspace((s) => s.path);
-  const files = useFileIndex(useShallow(selectAllFiles));
-  const recentPaths = useRecentFiles((s) => s.paths);
-  const [query, setQuery] = useState('');
-
-  const known = new Set(files.map((f) => f.path));
-  const recent = recentPaths.filter((p) => known.has(p));
-  const open = (path: string) => useLayout.getState().openFile(path, getFileNameFromPath(path));
 
   return (
     <div className='absolute inset-0 flex flex-col bg-background'>
@@ -39,45 +23,35 @@ export function SearchPage() {
         <PhoneTitle>Search</PhoneTitle>
       </PhoneHeader>
       {root ? (
-        <Command className='min-h-0 flex-1 rounded-none! bg-transparent p-2'>
-          <CommandInput
-            placeholder='Search files'
-            value={query}
-            onValueChange={setQuery}
-            autoFocus
-            autoCapitalize='off'
-            autoCorrect='off'
-            spellCheck={false}
-            enterKeyHint='search'
-          />
-          <CommandList className='max-h-none flex-1 pt-2'>
-            {query ? (
-              <>
-                <CommandEmpty>No matching files.</CommandEmpty>
-                <CommandGroup>
-                  {files.map((entry) => (
-                    <CommandItem key={entry.path} value={entry.path} className={ITEM} onSelect={() => open(entry.path)}>
-                      <QuickOpenItem entry={entry} root={root} />
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </>
-            ) : recent.length > 0 ? (
-              <CommandGroup heading='Recent'>
-                {recent.map((path) => (
-                  <CommandItem key={path} value={path} className={ITEM} onSelect={() => open(path)}>
-                    <QuickOpenItem entry={{ path, name: getFileNameFromPath(path) }} root={root} />
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ) : (
-              <p className='py-10 text-center text-sm text-muted-foreground'>Type to find a file.</p>
-            )}
-          </CommandList>
-        </Command>
+        <div className='flex min-h-0 flex-1 flex-col pt-2'>
+          <SearchView root={root} empty={<RecentFiles root={root} />} autoFocus />
+        </div>
       ) : (
         <p className='py-10 text-center text-sm text-muted-foreground'>No workspace open</p>
       )}
     </div>
+  );
+}
+
+function RecentFiles({ root }: { root: string }) {
+  const known = new Set(useFileIndex(useShallow((s) => s.files.map((f) => f.path))));
+  const recent = useRecentFiles((s) => s.paths).filter((p) => known.has(p));
+  if (recent.length === 0) {
+    return <p className='py-10 text-center text-sm text-muted-foreground'>Search notes, canvases, PDFs and handwriting.</p>;
+  }
+  return (
+    <section>
+      <p className='px-2 pt-1 pb-1 text-xs font-medium text-muted-foreground'>Recent</p>
+      {recent.map((path) => (
+        <button
+          key={path}
+          type='button'
+          className='flex min-h-12 w-full items-center rounded-lg px-3 text-left hover:bg-accent'
+          onClick={() => useLayout.getState().openFile(path, getFileNameFromPath(path))}
+        >
+          <QuickOpenItem entry={{ path, name: getFileNameFromPath(path) }} root={root} />
+        </button>
+      ))}
+    </section>
   );
 }

@@ -17,6 +17,7 @@ import { useSaveFailure } from '@/lib/stores/save-status';
 import { createBoardStore, onBoardEdit, type BoardStore } from '@/lib/task-board/store';
 import { Board } from './board';
 import '@/styles/task-board.css';
+import { useFindStore } from '@/lib/stores/find';
 
 /**
  * A `*.task.md` tab: the note as a board. Reads the note (or the text source
@@ -48,6 +49,13 @@ export function TaskBoardView({ path }: { path: string }) {
       cancelled = true;
     };
   }, [path]);
+
+  // A board has no find of its own: a search hit just opens it, and its jump
+  // mustn't wait for whichever editor of this note comes next.
+  const jumpRequest = useFindStore((s) => (s.jump?.path === path ? s.jump : null));
+  useEffect(() => {
+    if (jumpRequest) useFindStore.getState().takeJump(path);
+  }, [jumpRequest, path]);
 
   if (loadError !== null) {
     return (

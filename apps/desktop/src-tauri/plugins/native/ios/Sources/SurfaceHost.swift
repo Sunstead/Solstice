@@ -128,6 +128,11 @@ class SurfaceView: UIView {
   /// Shows the next (or previous) match; its index, or -1 for none.
   func findStep(_ direction: Int) -> Int { -1 }
 
+  /// Makes the first match on page `page` (zero-based) or after it the current
+  /// one, preferring handwriting or text as `ink` says: where full-text search
+  /// sends it. Returns the current match.
+  func findPage(_ page: Int, ink: Bool) -> Int { -1 }
+
   func send(_ type: String, _ extra: JSObject = [:]) {
     var data: JSObject = ["id": id, "type": type, "path": path]
     data.merge(extra) { $1 }

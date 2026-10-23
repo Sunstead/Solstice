@@ -150,6 +150,7 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
             "Edit",
             vec![
                 Command(EditFind),
+                Command(EditFindInFiles),
                 Separator,
                 Native(Undo),
                 Native(Redo),

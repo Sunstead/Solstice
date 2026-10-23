@@ -156,6 +156,45 @@ pub fn read(pdf: &[u8]) -> Result<Opened> {
     })
 }
 
+/// What's written on a page, for search.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PageText {
+    /// The page's own text.
+    pub text: String,
+    /// The handwriting recognised in our marks on it.
+    pub handwriting: String,
+}
+
+/// Each page's text and handwriting. A page whose text can't be read has
+/// none, rather than failing the rest.
+pub fn page_texts(pdf: &[u8]) -> Result<Vec<PageText>> {
+    /// Per page, so a small stream can't inflate without bound.
+    const MAX_CONTENT: usize = 64 << 20;
+    let doc = load(pdf)?;
+    if doc.is_encrypted() {
+        return Err(ENCRYPTED.into());
+    }
+    Ok(doc
+        .get_pages()
+        .into_iter()
+        .map(|(number, page)| {
+            let text = doc
+                .extract_text_chunks_with_limit(&[number], MAX_CONTENT)
+                .into_iter()
+                .filter_map(std::result::Result::ok)
+                .collect::<String>();
+            let handwriting = annotations(&doc, page)
+                .into_iter()
+                .filter(|(_, a)| marker(a) == Some(COPY))
+                .filter_map(|(_, a)| lopdf::decode_text_string(a.get(b"Contents").ok()?).ok())
+                .filter(|t| !t.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n");
+            PageText { text, handwriting }
+        })
+        .collect())
+}
+
 /// `pdf` with `inserts` added, then `edits` made, written compactly.
 /// Marks of ours an old save wrote badly are put right on the way.
 pub fn apply(pdf: &[u8], inserts: &[Insert], edits: &[Edit]) -> Result<Vec<u8>> {

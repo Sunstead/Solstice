@@ -19,11 +19,12 @@ import { primaryViews } from '@/lib/views/registry';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { useEffect } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
-import { WorkspaceSwitcher } from './workspace-switcher';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { AccountButton } from './account-button';
 import { cn } from '@/lib/utils';
 import { useOverSurface } from '@/lib/native-surfaces';
+import { WorkspaceSwitcher } from './workspace-switcher';
+import { useSetting } from '@/lib/settings/store';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { open, setOpen, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
@@ -37,6 +38,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   );
   const setSidebarCollapsed = useWorkspaceUIStore((s) => s.setSidebarCollapsed);
   const openSettings = useSettingsDialog((s) => s.openSettings);
+  const workspaceSwitcherLocation = useSetting('appearance.workspaceSwitcherLocation');
 
   const activeView =
     primaryViews.find((v) => v.id === activePrimaryView) ?? primaryViews[0];
@@ -110,6 +112,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroup className='p-0'>
             <SidebarGroupContent className='px-1.5 md:px-0 text-muted-foreground'>
               <SidebarMenu className='gap-2 items-center py-2'>
+                {!isMobile && workspaceSwitcherLocation === 'icon-sidebar' && (
+                  <SidebarMenuItem>
+                    <WorkspaceSwitcher variant='icon' />
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                   <AccountButton />
                 </SidebarMenuItem>
@@ -149,9 +156,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
       >
         {ActiveSidebarContent && <ActiveSidebarContent />}
-        <SidebarFooter className='border-t islands:border-t-0 island-borders:border-t'>
-          <WorkspaceSwitcher />
-        </SidebarFooter>
+        {workspaceSwitcherLocation === 'explorer-sidebar' && (
+          <SidebarFooter className='border-t islands:border-t-0 island-borders:border-t'>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <WorkspaceSwitcher />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+        )}
       </Sidebar>
       <SidebarRail ref={overSurface} />
     </Sidebar>

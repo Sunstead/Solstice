@@ -76,6 +76,7 @@ command_id! {
     EditStrikethrough => "edit.strikethrough",
     EditHighlight => "edit.highlight",
     EditFind => "edit.find",
+    EditFindInFiles => "edit.find_in_files",
 
     EditHeading1 => "edit.heading1",
     EditHeading2 => "edit.heading2",
@@ -432,6 +433,12 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             id: CommandId::EditFind,
             label: "Find...".into(),
             accelerator: Some("CmdOrCtrl+F".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::EditFindInFiles,
+            label: "Find in Files...".into(),
+            accelerator: Some("CmdOrCtrl+Shift+F".into()),
             is_overridden: false,
         },
         // -- Headings (commonmark) --
