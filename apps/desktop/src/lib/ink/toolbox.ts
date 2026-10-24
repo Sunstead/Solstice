@@ -293,9 +293,9 @@ export function sanitize(raw: unknown): Toolbox {
 }
 
 /** How much of the badge's fill is the ink, over the menus' color. */
-const BADGE_TINT = 30;
+const BADGE_TINT = 40;
 /** The badge's opacity: the menus' glass, but nearly solid, since over a canvas there's nothing for it to blur. */
-const BADGE_OPACITY = 92;
+const BADGE_OPACITY = 70;
 
 /** The tool badge's colors (`ToolBadge`): its fill tinted toward the ink in hand, and its rim that ink. */
 export function badgeLook(slot: ToolSlot): { fill: string; rim: string | null } {
