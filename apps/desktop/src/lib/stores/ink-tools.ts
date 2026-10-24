@@ -13,7 +13,7 @@ import { createScopedStorage } from './scoped-storage';
 
 type InkToolsState = Toolbox & { dispatch: (action: ToolboxAction) => void };
 
-const pick = ({ slots, selected, previous, recents, recentColors, ruler, fingerDraws }: Toolbox): Toolbox => ({
+const pick = ({
   slots,
   selected,
   previous,
@@ -21,6 +21,16 @@ const pick = ({ slots, selected, previous, recents, recentColors, ruler, fingerD
   recentColors,
   ruler,
   fingerDraws,
+  badgeCorner,
+}: Toolbox): Toolbox => ({
+  slots,
+  selected,
+  previous,
+  recents,
+  recentColors,
+  ruler,
+  fingerDraws,
+  badgeCorner,
 });
 
 /**

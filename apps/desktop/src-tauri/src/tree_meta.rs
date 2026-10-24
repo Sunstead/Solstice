@@ -99,11 +99,13 @@ pub async fn tree_meta(app: AppHandle, root: String) -> Result<TreeMetaState, St
     if !solstice_sync_client::is_linked(&root) {
         return Ok(state(tree_file::read(&root), false));
     }
-    match client(&app, &root).await {
-        Some(client) => client.tree_meta().await.map(|m| state(m, true)).map_err(|e| e.to_string()),
-        // Not syncing (it couldn't start): the last mirror, to look at.
-        None => Ok(state(tree_file::read(&root), true)),
-    }
+    // Not started yet (the frontend asks again on `SyncChanged`, which it
+    // sends once it has), or it couldn't: the last mirror, to look at.
+    let meta = match crate::sync::client_for_root(&app, &root) {
+        Some(client) => client.tree_meta(),
+        None => tree_file::read(&root),
+    };
+    Ok(state(meta, true))
 }
 
 /// Changes a workspace's bookmarks or folder colors, and returns them after.

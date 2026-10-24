@@ -210,6 +210,13 @@ describe('slots', () => {
     expect(toolbox(start(), { type: 'toggleRuler' }).ruler).toBe(true);
     expect(toolbox(start(), { type: 'setFingerDraws', on: true }).fingerDraws).toBe(true);
   });
+
+  it('keeps the corner the badge was thrown to', () => {
+    expect(start().badgeCorner).toBe('bottom-right');
+    expect(toolbox(start(), { type: 'setBadgeCorner', corner: 'top-left' }).badgeCorner).toBe('top-left');
+    const state = start();
+    expect(toolbox(state, { type: 'setBadgeCorner', corner: 'bottom-right' })).toBe(state);
+  });
 });
 
 describe('sanitize', () => {
@@ -244,6 +251,9 @@ describe('sanitize', () => {
     expect(state.recentColors).toEqual(['#abcdef']);
     expect(state.ruler).toBe(false);
     expect(state.fingerDraws).toBe(true);
+    expect(state.badgeCorner).toBe('bottom-right');
+    expect(sanitize({ slots: [{ id: 'a', kind: 'pen' }], badgeCorner: 'top-left' }).badgeCorner).toBe('top-left');
+    expect(sanitize({ slots: [{ id: 'a', kind: 'pen' }], badgeCorner: 'middle' }).badgeCorner).toBe('bottom-right');
   });
 });
 

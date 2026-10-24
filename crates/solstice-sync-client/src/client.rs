@@ -115,9 +115,6 @@ enum Cmd {
         text: Option<String>,
         reply: oneshot::Sender<Result<(), Error>>,
     },
-    TreeMeta {
-        reply: oneshot::Sender<TreeMeta>,
-    },
     ApplyTreeMeta {
         ops: Vec<TreeOp>,
         reply: oneshot::Sender<Result<TreeMeta, Error>>,
@@ -137,7 +134,7 @@ pub struct Client {
     tx: mpsc::UnboundedSender<Cmd>,
     status: watch::Receiver<Status>,
     reviews: watch::Receiver<u64>,
-    tree_meta: watch::Receiver<u64>,
+    tree_meta: watch::Receiver<TreeMeta>,
     link: Link,
     root: PathBuf,
 }
@@ -171,7 +168,7 @@ impl Client {
         let (tx, rx) = mpsc::unbounded_channel();
         let (status_tx, status) = watch::channel(Status::Connecting);
         let (reviews_tx, reviews) = watch::channel(0u64);
-        let (tree_meta_tx, tree_meta) = watch::channel(0u64);
+        let (tree_meta_tx, tree_meta) = watch::channel(vault.tree_meta());
         let last_meta = tree_file::read(&root);
         let actor = Actor {
             link: saved.link.clone(),
@@ -235,18 +232,16 @@ impl Client {
         self.reviews.clone()
     }
 
-    /// Bumps whenever the bookmarks or folder colors changed, here or
+    /// Changes whenever the bookmarks or folder colors do, here or
     /// elsewhere.
-    pub fn watch_tree_meta(&self) -> watch::Receiver<u64> {
+    pub fn watch_tree_meta(&self) -> watch::Receiver<TreeMeta> {
         self.tree_meta.clone()
     }
 
-    pub async fn tree_meta(&self) -> Result<TreeMeta, Error> {
-        let (reply, rx) = oneshot::channel();
-        self.tx
-            .send(Cmd::TreeMeta { reply })
-            .map_err(|_| Error::Stopped)?;
-        rx.await.map_err(|_| Error::Stopped)
+    /// The bookmarks and folder colors now. Never waits on the sync loop,
+    /// which reads the whole folder before it answers anything.
+    pub fn tree_meta(&self) -> TreeMeta {
+        self.tree_meta.borrow().clone()
     }
 
     /// Changes the bookmarks or folder colors, and returns them after.
@@ -353,7 +348,8 @@ struct Actor {
     dirty: BTreeSet<DocKey>,
     status: watch::Sender<Status>,
     reviews: watch::Sender<u64>,
-    tree_meta: watch::Sender<u64>,
+    /// The vault's tree meta, for [`Client::tree_meta`].
+    tree_meta: watch::Sender<TreeMeta>,
     /// The tree meta last mirrored to `.solstice/tree.json`.
     last_meta: TreeMeta,
     tx: mpsc::UnboundedSender<Cmd>,
@@ -474,8 +470,8 @@ impl Actor {
         if let Err(e) = tree_file::write(self.dir.root(), &now) {
             tracing::warn!(error = %e, "can't write the folder's tree.json");
         }
+        self.tree_meta.send_replace(now.clone());
         self.last_meta = now;
-        self.tree_meta.send_modify(|n| *n += 1);
     }
 
     async fn token(&mut self) -> Result<Option<String>, Error> {
@@ -744,9 +740,6 @@ impl Actor {
                 self.local(socket, msgs).await;
                 self.bump_reviews();
                 let _ = reply.send(Ok(()));
-            }
-            Cmd::TreeMeta { reply } => {
-                let _ = reply.send(self.vault.tree_meta());
             }
             Cmd::ApplyTreeMeta { ops, reply } => match self.vault.apply_tree_ops(&ops) {
                 Ok(msgs) => {

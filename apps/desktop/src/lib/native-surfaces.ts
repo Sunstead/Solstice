@@ -151,6 +151,15 @@ export function useOverSurface() {
 }
 
 /**
+ * Web content over a surface moved in a way nothing watched sees (a dragged
+ * badge's `translate`): measure again for a few frames, so its touches stay
+ * the webview's where it now is.
+ */
+export function overSurfaceMoved() {
+  kicks.forEach((kick) => kick());
+}
+
+/**
  * Whether a menu, popover or dialog is open: they mount in their own nodes
  * under `<body>`, beside `#root`. While one is, the webview takes every touch,
  * so a tap outside it closes it, as it would on the web.
