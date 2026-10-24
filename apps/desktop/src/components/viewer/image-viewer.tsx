@@ -41,6 +41,31 @@ const TOUCHPAD_DELTA = 50;
 /** Past this, a bitmap is being inspected pixel by pixel; stop smoothing it. */
 const PIXELATE_ABOVE = 2;
 
+/**
+ * A drawing's stand-in while the view moves: a bitmap at most this many
+ * pixels on its long side. WebKit redraws a big SVG in full on every frame
+ * of a pan or zoom (a fifth of a second at 100k strokes); the bitmap keeps
+ * up, and the SVG comes back sharp once the view has settled for `SETTLE_MS`.
+ */
+const STAND_IN_PIXELS = 4096;
+const SETTLE_MS = 200;
+
+/** Draws `img` into `canvas` once the first frame is up: it takes a moment. */
+function drawStandIn(img: HTMLImageElement, canvas: HTMLCanvasElement | null) {
+  if (!canvas) return;
+  delete canvas.dataset.ready;
+  window.setTimeout(() => {
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+    if (!width || !height) return;
+    const k = Math.min(1, STAND_IN_PIXELS / Math.max(width, height));
+    canvas.width = Math.max(1, Math.round(width * k));
+    canvas.height = Math.max(1, Math.round(height * k));
+    canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.dataset.ready = '';
+  });
+}
+
 /** Stops the zoom buttons step through, in even increments where it matters. */
 const ZOOM_STOPS = [
   0.1, 0.15, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8, 10,
@@ -62,6 +87,9 @@ export function ImageViewer({ path }: { path: string }) {
   const darkPaper = useSetting('ink.darkPaper');
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const standInRef = useRef<HTMLCanvasElement>(null);
+  const drawing = isDrawing(path);
 
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -95,6 +123,15 @@ export function ImageViewer({ path }: { path: string }) {
 
     return () => observer.disconnect();
   }, []);
+
+  // Moving: a drawing shows its stand-in, on the DOM alone (no render).
+  useEffect(() => {
+    const node = contentRef.current;
+    if (!drawing || !node) return;
+    node.dataset.moving = '';
+    const settle = window.setTimeout(() => delete node.dataset.moving, SETTLE_MS);
+    return () => window.clearTimeout(settle);
+  }, [drawing, scale, offset]);
 
   /** Centres the image at the largest scale leaving `FIT_PADDING` clear. */
   const fit = useCallback(() => {
@@ -399,6 +436,7 @@ export function ImageViewer({ path }: { path: string }) {
 
         {asset.status === 'ready' && (
           <div
+            ref={contentRef}
             className='solstice-canvas-content absolute size-0'
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
@@ -413,16 +451,23 @@ export function ImageViewer({ path }: { path: string }) {
               alt={basename(path)}
               draggable={false}
               className='max-w-none select-none'
-              onLoad={(event) =>
-                setImage({
-                  width: event.currentTarget.naturalWidth,
-                  height: event.currentTarget.naturalHeight,
-                })
-              }
+              onLoad={(event) => {
+                const img = event.currentTarget;
+                setImage({ width: img.naturalWidth, height: img.naturalHeight });
+                if (drawing) drawStandIn(img, standInRef.current);
+              }}
               style={{
                 imageRendering: scale > PIXELATE_ABOVE && !isVectorImage(path) ? 'pixelated' : 'auto',
               }}
             />
+            {drawing && (
+              <canvas
+                ref={standInRef}
+                aria-hidden
+                className='solstice-stand-in'
+                style={{ width: image.width, height: image.height }}
+              />
+            )}
           </div>
         )}
       </div>

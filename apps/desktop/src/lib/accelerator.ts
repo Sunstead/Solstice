@@ -34,7 +34,9 @@ function convert(
 export function toTinykeysFormat(accelerator: string): string {
   const parts = convert(accelerator, '$mod', '+').split('+');
   const key = parts.pop()!;
-  return [...parts, keyToCode(key)].join('+');
+  // tinykeys asks `getModifierState`, which knows Ctrl only as "Control".
+  const modifiers = parts.map((m) => (m === 'Ctrl' ? 'Control' : m));
+  return [...modifiers, keyToCode(key)].join('+');
 }
 
 function keyToCode(key: string): string {

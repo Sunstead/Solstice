@@ -43,6 +43,11 @@ describe('toTinykeysFormat', () => {
     expect(toTinykeysFormat('CmdOrCtrl+Shift+B')).toBe('$mod+Shift+b');
     expect(toTinykeysFormat('Alt+ArrowLeft')).toBe('Alt+ArrowLeft');
   });
+
+  it('writes a real Ctrl as the Control key tinykeys knows', () => {
+    expect(toTinykeysFormat('Ctrl+-')).toBe('Control+Minus');
+    expect(toTinykeysFormat('Ctrl+Shift+-')).toBe('Control+Shift+Minus');
+  });
 });
 
 describe('findConflicts', () => {

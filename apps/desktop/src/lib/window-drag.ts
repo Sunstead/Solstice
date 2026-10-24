@@ -3,8 +3,14 @@
  *
  * Tauri's drag.js only drags when the press lands on a `data-tauri-drag-region`
  * itself, and a modal's overlay takes every press. So a press on an overlay is
- * looked through: if a drag region lies beneath, it drags (or maximizes on a
- * double-click) the window instead, and the dialog never hears of it.
+ * looked through: if a drag region lies beneath, moving the press drags the
+ * window (a double-click maximizes it), and the dialog never hears of that.
+ *
+ * A press that doesn't move is a click, and left alone: it's a click outside
+ * the dialog like any other. The native drag must not start on the press
+ * itself. The system's drag loop takes the mouse-up, so the page never hears
+ * the button come up, and a click that started one without moving was left
+ * held: the dialog and the webview ignored the clicks after it.
  */
 
 const DRAG_REGION = 'data-tauri-drag-region';
@@ -52,22 +58,62 @@ export function dragRegionUnder(stack: Element[], overlay: Element): boolean {
 
 type DragWindow = { startDragging(): Promise<void>; toggleMaximize(): Promise<void> };
 
+/** How far a press moves before it's a drag and not a click, in px. */
+const DRAG_THRESHOLD = 4;
+
 /** Starts looking through overlays for presses on a drag region. Returns the stop. */
 export function dragThroughOverlays(currentWindow: () => DragWindow): () => void {
-  // The click that ends a press taken for a drag: the dialog would read it as
-  // a press outside and close.
+  // A press on an overlay over a drag region, not yet moved far enough to be
+  // a drag.
+  let pending: { x: number; y: number } | null = null;
+  // The click that ends a drag or a double-click: the dialog would read it as
+  // a press outside and close. Only ever set while the click can still come.
   let swallowClick = false;
 
   const onDown = (event: MouseEvent) => {
+    pending = null;
     swallowClick = false;
     const target = event.target;
     if (event.button !== 0 || !(target instanceof Element) || !target.matches(OVERLAY)) return;
     if (!dragRegionUnder(document.elementsFromPoint(event.clientX, event.clientY), target)) return;
+    if (event.detail === 2) {
+      event.preventDefault();
+      event.stopPropagation();
+      swallowClick = true;
+      void currentWindow().toggleMaximize();
+      return;
+    }
+    pending = { x: event.clientX, y: event.clientY };
+  };
+
+  const onMove = (event: MouseEvent) => {
+    if (!pending) return;
+    if ((event.buttons & 1) === 0) {
+      pending = null;
+      return;
+    }
+    if (Math.hypot(event.clientX - pending.x, event.clientY - pending.y) < DRAG_THRESHOLD) return;
+    pending = null;
+    swallowClick = true;
     event.preventDefault();
     event.stopPropagation();
-    swallowClick = true;
-    const win = currentWindow();
-    void (event.detail === 2 ? win.toggleMaximize() : win.startDragging());
+    // The system's drag loop ends with the button's release and keeps it, so
+    // when it's over, say so: the page would otherwise go on holding a press,
+    // and the next click would be taken for the end of this one.
+    void currentWindow()
+      .startDragging()
+      .catch(() => {})
+      .finally(release);
+  };
+
+  const release = () => {
+    swallowClick = false;
+    document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' }));
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+  };
+
+  const onUp = () => {
+    pending = null;
   };
 
   const onClick = (event: MouseEvent) => {
@@ -78,9 +124,13 @@ export function dragThroughOverlays(currentWindow: () => DragWindow): () => void
   };
 
   window.addEventListener('mousedown', onDown, true);
+  window.addEventListener('mousemove', onMove, true);
+  window.addEventListener('mouseup', onUp, true);
   window.addEventListener('click', onClick, true);
   return () => {
     window.removeEventListener('mousedown', onDown, true);
+    window.removeEventListener('mousemove', onMove, true);
+    window.removeEventListener('mouseup', onUp, true);
     window.removeEventListener('click', onClick, true);
   };
 }

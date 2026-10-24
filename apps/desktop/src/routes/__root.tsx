@@ -39,6 +39,7 @@ import {
 import { useSourceModeCommand } from '@/hooks/use-source-mode';
 import { KeyboardBar } from '@/components/mobile/keyboard-bar';
 import { SlashMenu } from '@/components/editor/slash-menu';
+import { WikilinkMenu } from '@/components/editor/wikilink-menu';
 import { SqueezePalette } from '@/components/ink/squeeze-palette';
 import { PageSheet } from '@/components/ink/page-sheet';
 import { can } from '@/lib/backend/platform';
@@ -239,6 +240,7 @@ export const Route = createRootRoute({
         />
 
         <SlashMenu />
+        <WikilinkMenu />
         {can.nativeViews && <SqueezePalette />}
         {can.nativeViews && <PageSheet />}
 

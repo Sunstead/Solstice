@@ -11,11 +11,13 @@ import os
 /// first touch (a finger pans, or draws too with finger drawing on: `Ink`).
 /// Saved as an SVG (`DrawingFile`) whose markup is read back here.
 final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
-  /// The canvas starts this big, the content in its middle, and grows by
-  /// half again (at least `growBy`) when drawing nears an edge.
-  private static let side: CGFloat = 16384
-  private static let growBy: CGFloat = 8192
-  private static let nearEdge: CGFloat = 2048
+  /// The canvas is at least this big, what's drawn in its middle, and grows
+  /// by half again when the view nears an edge. Its size costs nothing; a
+  /// growth reloads the canvas, which in a big drawing takes a second. It
+  /// starts at (0, 0): PaperKit's visible frame is counted from there
+  /// whatever the markup's origin, so with any other the view opened far
+  /// from the drawing and the Pencil's line missed its strokes.
+  private static let side: CGFloat = 262_144
   private static let signposts = OSSignposter(subsystem: "app.solstice", category: "DrawingSurface")
   private static let features: FeatureSet = {
     var features = FeatureSet.latest
@@ -27,8 +29,12 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   /// It holds the tools (`Ink`): its canvas is first responder.
   private var hasTools = false
   private var unsaved = false
+  /// The file couldn't be read (or is a later format): shown as it is, never saved.
+  private var readOnly = false
   /// The wait before a save; a new mark restarts it.
   private var pendingSave: Task<Void, Never>?
+  /// How long to wait before a save: longer as saves get slower.
+  private var savePacing = Pacing(least: 3, most: 30)
   /// Saves, one at a time. Never cancelled: marks made meanwhile are saved
   /// after the one under way.
   private let saves = Saves()
@@ -40,10 +46,10 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   private var recognition = Recognition()
   /// When a stroke last began: no reload under a moving Pencil.
   private var drewAt: Date?
-  /// Whether the last touch to land was the Pencil's: what drew the stroke
-  /// that just ended.
-  private let touchKind = TouchKind { _ in }
   private var scratcher: Scratcher?
+  /// Reading the file, until the canvas is up.
+  private var loading: Task<Void, Never>?
+  private let spinner = UIActivityIndicatorView(style: .large)
 
   override init(id: String, path: String, plugin: NativePlugin) {
     super.init(id: id, path: path, plugin: plugin)
@@ -55,24 +61,61 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     pencil.delaysTouchesBegan = false
     pencil.delegate = self
     addGestureRecognizer(pencil)
-    addGestureRecognizer(touchKind)
+
+    backgroundColor = Paper.colour(dark: Ink.shared.darkPaper)
+    spinner.hidesWhenStopped = true
+    addSubview(spinner)
 
     Ink.shared.register(self)
     load()
   }
 
-  private func load() {
-    let text = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
-    var markup =
-      DrawingFile.read(text)
-      ?? PaperMarkup(bounds: CGRect(x: 0, y: 0, width: Self.side, height: Self.side))
+  /// Reads the file off the main thread (a big drawing's markup takes
+  /// seconds to parse), the paper and a spinner shown meanwhile, then shows
+  /// it. `then` runs once it's shown.
+  private func load(then: @escaping @MainActor () -> Void = {}) {
+    loading?.cancel()
+    spinner.startAnimating()
+    let url = URL(fileURLWithPath: path)
+    let state = Self.signposts.beginInterval("open")
+    loading = Task { @MainActor [weak self] in
+      let read = await Task.detached(priority: .userInitiated) {
+        Result {
+          var contents = try DrawingFile.read(contentsOf: url)
+          // Made roomy here: moving every stroke takes a moment.
+          if var markup = contents.markup {
+            let shift = Self.roomy(&markup)
+            contents.markup = markup
+            contents.drawn = contents.drawn?.offsetBy(dx: shift.x, dy: shift.y)
+          }
+          return contents
+        }
+      }.value
+      Self.signposts.endInterval("open", state)
+      guard let self, !Task.isCancelled else { return }
+      self.loading = nil
+      self.spinner.stopAnimating()
+      switch read {
+      case .success(let contents):
+        self.show(contents)
+      case .failure(let error):
+        self.readOnly = true
+        self.send("error", ["message": error.localizedDescription])
+      }
+      then()
+    }
+  }
+
+  private func show(_ contents: DrawingFile.Contents) {
+    var markup = contents.markup ?? PaperMarkup(bounds: CGRect(x: 0, y: 0, width: Self.side, height: Self.side))
     // White paper, as in Freeform, but painted by the view: PaperKit's own
     // paper would be drawn into the SVG's picture layer, over nothing.
     markup.backgroundColor = UIColor.clear.cgColor
-    grow(&markup)
 
     controller.map(detach)
-    recognition = Recognition()
+    Task { await writer.seed(contents.strokes) }
+    // About half a millisecond an element, on the simulator.
+    recognition = Recognition(text: contents.text, at: Date(), cost: Double(contents.elements) * 0.0005)
     let controller = PaperMarkupViewController(markup: markup, supportedFeatureSet: Self.features)
     controller.delegate = self
     controller.view.frame = bounds
@@ -83,72 +126,85 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     Ink.shared.configure(controller)
     if let parent = plugin?.manager.viewController {
       parent.addChild(controller)
-      addSubview(controller.view)
+      insertSubview(controller.view, belowSubview: spinner)
       controller.didMove(toParent: parent)
     } else {
-      addSubview(controller.view)
+      insertSubview(controller.view, belowSubview: spinner)
     }
     self.controller = controller
-    scratcher = Scratcher(markup)
+    scratcher = Scratcher()
     observeMarkup(of: controller) { [weak self, weak controller] in
       guard let self, let controller, self.controller === controller else { return }
       self.paperMarkupViewControllerDidChangeMarkup(controller)
     }
-    opening = markup
+    opening = contents.drawn ?? .null
     setNeedsLayout()
     if hasTools {
       DispatchQueue.main.async { controller.becomeFirstResponder() }
     }
   }
 
-  /// The markup just loaded, until the surface has a size to show it in (its
-  /// frame comes from the webview after it opens).
-  private var opening: PaperMarkup?
+  /// Once the file has been read and its canvas is up (or it couldn't be).
+  func shown() async {
+    await loading?.value
+  }
+
+  /// What was drawn, as the file last saw it, until the surface has a size
+  /// to show it in (its frame comes from the webview after it opens).
+  private var opening: CGRect?
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    guard let markup = opening, let controller, bounds.width > 0, bounds.height > 0 else { return }
+    spinner.center = CGPoint(x: bounds.midX, y: bounds.midY)
+    guard let drawn = opening, let controller, bounds.width > 0, bounds.height > 0 else { return }
     opening = nil
     // Starts on what's drawn (or the middle of an empty canvas).
-    let content = markup.contentsRenderFrame
     let size = bounds.size
+    let markup = controller.markup?.bounds ?? .zero
     let centre =
-      content.isNull || content.isEmpty
-      ? CGPoint(x: markup.bounds.midX, y: markup.bounds.midY)
-      : CGPoint(x: content.midX, y: content.minY + min(content.height, size.height) / 2)
+      drawn.isNull || drawn.isEmpty
+      ? CGPoint(x: markup.midX, y: markup.midY)
+      : CGPoint(x: drawn.midX, y: drawn.minY + min(drawn.height, size.height) / 2)
     controller.view.layoutIfNeeded()
     controller.setContentVisibleFrame(
       CGRect(x: centre.x - size.width / 2, y: centre.y - size.height / 2, width: size.width, height: size.height),
       animated: false)
   }
 
-  /// Room to keep drawing: content near an edge moves inwards on a bigger
-  /// canvas. Returns how far it moved.
+  /// At least `side` across, from (0, 0) (`grown`). Returns how far what's
+  /// drawn moved.
   @discardableResult
-  private func grow(_ markup: inout PaperMarkup) -> CGPoint {
-    let content = markup.contentsRenderFrame
-    guard !content.isNull, !content.isEmpty else { return .zero }
+  nonisolated static func roomy(_ markup: inout PaperMarkup) -> CGPoint {
     let b = markup.bounds
-    let near =
-      content.minX - b.minX < Self.nearEdge || content.minY - b.minY < Self.nearEdge
-      || b.maxX - content.maxX < Self.nearEdge || b.maxY - content.maxY < Self.nearEdge
-    guard near else { return .zero }
-    let by = max(Self.growBy, b.width / 2)
-    let shift = CGPoint(x: by / 2, y: by / 2)
-    markup.transformContent(CGAffineTransform(translationX: shift.x, y: shift.y))
-    markup.bounds = CGRect(x: b.minX, y: b.minY, width: b.width + by, height: b.height + by)
+    return grown(&markup, to: CGSize(width: max(b.width, side), height: max(b.height, side)))
+  }
+
+  /// `size` from (0, 0), what was there moved into its middle. Returns how
+  /// far it moved.
+  nonisolated static func grown(_ markup: inout PaperMarkup, to size: CGSize) -> CGPoint {
+    let b = markup.bounds
+    let shift = CGPoint(x: (size.width - b.width) / 2 - b.minX, y: (size.height - b.height) / 2 - b.minY)
+    if shift != .zero { markup.transformContent(CGAffineTransform(translationX: shift.x, y: shift.y)) }
+    markup.bounds = CGRect(origin: .zero, size: size)
     return shift
   }
 
-  /// Grows the canvas once a stroke has taken it near an edge, the view
-  /// kept on the same place. PaperKit draws a new markup afresh (the canvas
-  /// blinks), so it's done seldom and as the stroke ends, never mid-save
-  /// while the drawing is being looked over.
+  /// Grows the canvas by half again when the view nears an edge (what's in
+  /// view is all that can have been drawn on), the view kept on the same
+  /// place. PaperKit draws a new markup afresh (the canvas blinks), so it's
+  /// done seldom and as a stroke ends.
   private func growIfNeeded() {
+    guard let controller, let bounds = controller.markup?.bounds else { return }
+    let visible = controller.contentVisibleFrame
+    let room = max(visible.width, visible.height)
+    guard
+      visible.minX - bounds.minX < room || visible.minY - bounds.minY < room
+        || bounds.maxX - visible.maxX < room || bounds.maxY - visible.maxY < room
+    else { return }
     DispatchQueue.main.async { [weak self] in
       guard let self, let controller = self.controller, var markup = controller.markup else { return }
-      let shift = self.grow(&markup)
-      guard shift != .zero else { return }
+      let b = markup.bounds
+      let shift = Self.grown(&markup, to: CGSize(width: b.width * 1.5, height: b.height * 1.5))
       let visible = controller.contentVisibleFrame
       controller.markup = markup
       controller.setContentVisibleFrame(visible.offsetBy(dx: shift.x, dy: shift.y), animated: false)
@@ -173,8 +229,8 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
       surfaceLog.info("reload \(self.id, privacy: .public): changed on disk")
       // Back to the same place.
       let visible = self.controller?.contentVisibleFrame
-      self.load()
-      if let visible, let controller = self.controller {
+      self.load { [weak self] in
+        guard let self, let visible, let controller = self.controller else { return }
         self.opening = nil
         controller.view.layoutIfNeeded()
         controller.setContentVisibleFrame(visible, animated: false)
@@ -193,6 +249,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }
 
   override func paperChanged() {
+    backgroundColor = Paper.colour(dark: Ink.shared.darkPaper)
     controller.map(showPaper)
   }
 
@@ -215,6 +272,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
     if gesture.state == .began { Ink.shared.activate(self, touched: true) }
+    scratcher?.track(gesture, on: controller)
   }
 
   func paperMarkupViewControllerDidBeginDrawing(_ controller: PaperMarkupViewController) {
@@ -230,14 +288,15 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
-    scratcher?.check(controller, pencil: touchKind.pencil)
+    scratcher?.changed(controller)
     growIfNeeded()
     unsaved = true
     recognition.changed()
     dirty()
     pendingSave?.cancel()
+    let wait = Duration.seconds(savePacing.wait)
     pendingSave = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: Self.saveAfter)
+      try? await Task.sleep(for: wait)
       guard !Task.isCancelled, let self else { return }
       self.pendingSave = nil
       await self.save()
@@ -288,6 +347,8 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     pendingSave?.cancel()
     pendingSave = nil
     Task { @MainActor in
+      // Still opening: nothing drawn yet to save.
+      await self.loading?.value
       await self.save(final: true)
       self.leave()
       done()
@@ -305,7 +366,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   private func save(final: Bool = false) async {
     await saves.run { [weak self] in
       guard let self else { return }
-      guard self.unsaved || (final && self.recognition.isDue(now: Date(), final: true)) else { return }
+      guard !self.readOnly, self.unsaved || (final && self.recognition.isDue(now: Date(), final: true)) else { return }
       await self.write(final: final)
     }
   }
@@ -314,14 +375,24 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     guard let controller, let markup = controller.markup else { return }
     unsaved = false
     let state = Self.signposts.beginInterval("save")
-    defer { Self.signposts.endInterval("save", state) }
+    let started = Date()
+    // Recognising is paced on its own.
+    var recognisingTook: TimeInterval = 0
+    defer {
+      Self.signposts.endInterval("save", state)
+      savePacing.took(-started.timeIntervalSinceNow - recognisingTook)
+    }
 
     do {
       let generation = recognition.generation
       var text = recognition.text ?? ""
       if recognition.isDue(now: Date(), final: final) {
+        let recognising = Self.signposts.beginInterval("recognise")
+        let asked = Date()
         text = await markup.indexableContent ?? ""
-        recognition.recognised(text, of: generation, at: Date())
+        recognisingTook = -asked.timeIntervalSinceNow
+        recognition.recognised(text, of: generation, at: Date(), took: recognisingTook)
+        Self.signposts.endInterval("recognise", recognising)
       }
       let writer = self.writer
       let svg = try await Task.detached(priority: .utility) { try await writer.write(markup, text: text) }.value

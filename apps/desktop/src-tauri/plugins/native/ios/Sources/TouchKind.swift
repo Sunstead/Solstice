@@ -1,9 +1,8 @@
 import UIKit
 
 /// Reports whether each touch landing is the Pencil's, before the view's
-/// other gestures act on it, and never takes part itself: PDFs' markup mode,
-/// and whose stroke a scratch-out is (`Scratcher`). (Hit testing comes
-/// too early: its event doesn't hold the touch yet.)
+/// other gestures act on it, and never takes part itself: PDFs' markup mode.
+/// (Hit testing comes too early: its event doesn't hold the touch yet.)
 final class TouchKind: UIGestureRecognizer, UIGestureRecognizerDelegate {
   private let landed: (_ pencil: Bool) -> Void
   /// The last touch to land was the Pencil's (or landed while it was down).

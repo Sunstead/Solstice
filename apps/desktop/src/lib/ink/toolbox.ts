@@ -5,6 +5,8 @@
  * share it; Swift only applies the slot in hand (`toNative`, `ToolSpec.swift`).
  */
 
+import { CORNERS, type Corner } from './badge-motion';
+
 export const INK_KINDS = [
   'pen',
   'monoline',
@@ -56,6 +58,8 @@ export type Toolbox = {
   ruler: boolean;
   /** A finger draws too, on every surface. */
   fingerDraws: boolean;
+  /** Where the tool badge sits while the ribbon is hidden. */
+  badgeCorner: Corner;
 };
 
 export const MAX_RECENT_TOOLS = 6;
@@ -138,6 +142,7 @@ export function defaultToolbox(): Toolbox {
     recentColors: [],
     ruler: false,
     fingerDraws: false,
+    badgeCorner: 'bottom-right',
   };
 }
 
@@ -159,7 +164,8 @@ export type ToolboxAction =
   | { type: 'changeKind'; id: string; kind: ToolKind }
   | { type: 'move'; from: number; to: number }
   | { type: 'toggleRuler' }
-  | { type: 'setFingerDraws'; on: boolean };
+  | { type: 'setFingerDraws'; on: boolean }
+  | { type: 'setBadgeCorner'; corner: Corner };
 
 function select<T extends Toolbox>(state: T, id: string): T {
   if (id === state.selected || !state.slots.some((s) => s.id === id)) return state;
@@ -238,6 +244,8 @@ export function toolbox<T extends Toolbox>(state: T, action: ToolboxAction): T {
       return { ...state, ruler: !state.ruler };
     case 'setFingerDraws':
       return action.on === state.fingerDraws ? state : { ...state, fingerDraws: action.on };
+    case 'setBadgeCorner':
+      return action.corner === state.badgeCorner ? state : { ...state, badgeCorner: action.corner };
   }
 }
 
@@ -280,6 +288,23 @@ export function sanitize(raw: unknown): Toolbox {
     recentColors,
     ruler: input.ruler === true,
     fingerDraws: input.fingerDraws === true,
+    badgeCorner: CORNERS.includes(input.badgeCorner as Corner) ? (input.badgeCorner as Corner) : 'bottom-right',
+  };
+}
+
+/** How much of the badge's fill is the ink, over the menus' color. */
+const BADGE_TINT = 40;
+/** The badge's opacity: the menus' glass, but nearly solid, since over a canvas there's nothing for it to blur. */
+const BADGE_OPACITY = 70;
+
+/** The tool badge's colors (`ToolBadge`): its fill tinted toward the ink in hand, and its rim that ink. */
+export function badgeLook(slot: ToolSlot): { fill: string; rim: string | null } {
+  const base = hasInk(slot.kind)
+    ? `color-mix(in oklab, ${slot.color} ${BADGE_TINT}%, var(--popover))`
+    : 'var(--popover)';
+  return {
+    fill: `color-mix(in oklab, ${base} ${BADGE_OPACITY}%, transparent)`,
+    rim: hasInk(slot.kind) ? slot.color : null,
   };
 }
 

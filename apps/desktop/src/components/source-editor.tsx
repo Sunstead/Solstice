@@ -22,6 +22,7 @@ import { registerTextSource } from '@/lib/stores/editor-text';
 import { abandonPendingWrites, clearAbandoned } from '@/lib/stores/external-changes';
 import { useSaveFailure } from '@/lib/stores/save-status';
 import { useReviewFor } from '@/lib/stores/sync';
+import { sourceWikilinkSuggest } from '@/lib/wikilink/suggest-menu';
 
 /** A reload from disk, which mustn't count as an edit. */
 const external = Annotation.define<boolean>();
@@ -75,6 +76,7 @@ export function SourceEditor({ path, initialContent }: { path: string; initialCo
           doc: initialContent,
           extensions: [
             history(),
+            sourceWikilinkSuggest,
             keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
             markdown({ codeLanguages: languages }),
             codeBlockHighlighting,

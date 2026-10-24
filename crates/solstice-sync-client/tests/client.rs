@@ -436,7 +436,7 @@ async fn bookmarks_sync_and_mirror_to_tree_json() {
     assert_eq!(tree_paths(&p.a), ["From A.md"], "mirrored at once");
     eventually("the bookmark on B", || tree_paths(&p.b) == ["From A.md"]).await;
     assert_eq!(
-        cb.tree_meta().await.unwrap().folder_colors["Folder"],
+        cb.tree_meta().folder_colors["Folder"],
         "#e5484d"
     );
     assert!(changes.has_changed().unwrap(), "B was told");
@@ -456,6 +456,30 @@ async fn bookmarks_sync_and_mirror_to_tree_json() {
         }])
         .await
         .is_err());
+    ca.stop().await;
+    cb.stop().await;
+    p.server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bookmarks_are_there_the_moment_a_client_starts() {
+    let (p, ca, cb) = pair().await;
+    ca.apply_tree_meta(vec![TreeOp::AddBookmark {
+        id: "plan".into(),
+        path: "From A.md".into(),
+    }])
+    .await
+    .unwrap();
+    ca.stop().await;
+    // The mirror is stale, so the answer can only come from the vault.
+    std::fs::remove_file(p.a.join(".solstice/tree.json")).unwrap();
+    // Plenty for the startup scan to read, which used to hold every answer.
+    for i in 0..300 {
+        write(&p.a, &format!("Bulk/{i}.md"), &"text ".repeat(2000));
+    }
+    let ca = Client::start(p.a.clone(), Arc::new(NoTokens)).unwrap();
+    let meta = ca.tree_meta();
+    assert_eq!(meta.bookmarks[0].path, "From A.md");
     ca.stop().await;
     cb.stop().await;
     p.server.stop().await;

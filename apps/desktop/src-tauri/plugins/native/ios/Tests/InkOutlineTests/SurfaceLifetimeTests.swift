@@ -33,19 +33,36 @@ final class SurfaceLifetimeTests: XCTestCase {
 
   /// A closed drawing's canvas stayed under the app's view controller, with
   /// its whole drawing, for as long as the app ran.
-  func testClosingADrawingLetsItsCanvasGo() {
+  func testClosingADrawingLetsItsCanvasGo() async {
     let host = SurfaceHost(frame: CGRect(x: 0, y: 0, width: 800, height: 600))
-    host.add(drawing("a"))
+    let surface = drawing("a")
+    host.add(surface)
+    await surface.shown()
     XCTAssertEqual(parent.children.count, 1)
     host.remove("a")
     XCTAssertEqual(parent.children.count, 0)
   }
 
-  func testOpeningOverASurfaceLetsTheOldOneGo() {
+  func testOpeningOverASurfaceLetsTheOldOneGo() async {
     let host = SurfaceHost(frame: CGRect(x: 0, y: 0, width: 800, height: 600))
-    host.add(drawing("a"))
-    host.add(drawing("a"))
+    let first = drawing("a")
+    host.add(first)
+    await first.shown()
+    let second = drawing("a")
+    host.add(second)
+    await second.shown()
     XCTAssertEqual(parent.children.count, 1)
+  }
+
+  /// A drawing that couldn't be read was a blank canvas, saved over the file.
+  func testAnUnreadableDrawingIsNeverSavedOver() async throws {
+    let url = folder.appendingPathComponent("broken.drawing.svg")
+    let broken = #"<svg><metadata><solstice:paper version="2" encoding="deflate">bm90IGRlZmxhdGVk</solstice:paper></metadata></svg>"#
+    try broken.write(to: url, atomically: true, encoding: .utf8)
+    let surface = DrawingSurface(id: "b", path: url.path, plugin: plugin)
+    await surface.shown()
+    await flush(surface)
+    XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), broken)
   }
 
   // -- A PDF's page canvases ------------------------------------------------

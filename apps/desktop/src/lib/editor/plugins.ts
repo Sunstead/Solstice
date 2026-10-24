@@ -33,6 +33,7 @@ import { attachmentPasteDrop } from './paste-drop';
 import { trailingTap } from './trailing-tap';
 import { caretClearance } from './caret-clearance';
 import { slashMenu } from '@/lib/slash';
+import { wikilinkSuggest } from '@/lib/wikilink/suggest-menu';
 
 type NodeViewFactory = ReturnType<typeof useNodeViewFactory>;
 
@@ -189,5 +190,7 @@ export function createEditorFeatures({
     caretClearance,
 
     slashMenu,
+
+    wikilinkSuggest,
   ].flat();
 }

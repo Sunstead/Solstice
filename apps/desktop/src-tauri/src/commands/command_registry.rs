@@ -187,6 +187,9 @@ fn web_accelerator(id: CommandId) -> Option<&'static str> {
         // Safari's and Chrome's own tab switching.
         CommandId::ViewNextTab => Some("Alt+Shift+]"),
         CommandId::ViewPreviousTab => Some("Alt+Shift+["),
+        // Ctrl+- zooms out in a browser.
+        CommandId::NavigationBack => Some("Alt+ArrowLeft"),
+        CommandId::NavigationForward => Some("Alt+ArrowRight"),
         _ => None,
     }
 }
@@ -581,16 +584,18 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             is_overridden: false,
         },
         // -- Navigation --
+        // A real Ctrl on every platform, as VS Code has it: Alt+Arrows move
+        // by word in text on macOS.
         CommandMeta {
             id: CommandId::NavigationBack,
             label: "Go Back".into(),
-            accelerator: Some("Alt+ArrowLeft".into()),
+            accelerator: Some("Ctrl+-".into()),
             is_overridden: false,
         },
         CommandMeta {
             id: CommandId::NavigationForward,
             label: "Go Forward".into(),
-            accelerator: Some("Alt+ArrowRight".into()),
+            accelerator: Some("Ctrl+Shift+-".into()),
             is_overridden: false,
         },
         // -- Canvas --
@@ -664,6 +669,25 @@ mod web_tests {
             let a = c.accelerator.as_deref().unwrap_or_default();
             assert!(!["CmdOrCtrl+N", "CmdOrCtrl+T", "CmdOrCtrl+W"].contains(&a), "{} uses {a}", c.id);
         }
+    }
+}
+
+#[cfg(test)]
+mod navigation_tests {
+    use super::*;
+
+    #[test]
+    fn history_is_ctrl_minus_and_ctrl_shift_minus() {
+        let key = |commands: &[CommandMeta], id: CommandId| {
+            commands.iter().find(|c| c.id == id).and_then(|c| c.accelerator.clone())
+        };
+        let app = default_commands();
+        assert_eq!(key(&app, CommandId::NavigationBack).as_deref(), Some("Ctrl+-"));
+        assert_eq!(key(&app, CommandId::NavigationForward).as_deref(), Some("Ctrl+Shift+-"));
+        // A browser zooms out with Ctrl+-.
+        let web = web_commands();
+        assert_eq!(key(&web, CommandId::NavigationBack).as_deref(), Some("Alt+ArrowLeft"));
+        assert_eq!(key(&web, CommandId::NavigationForward).as_deref(), Some("Alt+ArrowRight"));
     }
 }
 

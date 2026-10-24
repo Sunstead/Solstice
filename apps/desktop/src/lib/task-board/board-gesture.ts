@@ -216,6 +216,7 @@ export function createBoardGesture(root: HTMLElement, { moveCard, moveColumn, me
   const startDrag = () => {
     if (!press) return;
     press.dragging = true;
+    window.getSelection()?.removeAllRanges();
     clearTimeout(stillTimer);
     if (!press.lifted) lift();
     const rect = press.el.getBoundingClientRect();
@@ -329,7 +330,15 @@ export function createBoardGesture(root: HTMLElement, { moveCard, moveColumn, me
     if (pressable(event.target)) event.preventDefault();
   };
 
+  // A card being dragged shouldn't select the text under the pointer.
+  const onSelectStart = (event: Event) => {
+    // The target is a text node when the press lands on text.
+    const node = event.target as Node | null;
+    if (press && pressable(node instanceof Element ? node : (node?.parentElement ?? null))) event.preventDefault();
+  };
+
   root.addEventListener('pointerdown', onDown);
+  root.addEventListener('selectstart', onSelectStart);
   root.addEventListener('pointermove', onMove);
   root.addEventListener('pointerup', onUp);
   root.addEventListener('pointercancel', onCancel);
@@ -340,6 +349,7 @@ export function createBoardGesture(root: HTMLElement, { moveCard, moveColumn, me
   return () => {
     reset();
     root.removeEventListener('pointerdown', onDown);
+    root.removeEventListener('selectstart', onSelectStart);
     root.removeEventListener('pointermove', onMove);
     root.removeEventListener('pointerup', onUp);
     root.removeEventListener('pointercancel', onCancel);

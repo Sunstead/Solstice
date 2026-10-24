@@ -107,7 +107,10 @@ function Row({
 
   return (
     <div className='grid gap-2 p-2'>
-      <div className='flex items-center gap-2'>
+      {/* As tall as the options button, which is the row's tallest part: the
+          open workspace has only a label there, and the one being removed
+          none, so their rows would otherwise be shorter than the rest. */}
+      <div className='flex min-h-8 items-center gap-2 touch:min-h-10'>
         <WorkspaceColorPicker
           color={color}
           picked={stored !== null}

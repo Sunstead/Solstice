@@ -195,32 +195,34 @@ final class SurfaceHost: UIView {
     return host
   }
 
-  /// Gives the webview's own class (wry's) a subclass whose hit test answers
-  /// nothing over a surface, so UIKit goes on to the host underneath. A
-  /// subclass of the real class, made at runtime, keeps wry's overrides.
+  /// The web view whose touches go to the surfaces under it.
+  private static weak var routed: WKWebView?
+
+  /// Has the web view's class (wry's) answer nothing to a hit test over a
+  /// shown surface, so UIKit goes on to the host underneath. On the class,
+  /// for that web view only: never by changing its class (`MethodHooks.swift`).
   private static func routeTouches(of webview: WKWebView) {
-    guard let base = object_getClass(webview) else { return }
-    let name = "Solstice_" + NSStringFromClass(base)
+    routed = webview
+    let cls = realClass(of: webview)
+    guard !hooked.contains(ObjectIdentifier(cls)) else { return }
+    hooked.insert(ObjectIdentifier(cls))
     let selector = #selector(UIView.hitTest(_:with:))
-    var made: AnyClass? = NSClassFromString(name)
-    if made == nil, let subclass = objc_allocateClassPair(base, name, 0),
-      let method = class_getInstanceMethod(base, selector)
-    {
-      typealias HitTest = @convention(c) (AnyObject, Selector, CGPoint, UIEvent?) -> UIView?
-      let original = unsafeBitCast(class_getMethodImplementation(base, selector), to: HitTest.self)
+    replaceMethod(of: cls, selector) { original in
+      typealias HitTest = @convention(c) (UIView, Selector, CGPoint, UIEvent?) -> UIView?
+      let hitTest = unsafeBitCast(original, to: HitTest.self)
       let block: @convention(block) (UIView, CGPoint, UIEvent?) -> UIView? = { view, point, event in
-        if let host = SurfaceHost.current, host.takesTouch(at: view.convert(point, to: host)) {
-          return nil
+        let taken = MainActor.assumeIsolated {
+          guard view === routed, let host = SurfaceHost.current else { return false }
+          return host.takesTouch(at: view.convert(point, to: host))
         }
-        return original(view, selector, point, event)
+        return taken ? nil : hitTest(view, selector, point, event)
       }
-      class_addMethod(
-        subclass, selector, imp_implementationWithBlock(block), method_getTypeEncoding(method))
-      objc_registerClassPair(subclass)
-      made = subclass
+      return block
     }
-    if let made { object_setClass(webview, made) }
   }
+
+  /// Classes whose hit test is already ours.
+  private static var hooked: Set<ObjectIdentifier> = []
 }
 
 import Observation

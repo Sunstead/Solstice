@@ -160,6 +160,27 @@
   }
 }
 
+/* Menu rows a finger can hit: dropdown, context and menubar items, submenu
+   triggers and the check and radio rows grow to about 44pt where touch leads
+   (`data-touch`). Unlayered, to beat the rows' own py-1.5. */
+:root[data-touch] :is(
+    [data-slot='dropdown-menu-item'],
+    [data-slot='dropdown-menu-sub-trigger'],
+    [data-slot='dropdown-menu-checkbox-item'],
+    [data-slot='dropdown-menu-radio-item'],
+    [data-slot='context-menu-item'],
+    [data-slot='context-menu-sub-trigger'],
+    [data-slot='context-menu-checkbox-item'],
+    [data-slot='context-menu-radio-item'],
+    [data-slot='menubar-item'],
+    [data-slot='menubar-sub-trigger'],
+    [data-slot='menubar-checkbox-item'],
+    [data-slot='menubar-radio-item']
+  ) {
+  min-height: 2.75rem;
+  font-size: 15px;
+}
+
 /* iOS zooms into any field under 16px when it's focused. Unlayered, so it
    beats the text-sm the fields carry. */
 @media (pointer: coarse) {

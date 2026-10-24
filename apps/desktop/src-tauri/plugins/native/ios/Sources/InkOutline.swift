@@ -1,3 +1,4 @@
+import CryptoKit
 import PencilKit
 import SurfaceCore
 import UIKit
@@ -146,6 +147,30 @@ enum InkOutline {
       ink: stroke.ink.inkType.rawValue, width: stroke.path.first?.size.width ?? 0, color: stroke.ink.color,
       transform: [t.a, t.b, t.c, t.d],
       parts: stroke.maskedPathRanges.flatMap { [$0.lowerBound, $0.upperBound] })
+  }
+
+  /// Goes up when ink is drawn differently: what files hold is then made again.
+  static let outlineVersion = 2
+
+  /// A stroke's look as a name that's the same on every launch and device
+  /// (a `Key`'s hash isn't): its SVG's in a drawing's file. Rounded, so the
+  /// trip through PaperKit's data can't change it.
+  static func digest(of key: Key) -> String {
+    var r: CGFloat = 0
+    var g: CGFloat = 0
+    var b: CGFloat = 0
+    var a: CGFloat = 0
+    let srgb =
+      CGColorSpace(name: CGColorSpace.sRGB).flatMap { key.color.cgColor.converted(to: $0, intent: .defaultIntent, options: nil) }
+      .map { UIColor(cgColor: $0) } ?? key.color
+    srgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+    func f(_ v: CGFloat, _ places: Double = 1000) -> String { String(Int((Double(v) * places).rounded())) }
+    let text = [
+      String(outlineVersion), String(Int((key.created.timeIntervalSinceReferenceDate * 1000).rounded())),
+      String(key.count), String(key.seed), key.ink, f(key.width), f(r), f(g), f(b), f(a),
+      key.transform.map { f($0, 10_000) }.joined(separator: ","), key.parts.map { f($0) }.joined(separator: ","),
+    ].joined(separator: "|")
+    return SHA256.hash(data: Data(text.utf8)).prefix(10).map { String(format: "%02x", $0) }.joined()
   }
 
   private static let measured = OSAllocatedUnfairLock(initialState: (looks: [Key: Look](), points: 0))

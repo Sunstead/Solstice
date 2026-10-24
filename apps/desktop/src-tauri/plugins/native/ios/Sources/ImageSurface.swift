@@ -31,7 +31,6 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
   /// What we last wrote, so our own save isn't taken for a change.
   private var written: String?
   private var drewAt: Date?
-  private let touchKind = TouchKind { _ in }
   private var scratcher: Scratcher?
   /// The markup just loaded, until the surface has a size to fit it to.
   private var opening: PaperMarkup?
@@ -46,7 +45,6 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
     pencil.delaysTouchesBegan = false
     pencil.delegate = self
     addGestureRecognizer(pencil)
-    addGestureRecognizer(touchKind)
     Ink.shared.register(self)
     load()
   }
@@ -84,7 +82,7 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
       addSubview(controller.view)
     }
     self.controller = controller
-    scratcher = Scratcher(markup)
+    scratcher = Scratcher()
     observeMarkup(of: controller) { [weak self, weak controller] in
       guard let self, let controller, self.controller === controller else { return }
       self.paperMarkupViewControllerDidChangeMarkup(controller)
@@ -168,6 +166,7 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
 
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
     if gesture.state == .began { Ink.shared.activate(self, touched: true) }
+    scratcher?.track(gesture, on: controller)
   }
 
   func paperMarkupViewControllerDidBeginDrawing(_ controller: PaperMarkupViewController) {
@@ -175,7 +174,7 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
   }
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
-    scratcher?.check(controller, pencil: touchKind.pencil)
+    scratcher?.changed(controller)
     marked = true
     unsaved = true
     dirty()
