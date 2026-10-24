@@ -292,6 +292,22 @@ export function sanitize(raw: unknown): Toolbox {
   };
 }
 
+/** How much of the badge's fill is the ink, over the menus' color. */
+const BADGE_TINT = 30;
+/** The badge's opacity: the menus' glass, but nearly solid, since over a canvas there's nothing for it to blur. */
+const BADGE_OPACITY = 92;
+
+/** The tool badge's colors (`ToolBadge`): its fill tinted toward the ink in hand, and its rim that ink. */
+export function badgeLook(slot: ToolSlot): { fill: string; rim: string | null } {
+  const base = hasInk(slot.kind)
+    ? `color-mix(in oklab, ${slot.color} ${BADGE_TINT}%, var(--popover))`
+    : 'var(--popover)';
+  return {
+    fill: `color-mix(in oklab, ${base} ${BADGE_OPACITY}%, transparent)`,
+    rim: hasInk(slot.kind) ? slot.color : null,
+  };
+}
+
 /** The slot as Swift's `ToolSpec` reads it. */
 export function toNative(slot: ToolSlot) {
   return {

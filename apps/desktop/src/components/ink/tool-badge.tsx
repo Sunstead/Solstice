@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef } from 'react';
 
 import { createBadgeGesture, type BadgeGesture } from '@/lib/ink/badge-gesture';
-import { hasInk, selectedSlot, TOOL_LABELS } from '@/lib/ink/toolbox';
+import { badgeLook, selectedSlot, TOOL_LABELS } from '@/lib/ink/toolbox';
 import { useOverSurface } from '@/lib/native-surfaces';
 import { setSetting } from '@/lib/settings/store';
 import { inkDispatch, useInkTools } from '@/lib/stores/ink-tools';
@@ -9,8 +9,8 @@ import { ToolIcon } from './tool-icon';
 
 /**
  * The tool in hand while the ribbon is hidden, as Apple's minimized tool
- * picker shows it: a glass circle rimmed in the ink's color, in a corner of the
- * content. It drags with a finger or the Pencil and springs to the corner
+ * picker shows it: a circle of the menus' glass, tinted and rimmed with the
+ * ink, in a corner of the content. It drags with a finger or the Pencil and springs to the corner
  * it's thrown toward (`badge-gesture.ts`), kept with the tools; a tap brings
  * the ribbon back.
  */
@@ -21,6 +21,7 @@ export function ToolBadge() {
   const area = useRef<HTMLDivElement>(null);
   const badge = useRef<HTMLButtonElement | null>(null);
   const gesture = useRef<BadgeGesture | null>(null);
+  const look = badgeLook(slot);
   const label = `Show Tools (${TOOL_LABELS[slot.kind]})`;
 
   const ref = useCallback(
@@ -62,16 +63,16 @@ export function ToolBadge() {
         type='button'
         title={label}
         aria-label={label}
-        // The menus' glass: translucent, the blur on a layer of its own.
-        className='pointer-events-auto absolute top-0 left-0 flex size-15 touch-none items-center justify-center rounded-full bg-popover/80 text-popover-foreground shadow-lg ring-1 ring-foreground/10 transition-shadow select-none before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150 data-lifted:shadow-2xl'
+        // The menus' glass, the blur on a layer of its own.
+        className='pointer-events-auto absolute top-0 left-0 flex size-15 touch-none items-center justify-center rounded-full text-popover-foreground shadow-lg ring-1 ring-foreground/10 transition-shadow select-none before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150 data-lifted:shadow-2xl'
       >
-        {/* Over the blur: under it, a new color showed only once WebKit next redrew the backdrop. */}
+        {/* The tint and rim, over the blur: under it, a new color showed only once WebKit next redrew the backdrop. */}
         <span
           aria-hidden
           className='pointer-events-none absolute inset-0 rounded-full border-[3px] border-foreground/10'
-          style={hasInk(slot.kind) ? { borderColor: slot.color } : undefined}
+          style={{ backgroundColor: look.fill, ...(look.rim && { borderColor: look.rim }) }}
         />
-        <ToolIcon kind={slot.kind} className='size-7' />
+        <ToolIcon kind={slot.kind} className='relative size-7' />
       </button>
     </div>
   );

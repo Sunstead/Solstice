@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   INK_PALETTE,
+  badgeLook,
   TOOL_KINDS,
   MAX_RECENT_COLORS,
   MAX_RECENT_TOOLS,
@@ -254,6 +255,21 @@ describe('sanitize', () => {
     expect(state.badgeCorner).toBe('bottom-right');
     expect(sanitize({ slots: [{ id: 'a', kind: 'pen' }], badgeCorner: 'top-left' }).badgeCorner).toBe('top-left');
     expect(sanitize({ slots: [{ id: 'a', kind: 'pen' }], badgeCorner: 'middle' }).badgeCorner).toBe('bottom-right');
+  });
+});
+
+describe('badgeLook', () => {
+  it('tints the menus\' color toward the ink in hand, nearly opaque', () => {
+    const look = badgeLook({ ...defaultToolbox().slots[0], color: '#ff3b30' });
+    expect(look.rim).toBe('#ff3b30');
+    expect(look.fill).toContain('#ff3b30');
+    expect(look.fill).toContain('var(--popover)');
+    expect(look.fill).toContain('92%');
+  });
+
+  it('is the menus\' own color for a tool with no ink', () => {
+    const eraser = defaultToolbox().slots.find((s) => s.kind === 'eraser')!;
+    expect(badgeLook(eraser)).toEqual({ fill: 'color-mix(in oklab, var(--popover) 92%, transparent)', rim: null });
   });
 });
 
