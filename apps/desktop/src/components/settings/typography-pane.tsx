@@ -42,6 +42,11 @@ function Sample() {
  * preview stacks on top at full width instead, which is also where a phone
  * wants it.
  *
+ * The container is its own element, apart from the row it measures: a
+ * container query never matches the element that is the container, so with
+ * both on one div the row stayed a column and the preview, still `@xl:sticky`
+ * and 23rem wide, rode over the settings as they scrolled.
+ *
  * The preview is `sticky` against the dialog's scroll area and is deliberately
  * not a scroll container itself: nesting one here meant the wheel stopped
  * moving the settings the moment the pointer crossed into the preview.
@@ -50,18 +55,20 @@ function Sample() {
  */
 export function TypographyPane() {
   return (
-    <div className='@container flex flex-col gap-8 @xl:flex-row-reverse @xl:items-start @xl:gap-10'>
-      <aside className='@xl:sticky @xl:top-6 @xl:w-[23rem] @xl:shrink-0'>
-        <h3 className='pb-1.5 text-xs font-medium text-muted-foreground'>
-          Preview
-        </h3>
-        <div className='overflow-hidden rounded-lg border border-border/60 bg-card'>
-          <Sample />
-        </div>
-      </aside>
+    <div className='@container'>
+      <div className='flex flex-col gap-8 @xl:flex-row-reverse @xl:items-start @xl:gap-10'>
+        <aside className='@xl:sticky @xl:top-6 @xl:w-[23rem] @xl:shrink-0'>
+          <h3 className='pb-1.5 text-xs font-medium text-muted-foreground'>
+            Preview
+          </h3>
+          <div className='overflow-hidden rounded-lg border border-border/60 bg-card'>
+            <Sample />
+          </div>
+        </aside>
 
-      <div className='min-w-0 flex-1'>
-        <SettingsPane section='typography' />
+        <div className='min-w-0 flex-1'>
+          <SettingsPane section='typography' />
+        </div>
       </div>
     </div>
   );

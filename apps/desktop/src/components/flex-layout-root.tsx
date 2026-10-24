@@ -35,6 +35,7 @@ import { stripPresetExtension } from '@/lib/stores/entry-input';
 import { useSetting } from '@/lib/settings/store';
 import { TabCloseIcon } from './tab-close-icon';
 import { closeTab, playEnter, watchClosePresses } from '@/lib/tab-motion';
+import { watchStickyDock } from '@/lib/tab-dock';
 import { TabMenu } from './tab-menu';
 import { useTabLongPress, type TabMenuRequest } from '@/lib/tab-long-press';
 import { ownsDrag, soleStrip, useTabGesture } from '@/lib/tab-gesture';
@@ -191,6 +192,13 @@ export default function FlexLayoutRoot() {
       presses.dispose();
       closePresses.current = null;
     };
+  }, []);
+
+  // A + docked at the end of a bar that has room again goes back beside the
+  // tabs when one leaves (lib/tab-dock.ts).
+  useEffect(() => {
+    const container = containerRef.current;
+    return container ? watchStickyDock(container) : undefined;
   }, []);
 
   // A tab's menu: right click, or holding it with a finger or the Pencil.

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { FilePlusCorner, Frame, type LucideIcon, Search, X } from 'lucide-react';
+import { FilePlusCorner, type LucideIcon, Search, X } from 'lucide-react';
 import { Button } from '@sunstead/ui/components/button';
 
 import { ScrollArea } from '@sunstead/ui/components/scroll-area';
@@ -20,7 +20,6 @@ import { Keybind } from './keybind';
 
 const actions: { label: string; icon: LucideIcon; commandId: CommandId }[] = [
   { label: 'New note', icon: FilePlusCorner, commandId: 'file.new_note' },
-  { label: 'New canvas', icon: Frame, commandId: 'file.new_canvas' },
   { label: 'Open note…', icon: Search, commandId: 'file.open_file' },
 ];
 const close = { label: 'Close tab', icon: X, commandId: 'file.close_tab' as const };
@@ -135,11 +134,6 @@ const blankTabActions: {
     label: 'Create new note...',
     icon: FilePlusCorner,
     commandId: 'file.new_note',
-  },
-  {
-    label: 'Create new canvas...',
-    icon: Frame,
-    commandId: 'file.new_canvas',
   },
   {
     label: 'Open note...',
