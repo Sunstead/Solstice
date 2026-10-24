@@ -174,3 +174,17 @@ fn searching_a_large_vault_is_quick() {
     println!("first read {first:?}, refresh + search {warm:?}, reopen from cache {cached:?}");
     assert!(warm.as_millis() < 250, "{warm:?}");
 }
+
+/// A big drawing's handwriting was lost past 64 MB: the file wasn't read.
+/// Its `<desc>` comes first, so only its head is.
+#[test]
+fn a_huge_drawings_handwriting_is_found() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut svg = String::from("<svg><desc>integrate by parts</desc><metadata><solstice:paper>");
+    svg.push_str(&"A".repeat(70 << 20));
+    svg.push_str("</solstice:paper></metadata></svg>");
+    write(dir.path(), "Big.drawing.svg", &svg);
+    let mut index = Index::open(dir.path().to_path_buf(), None);
+    index.refresh().unwrap();
+    assert_eq!(paths(&index, "by parts"), vec!["Big.drawing.svg"]);
+}

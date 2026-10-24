@@ -713,6 +713,53 @@ fn apples_ink_changed_since_it_was_taken_stays() {
     assert_eq!(read(&pdf).unwrap().apple[0].len(), 1);
 }
 
+/// Preview's newer stamps (macOS and iOS 27) carry only `PPKHash`/`PPKID`,
+/// no ink anyone can read: Preview's picture of Solstice's own ink once
+/// Preview has dropped Solstice's data (Notebook.pdf), or its own ink. They
+/// stay as Preview wrote them, through every save.
+#[test]
+fn apples_stamps_without_readable_ink_are_left_alone() {
+    let mut doc = plain(1);
+    let page = page_ids(&doc)[0];
+    add_annotation(
+        &mut doc,
+        page,
+        dictionary! {
+            "Type" => "Annot", "Subtype" => "Stamp", "F" => 4,
+            "Rect" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Contents" => Object::string_literal("handwriting Preview kept"),
+            "AAPL:AKExtras" => dictionary! {
+                "PPKHash" => Object::string_literal("cGgABAdb"),
+                "PPKID" => Object::string_literal("AiE14jJE"),
+            },
+        },
+    );
+    let pdf = bytes(&mut doc);
+    let opened = read(&pdf).unwrap();
+    assert!(opened.apple[0].is_empty(), "nothing to draw live");
+    assert!(!opened.needs_repair);
+    let saved = apply(
+        &pdf,
+        &[],
+        &[Edit {
+            page: 0,
+            markup: Some(markup(0)),
+            absorbed: vec![],
+        }],
+    )
+    .unwrap();
+    let after = load(&saved);
+    let annots = after
+        .get_dictionary(page_ids(&after)[0])
+        .unwrap()
+        .get(b"Annots")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .len();
+    assert_eq!(annots, 2, "Preview's stamp and ours");
+}
+
 /// A real file: `SOLSTICE_PDF=<path> cargo test -p solstice-pdf --release
 /// -- --ignored --nocapture repairs_a_real_file`. Writes `<path>.repaired.pdf`.
 #[test]

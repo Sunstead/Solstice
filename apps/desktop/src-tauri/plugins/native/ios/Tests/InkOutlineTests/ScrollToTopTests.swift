@@ -30,8 +30,9 @@ final class ScrollToTopTests: XCTestCase {
     view.subviews(of: UIScrollView.self).filter(\.scrollsToTop)
   }
 
-  func testADrawingsCanvasLeavesTheStatusBarAlone() {
+  func testADrawingsCanvasLeavesTheStatusBarAlone() async {
     let surface = DrawingSurface(id: "d", path: folder.appendingPathComponent("d.drawing.svg").path, plugin: plugin)
+    await surface.shown()
     surface.frame = CGRect(x: 0, y: 0, width: 800, height: 600)
     surface.layoutIfNeeded()
     XCTAssertFalse(surface.subviews(of: UIScrollView.self).isEmpty, "the canvas has a scroll view to check")

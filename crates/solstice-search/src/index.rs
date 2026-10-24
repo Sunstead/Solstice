@@ -8,7 +8,7 @@ use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 
-use crate::extract::{extract, kind_of, Doc};
+use crate::extract::{extract, kind_of, Doc, Kind};
 use crate::query::{search, Limits, Query, Results};
 
 /// Bumped when what's cached changes shape or meaning: an older cache is
@@ -133,7 +133,13 @@ impl Index {
                 continue;
             }
             let Some(kind) = kind_of(&path) else { continue };
-            let doc = if size > MAX_FILE {
+            let doc = if kind == Kind::Drawing {
+                // Its handwriting is all that's searched, and comes first.
+                match read_until(&self.root.join(&path), b"</desc>") {
+                    Ok(bytes) => extract(kind, &bytes),
+                    Err(_) => continue,
+                }
+            } else if size > MAX_FILE {
                 Doc { kind, segments: Vec::new() }
             } else {
                 match fs::read(self.root.join(&path)) {
@@ -219,4 +225,25 @@ fn write_cache(path: &Path, cache: &Cache) -> io::Result<()> {
     serde_json::to_writer(&mut encoder, cache)?;
     encoder.finish()?.flush()?;
     fs::rename(&temp, path)
+}
+
+/// The file at `path` up to the end of `end`'s first appearance, or all of
+/// it: a drawing's handwriting without its megabytes of markup.
+fn read_until(path: &Path, end: &[u8]) -> io::Result<Vec<u8>> {
+    let mut file = fs::File::open(path)?;
+    let mut bytes = Vec::new();
+    let mut chunk = vec![0; 256 << 10];
+    loop {
+        let read = file.read(&mut chunk)?;
+        if read == 0 {
+            return Ok(bytes);
+        }
+        // Where `end` could start, counting a match across the chunks.
+        let from = bytes.len().saturating_sub(end.len());
+        bytes.extend_from_slice(&chunk[..read]);
+        if let Some(at) = bytes[from..].windows(end.len()).position(|w| w == end) {
+            bytes.truncate(from + at + end.len());
+            return Ok(bytes);
+        }
+    }
 }

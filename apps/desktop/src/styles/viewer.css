@@ -203,3 +203,21 @@ html[data-reduce-motion='true'] .solstice-media-chrome {
 .solstice-embed-player {
   width: 100%;
 }
+
+/* A drawing's bitmap stand-in, shown in place of its SVG while the view
+   moves (`drawStandIn` in image-viewer.tsx). */
+.solstice-stand-in {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.solstice-canvas-content[data-moving] .solstice-stand-in[data-ready] {
+  visibility: visible;
+}
+
+.solstice-canvas-content[data-moving]:has(.solstice-stand-in[data-ready]) img {
+  visibility: hidden;
+}

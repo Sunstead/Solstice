@@ -56,6 +56,51 @@ final class InkLineTests: XCTestCase {
     XCTAssertGreaterThan(mean, 10, "\(runs.count) runs for \(count) points")
   }
 
+  // -- Size --
+
+  /// Joined-up handwriting, 1.5 pt between points: loops a few points across.
+  private func handwriting(_ count: Int) -> [CGPoint] {
+    (0..<count).map { i in
+      let t = CGFloat(i) * 1.5
+      return CGPoint(x: t * 0.6 + 4 * sin(t / 5), y: 7 * cos(t / 5) + 3 * sin(t / 17))
+    }
+  }
+
+  /// A drawing's file held a curve per 1.5 pt of ink (about 2 KB a stroke):
+  /// the curve is fitted in far fewer segments, never further than
+  /// `tolerance` from any of the line's points.
+  func testTheCurveIsFittedInFewSegmentsCloseToEveryPoint() {
+    let points = handwriting(400)
+    let runs = InkLine.runs(points.map { (point: $0, radius: 1) })
+    let segments = runs.reduce(0) { $0 + $1.segments.count }
+    XCTAssertLessThan(segments * 3, points.count, "\(segments) segments for \(points.count) points")
+
+    var samples: [CGPoint] = []
+    for run in runs {
+      var from = run.start
+      for segment in run.segments {
+        samples += (0...512).map { InkLine.point(on: segment, from: from, at: CGFloat($0) / 512) }
+        from = segment.to
+      }
+    }
+    for p in points {
+      let nearest = samples.map { hypot($0.x - p.x, $0.y - p.y) }.min() ?? .infinity
+      XCTAssertLessThanOrEqual(nearest, InkLine.tolerance + 0.02)
+    }
+  }
+
+  /// Fitted or not, the curve passes through where each run starts and ends.
+  func testFittedRunsStillMeet() {
+    let points = handwriting(200)
+    let radii = (0..<200).map { 0.6 + CGFloat($0) / 200 }
+    let runs = InkLine.runs(Array(zip(points, radii)).map { (point: $0, radius: $1) })
+    XCTAssertEqual(runs.first?.start, points.first)
+    XCTAssertEqual(runs.last?.segments.last?.to, points.last)
+    for (before, after) in zip(runs, runs.dropFirst()) {
+      XCTAssertEqual(before.segments.last?.to, after.start)
+    }
+  }
+
   func testADotIsOneRunOfNoLength() {
     let runs = InkLine.runs([(point: CGPoint(x: 3, y: 4), radius: 1.5)])
     XCTAssertEqual(runs.count, 1)

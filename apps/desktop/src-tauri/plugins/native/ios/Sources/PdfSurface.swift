@@ -129,6 +129,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     stored = [:]
     appleInks = [:]
     cached = [:]
+    var converting: [ObjectIdentifier] = []
     for index in 0..<document.pageCount {
       guard let page = document.page(at: index) else { continue }
       let key = ObjectIdentifier(page)
@@ -146,15 +147,17 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
         appleInks[key, default: []].append((ink.fingerprint, drawing))
         PdfMarkup.hideAppleInk(at: rect, on: page)
       }
+      if appleInks[key] != nil { converting.append(key) }
     }
     dropCanvases()
     pdfView.document = document
     Ink.letFingerDraw(Ink.shared.fingerDraws, in: pdfView)
     Ink.ignoreStatusBarTap(in: pdfView)
-    if opened?.needsRepair == true {
-      repairing = true
-      scheduleSave(after: .zero)
-    }
+    // Apple's ink is written as Solstice's straight away, page shown or not:
+    // until then every other reader shows Apple's blurry picture of it.
+    unsaved.formUnion(converting)
+    if opened?.needsRepair == true { repairing = true }
+    if repairing || !converting.isEmpty { scheduleSave(after: .zero) }
   }
 
   /// Marks in hand: unsaved, being saved, or being drawn.
@@ -246,7 +249,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     let host = CanvasHost(controller: controller, page: CGRect(origin: .zero, size: size))
     host.zoom = zoom
     canvases[key] = (page, controller, host)
-    scratchers[key] = Scratcher(markup)
+    scratchers[key] = Scratcher()
     observeMarkup(of: controller) { [weak self, weak controller] in
       guard let self, let controller, self.canvases[key]?.controller === controller else { return }
       self.paperMarkupViewControllerDidChangeMarkup(controller)
@@ -364,16 +367,20 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }
 
   @objc private func pencilDown(_ gesture: UILongPressGestureRecognizer) {
-    guard gesture.state == .began else { return }
-    Ink.shared.activate(self, touched: true)
-    // The page under the Pencil holds the tools.
-    let point = gesture.location(in: pdfView)
-    if let page = pdfView.page(for: point, nearest: true),
-      let controller = canvases[ObjectIdentifier(page)]?.controller, !controller.isFirstResponder
-    {
-      controller.becomeFirstResponder()
+    if gesture.state == .began {
+      Ink.shared.activate(self, touched: true)
+      // The page under the Pencil holds the tools, and is the one it's on.
+      let point = gesture.location(in: pdfView)
+      penPage = pdfView.page(for: point, nearest: true).map(ObjectIdentifier.init)
+      if let penPage, let controller = canvases[penPage]?.controller, !controller.isFirstResponder {
+        controller.becomeFirstResponder()
+      }
     }
+    if let penPage { scratchers[penPage]?.track(gesture, on: canvases[penPage]?.controller) }
   }
+
+  /// The page the Pencil came down on.
+  private var penPage: ObjectIdentifier?
 
   @objc private func pageChanged() {
     // A new page in view: its canvas takes the tools, if this has them.
@@ -503,7 +510,7 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
   func paperMarkupViewControllerDidChangeMarkup(_ controller: PaperMarkupViewController) {
     guard let entry = canvases.first(where: { $0.value.controller === controller }) else { return }
-    scratchers[entry.key]?.check(controller, pencil: pdfView.pencilLanded)
+    scratchers[entry.key]?.changed(controller)
     unsaved.insert(entry.key)
     scheduleSave()
   }
@@ -554,9 +561,17 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     let state = Self.signposts.beginInterval("save")
     defer { Self.signposts.endInterval("save", state) }
 
-    // Taken all at once, so page numbers and added pages agree.
-    let pages = unsaved.compactMap { key in
-      canvases[key].map { (key: key, page: $0.page, controller: $0.controller, index: document.index(for: $0.page)) }
+    // Taken all at once, so page numbers and added pages agree. A page with
+    // no canvas (Apple's ink converted on open) saves the marks it would show.
+    let byKey = Dictionary(
+      (0..<document.pageCount).compactMap { document.page(at: $0) }.map { (ObjectIdentifier($0), $0) },
+      uniquingKeysWith: { first, _ in first })
+    let pages = unsaved.compactMap { key -> (key: ObjectIdentifier, page: PDFPage, markup: PaperMarkup?, index: Int)? in
+      if let canvas = canvases[key] {
+        return (key, canvas.page, canvas.controller.markup, document.index(for: canvas.page))
+      }
+      guard let page = byKey[key] else { return nil }
+      return (key, page, marks(of: page), document.index(for: page))
     }
     let inserts = self.inserts
     let repairing = self.repairing
@@ -566,13 +581,13 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
     var saved = false
     if encrypted {
-      saved = await writeWithPDFKit(document, pages.map { ($0.page, $0.controller) })
+      saved = await writeWithPDFKit(document, pages.map { ($0.page, $0.markup) })
     } else {
       var request = PdfStore.Request(inserts: inserts)
       do {
         let collect = Self.signposts.beginInterval("collect")
         for entry in pages {
-          guard let markup = entry.controller.markup else { continue }
+          guard let markup = entry.markup else { continue }
           let absorbed = appleInks[entry.key]?.map(\.fingerprint) ?? []
           request.edits.append(
             try await PdfMarkup.edit(of: markup, page: entry.page, index: entry.index, absorbed: absorbed))
@@ -589,7 +604,13 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
 
     if saved {
       // Apple's ink on these pages is Solstice's now, in the file too.
-      if !encrypted { for entry in pages { appleInks[entry.key] = nil } }
+      if !encrypted {
+        for entry in pages {
+          appleInks[entry.key] = nil
+          // Its canvas, when it's made, starts from what was written.
+          if canvases[entry.key] == nil { cached[entry.key] = entry.markup }
+        }
+      }
       self.saved()
     } else {
       // Kept to try again with the next change.
@@ -604,9 +625,9 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
     }
   }
 
-  private func writeWithPDFKit(_ document: PDFDocument, _ pages: [(PDFPage, PaperMarkupViewController)]) async -> Bool {
-    for (page, controller) in pages {
-      guard let markup = controller.markup else { continue }
+  private func writeWithPDFKit(_ document: PDFDocument, _ pages: [(PDFPage, PaperMarkup?)]) async -> Bool {
+    for (page, markup) in pages {
+      guard let markup else { continue }
       do {
         try await PdfMarkup.replace(markup, on: page)
       } catch {

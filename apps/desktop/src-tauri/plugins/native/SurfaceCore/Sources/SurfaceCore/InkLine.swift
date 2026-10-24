@@ -22,6 +22,16 @@ public enum InkLine {
   public static let usualShare: CGFloat = 0.55
   /// A run's width stays within this share of where it started.
   static let widthStep: CGFloat = 0.04
+  /// How far the curve may stray from the line's points, in points: under
+  /// half a pixel at 400%, for a third of the segments of one per point.
+  /// Less on a thin line, whose shape it is more of (`InkOutlineTests`).
+  static let tolerance: CGFloat = 0.05
+
+  static func tolerance(width: CGFloat) -> CGFloat {
+    min(tolerance, max(0.02, width * 0.035))
+  }
+  /// The most points one segment spans.
+  static let longestSpan = 24
 
   /// The line (each point with its radius) cut into runs whose width stays
   /// within `widthStep`. The curve is one through the whole line, sliced:
@@ -31,7 +41,7 @@ public enum InkLine {
     guard let first = line.first else { return [] }
     guard line.count > 1 else { return [Run(start: first.point, segments: [], width: 2 * first.radius)] }
     let points = line.map(\.point)
-    let segments = curve(through: points)
+    let tangents = tangents(of: points)
     var out: [Run] = []
     var start = 0
     while start < line.count - 1 {
@@ -39,7 +49,8 @@ public enum InkLine {
       let r = line[start].radius
       while end < line.count - 1, abs(line[end + 1].radius - r) <= max(r * widthStep, 0.01) { end += 1 }
       let mean = line[start...end].map(\.radius).reduce(0, +) / CGFloat(end - start + 1)
-      out.append(Run(start: points[start], segments: Array(segments[start..<end]), width: 2 * mean))
+      let segments = fit(points, tangents, from: start, to: end, within: tolerance(width: 2 * mean))
+      out.append(Run(start: points[start], segments: segments, width: 2 * mean))
       start = end
     }
     return out
@@ -49,23 +60,80 @@ public enum InkLine {
   /// next: each point's tangent from its neighbours, scaled by the distance
   /// to the next, so it neither kinks nor overshoots where points bunch up.
   static func curve(through points: [CGPoint]) -> [Segment] {
-    func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { max(hypot(b.x - a.x, b.y - a.y), 0.0001) }
-    func tangent(_ i: Int) -> CGPoint {
+    let tangents = tangents(of: points)
+    return (0..<max(points.count - 1, 0)).map { segment(points, tangents, from: $0, to: $0 + 1) }
+  }
+
+  /// The same curve from `from` to `to`, in as few segments as stay within
+  /// `tolerance` of every point between: the file had one per 1.5 pt.
+  static func fit(_ points: [CGPoint], _ tangents: [CGPoint], from: Int, to: Int, within tolerance: CGFloat) -> [Segment] {
+    var out: [Segment] = []
+    var i = from
+    while i < to {
+      var j = i + 1
+      var best = segment(points, tangents, from: i, to: j)
+      while j < to, j + 1 - i <= longestSpan {
+        let longer = segment(points, tangents, from: i, to: j + 1)
+        guard fits(longer, from: points[i], through: points[(i + 1)...j], within: tolerance) else { break }
+        best = longer
+        j += 1
+      }
+      out.append(best)
+      i = j
+    }
+    return out
+  }
+
+  /// Each point's tangent, from its neighbours.
+  static func tangents(of points: [CGPoint]) -> [CGPoint] {
+    points.indices.map { i in
       let a = points[max(i - 1, 0)]
       let b = points[min(i + 1, points.count - 1)]
       let length = distance(a, points[i]) + distance(points[i], b)
       return CGPoint(x: (b.x - a.x) / length, y: (b.y - a.y) / length)
     }
-    return (0..<(points.count - 1)).map { i in
-      let p = points[i]
-      let q = points[i + 1]
-      let h = distance(p, q) / 3
-      let t0 = tangent(i)
-      let t1 = tangent(i + 1)
-      return Segment(
-        control1: CGPoint(x: p.x + t0.x * h, y: p.y + t0.y * h),
-        control2: CGPoint(x: q.x - t1.x * h, y: q.y - t1.y * h), to: q)
+  }
+
+  /// From point `from` to `to` along their tangents, its handles a third of
+  /// the line between them (for neighbours, the distance between them).
+  private static func segment(_ points: [CGPoint], _ tangents: [CGPoint], from: Int, to: Int) -> Segment {
+    let p = points[from]
+    let q = points[to]
+    let h = (from..<to).reduce(0) { $0 + distance(points[$1], points[$1 + 1]) } / 3
+    let t0 = tangents[from]
+    let t1 = tangents[to]
+    return Segment(
+      control1: CGPoint(x: p.x + t0.x * h, y: p.y + t0.y * h),
+      control2: CGPoint(x: q.x - t1.x * h, y: q.y - t1.y * h), to: q)
+  }
+
+  /// Whether every one of `points` is within `tolerance` of `segment`.
+  private static func fits(
+    _ segment: Segment, from start: CGPoint, through points: ArraySlice<CGPoint>, within tolerance: CGFloat
+  ) -> Bool {
+    let steps = 8 * (points.count + 1)
+    let samples = (0...steps).map { point(on: segment, from: start, at: CGFloat($0) / CGFloat(steps)) }
+    return points.allSatisfy { p in
+      zip(samples, samples.dropFirst()).contains { distance(p, $0, $1) <= tolerance }
     }
+  }
+
+  static func point(on s: Segment, from p: CGPoint, at t: CGFloat) -> CGPoint {
+    let u = 1 - t
+    let a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t
+    return CGPoint(
+      x: a * p.x + b * s.control1.x + c * s.control2.x + d * s.to.x,
+      y: a * p.y + b * s.control1.y + c * s.control2.y + d * s.to.y)
+  }
+
+  private static func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { max(hypot(b.x - a.x, b.y - a.y), 0.0001) }
+
+  /// From `p` to the line `a`–`b`.
+  private static func distance(_ p: CGPoint, _ a: CGPoint, _ b: CGPoint) -> CGFloat {
+    let dx = b.x - a.x, dy = b.y - a.y
+    let squared = dx * dx + dy * dy
+    let t = squared > 0 ? max(0, min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / squared)) : 0
+    return hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
   }
 
   // -- Measuring -----------------------------------------------------------

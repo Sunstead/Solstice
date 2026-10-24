@@ -26,7 +26,7 @@ final class DrawingFileTests: XCTestCase {
 
   /// The drawing's ink, without the metadata (whose bytes PaperKit may vary).
   private func ink(_ svg: String) -> Substring {
-    svg[svg.range(of: "</desc>")!.upperBound...]
+    svg[svg.range(of: "</metadata>")!.upperBound...]
   }
 
   /// The picture layer's image, decoded.
@@ -86,5 +86,93 @@ final class DrawingFileTests: XCTestCase {
     var moved = original
     moved.transform = CGAffineTransform(translationX: 4096, y: 4096)
     XCTAssertEqual(InkOutline.key(of: original), InkOutline.key(of: moved))
+  }
+
+  // -- Opening again ------------------------------------------------------
+
+  /// Each launch's first save measured every stroke again with PencilKit (a
+  /// few milliseconds each: minutes in a big drawing). What the file holds
+  /// of each stroke is used instead.
+  func testAReopenedDrawingsFirstSaveBuildsNothing() async throws {
+    let strokes = (0..<20).map { stroke(at: CGPoint(x: 1000, y: 1000 + CGFloat($0) * 30)) }
+    let svg = try await DrawingFile.Writer().write(markup(strokes: strokes), text: "hello")
+    let contents = try DrawingFile.read(Data(svg.utf8))
+    XCTAssertEqual(contents.strokes.count, 20)
+    XCTAssertEqual(contents.text, "hello")
+
+    let writer = DrawingFile.Writer()
+    await writer.seed(contents.strokes)
+    let again = try await writer.write(try XCTUnwrap(contents.markup), text: "hello")
+    let built = await writer.built
+    XCTAssertEqual(built, 0)
+    XCTAssertEqual(ink(again), ink(svg))
+  }
+
+  /// The canvas growing (or the lasso) moved strokes, and every moved
+  /// stroke's SVG was made again.
+  func testMovingEverythingBuildsNothing() async throws {
+    let writer = DrawingFile.Writer()
+    var markup = markup(strokes: (0..<10).map { stroke(at: CGPoint(x: 1000, y: 1000 + CGFloat($0) * 30)) })
+    _ = try await writer.write(markup, text: "")
+    markup.transformContent(CGAffineTransform(translationX: 4096, y: -512))
+    let moved = try await writer.write(markup, text: "")
+    let built = await writer.built
+    XCTAssertEqual(built, 10)
+    XCTAssertTrue(moved.contains("translate(4096 -512)") || moved.contains("translate(4096"))
+  }
+
+  /// The picture layer was drawn again on every save, even when only ink
+  /// had changed.
+  func testThePictureIsDrawnOnlyWhenWhatItShowsChanges() async throws {
+    let writer = DrawingFile.Writer()
+    var markup = markup(strokes: [stroke(at: CGPoint(x: 1000, y: 1000))])
+    markup.insertNewTextbox(
+      attributedText: NSAttributedString(string: "note"), frame: CGRect(x: 1200, y: 1000, width: 200, height: 60))
+    _ = try await writer.write(markup, text: "")
+    markup.append(contentsOf: PKDrawing(strokes: [stroke(at: CGPoint(x: 1000, y: 1100))]))
+    _ = try await writer.write(markup, text: "")
+    let pictures = await writer.pictures
+    XCTAssertEqual(pictures, 1)
+  }
+
+  /// PaperKit's markup is most of a drawing's file: it's deflated.
+  func testTheMarkupIsDeflated() async throws {
+    let strokes = (0..<200).map { stroke(at: CGPoint(x: 1000 + CGFloat($0 % 20) * 90, y: 1000 + CGFloat($0 / 20) * 30)) }
+    let markup = markup(strokes: strokes)
+    let raw = try await markup.dataRepresentation()
+    let svg = try await DrawingFile.Writer().write(markup, text: "")
+    XCTAssertTrue(svg.contains("encoding=\"deflate\""))
+    XCTAssertLessThan(svg.utf8.count, raw.base64EncodedString().utf8.count)
+    let read = try XCTUnwrap(try DrawingFile.read(Data(svg.utf8)).markup)
+    XCTAssertEqual(read.subelements.strokes.count, 200)
+  }
+
+  /// Files saved before: the markup undeflated, its `<desc>` after it.
+  func testAnOldFileStillOpens() async throws {
+    let markup = markup(strokes: [stroke(at: CGPoint(x: 1000, y: 1000))])
+    let data = try await markup.dataRepresentation()
+    let old = """
+      <svg xmlns="http://www.w3.org/2000/svg" xmlns:solstice="\(DrawingFile.namespace)" viewBox="976 976 128 72" width="128" height="72">
+        <metadata><solstice:paper version="1">\(data.base64EncodedString())</solstice:paper></metadata>
+        <desc>old &amp; good</desc>
+        <rect x="976" y="976" width="128" height="72" fill="#fff"/>
+      </svg>
+      """
+    let contents = try DrawingFile.read(Data(old.utf8))
+    XCTAssertEqual(contents.markup?.subelements.strokes.count, 1)
+    XCTAssertEqual(contents.text, "old & good")
+    XCTAssertEqual(contents.drawn, CGRect(x: 976, y: 976, width: 128, height: 72))
+  }
+
+  /// A drawing whose markup couldn't be read opened as a blank canvas, and
+  /// its first save wrote the blank over it.
+  func testAnUnreadableOrNewerFileIsntTakenForANewOne() {
+    let corrupt = #"<svg><metadata><solstice:paper version="2" encoding="deflate">bm90IGRlZmxhdGVk</solstice:paper></metadata></svg>"#
+    XCTAssertThrowsError(try DrawingFile.read(Data(corrupt.utf8)))
+    let newer = #"<svg><metadata><solstice:paper version="9">AAAA</solstice:paper></metadata></svg>"#
+    XCTAssertThrowsError(try DrawingFile.read(Data(newer.utf8))) { error in
+      guard case DrawingFile.ReadError.newer(9) = error else { return XCTFail("\(error)") }
+    }
+    XCTAssertNil(try DrawingFile.read(Data()).markup, "an empty file is a new drawing")
   }
 }
