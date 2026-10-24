@@ -24,14 +24,14 @@ final class PencilTaps {
   /// Watches `webview`'s window; `send` gets each missed tap, in the
   /// webview's points.
   init?(_ webview: WKWebView, send: @escaping (CGPoint) -> Void) {
-    guard let window = webview.window else { return nil }
+    guard webview.window != nil else { return nil }
     self.webview = webview
     self.send = send
-    Self.watch(window, with: self)
+    Self.watch(with: self)
   }
 
-  private func saw(_ event: UIEvent) {
-    guard event.type == .touches, let webview, let touches = event.allTouches else { return }
+  private func saw(_ event: UIEvent, in window: UIWindow) {
+    guard event.type == .touches, let webview, webview.window === window, let touches = event.allTouches else { return }
     for touch in touches where touch.type == .pencil {
       let key = ObjectIdentifier(touch)
       switch touch.phase {
@@ -70,29 +70,28 @@ final class PencilTaps {
 
   private static let webKitTaps: Set<String> = ["WKTouchEventsGestureRecognizer", "WKSyntheticTapGestureRecognizer"]
 
-  /// Gives `window`'s class a subclass whose `sendEvent` tells `taps` of each
-  /// event once it's sent, as `SurfaceHost.routeTouches` does the hit test.
-  private static func watch(_ window: UIWindow, with taps: PencilTaps) {
+  /// Has `UIWindow`'s own `sendEvent` tell `taps` of each event once it's
+  /// sent. Never by giving the window a class of its own: WebKit observes
+  /// the window, and key-value observing has already given it one, which a
+  /// subclass of breaks (adding or removing a web view, the share sheet and
+  /// PDF printing crashed). Every window goes through here; `saw` keeps to
+  /// the web view's.
+  private static func watch(with taps: PencilTaps) {
     current = taps
-    guard let base = object_getClass(window) else { return }
-    let name = "Solstice_" + NSStringFromClass(base)
-    let selector = #selector(UIWindow.sendEvent(_:))
-    var made: AnyClass? = NSClassFromString(name)
-    if made == nil, let subclass = objc_allocateClassPair(base, name, 0),
-      let method = class_getInstanceMethod(base, selector)
-    {
-      typealias SendEvent = @convention(c) (AnyObject, Selector, UIEvent) -> Void
-      let original = unsafeBitCast(class_getMethodImplementation(base, selector), to: SendEvent.self)
-      let block: @convention(block) (UIWindow, UIEvent) -> Void = { window, event in
-        original(window, selector, event)
-        MainActor.assumeIsolated { PencilTaps.current?.saw(event) }
-      }
-      class_addMethod(subclass, selector, imp_implementationWithBlock(block), method_getTypeEncoding(method))
-      objc_registerClassPair(subclass)
-      made = subclass
-    }
-    if let made { object_setClass(window, made) }
+    _ = sendEventSwapped
   }
+
+  private static let sendEventSwapped: Void = {
+    let selector = #selector(UIWindow.sendEvent(_:))
+    guard let method = class_getInstanceMethod(UIWindow.self, selector) else { return }
+    typealias SendEvent = @convention(c) (UIWindow, Selector, UIEvent) -> Void
+    let original = unsafeBitCast(method_getImplementation(method), to: SendEvent.self)
+    let block: @convention(block) (UIWindow, UIEvent) -> Void = { window, event in
+      original(window, selector, event)
+      MainActor.assumeIsolated { PencilTaps.current?.saw(event, in: window) }
+    }
+    method_setImplementation(method, imp_implementationWithBlock(block))
+  }()
 
   private static weak var current: PencilTaps?
 }
