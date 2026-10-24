@@ -9,7 +9,7 @@ import { ToolIcon } from './tool-icon';
 
 /**
  * The tool in hand while the ribbon is hidden, as Apple's minimized tool
- * picker shows it: a circle rimmed in the ink's color, in a corner of the
+ * picker shows it: a glass circle rimmed in the ink's color, in a corner of the
  * content. It drags with a finger or the Pencil and springs to the corner
  * it's thrown toward (`badge-gesture.ts`), kept with the tools; a tap brings
  * the ribbon back.
@@ -62,10 +62,11 @@ export function ToolBadge() {
         type='button'
         title={label}
         aria-label={label}
-        className='pointer-events-auto absolute top-0 left-0 flex size-12 touch-none items-center justify-center rounded-full border-[3px] border-border bg-popover/90 text-popover-foreground shadow-lg backdrop-blur-md transition-shadow select-none data-lifted:shadow-2xl'
+        // The menus' glass: translucent, the blur on a layer of its own.
+        className='pointer-events-auto absolute top-0 left-0 flex size-15 touch-none items-center justify-center rounded-full border-[3px] border-foreground/10 bg-popover/70 text-popover-foreground shadow-lg ring-1 ring-foreground/10 transition-shadow select-none before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150 data-lifted:shadow-2xl'
         style={hasInk(slot.kind) ? { borderColor: slot.color } : undefined}
       >
-        <ToolIcon kind={slot.kind} className='size-5' />
+        <ToolIcon kind={slot.kind} className='size-7' />
       </button>
     </div>
   );

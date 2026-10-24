@@ -201,7 +201,8 @@ function Arc({ page, direction }: { page: PalettePage; direction: number }) {
   return (
     <>
       <Band centre={c} radius={ARC} angles={angles} />
-      {fanned && <Band key={page} centre={c} radius={FAN} angles={fanAngles} fade />}
+      {/* Keyed apart from the fan's buttons: siblings sharing a key, React can leave one behind. */}
+      {fanned && <Band key={`band-${page}`} centre={c} radius={FAN} angles={fanAngles} fade />}
 
       {items.map((item, i) => (
         <Placed key={item.type === 'tool' ? item.slot.id : item.type} at={polar(c, ARC, angles[i])}>
@@ -253,7 +254,7 @@ function Arc({ page, direction }: { page: PalettePage; direction: number }) {
       ))}
 
       {fanned && (
-        <Fanned key={page}>
+        <Fanned key={`fan-${page}`}>
           {fanAngles.map((angle, i) => (
             <Placed key={i} at={polar(c, FAN, angle)}>
               {fanned[i]}
