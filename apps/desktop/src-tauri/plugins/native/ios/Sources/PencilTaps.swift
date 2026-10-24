@@ -71,11 +71,8 @@ final class PencilTaps {
   private static let webKitTaps: Set<String> = ["WKTouchEventsGestureRecognizer", "WKSyntheticTapGestureRecognizer"]
 
   /// Has `UIWindow`'s own `sendEvent` tell `taps` of each event once it's
-  /// sent. Never by giving the window a class of its own: WebKit observes
-  /// the window, and key-value observing has already given it one, which a
-  /// subclass of breaks (adding or removing a web view, the share sheet and
-  /// PDF printing crashed). Every window goes through here; `saw` keeps to
-  /// the web view's.
+  /// sent, leaving the window's class alone (`MethodHooks.swift`). Every
+  /// window goes through here; `saw` keeps to the web view's.
   private static func watch(with taps: PencilTaps) {
     current = taps
     _ = sendEventSwapped
@@ -83,14 +80,15 @@ final class PencilTaps {
 
   private static let sendEventSwapped: Void = {
     let selector = #selector(UIWindow.sendEvent(_:))
-    guard let method = class_getInstanceMethod(UIWindow.self, selector) else { return }
-    typealias SendEvent = @convention(c) (UIWindow, Selector, UIEvent) -> Void
-    let original = unsafeBitCast(method_getImplementation(method), to: SendEvent.self)
-    let block: @convention(block) (UIWindow, UIEvent) -> Void = { window, event in
-      original(window, selector, event)
-      MainActor.assumeIsolated { PencilTaps.current?.saw(event, in: window) }
+    replaceMethod(of: UIWindow.self, selector) { original in
+      typealias SendEvent = @convention(c) (UIWindow, Selector, UIEvent) -> Void
+      let send = unsafeBitCast(original, to: SendEvent.self)
+      let block: @convention(block) (UIWindow, UIEvent) -> Void = { window, event in
+        send(window, selector, event)
+        MainActor.assumeIsolated { PencilTaps.current?.saw(event, in: window) }
+      }
+      return block
     }
-    method_setImplementation(method, imp_implementationWithBlock(block))
   }()
 
   private static weak var current: PencilTaps?

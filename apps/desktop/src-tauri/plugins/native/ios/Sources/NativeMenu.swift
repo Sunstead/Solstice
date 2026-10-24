@@ -59,33 +59,32 @@ enum NativeMenu {
 
   /// Teaches the app to build the menu and run its items. UIKit asks
   /// UIApplication (and a delegate that's a responder, which tao's isn't), so
-  /// the application gets a runtime subclass that adds ours to the menu, and
-  /// the method its items call.
+  /// the application's class adds ours to the menu and gets the method its
+  /// items call. On its class, never by changing it (`MethodHooks.swift`).
   private static func install() {
-    let app = UIApplication.shared
-    guard !installed, let base = object_getClass(app) else { return }
+    guard !installed else { return }
     installed = true
-    let name = "Solstice_" + NSStringFromClass(base)
-    var made: AnyClass? = NSClassFromString(name)
-    if made == nil, let subclass = objc_allocateClassPair(base, name, 0) {
-      let selector = #selector(UIResponder.buildMenu(with:))
+    install(on: UIApplication.shared)
+  }
+
+  /// `install`, on any responder (a test's stand-in for the application).
+  static func install(on app: UIResponder) {
+    let cls = realClass(of: app)
+    let selector = #selector(UIResponder.buildMenu(with:))
+    replaceMethod(of: cls, selector) { original in
       typealias Build = @convention(c) (AnyObject, Selector, UIMenuBuilder) -> Void
-      let original = unsafeBitCast(class_getMethodImplementation(base, selector), to: Build.self)
-      let build: @convention(block) (AnyObject, UIMenuBuilder) -> Void = { this, builder in
-        original(this, selector, builder)
+      let build = unsafeBitCast(original, to: Build.self)
+      let block: @convention(block) (AnyObject, UIMenuBuilder) -> Void = { this, builder in
+        build(this, selector, builder)
         NativeMenu.build(builder)
       }
-      class_addMethod(subclass, selector, imp_implementationWithBlock(build), "v@:@")
-
-      let run: @convention(block) (AnyObject, UICommand) -> Void = { _, command in
-        guard let id = command.propertyList as? String else { return }
-        NativeMenu.plugin?.trigger("menu", data: ["id": id])
-      }
-      class_addMethod(subclass, action, imp_implementationWithBlock(run), "v@:@")
-      objc_registerClassPair(subclass)
-      made = subclass
+      return block
     }
-    if let made { object_setClass(app, made) }
+    let run: @convention(block) (AnyObject, UICommand) -> Void = { _, command in
+      guard let id = command.propertyList as? String else { return }
+      NativeMenu.plugin?.trigger("menu", data: ["id": id])
+    }
+    class_addMethod(cls, action, imp_implementationWithBlock(run), "v@:@")
   }
 
   private static let action = NSSelectorFromString("solsticeMenuCommand:")

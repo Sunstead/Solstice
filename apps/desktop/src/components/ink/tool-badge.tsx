@@ -63,7 +63,7 @@ export function ToolBadge() {
         title={label}
         aria-label={label}
         // The menus' glass: translucent, the blur on a layer of its own.
-        className='pointer-events-auto absolute top-0 left-0 flex size-15 touch-none items-center justify-center rounded-full bg-popover/70 text-popover-foreground shadow-lg ring-1 ring-foreground/10 transition-shadow select-none before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150 data-lifted:shadow-2xl'
+        className='pointer-events-auto absolute top-0 left-0 flex size-15 touch-none items-center justify-center rounded-full bg-popover/80 text-popover-foreground shadow-lg ring-1 ring-foreground/10 transition-shadow select-none before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150 data-lifted:shadow-2xl'
       >
         {/* Over the blur: under it, a new color showed only once WebKit next redrew the backdrop. */}
         <span
