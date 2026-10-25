@@ -150,6 +150,31 @@ export function useOverSurface() {
   }, []);
 }
 
+let sizesHeld = 0;
+
+/**
+ * Keeps every surface at its size until released, following only where its
+ * element is. For a layout change that's then eased by transforms (Zen mode):
+ * a new size makes PDFKit and PaperKit lay out and redraw on the main thread,
+ * which also composites the page, and the motion froze and jumped. Released,
+ * each takes its true size once.
+ */
+export function holdSurfaceSizes(): () => void {
+  sizesHeld++;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    sizesHeld--;
+    if (!sizesHeld) kicks.forEach((kick) => kick());
+  };
+}
+
+/** Whether surfaces keep their sizes for now (`holdSurfaceSizes`). */
+export function surfaceSizesHeld(): boolean {
+  return sizesHeld > 0;
+}
+
 /**
  * Web content over a surface moved in a way nothing watched sees (a dragged
  * badge's `translate`): measure again for a few frames, so its touches stay

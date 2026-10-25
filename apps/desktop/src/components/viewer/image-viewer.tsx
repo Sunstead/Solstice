@@ -9,7 +9,6 @@ import { canvasGround, isDrawing, isVectorImage } from '@/lib/embed/kind';
 import { pinchView, type Viewport } from '@/lib/canvas/viewport';
 import type { Point } from '@/lib/canvas/types';
 import { CanvasGrid } from './canvas-grid';
-import { PaperToggle } from './paper-toggle';
 import { ViewerFrame } from './viewer-frame';
 import {
   ViewerToolbar,
@@ -379,7 +378,6 @@ export function ImageViewer({ path }: { path: string }) {
   return (
     <ViewerFrame
       path={path}
-      leading={isDrawing(path) ? <PaperToggle /> : undefined}
       toolbar={
         <ViewerToolbar>
           <Button

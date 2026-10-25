@@ -24,6 +24,7 @@ import { WindowControls } from './window-controls';
 import { useIsMac } from '@/hooks/use-platform';
 import {
   applyTabMode,
+  applyZen,
   applyTopEdgeDragRegions,
   findCornerTabset,
   syncTopEdgeTabsetDrag,
@@ -33,6 +34,7 @@ import { getFileIconFor } from '@/assets/icons';
 import { Button } from '@sunstead/ui/components/button';
 import { stripPresetExtension } from '@/lib/stores/entry-input';
 import { useSetting } from '@/lib/settings/store';
+import { useZen } from '@/lib/zen';
 import { TabCloseIcon } from './tab-close-icon';
 import { closeTab, playEnter, watchClosePresses } from '@/lib/tab-motion';
 import { watchStickyDock } from '@/lib/tab-dock';
@@ -96,6 +98,18 @@ export default function FlexLayoutRoot() {
   useEffect(() => {
     if (model) applyTabMode(model, single);
   }, [model, single]);
+
+  // Zen keeps the active tabset maximized, following it if a command or link
+  // moves focus to another pane.
+  const zen = useZen();
+  useEffect(() => {
+    if (!model) return;
+    applyZen(model, zen);
+    if (!zen) return;
+    const listener = () => applyZen(model, true);
+    model.addChangeListener(listener);
+    return () => model.removeChangeListener(listener);
+  }, [model, zen]);
 
   // Retargeting a tab after a rename mutates its config in place, which
   // FlexLayout's content memo cannot see. Hand the store the imperative

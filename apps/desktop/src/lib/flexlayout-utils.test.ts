@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Model, TabNode, TabSetNode, type IJsonTabSetNode } from 'flexlayout-react';
-import { applyTabMode } from '@/lib/flexlayout-utils';
+import { Actions, Model, TabNode, TabSetNode, type IJsonTabSetNode } from 'flexlayout-react';
+import { applyTabMode, applyZen } from '@/lib/flexlayout-utils';
 
 const tabset = (id: string, tabs: string[], extra: Partial<IJsonTabSetNode> = {}): IJsonTabSetNode => ({
   type: 'tabset',
@@ -63,5 +63,32 @@ describe('applyTabMode', () => {
     const only = model.getNodeById('only') as TabSetNode;
     expect(only.getChildren().map((t) => t.getId())).toEqual(['a', 'b']);
     expect(only.getSelectedNode()?.getId()).toBe('b');
+  });
+});
+
+describe('applyZen', () => {
+  it('maximizes the active tabset, and restores the split on exit', () => {
+    const model = split();
+    applyZen(model, true);
+    expect(model.getMaximizedTabset()?.getId()).toBe('bottom');
+
+    applyZen(model, false);
+    expect(model.getMaximizedTabset()).toBeUndefined();
+    expect(tabsets(model)).toHaveLength(3);
+  });
+
+  it('follows the active tabset when it changes', () => {
+    const model = split();
+    applyZen(model, true);
+    model.doAction(Actions.setActiveTabset('left'));
+    applyZen(model, true);
+    expect(model.getMaximizedTabset()?.getId()).toBe('left');
+  });
+
+  it('is a no-op with one tabset', () => {
+    const model = split();
+    applyTabMode(model, true);
+    applyZen(model, true);
+    expect(model.getMaximizedTabset()).toBeUndefined();
   });
 });

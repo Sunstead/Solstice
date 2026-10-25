@@ -149,3 +149,23 @@ export function applyTabMode(model: Model, single: boolean): void {
   }
   if (active) model.doAction(Actions.selectTab(active));
 }
+
+/**
+ * Zen mode's panes: the active tabset maximized (flexlayout's own maximize,
+ * which hides the rest), back to the split on exit. One tabset needs nothing.
+ */
+export function applyZen(model: Model, on: boolean): void {
+  const maximized = model.getMaximizedTabset();
+  if (!on) {
+    if (maximized) model.doAction(Actions.maximizeToggle(maximized.getId()));
+    return;
+  }
+  let count = 0;
+  model.visitNodes((node) => {
+    if (node instanceof TabSetNode) count++;
+  });
+  const active = model.getActiveTabset();
+  if (count < 2 || !active || active === maximized) return;
+  if (maximized) model.doAction(Actions.maximizeToggle(maximized.getId()));
+  model.doAction(Actions.maximizeToggle(active.getId()));
+}

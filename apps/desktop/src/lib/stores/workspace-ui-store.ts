@@ -7,6 +7,8 @@ interface WorkspaceUIState {
   activePrimaryView: string;
   sidebarCollapsed: boolean;
   sidebarWidth: number;
+  /** Zen mode (`lib/zen.ts`): the shown tab fills the window. */
+  zen: boolean;
   /**
    * Folders the explorer tree has open, as the OS-native paths `useFiles`
    * keys its entries by -- the same form `layout.json` stores tab paths in,
@@ -16,6 +18,7 @@ interface WorkspaceUIState {
   setActivePrimaryView: (id: string) => void;
   setSidebarCollapsed: (value: boolean) => void;
   setSidebarWidth: (width: number) => void;
+  setZen: (value: boolean) => void;
   setFolderExpanded: (path: string, expanded: boolean) => void;
   forgetExpandedSubtree: (path: string) => void;
   setExpandedFolders: (paths: string[]) => void;
@@ -27,10 +30,12 @@ export const useWorkspaceUIStore = create<WorkspaceUIState>()(
       activePrimaryView: 'notes',
       sidebarCollapsed: false,
       sidebarWidth: 260,
+      zen: false,
       expandedFolders: [],
       setActivePrimaryView: (id) => set({ activePrimaryView: id }),
       setSidebarCollapsed: (value) => set({ sidebarCollapsed: value }),
       setSidebarWidth: (width) => set({ sidebarWidth: width }),
+      setZen: (value) => set({ zen: value }),
 
       setFolderExpanded: (path, expanded) =>
         set((state) => {

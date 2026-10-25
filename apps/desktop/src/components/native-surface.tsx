@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { nativeSurfaces, type SurfaceKind } from '@/lib/backend/native';
 import { useFindStore } from '@/lib/stores/find';
-import { follow, refreshers, retainHost, seeThrough, unmark, useSurfaceStates } from '@/lib/native-surfaces';
+import { follow, refreshers, retainHost, seeThrough, surfaceSizesHeld, unmark, useSurfaceStates } from '@/lib/native-surfaces';
 import { useFileVersion } from '@/lib/viewer/file-version';
 
 /**
@@ -19,15 +19,18 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
     void nativeSurfaces.open(id, kind, path);
 
     let last = '';
+    let size: { width: number; height: number } | null = null;
     const under = new Set<Element>();
     const measure = () => {
       const r = el.getBoundingClientRect();
       const visible = r.width > 0 && r.height > 0 && el.checkVisibility?.() !== false;
-      const key = `${r.x},${r.y},${r.width},${r.height},${visible}`;
+      // Held (`holdSurfaceSizes`), the view only moves with the element.
+      if (!size || !surfaceSizesHeld()) size = { width: r.width, height: r.height };
+      const key = `${r.x},${r.y},${size.width},${size.height},${visible}`;
       if (key === last) return false;
       last = key;
       const backdrop = visible ? seeThrough(el, r, under) : null;
-      void nativeSurfaces.place(id, { x: r.x, y: r.y, width: r.width, height: r.height }, visible, backdrop);
+      void nativeSurfaces.place(id, { x: r.x, y: r.y, ...size }, visible, backdrop);
       return true;
     };
     const stopFollowing = follow(el, measure);

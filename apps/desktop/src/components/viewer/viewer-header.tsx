@@ -1,6 +1,7 @@
 import FileBreadcrumb from '@/components/file-breadcrumb';
 import { FileActionsDropdown } from '@/components/file-actions-dropdown';
 import { ShareButton } from '@/components/share-button';
+import { ZenToggle } from './zen-toggle';
 import { FindBar } from '@/components/find-bar';
 import { useOverSurface } from '@/lib/native-surfaces';
 import { revealInExplorer } from '@/lib/entry-actions';
@@ -76,6 +77,7 @@ export function ViewerHeader({
         />
       </div>
       <div className='flex items-center gap-0.5'>
+        <ZenToggle />
         <ShareButton path={path} />
         <FileActionsDropdown path={path} surface={find ? 'editor' : 'viewer'} />
       </div>
