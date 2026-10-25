@@ -72,12 +72,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // Shown for the slide; hidden once off screen, where a sliver of the
     // explorer would otherwise stay at the edge.
     side?.style.removeProperty('visibility');
-    // Leaving, the pane starts up and to the left of where it lands: what it
-    // uncovers on the right and below is the pane's color, not a gap.
-    if (shell) shell.style.background = 'var(--background)';
     void playZen({ inset: el, column: side, entering: zen, before: from, onPlay: playSurfaceEase, marks: parts }).then(() => {
       shell?.removeAttribute('data-zen-moving');
-      if (shell) shell.style.background = '';
       endSurfaceEase();
       if (zen) side?.style.setProperty('visibility', 'hidden');
     });

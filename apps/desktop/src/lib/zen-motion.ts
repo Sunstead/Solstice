@@ -97,6 +97,9 @@ function flipMarks(inset: HTMLElement, marks: ZenMarks, timing: KeyframeAnimatio
   const place = () => {
     held.splice(0).forEach((a) => a.cancel());
     layer.replaceChildren();
+    // A part hidden by an earlier pass may not move in this one.
+    hidden.forEach((el) => (el.style.visibility = ''));
+    hidden.clear();
     const box = inset.getBoundingClientRect();
     for (const [el, before] of marks) {
       if (!el.isConnected) continue;
@@ -176,6 +179,15 @@ export function playZen({ inset, column, entering, before, onPlay, marks }: ZenP
           : []),
       ];
   for (const a of animations) a.pause();
+  // Leaving, the narrower pane starts up and to the left of where it lands:
+  // the band it uncovers to its right and below is painted the notes'
+  // colour, a shadow that rides with it and ends past the screen's edge.
+  const bandX = Math.max(0, -x);
+  const bandY = Math.max(0, -y);
+  if (!reduced && (bandX || bandY)) {
+    inset.style.boxShadow = `${bandX}px ${bandY}px 0 0 var(--background)`;
+    void animations[0].finished.catch(() => undefined).then(() => (inset.style.boxShadow = ''));
+  }
   const playMarks = marks && !reduced ? flipMarks(inset, marks, timing) : null;
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {

@@ -66,10 +66,7 @@ export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): nu
   under.clear();
   for (const below of found) under.add(below);
   const islands = document.documentElement.dataset.islands === 'true';
-  // In Zen and while it switches, what shows round a moving pane is the
-  // notes' colour, as the page paints there.
-  const zen = easing || document.documentElement.dataset.zen !== undefined;
-  const host = (islands && !zen && windowColour()) || background;
+  const host = (islands && windowColour()) || background;
   if (host) void nativeSurfaces.background(host);
   return background;
 }
