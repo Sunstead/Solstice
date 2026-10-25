@@ -277,6 +277,19 @@ final class SurfaceHost: UIView {
     set { UserDefaults.standard.set(newValue, forKey: "solstice.launchColour") }
   }
 
+  /// The theme's appearance (`appearance`), kept for the next launch too, so
+  /// the keyboard, the loupe and every UIKit view match it: the page never
+  /// sets `color-scheme`, which would restyle its own controls.
+  static var launchDark: Bool? {
+    get { UserDefaults.standard.object(forKey: "solstice.launchDark") as? Bool }
+    set { UserDefaults.standard.set(newValue, forKey: "solstice.launchDark") }
+  }
+
+  static func applyAppearance(to window: UIWindow?) {
+    guard let window, let dark = launchDark else { return }
+    window.overrideUserInterfaceStyle = dark ? .dark : .light
+  }
+
   /// Sits under `webview`, the same size, and makes it see-through.
   static func install(under webview: WKWebView) -> SurfaceHost? {
     guard let parent = webview.superview else { return nil }
@@ -289,13 +302,32 @@ final class SurfaceHost: UIView {
       host.backgroundColor = colour
       webview.window?.backgroundColor = colour
     }
+    applyAppearance(to: webview.window)
     parent.insertSubview(host, belowSubview: webview)
     webview.isOpaque = false
     webview.backgroundColor = .clear
     webview.scrollView.backgroundColor = .clear
     current = host
     routeTouches(of: webview)
+    hideFormAccessory(of: webview)
     return host
+  }
+
+  /// Takes away WebKit's bar over the keyboard (previous, next, Done): it
+  /// stacked under the note's own keyboard bar and gave every other field
+  /// away as a web page. The keyboard bar's own button puts the keyboard
+  /// away. On WKContentView's class, which answers for every field.
+  private static func hideFormAccessory(of webview: WKWebView) {
+    guard
+      let content = webview.scrollView.subviews.first(where: { NSStringFromClass(type(of: $0)).hasPrefix("WKContent") })
+    else { return }
+    let cls = realClass(of: content)
+    guard !hooked.contains(ObjectIdentifier(cls)) else { return }
+    hooked.insert(ObjectIdentifier(cls))
+    replaceMethod(of: cls, #selector(getter: UIResponder.inputAccessoryView)) { _ in
+      let block: @convention(block) (UIView) -> UIView? = { _ in nil }
+      return block
+    }
   }
 
   /// The web view whose touches go to the surfaces under it.

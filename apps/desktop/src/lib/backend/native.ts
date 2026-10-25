@@ -78,6 +78,8 @@ export const nativeSurfaces = {
   background: (rgb: number[]) => host({ op: 'background', rgb }),
   /** The theme's background, kept for the next launch's first frames. */
   launchColour: (rgb: number[]) => host({ op: 'launchColour', rgb }),
+  /** The theme's appearance, for UIKit's own views (the keyboard, the loupe, pickers). */
+  appearance: (dark: boolean) => host({ op: 'appearance', on: dark }),
   listen: (handler: (event: SurfaceEvent) => void) =>
     addPluginListener('solstice-native', 'surface', handler),
 };
@@ -184,7 +186,23 @@ export const nativePencilTaps = {
  * The Taptic Engine (`Haptics.swift`), for gestures that lift, drop or
  * cross a slot. Fire and forget: a missed tick is only a missed tick.
  */
-export type HapticKind = 'lift' | 'drop' | 'tick' | 'dismiss' | 'warning';
+/**
+ * `lift`/`drop`/`tick`: a drag. `dismiss`: a sheet let go of. `select`: a
+ * choice changed (a toggle, a checkbox). `hold`: a hold opened something.
+ * `commit`: a swipe passed the point where letting go acts. `light`: a pull
+ * that triggers. `success`/`warning`: something made or moved, or a delete.
+ */
+export type HapticKind =
+  | 'lift'
+  | 'drop'
+  | 'tick'
+  | 'dismiss'
+  | 'warning'
+  | 'select'
+  | 'hold'
+  | 'commit'
+  | 'light'
+  | 'success';
 
 export const nativeHaptics = {
   /** Wakes the engine before a tick that may follow (a press that may lift). */

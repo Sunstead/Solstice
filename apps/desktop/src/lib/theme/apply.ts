@@ -30,7 +30,8 @@ export interface FirstPaint {
  * these through `var()`, so nothing else has to be told a theme changed.
  *
  * `color-scheme` is left alone, as it always was: setting it would restyle
- * native controls.
+ * native controls. The iOS app tells UIKit instead, which reaches the
+ * keyboard and the system's own views without touching the page.
  */
 export function applyTheme(theme: Theme) {
   const root = document.documentElement;
@@ -53,6 +54,7 @@ export function applyTheme(theme: Theme) {
   for (const [name, value] of vars) root.style.setProperty(name, value);
 
   syncThemeColor();
+  if (can.nativeViews) void nativeSurfaces.appearance(theme.appearance === 'dark');
 
   rememberForFirstPaint({
     theme: builtin.id,

@@ -199,6 +199,11 @@ class NativePlugin: Plugin {
       if let rgb = args.rgb, rgb.count >= 3 { SurfaceHost.launchColour = rgb }
       return invoke.resolve()
     }
+    if args.op == "appearance" {
+      SurfaceHost.launchDark = args.on
+      DispatchQueue.main.async { SurfaceHost.applyAppearance(to: self.webview?.window) }
+      return invoke.resolve()
+    }
     DispatchQueue.main.async {
       guard let host = self.host else { return invoke.resolve() }
       switch args.op {
