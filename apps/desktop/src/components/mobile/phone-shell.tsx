@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useReducer, useRef } from 'react';
+import { Actions, type Model } from 'flexlayout-react';
 import { Bookmark, Files, Search } from 'lucide-react';
 
 import { useAccountActions } from '@/hooks/use-account-actions';
@@ -10,7 +11,7 @@ import { useLayout } from '@/hooks/use-layout';
 import { useLayoutSession } from '@/hooks/use-layout-session';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
-import { touchFirst } from '@/lib/backend/platform';
+import { can, touchFirst } from '@/lib/backend/platform';
 import { useEntryInput } from '@/lib/stores/entry-input';
 import { usePhoneNav, type PhonePage } from '@/lib/stores/phone-nav';
 import { useRevealTarget } from '@/lib/stores/reveal-target';
@@ -18,12 +19,14 @@ import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { cn } from '@/lib/utils';
 import { FilesPage } from './files-page';
 import { NoteHeader } from './note-pane';
+import { EntrySheet } from './entry-sheet';
 import { tabPath } from './phone-history';
 import { PushPane } from './push-pane';
 import { BookmarksPage } from './bookmarks-page';
 import { SearchPage } from './search-page';
-import { shownTab } from './tabs';
+import { allTabs, shownTab } from './tabs';
 import { useScrollEdge } from '@/lib/scroll-edge';
+import { followDynamicType } from '@/lib/dynamic-type';
 import { YouPage } from './you-page';
 
 /**
@@ -51,8 +54,10 @@ export function PhoneShell() {
     const listener = () => {
       handleModelChange(model);
       redraw();
+      if (!can.tabs) queueMicrotask(() => keepOnlyShown(model));
     };
     model.addChangeListener(listener);
+    if (!can.tabs) keepOnlyShown(model);
     return () => model.removeChangeListener(listener);
   }, [model, handleModelChange]);
 
@@ -65,10 +70,14 @@ export function PhoneShell() {
   useEffect(() => usePhoneNav.getState().reset(), [workspace]);
 
   // The phone has one look: Islands and its gaps are the window's
-  // (`islands:` and `islands.css` skip it).
+  // (`islands:` and `islands.css` skip it). Its type follows Dynamic Type.
   useLayoutEffect(() => {
     document.documentElement.setAttribute('data-phone-layout', '');
-    return () => document.documentElement.removeAttribute('data-phone-layout');
+    const stopFollowing = touchFirst ? followDynamicType() : () => {};
+    return () => {
+      stopFollowing();
+      document.documentElement.removeAttribute('data-phone-layout');
+    };
   }, []);
 
   const shown = model ? shownTab(model) : null;
@@ -143,14 +152,27 @@ export function PhoneShell() {
       </div>
       {model && (
         <PushPane open={noteOpen} onClose={goHome} behind={home} keepMounted>
-          <NoteHeader model={model} shown={shown} />
+          <NoteHeader shown={shown} />
           <div className='relative min-h-0 flex-1 bg-background'>
             {shown ? <TabContent key={shownId} node={shown} /> : <BlankTab tabId='' />}
           </div>
         </PushPane>
       )}
+      <EntrySheet />
     </div>
   );
+}
+
+/**
+ * The iPhone shows one note at a time (`can.tabs`): whatever else the model
+ * holds (restored from a wider window, opened in a new tab) goes. Only the
+ * shown tab is ever mounted here, so nothing unsaved goes with them.
+ */
+function keepOnlyShown(model: Model) {
+  const shown = shownTab(model);
+  for (const tab of allTabs(model)) {
+    if (tab !== shown) model.doAction(Actions.deleteTab(tab.getId()));
+  }
 }
 
 /**
@@ -202,6 +224,20 @@ const PAGES: { id: PhonePage; label: string; icon: typeof Files }[] = [
   { id: 'search', label: 'Search', icon: Search },
 ];
 
+/**
+ * Tapping the tab already shown, as UIKit's: back to its root if something's
+ * pushed on it, else its list to the top.
+ */
+function toRoot(page: PhonePage) {
+  const nav = usePhoneNav.getState();
+  if (page === 'you' && nav.sections.length) return nav.popSections();
+  const root = document.querySelector(`[data-phone-page='${page}']`);
+  if (!root) return;
+  for (const el of root.querySelectorAll<HTMLElement>('*')) {
+    if (el.scrollTop > 0 && el.scrollHeight > el.clientHeight) el.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
 /** Files, Bookmarks, Search and You, along the bottom; hidden while the keyboard's up. */
 function AppFooter() {
   const page = usePhoneNav((s) => s.page);
@@ -219,7 +255,7 @@ function AppFooter() {
       type='button'
       aria-label={label}
       aria-current={page === id ? 'page' : undefined}
-      onClick={() => showPage(id)}
+      onClick={() => (page === id ? toRoot(id) : showPage(id))}
       className={cn(
         'flex min-h-12 flex-1 items-center justify-center py-2.5 text-muted-foreground',
         page === id && 'text-foreground',
@@ -231,7 +267,17 @@ function AppFooter() {
 
   return (
     <nav ref={edge} className='phone-tab-bar flex shrink-0 bg-background pb-[max(env(safe-area-inset-bottom),0.375rem)]'>
-      {PAGES.map(({ id, label, icon: Icon }) => item(id, label, <Icon className='size-6' />))}
+      {PAGES.map(({ id, label, icon: Icon }) =>
+        item(
+          id,
+          label,
+          // The tab shown is drawn heavier, Bookmarks filled, as UIKit fills them.
+          <Icon
+            className={cn('size-6', page === id && id === 'bookmarks' && 'fill-current')}
+            strokeWidth={page === id ? 2.4 : 1.8}
+          />,
+        ),
+      )}
       {item(
         'you',
         'You',

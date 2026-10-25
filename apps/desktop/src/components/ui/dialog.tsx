@@ -8,6 +8,7 @@ import {
   DialogOverlay,
   DialogPortal,
 } from '@sunstead/ui/components/dialog';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { touchFirst } from '@/lib/backend/platform';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +38,8 @@ export function DialogContent({
   align = 'center',
   ...props
 }: ComponentProps<typeof PackageDialogContent> & { align?: PaneAlign }) {
+  // On a phone a dialog is a sheet from the bottom, as iOS's forms are.
+  const sheet = useIsMobile() && align === 'center';
   if (!touchFirst) {
     return (
       <PackageDialogContent className={className} showCloseButton={showCloseButton} {...props}>
@@ -50,15 +53,17 @@ export function DialogContent({
       <Pane
         slot='dialog-content'
         closeSlot='dialog-close'
-        align={align}
+        align={sheet ? 'end' : align}
         popupProps={props}
         cardClassName={cn(
           'grid w-full max-w-[calc(100%-2rem)] gap-6 rounded-xl bg-popover p-6 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none sm:max-w-md',
           className,
+          sheet &&
+            'max-w-full gap-4 rounded-t-2xl rounded-b-none bg-sidebar px-4 pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] ring-0 sm:max-w-full',
         )}
       >
         {children}
-        {showCloseButton && (
+        {showCloseButton && !sheet && (
           <DialogClose render={<Button variant='ghost' className='absolute top-4 right-4' size='icon-sm' />}>
             <XIcon />
             <span className='sr-only'>Close</span>

@@ -14,3 +14,10 @@
   outline: none;
   box-shadow: none;
 }
+/* A phone's note sits as Notes' does: 20pt in from either edge, starting
+   just under the bar rather than a desktop page's band below it. */
+:root[data-phone-layout] .ProseMirror {
+  padding-left: max(1.25rem, calc((100% - var(--editor-measure, 80ch)) / 2));
+  padding-right: max(1.25rem, calc((100% - var(--editor-measure, 80ch)) / 2));
+  padding-top: 1rem;
+}

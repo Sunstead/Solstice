@@ -45,6 +45,7 @@ import { cardAt, cardMarkdown, parseBoard, type CardRef } from '@/lib/task-board
 import type { BoardStore } from '@/lib/task-board/store';
 import { cn } from '@/lib/utils';
 import { BoardCard, CardEditor } from './board-card';
+import { haptics } from '@/lib/haptics';
 
 type Editing = { kind: 'card'; ref: CardRef } | { kind: 'new-card'; column: number; key?: number } | null;
 type Menu = { target: BoardTarget; x: number; y: number } | null;
@@ -183,8 +184,14 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
                     index={i}
                     path={path}
                     addingSubtask={subtaskOf?.column === c && subtaskOf.card === i}
-                    onToggle={() => change((t) => toggleCard(t, { column: c, card: i }))}
-                    onToggleSubtask={(line) => change((t) => toggleSubtask(t, line))}
+                    onToggle={() => {
+                      haptics.play('select');
+                      change((t) => toggleCard(t, { column: c, card: i }));
+                    }}
+                    onToggleSubtask={(line) => {
+                      haptics.play('select');
+                      change((t) => toggleSubtask(t, line));
+                    }}
                     onDeleteSubtask={(line) => change((t) => deleteSubtask(t, line))}
                     onStartSubtask={() => startSubtask({ column: c, card: i })}
                     onAddSubtask={(title) => change((t) => addSubtask(t, { column: c, card: i }, title))}

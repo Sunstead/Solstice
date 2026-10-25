@@ -7,7 +7,8 @@ import {
   stripPresetExtension,
 } from '@/lib/stores/entry-input';
 import { fileOperations } from '@/lib/file-operations';
-import { isSamePath, parentOf } from '@/lib/path-utils';
+import { isSamePath, normalizePath, parentOf, parentPath } from '@/lib/path-utils';
+import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useFileTreeDrag, useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { useDragHoverStore } from '@/hooks/use-drag-hover';
 import { EntryInput, type EntryResult } from './entry-input';
@@ -16,7 +17,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@sunstead/ui/components/collapsible';
-import { ContextMenu, ContextMenuTrigger } from '@sunstead/ui/components/context-menu';
+import { EntryMenuTrigger } from './entry-menu-trigger';
 import {
   SidebarMenuButton,
   SidebarMenuItem,
@@ -100,7 +101,8 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   const shownPath = useLayout((s) => s.getActiveFilePath());
   // A phone's list marks nothing: the note is over it, and coming back to a
   // lit row is a desktop's sidebar, not an iPhone's.
-  const activeFilePath = useSidebar().isMobile ? null : shownPath;
+  const phone = useSidebar().isMobile;
+  const activeFilePath = phone ? null : shownPath;
   const operation = useEntryInput((s) => s.operation);
   const cancel = useEntryInput((s) => s.cancel);
   const isMac = useIsMac();
@@ -210,30 +212,30 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
     }
 
     return (
-      <ContextMenu>
-        <ContextMenuTrigger
-          render={
-            <SidebarMenuButton
-              ref={nodeRef}
-              // Where a share sheet from its menu points (`shareAnchor`).
-              data-tree-path={node.path}
-              isActive={!!activeFilePath && isSamePath(activeFilePath, node.path)}
-              className={cn(
-                'data-active:font-normal w-full max-w-full truncate pl-8',
-                dropHighlightClassName,
-                revealClassName,
-              )}
-              onClick={() => openFile(node.path, node.name)}
-              onKeyDown={handleDeleteKeyDown}
-            >
-              <FileIcon />
-              <FormattedFileName name={node.name} />
-              {bookmarked && <BookmarkedMark />}
-            </SidebarMenuButton>
-          }
-        />
-        <FileTreeItemContextMenuContent node={node} />
-      </ContextMenu>
+      <EntryMenuTrigger
+        entry={node}
+        from='tree'
+        render={
+          <SidebarMenuButton
+            ref={nodeRef}
+            // Where a share sheet from its menu points (`shareAnchor`).
+            data-tree-path={node.path}
+            isActive={!!activeFilePath && isSamePath(activeFilePath, node.path)}
+            className={cn(
+              'data-active:font-normal w-full max-w-full truncate pl-8',
+              dropHighlightClassName,
+              revealClassName,
+            )}
+            onClick={() => openFile(node.path, node.name)}
+            onKeyDown={handleDeleteKeyDown}
+          >
+            <FileIcon />
+            <FormattedFileName name={node.name} />
+            {bookmarked && <BookmarkedMark />}
+          </SidebarMenuButton>
+        }
+        menu={<FileTreeItemContextMenuContent node={node} />}
+      />
     );
   }
 
@@ -259,32 +261,33 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
             expanded={node.expanded}
           />
         ) : (
-          <ContextMenu>
-            <ContextMenuTrigger
-              render={
-                <CollapsibleTrigger
-                  render={
-                    <SidebarMenuButton
-                      ref={nodeRef}
-                      className={cn(dropHighlightClassName, revealClassName)}
-                      onKeyDown={handleDeleteKeyDown}
-                    >
-                      <ChevronRight
-                        className={cn(
-                          'transition-transform',
-                          node.expanded && 'rotate-90',
-                        )}
-                      />
-                      <FolderGlyph open={node.expanded} color={folderColor} className='size-4 min-w-4' />
-                      <FormattedFileName name={node.name} />
-                      {bookmarked && <BookmarkedMark />}
-                    </SidebarMenuButton>
-                  }
-                />
-              }
-            />
-            <FileTreeItemContextMenuContent node={node} />
-          </ContextMenu>
+          <EntryMenuTrigger
+            entry={node}
+            from='tree'
+            render={
+              <CollapsibleTrigger
+                render={
+                  <SidebarMenuButton
+                    ref={nodeRef}
+                    className={cn(dropHighlightClassName, revealClassName)}
+                    onKeyDown={handleDeleteKeyDown}
+                  >
+                    <ChevronRight
+                      className={cn(
+                        'transition-transform',
+                        node.expanded && 'rotate-90',
+                      )}
+                    />
+                    <FolderGlyph open={node.expanded} color={folderColor} className='size-4 min-w-4' />
+                    <FormattedFileName name={node.name} />
+                    {bookmarked && <BookmarkedMark />}
+                    {phone && <FolderCount path={node.path} />}
+                  </SidebarMenuButton>
+                }
+              />
+            }
+            menu={<FileTreeItemContextMenuContent node={node} />}
+          />
         )}
 
         <CollapsibleContent ref={childrenDropRef}>
@@ -339,4 +342,11 @@ export function FormattedFileName({ name }: { name: string }) {
       {showExtensions ? name : stripPresetExtension(name).name}
     </span>
   );
+}
+
+/** How many things a folder holds, quiet on the row's right, as a phone's lists show it. */
+function FolderCount({ path }: { path: string }) {
+  const count = useFileIndex((s) => s.files.filter((f) => parentPath(f.path) === normalizePath(path)).length);
+  if (!count) return null;
+  return <span className='ml-auto shrink-0 pl-2 text-[15px] text-muted-foreground tabular-nums'>{count}</span>;
 }

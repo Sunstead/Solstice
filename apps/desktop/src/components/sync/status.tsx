@@ -44,10 +44,12 @@ export function SyncStatusLine({ info }: { info: SyncInfo }) {
 }
 
 /** The title bar's sync indicator; opens the Sync settings. Hidden when not synced. */
-export function SyncIndicator() {
+export function SyncIndicator({ quiet = false }: { quiet?: boolean }) {
   const info = useSync((s) => s.info);
   const openSettings = useSettingsDialog((s) => s.openSettings);
   if (!info) return null;
+  // `quiet` (a phone's note bar) shows only what the user should know of.
+  if (quiet && info.state !== 'offline' && !needsAttention(info)) return null;
 
   const label = `${describe(info)}${info.reviews > 0 ? ` (${reviewsText(info.reviews)})` : ''}`;
 

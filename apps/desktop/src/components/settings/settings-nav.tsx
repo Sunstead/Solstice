@@ -9,7 +9,7 @@ import { SettingsPane } from './settings-pane';
  */
 export function SettingsSectionList({ onOpen }: { onOpen: (id: SectionId) => void }) {
   return (
-    <div className='flex flex-col divide-y overflow-hidden rounded-xl border bg-card'>
+    <div className='phone-rows flex flex-col overflow-hidden rounded-xl bg-card'>
       {settingsSections.map((section) => (
         <Row key={section.id} icon={section.icon} label={section.label} chevron onClick={() => onOpen(section.id)} />
       ))}

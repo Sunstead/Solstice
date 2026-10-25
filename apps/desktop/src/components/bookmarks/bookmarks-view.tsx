@@ -24,6 +24,8 @@ import {
   DropdownMenuTrigger,
 } from '@sunstead/ui/components/dropdown-menu';
 import { EntryMenuItems } from '@/components/entry-menu-items';
+import { EntryMenuTrigger } from '@/components/entry-menu-trigger';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { useCreateActions } from '@/hooks/use-create-actions';
 import { useFileTreeDrag, useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { useLayout } from '@/hooks/use-layout';
@@ -33,6 +35,7 @@ import { createSlotGesture } from '@/lib/ink/slot-gesture';
 import { getFileNameFromPath, getRelativePath, normalizePath, parentPath } from '@/lib/path-utils';
 import { useSetting } from '@/lib/settings/store';
 import { useTreeMeta } from '@/lib/stores/tree-meta';
+import { useEntrySheet } from '@/lib/stores/entry-sheet';
 import { useFileIndex } from '@/lib/stores/use-file-index';
 import { toAbs } from '@/lib/tree-meta/ops';
 import { childrenOf, moveOp, visibleBookmarks } from '@/lib/tree-meta/view';
@@ -62,7 +65,16 @@ const dropdownComponents = {
  * Bookmarks reorder by dragging; inside a folder, files drag onto its
  * folders to move there. The sidebar's Bookmarks view and the phone's page.
  */
-export function BookmarksView({ root, header }: { root: string; header?: (trail: ReactNode) => ReactNode }) {
+export function BookmarksView({
+  root,
+  header,
+  onOpenFolder,
+}: {
+  root: string;
+  header?: (trail: ReactNode) => ReactNode;
+  /** Opens a folder somewhere else (a phone pushes it as a page) rather than here. */
+  onOpenFolder?: (path: string) => void;
+}) {
   const index = useFileIndex((s) => s.files);
   const indexed = useFileIndex((s) => s.lastLoadedAt !== null);
   const byPath = useMemo(() => new Map(index.map((e) => [normalizePath(e.path), e])), [index]);
@@ -92,10 +104,20 @@ export function BookmarksView({ root, header }: { root: string; header?: (trail:
             root={root}
             entryAt={(rel) => byPath.get(normalizePath(toAbs(root, rel)))}
             indexed={indexed}
-            onOpenFolder={(path) => setTrail([path])}
+            onOpenFolder={onOpenFolder ?? ((path) => setTrail([path]))}
           />
         )}
       </div>
+    </div>
+  );
+}
+
+/** One opened folder's contents on their own, for a page of its own (`BookmarksPage`). */
+export function BookmarkFolder({ folder, onOpenFolder }: { folder: string; onOpenFolder: (path: string) => void }) {
+  const index = useFileIndex((s) => s.files);
+  return (
+    <div className='flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4'>
+      <FolderContents folder={folder} index={index} onOpenFolder={onOpenFolder} />
     </div>
   );
 }
@@ -194,9 +216,10 @@ function TopBookmarks({
   const grid = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ entry: FileEntry; at: DOMRect } | null>(null);
   // What the gesture, set up once, acts on.
-  const latest = useRef({ visible, shown });
+  const phone = useIsMobile();
+  const latest = useRef({ visible, shown, phone });
   useLayoutEffect(() => {
-    latest.current = { visible, shown };
+    latest.current = { visible, shown, phone };
   });
 
   useEffect(() => {
@@ -211,7 +234,10 @@ function TopBookmarks({
       },
       menu: (i, at) => {
         const entry = latest.current.shown[i]?.entry;
-        if (entry) setMenu({ entry, at });
+        if (!entry) return;
+        // A phone's is the hold sheet (`EntrySheet`).
+        if (latest.current.phone) useEntrySheet.getState().open(entry);
+        else setMenu({ entry, at });
       },
     });
   }, []);
@@ -228,7 +254,7 @@ function TopBookmarks({
           <TopCard key={bookmark.id} index={i} entry={entry} root={root} onOpen={() => open(entry, onOpenFolder)} />
         ))}
       </CardGrid>
-      {menu && <AnchoredEntryMenu entry={menu.entry} at={menu.at} onClose={() => setMenu(null)} />}
+      {menu && !phone && <AnchoredEntryMenu entry={menu.entry} at={menu.at} onClose={() => setMenu(null)} />}
     </>
   );
 }
@@ -287,6 +313,7 @@ function FolderContents({
     [index, folder, showHidden, foldersFirst],
   );
   const { drop } = useFileTreeDrop(folder);
+  const phone = useIsMobile();
   const area = useRef<HTMLDivElement>(null);
   useEffect(() => {
     drop(area);
@@ -296,23 +323,25 @@ function FolderContents({
   // the Explorer's empty space is the workspace's.
   const self: FileEntry = { path: folder, name: getFileNameFromPath(folder), is_dir: true };
 
+  const contents = (
+    <div ref={area} className='grow'>
+      {entries.length === 0 ? (
+        <p className='px-4 py-10 text-center text-sm text-muted-foreground'>This folder is empty.</p>
+      ) : (
+        <CardGrid>
+          {entries.map((entry) => (
+            <FolderEntryCard key={entry.path} entry={entry} onOpen={() => open(entry, onOpenFolder)} />
+          ))}
+        </CardGrid>
+      )}
+    </div>
+  );
+  // A phone's holds are the cards' sheets; a menu here would open with each.
+  if (phone) return contents;
+
   return (
     <ContextMenu>
-      <ContextMenuTrigger
-        render={
-          <div ref={area} className='grow'>
-            {entries.length === 0 ? (
-              <p className='px-4 py-10 text-center text-sm text-muted-foreground'>This folder is empty.</p>
-            ) : (
-              <CardGrid>
-                {entries.map((entry) => (
-                  <FolderEntryCard key={entry.path} entry={entry} onOpen={() => open(entry, onOpenFolder)} />
-                ))}
-              </CardGrid>
-            )}
-          </div>
-        }
-      />
+      <ContextMenuTrigger render={contents} />
       <FolderEntryMenu entry={self} />
     </ContextMenu>
   );
@@ -330,21 +359,20 @@ function FolderEntryCard({ entry, onOpen }: { entry: FileEntry; onOpen: () => vo
   const detail = entry.is_dir ? `${children} ${children === 1 ? 'item' : 'items'}` : fileKind(entry.name);
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger
-        render={
-          <BookmarkCard
-            ref={ref}
-            entry={entry}
-            detail={detail}
-            dropping={entry.is_dir && isOver && canDrop}
-            className={cn(isDragging && 'opacity-50')}
-            onClick={onOpen}
-          />
-        }
-      />
-      <FolderEntryMenu entry={entry} />
-    </ContextMenu>
+    <EntryMenuTrigger
+      entry={entry}
+      render={
+        <BookmarkCard
+          ref={ref}
+          entry={entry}
+          detail={detail}
+          dropping={entry.is_dir && isOver && canDrop}
+          className={cn(isDragging && 'opacity-50')}
+          onClick={onOpen}
+        />
+      }
+      menu={<FolderEntryMenu entry={entry} />}
+    />
   );
 }
 

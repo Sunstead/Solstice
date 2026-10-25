@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ChevronLeft, ChevronsUpDown, LogIn, LogOut } from 'lucide-react';
+import { ChevronsUpDown, LogIn, LogOut } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { useAccountActions } from '@/hooks/use-account-actions';
@@ -16,7 +16,7 @@ import { usePhoneNav } from '@/lib/stores/phone-nav';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { useSync } from '@/lib/stores/sync';
 import { WorkspacesSheet } from './files-page';
-import { PhoneHeader, PhoneTitle, Row, RowGroup } from './phone-parts';
+import { PhoneHeader, PhoneTitle, PushedHeader, Row, RowGroup } from './phone-parts';
 import { PushPane } from './push-pane';
 
 /**
@@ -41,7 +41,7 @@ export function YouPage() {
   };
 
   return (
-    <div className='absolute inset-0 overflow-hidden bg-background'>
+    <div data-phone-page='you' className='absolute inset-0 overflow-hidden bg-background'>
       <div ref={page} className='flex h-full flex-col'>
         <PhoneHeader large>
           <PhoneTitle>You</PhoneTitle>
@@ -74,24 +74,25 @@ export function YouPage() {
         </div>
       </div>
       <PushPane open={sections.length > 0} onClose={popSection} behind={page}>
-        {section && <SectionPage id={section} onBack={popSection} />}
+        {section && <SectionPage id={section} back={backName(sections, section)} onBack={popSection} />}
       </PushPane>
       <WorkspacesSheet open={workspacesOpen} onOpenChange={setWorkspacesOpen} />
     </div>
   );
 }
 
-function SectionPage({ id, onBack }: { id: SectionId; onBack: () => void }) {
+/** Where Back on `shown` goes: the section pushed before it, or You. */
+function backName(sections: SectionId[], shown: SectionId) {
+  const at = sections.lastIndexOf(shown);
+  const before = at > 0 ? sections[at - 1] : at < 0 ? sections[sections.length - 1] : undefined;
+  return before ? getSection(before).label : 'You';
+}
+
+function SectionPage({ id, back, onBack }: { id: SectionId; back: string; onBack: () => void }) {
   const section = getSection(id);
   return (
     <>
-      <PhoneHeader>
-        <Button variant='ghost' size='icon' onClick={onBack}>
-          <ChevronLeft />
-          <span className='sr-only'>Back</span>
-        </Button>
-        <PhoneTitle className='px-0'>{section.label}</PhoneTitle>
-      </PhoneHeader>
+      <PushedHeader back={back} onBack={onBack} title={section.label} />
       <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain'>
         <div className='mx-auto max-w-xl px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
           <SettingsSectionBody id={id} />
@@ -107,7 +108,7 @@ function AccountCard({ onOpenSync }: { onOpenSync: () => void }) {
   const linked = useSync((s) => s.info);
 
   return (
-    <div className='flex flex-col divide-y overflow-hidden rounded-xl border bg-card'>
+    <div className='phone-rows flex flex-col overflow-hidden rounded-xl bg-card'>
       <div className='flex items-center gap-3 p-3'>
         <UserAvatar username={username} size='lg' />
         <div className='flex min-w-0 flex-1 flex-col'>

@@ -12,6 +12,7 @@ import {
   Image,
   Italic,
   KeyboardOff,
+  Type,
   List,
   ListIndentDecrease,
   ListIndentIncrease,
@@ -25,6 +26,7 @@ import {
   Undo2,
 } from 'lucide-react';
 
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { KEYBOARD_BAR_GAP_PX, KEYBOARD_BAR_PX, useEditingFocus, useKeyboard, useKeyboardBarShown, useRect } from '@/lib/keyboard';
 import { isCommandEnabled, runCommand, type ScopedCommandId } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
@@ -51,6 +53,44 @@ const MAIN: Item[] = [
   { icon: Image, label: 'Image', id: 'edit.insert_image' },
 ];
 
+/** A phone's bar, as Notes': the few things reached for while typing. */
+const PHONE_MAIN: Item[] = [
+  { icon: ListTodo, label: 'Task list', id: 'edit.task_list' },
+  { icon: List, label: 'Bullet list', id: 'edit.bullet_list' },
+  { icon: Brackets, label: 'Link to note', id: 'edit.insert_wikilink' },
+  { icon: Image, label: 'Image', id: 'edit.insert_image' },
+  { icon: Undo2, label: 'Undo', id: 'native.undo' },
+  { icon: Redo2, label: 'Redo', id: 'native.redo' },
+];
+
+/** What its Aa opens, a row at a time. */
+const PHONE_FORMATS: Item[][] = [
+  [
+    { icon: Heading1, label: 'Title', id: 'edit.heading1' },
+    { icon: Heading2, label: 'Heading', id: 'edit.heading2' },
+    { icon: Heading3, label: 'Subheading', id: 'edit.heading3' },
+    { icon: Pilcrow, label: 'Body', id: 'edit.paragraph' },
+  ],
+  [
+    { icon: Bold, label: 'Bold', id: 'edit.bold' },
+    { icon: Italic, label: 'Italic', id: 'edit.italic' },
+    { icon: Strikethrough, label: 'Strikethrough', id: 'edit.strikethrough' },
+    { icon: Highlighter, label: 'Highlight', id: 'edit.highlight' },
+    { icon: Code, label: 'Inline code', id: 'edit.inline_code' },
+  ],
+  [
+    { icon: List, label: 'Bullet list', id: 'edit.bullet_list' },
+    { icon: ListOrdered, label: 'Ordered list', id: 'edit.ordered_list' },
+    { icon: ListTodo, label: 'Task list', id: 'edit.task_list' },
+    { icon: ListIndentDecrease, label: 'Outdent', id: 'edit.outdent' },
+    { icon: ListIndentIncrease, label: 'Indent', id: 'edit.indent' },
+  ],
+  [
+    { icon: Quote, label: 'Blockquote', id: 'edit.blockquote' },
+    { icon: SquareCode, label: 'Code block', id: 'edit.code_block' },
+  ],
+];
+
 const HEADINGS: Item[] = [
   { icon: Heading1, label: 'Heading 1', id: 'edit.heading1' },
   { icon: Heading2, label: 'Heading 2', id: 'edit.heading2' },
@@ -74,6 +114,8 @@ export function KeyboardBar() {
   const pane = shown ? (focus?.closest<HTMLElement>("[data-slot='scroll-area'], .flexlayout__tab") ?? null) : null;
   const rect = useRect(docked ? null : pane);
   const [headings, setHeadings] = useState(false);
+  const phone = useIsMobile();
+  const [formatting, setFormatting] = useState(false);
   // Re-render as the selection moves, for the pressed and disabled states.
   useActiveEditorStore((s) => s.commandStateVersion);
   const formats = useActiveEditorStore((s) => s.activeFormats);
@@ -128,6 +170,37 @@ export function KeyboardBar() {
       },
       { pressed: formats.has(item.id), disabled: !isCommandEnabled(item.id) },
     );
+
+  if (phone) {
+    const hide = () => {
+      setFormatting(false);
+      (document.activeElement as HTMLElement | null)?.blur();
+    };
+    // A glass capsule over the keyboard, Notes': Aa opens the formats above
+    // it, as a panel, since a sheet would take focus and the keyboard.
+    return (
+      <div className='fixed z-40 select-none px-2 [&_button]:rounded-full' style={{ ...place, height: KEYBOARD_BAR_PX }}>
+        {formatting && (
+          <div
+            role='toolbar'
+            aria-label='Formats'
+            className='phone-glass absolute inset-x-2 bottom-[calc(100%+0.375rem)] flex flex-col gap-1 rounded-3xl p-2'
+          >
+            {PHONE_FORMATS.map((row, i) => (
+              <div key={i} className='flex items-center justify-around'>
+                {row.map(run)}
+              </div>
+            ))}
+          </div>
+        )}
+        <div role='toolbar' aria-label='Formatting' className='phone-glass flex h-full items-center justify-between rounded-full px-1'>
+          {button('formats', 'Formats', Type, () => setFormatting((f) => !f), { pressed: formatting })}
+          {PHONE_MAIN.map(run)}
+          {button('hide', 'Hide keyboard', KeyboardOff, hide)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     // A box exactly as tall as its buttons, scrolling sideways only: anything

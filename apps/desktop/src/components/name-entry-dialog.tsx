@@ -1,14 +1,7 @@
 import { useRef, useState } from 'react';
 
-import { Button } from '@sunstead/ui/components/button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { FormLayout } from '@/components/ui/form-sheet';
 import {
   InputGroup,
   InputGroupAddon,
@@ -17,6 +10,7 @@ import {
 } from '@sunstead/ui/components/input-group';
 import { touchFirst } from '@/lib/backend/platform';
 import { fileOperations } from '@/lib/file-operations';
+import { haptics } from '@/lib/haptics';
 import { type EntryOperation, useEntryInput } from '@/lib/stores/entry-input';
 import { cn } from '@/lib/utils';
 
@@ -77,7 +71,10 @@ function NameForm({ operation, onDone }: { operation: EntryOperation; onDone: ()
           : await fileOperations.createFile(operation.parentPath, finalName, operation.kind.preset);
     setBusy(false);
     if (result.status === 'error') setError(result.error);
-    else onDone();
+    else {
+      if (operation.mode === 'create') haptics.play('success');
+      onDone();
+    }
   };
 
   return (
@@ -88,45 +85,41 @@ function NameForm({ operation, onDone }: { operation: EntryOperation; onDone: ()
         void submit();
       }}
     >
-      <DialogHeader>
-        <DialogTitle>{title(operation)}</DialogTitle>
-      </DialogHeader>
-      <div className='grid gap-2'>
-        <InputGroup className={cn('h-11', error && 'border-destructive')}>
-          <InputGroupInput
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setError(null);
-            }}
-            onFocus={(e) => {
-              if (selected.current) return;
-              selected.current = true;
-              e.target.select();
-            }}
-            aria-label='Name'
-            aria-invalid={error ? true : undefined}
-            placeholder={operation.kind.type === 'folder' ? 'Folder name' : 'Name'}
-            enterKeyHint='done'
-            autoCapitalize='sentences'
-            autoCorrect='off'
-            spellCheck={false}
-            autoFocus
-          />
-          {preset && (
-            <InputGroupAddon align='inline-end'>
-              <InputGroupText>.{preset.extension}</InputGroupText>
-            </InputGroupAddon>
-          )}
-        </InputGroup>
-        {error && <p className='text-xs text-destructive select-text'>{error}</p>}
-      </div>
-      <DialogFooter>
-        <DialogClose render={<Button type='button' variant='outline' />}>Cancel</DialogClose>
-        <Button type='submit' disabled={!ready}>
-          {operation.mode === 'rename' ? 'Rename' : 'Create'}
-        </Button>
-      </DialogFooter>
+      <FormLayout
+        title={title(operation)}
+        confirm={{ label: operation.mode === 'rename' ? 'Rename' : 'Create', disabled: !ready }}
+      >
+        <div className='grid gap-2'>
+          <InputGroup className={cn('h-11', error && 'border-destructive')}>
+            <InputGroupInput
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError(null);
+              }}
+              onFocus={(e) => {
+                if (selected.current) return;
+                selected.current = true;
+                e.target.select();
+              }}
+              aria-label='Name'
+              aria-invalid={error ? true : undefined}
+              placeholder={operation.kind.type === 'folder' ? 'Folder name' : 'Name'}
+              enterKeyHint='done'
+              autoCapitalize='sentences'
+              autoCorrect='off'
+              spellCheck={false}
+              autoFocus
+            />
+            {preset && (
+              <InputGroupAddon align='inline-end'>
+                <InputGroupText>.{preset.extension}</InputGroupText>
+              </InputGroupAddon>
+            )}
+          </InputGroup>
+          {error && <p className='text-xs text-destructive select-text'>{error}</p>}
+        </div>
+      </FormLayout>
     </form>
   );
 }

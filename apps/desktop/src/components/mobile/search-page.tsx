@@ -18,7 +18,7 @@ export function SearchPage() {
   const root = useWorkspace((s) => s.path);
 
   return (
-    <div className='absolute inset-0 flex flex-col bg-background'>
+    <div data-phone-page='search' className='absolute inset-0 flex flex-col bg-background'>
       <PhoneHeader large>
         <PhoneTitle>Search</PhoneTitle>
       </PhoneHeader>

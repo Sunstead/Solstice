@@ -126,6 +126,44 @@ content that doesn't scroll sideways (iOS 26 does the same).
 Everything here is CSS and React in the phone shell. The desktop's colours and
 theme system stay as they are; what changes is how the phone lays them out.
 
+**Where it stands (2026-10-25, branch `iphone-native`).** Done, and checked
+in the simulator unless it says otherwise:
+
+- 1.1 to 1.6, 1.8 to 1.10 as written, with these differences:
+  - The tint is `--primary`. On the darker themes that's near white, so
+    tinted buttons read as plain white there.
+  - Dynamic Type scales the whole UI's root size, clamped to 0.82 to 1.35×
+    (`lib/dynamic-type.ts`). Not tried at other text sizes.
+  - Holds: a folder's colours are swatches inline in the sheet rather than
+    a page pushed inside it. A task board card's hold keeps its own menu.
+  - Import from sync, Move and folder colour open as bottom sheets, but
+    still use the desktop's header and buttons. Only the name dialog and New
+    Workspace have the Cancel / title / confirm bar (`FormLayout`).
+  - Text fields: there's no clear button yet.
+  - The Aa panel opens above the bar rather than in place of the keyboard.
+    A sheet would take focus and drop the keyboard.
+  - Haptics: all of the table except pull to sync, whose `light` tick was
+    not felt in the simulator.
+  - Pull to sync shows only in a linked workspace, and only works on a list
+    long enough to scroll. Neither was tried here.
+- 1.7: Bookmarks folders are pushed pages. The tree has 44pt rows, a folder
+  count on the right, no indent guides and a spring on the chevron.
+  Settings are grouped rows with checkmark lists. Window and tab-strip
+  options are hidden. Sheets have a grabber and no X.
+
+Left for later:
+
+- **Swipe actions on rows.** A swipe left on home already brings the last
+  note back (`useSwipeToNote`), so swiping left for Delete needs deciding
+  first: either give that up on rows, or open Delete with a swipe right.
+- **A search field under Files' large title.** Pulling down already syncs,
+  and the Search tab already searches.
+- **Children easing in** when a folder opens.
+- **Large titles shrinking** on a long list. Not tried.
+- **The first tap after a transition is sometimes lost.** It shows after
+  closing a sheet or going back. It looks like UIKit ending the scroll view's
+  settle animation. Not fixed.
+
 ### 1.1 Pages on the notes' colour, no borders
 
 Today every phone page is `bg-sidebar` with a `border-b` under its header and

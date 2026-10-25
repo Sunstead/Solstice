@@ -129,6 +129,8 @@ export const settingsRegistry = {
       { value: 'explorer-sidebar', label: 'Explorer sidebar' },
     ],
     default: 'icon-sidebar',
+    // A phone has none of these places: its workspace is Files' title.
+    visibleWhen: () => !phoneLayout(),
   }),
 
   'appearance.reduceMotion': defineBoolean({
@@ -445,6 +447,7 @@ export const settingsRegistry = {
     // One document at a time suits a tablet, as GoodNotes and Safari do it;
     // splits are for a mouse. A phone shows one note whichever this is.
     default: touchFirst ? 'single' : 'split',
+    visibleWhen: () => !phoneLayout(),
   }),
 
   'ink.notebookTemplate': defineEnum({

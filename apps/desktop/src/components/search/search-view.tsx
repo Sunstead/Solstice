@@ -12,6 +12,7 @@ import { Button } from '@sunstead/ui/components/button';
 import { Input } from '@sunstead/ui/components/input';
 import type { FileHits, Hit, Jump } from '@/bindings';
 import { getFileIconFor } from '@/assets/icons';
+import { EntryMenuTrigger } from '@/components/entry-menu-trigger';
 import { FormattedFileName } from '@/components/file-tree';
 import { useLayout } from '@/hooks/use-layout';
 import { getFileNameFromPath, getRelativePath } from '@/lib/path-utils';
@@ -234,17 +235,22 @@ function NameMatches({ root }: { root: string }) {
 function NameRow({ match, root }: { match: NameMatch; root: string }) {
   const { entry } = match;
   return (
-    <button type='button' className={ROW} onClick={() => open(entry.path)}>
-      {createElement(getFileIconFor(entry.name), {
-        className: 'size-4 shrink-0',
-      })}
-      <span className='min-w-0 truncate'>
-        <FormattedFileName name={entry.name} />
-      </span>
-      <span className='min-w-0 flex-1 truncate text-xs text-muted-foreground'>
-        {folderOf(entry.path, root)}
-      </span>
-    </button>
+    <EntryMenuTrigger
+      entry={entry}
+      render={
+        <button type='button' className={ROW} onClick={() => open(entry.path)}>
+          {createElement(getFileIconFor(entry.name), {
+            className: 'size-4 shrink-0',
+          })}
+          <span className='min-w-0 truncate'>
+            <FormattedFileName name={entry.name} />
+          </span>
+          <span className='min-w-0 flex-1 truncate text-xs text-muted-foreground'>
+            {folderOf(entry.path, root)}
+          </span>
+        </button>
+      }
+    />
   );
 }
 
@@ -262,29 +268,34 @@ function FileGroup({ file, root }: { file: FileHits; root: string }) {
   return (
     // Off-screen groups skip layout and paint: thousands of rows stay cheap.
     <section className='[content-visibility:auto] [contain-intrinsic-size:auto_6rem]'>
-      <button
-        type='button'
-        className={ROW}
-        aria-expanded={!collapsed}
-        onClick={() => setCollapsed(!collapsed)}
-      >
-        <ChevronRight
-          className={cn(
-            'size-3.5 shrink-0 text-muted-foreground transition-transform',
-            !collapsed && 'rotate-90',
-          )}
-        />
-        {createElement(getFileIconFor(name), { className: 'size-4 shrink-0' })}
-        <span className='min-w-0 truncate font-medium'>
-          <FormattedFileName name={name} />
-        </span>
-        <span className='min-w-0 flex-1 truncate text-xs text-muted-foreground'>
-          {folderOf(file.path, root)}
-        </span>
-        <span className='shrink-0 rounded-full bg-muted px-1.5 text-xs tabular-nums text-muted-foreground'>
-          {file.count}
-        </span>
-      </button>
+      <EntryMenuTrigger
+        entry={{ path: file.path, name, is_dir: false }}
+        render={
+          <button
+            type='button'
+            className={ROW}
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            <ChevronRight
+              className={cn(
+                'size-3.5 shrink-0 text-muted-foreground transition-transform',
+                !collapsed && 'rotate-90',
+              )}
+            />
+            {createElement(getFileIconFor(name), { className: 'size-4 shrink-0' })}
+            <span className='min-w-0 truncate font-medium'>
+              <FormattedFileName name={name} />
+            </span>
+            <span className='min-w-0 flex-1 truncate text-xs text-muted-foreground'>
+              {folderOf(file.path, root)}
+            </span>
+            <span className='shrink-0 rounded-full bg-muted px-1.5 text-xs tabular-nums text-muted-foreground'>
+              {file.count}
+            </span>
+          </button>
+        }
+      />
       {!collapsed && (
         <div className='pl-5'>
           {file.hits.map((hit, index) => (

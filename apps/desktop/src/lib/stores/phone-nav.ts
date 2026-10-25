@@ -28,6 +28,8 @@ interface PhoneNavState {
   goHome: () => void;
   pushSection: (id: SectionId) => void;
   popSection: () => void;
+  /** Back to You's own page, past every section pushed on it. */
+  popSections: () => void;
 
   /** Records leaving `from` for another note, unless that was a step through history. */
   left: (from: string) => void;
@@ -57,6 +59,8 @@ export const usePhoneNav = create<PhoneNavState>((set, get) => ({
       const sections = s.sections.slice(0, -1);
       return { sections, section: sections[sections.length - 1] ?? s.section };
     }),
+
+  popSections: () => set((s) => (s.sections.length ? { sections: [] } : s)),
 
   left: (from) => {
     if (stepping) {

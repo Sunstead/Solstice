@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { WindowControls } from '@/components/window-controls';
 import { useIsFullscreen } from '@/hooks/use-fullscreen';
@@ -51,12 +51,68 @@ export function PhoneTitle({ children, className }: { children: ReactNode; class
   );
 }
 
-/** Rows in a list, iOS-style: a rounded group, divided. */
-export function RowGroup({ title, children }: { title?: ReactNode; children: ReactNode }) {
+/**
+ * A pushed page's bar, as UIKit's: back on the left carrying the previous
+ * page's name, the title centred and semibold, and buttons on the right.
+ * The two sides share the room left over equally, so the title stays in the
+ * middle.
+ */
+export function PushedHeader({
+  back,
+  onBack,
+  title,
+  actions,
+}: {
+  back: string;
+  onBack: () => void;
+  title: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <PhoneHeader className='h-11 gap-0'>
+      <div className='flex min-w-0 flex-1 basis-0'>
+        <PhoneBack label={back} onClick={onBack} />
+      </div>
+      <PhoneTitle className='max-w-[55%] flex-none px-1 text-center text-[17px]'>{title}</PhoneTitle>
+      <div className='flex min-w-0 flex-1 basis-0 items-center justify-end gap-0.5'>{actions}</div>
+    </PhoneHeader>
+  );
+}
+
+/** Back, named for where it goes ("‹ Files"), tinted. */
+export function PhoneBack({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      className='phone-tint flex h-11 min-w-11 items-center pr-2 text-[17px] active:opacity-40'
+    >
+      <ChevronLeft className='size-7 shrink-0' strokeWidth={2.25} />
+      <span className='-ml-0.5 truncate'>{label}</span>
+    </button>
+  );
+}
+
+/**
+ * Rows in a list, iOS-style: a rounded group with no outline, its rows
+ * divided by hairlines inset past their icons (`.phone-rows`, app.css).
+ * `sheet` is a group in a sheet, which is already on the card's colour.
+ */
+export function RowGroup({
+  title,
+  tone = 'page',
+  children,
+}: {
+  title?: ReactNode;
+  tone?: 'page' | 'sheet';
+  children: ReactNode;
+}) {
   return (
     <section className='flex flex-col gap-1.5'>
-      {title && <h2 className='px-3 text-xs font-medium text-muted-foreground'>{title}</h2>}
-      <div className='flex flex-col divide-y overflow-hidden rounded-xl border bg-card'>{children}</div>
+      {title && <h2 className='px-3 text-[13px] text-muted-foreground'>{title}</h2>}
+      <div className={cn('phone-rows flex flex-col overflow-hidden rounded-xl', tone === 'page' ? 'bg-card' : 'bg-muted')}>
+        {children}
+      </div>
     </section>
   );
 }
@@ -90,7 +146,7 @@ export function Row({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'flex min-h-12 w-full items-center gap-3 px-3 text-left text-[15px] active:bg-accent disabled:opacity-40',
+        'flex min-h-11 w-full items-center gap-3 px-3 text-left text-[17px] active:bg-accent disabled:opacity-40',
         destructive && 'text-destructive',
       )}
     >

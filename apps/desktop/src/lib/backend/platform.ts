@@ -60,6 +60,13 @@ export const can = {
    * the print dialog saves the PDF.
    */
   writePdf: (shell === 'mobile' && platform() === 'ios') || (shell === 'desktop' && platform() === 'macos'),
+  /**
+   * More than one tab: everywhere but the iPhone app, which shows one note at
+   * a time. A phone-width window elsewhere (a narrow desktop window, the
+   * iPad's Slide Over) keeps its tabs for when it widens. The screen, not
+   * the window, tells an iPhone from an iPad.
+   */
+  tabs: !(shell === 'mobile' && typeof screen !== 'undefined' && Math.min(screen.width, screen.height) < 600),
 } as const;
 
 /**

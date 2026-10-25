@@ -12,6 +12,7 @@ import { useDirectoryChildren, useFiles } from '@/hooks/use-files';
 import { can } from '@/lib/backend/platform';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
 import { PhoneHeader, Row, RowGroup } from './phone-parts';
+import { PullToSync } from './pull-to-sync';
 
 /**
  * The phone's home: the workspace's files, full screen. Its header names the
@@ -27,7 +28,7 @@ export function FilesPage({ hidden }: { hidden: boolean }) {
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
-    <div hidden={hidden} inert={hidden} className='absolute inset-0 flex flex-col bg-background'>
+    <div data-phone-page='files' hidden={hidden} inert={hidden} className='absolute inset-0 flex flex-col bg-background'>
       <PhoneHeader large>
         <button
           type='button'
@@ -47,39 +48,67 @@ export function FilesPage({ hidden }: { hidden: boolean }) {
       </PhoneHeader>
       {path ? (
         // `phone` widens the tree to the screen and its rows to a thumb.
-        <div data-phone='true' className='group/files relative flex min-h-0 flex-1 flex-col'>
-          <ExplorerTree path={path} />
-          <EmptyWorkspace path={path} onNew={create.find((action) => action.id === 'markdown')?.run} />
-        </div>
+        <PullToSync className='flex min-h-0 flex-1 flex-col'>
+          <div data-phone='true' className='group/files relative flex min-h-0 flex-1 flex-col'>
+            <ExplorerTree path={path} />
+            <EmptyWorkspace path={path} onNew={create.find((action) => action.id === 'markdown')?.run} />
+          </div>
+        </PullToSync>
       ) : (
         !loading && <NoWorkspace />
       )}
 
-      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        {/* Focus stays where the new name's field puts it, or the field closes. */}
-        <SheetContent side='bottom' finalFocus={false} className='gap-0 rounded-t-xl pb-[env(safe-area-inset-bottom)]'>
-          <SheetHeader className='pb-2'>
-            <SheetTitle>New</SheetTitle>
-          </SheetHeader>
-          <div className='px-4 pb-4'>
-            <RowGroup>
-              {create.map((action) => (
-                <Row
-                  key={action.id}
-                  icon={action.icon}
-                  label={action.label}
-                  onClick={() => {
-                    setCreateOpen(false);
-                    action.run();
-                  }}
-                />
-              ))}
-            </RowGroup>
-          </div>
-        </SheetContent>
-      </Sheet>
+      {path && <NewSheet folder={path} open={createOpen} onOpenChange={setCreateOpen} />}
       <WorkspacesSheet open={workspacesOpen} onOpenChange={setWorkspacesOpen} />
     </div>
+  );
+}
+
+/**
+ * What can be made in `folder`, from a bar's +. `dialog` names it in a
+ * dialog, where the tree isn't there to name it in.
+ */
+export function NewSheet({
+  folder,
+  dialog = false,
+  open,
+  onOpenChange,
+}: {
+  folder: string;
+  dialog?: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const create = useCreateActions(folder, { dialog });
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      {/* Focus stays where the new name's field puts it, or the field closes. */}
+      <SheetContent
+        side='bottom'
+        showCloseButton={false}
+        finalFocus={false}
+        className='gap-0 rounded-t-2xl bg-sidebar pb-[env(safe-area-inset-bottom)]'
+      >
+        <SheetHeader className='pb-2'>
+          <SheetTitle className='text-[17px]'>New</SheetTitle>
+        </SheetHeader>
+        <div className='px-4 pb-4'>
+          <RowGroup tone='sheet'>
+            {create.map((action) => (
+              <Row
+                key={action.id}
+                icon={action.icon}
+                label={action.label}
+                onClick={() => {
+                  onOpenChange(false);
+                  action.run();
+                }}
+              />
+            ))}
+          </RowGroup>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -96,13 +125,17 @@ export function WorkspacesSheet({ open, onOpenChange }: { open: boolean; onOpenC
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side='bottom' className='max-h-[85dvh] gap-0 rounded-t-xl pb-[env(safe-area-inset-bottom)]'>
+      <SheetContent
+        side='bottom'
+        showCloseButton={false}
+        className='max-h-[85dvh] gap-0 rounded-t-2xl bg-sidebar pb-[env(safe-area-inset-bottom)]'
+      >
         <SheetHeader className='pb-2'>
           <SheetTitle>Workspaces</SheetTitle>
         </SheetHeader>
         <div className='flex min-h-0 flex-col gap-5 overflow-y-auto px-4 pb-4'>
           {workspaces.length > 0 && (
-            <RowGroup>
+            <RowGroup tone='sheet'>
               {workspaces.map((workspace) => (
                 <Row
                   key={workspace.path}
@@ -114,7 +147,7 @@ export function WorkspacesSheet({ open, onOpenChange }: { open: boolean; onOpenC
               ))}
             </RowGroup>
           )}
-          <RowGroup>
+          <RowGroup tone='sheet'>
             {[...actions, manage].map((action) => (
               <Row key={action.id} icon={action.icon} label={action.label.replace(/…$/, '')} onClick={run(action.run)} />
             ))}
