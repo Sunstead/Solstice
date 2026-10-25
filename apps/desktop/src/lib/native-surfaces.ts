@@ -191,15 +191,20 @@ export function overSurfaceMoved() {
 /**
  * Whether a menu, popover or dialog is open: they mount in their own nodes
  * under `<body>`, beside `#root`. While one is, the webview takes every touch,
- * so a tap outside it closes it, as it would on the web.
+ * so a tap outside it closes it, as it would on the web (and the native tab
+ * bar, over the webview, steps aside).
  */
-function checkOverlays() {
-  const open = [...document.body.children].some(
+export function webOverlayOpen(): boolean {
+  return [...document.body.children].some(
     (el) =>
       el.id !== 'root' &&
       !(el instanceof HTMLScriptElement || el instanceof HTMLStyleElement) &&
       el.getBoundingClientRect().width > 0,
   );
+}
+
+function checkOverlays() {
+  const open = webOverlayOpen();
   const rects = [...overSurface]
     .map((el) => el.getBoundingClientRect())
     .filter((r) => r.width > 0 && r.height > 0)

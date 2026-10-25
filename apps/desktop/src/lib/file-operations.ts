@@ -188,7 +188,23 @@ async function duplicate(entry: Pick<FileTreeNode, 'path' | 'is_dir'>) {
   return result;
 }
 
+/**
+ * Copies files from elsewhere (the Files app's picks) into `folder`, each
+ * under a free name. The paths they got.
+ */
+async function importFiles(folder: string, sources: string[]): Promise<string[]> {
+  const made: string[] = [];
+  for (const source of sources) {
+    const result = await commands.importAttachment(source, folder);
+    if (result.status === 'error') logFailure('import', result.error);
+    else made.push(result.data);
+  }
+  if (made.length) await applyFsChanges(made.map((path) => selfChange('Created', path)));
+  return made;
+}
+
 export const fileOperations = {
+  importFiles,
   createFile,
   createFolder,
   rename,

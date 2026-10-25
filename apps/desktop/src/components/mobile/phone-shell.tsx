@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useReducer, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Actions, type Model } from 'flexlayout-react';
 import { Bookmark, Files, Search } from 'lucide-react';
 
@@ -12,6 +12,9 @@ import { useLayoutSession } from '@/hooks/use-layout-session';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { can, touchFirst } from '@/lib/backend/platform';
+import { nativeTabBar, type TabBarItem } from '@/lib/backend/native';
+import { initials } from '@/lib/initials';
+import { webOverlayOpen } from '@/lib/native-surfaces';
 import { useEntryInput } from '@/lib/stores/entry-input';
 import { usePhoneNav, type PhonePage } from '@/lib/stores/phone-nav';
 import { useRevealTarget } from '@/lib/stores/reveal-target';
@@ -148,7 +151,7 @@ export function PhoneShell() {
           {page === 'search' && <SearchPage />}
           {page === 'you' && <YouPage />}
         </div>
-        <AppFooter />
+        {can.nativeTabBar ? <NativeFooter /> : <AppFooter />}
       </div>
       {model && (
         <PushPane open={noteOpen} onClose={goHome} behind={home} keepMounted>
@@ -238,10 +241,21 @@ function toRoot(page: PhonePage) {
   }
 }
 
-/** Files, Bookmarks, Search and You, along the bottom; hidden while the keyboard's up. */
+/** A tab bar's tap: the tab, or the tab already shown back to its root. */
+function choose(page: PhonePage) {
+  const nav = usePhoneNav.getState();
+  if (nav.page === page) toRoot(page);
+  else nav.showPage(page);
+}
+
+/**
+ * Files, Bookmarks, Search and You, along the bottom, as a floating capsule
+ * whose highlight springs to the tab shown; hidden while the keyboard's up.
+ * Where there's no native one (`NativeFooter`): the web on a phone, a narrow
+ * window.
+ */
 function AppFooter() {
   const page = usePhoneNav((s) => s.page);
-  const showPage = usePhoneNav((s) => s.showPage);
   const keyboard = useKeyboard((s) => s.docked);
   const { username, attention } = useAccountActions();
   const edge = useScrollEdge('bottom');
@@ -255,38 +269,117 @@ function AppFooter() {
       type='button'
       aria-label={label}
       aria-current={page === id ? 'page' : undefined}
-      onClick={() => (page === id ? toRoot(id) : showPage(id))}
+      onClick={() => choose(id)}
       className={cn(
-        'flex min-h-12 flex-1 items-center justify-center py-2.5 text-muted-foreground',
+        'relative flex min-h-11 flex-1 items-center justify-center text-muted-foreground',
         page === id && 'text-foreground',
       )}
     >
       {icon}
     </button>
   );
+  const index = Math.max(0, [...PAGES.map((p) => p.id), 'you'].indexOf(page));
 
   return (
-    <nav ref={edge} className='phone-tab-bar flex shrink-0 bg-background pb-[max(env(safe-area-inset-bottom),0.375rem)]'>
-      {PAGES.map(({ id, label, icon: Icon }) =>
-        item(
-          id,
-          label,
-          // The tab shown is drawn heavier, Bookmarks filled, as UIKit fills them.
-          <Icon
-            className={cn('size-6', page === id && id === 'bookmarks' && 'fill-current')}
-            strokeWidth={page === id ? 2.4 : 1.8}
+    <nav ref={edge} className='phone-tab-bar shrink-0 px-5 pt-1.5 pb-[max(env(safe-area-inset-bottom),0.5rem)]'>
+      <div className='phone-tab-capsule relative flex rounded-full p-1'>
+        <span
+          aria-hidden
+          className='phone-tab-indicator absolute inset-y-1 left-1 w-[calc((100%-0.5rem)/4)] rounded-full'
+          style={{ transform: `translateX(${index * 100}%)` }}
+        />
+        {PAGES.map(({ id, label, icon: Icon }) =>
+          item(
+            id,
+            label,
+            // The tab shown is drawn heavier, Bookmarks filled, as UIKit fills them.
+            <Icon
+              className={cn('size-6', page === id && id === 'bookmarks' && 'fill-current')}
+              strokeWidth={page === id ? 2.4 : 1.8}
+            />,
+          ),
+        )}
+        {item(
+          'you',
+          'You',
+          <UserAvatar
+            username={username}
+            attention={attention}
+            className={cn('size-6', page === 'you' && 'ring-2 ring-foreground')}
           />,
-        ),
-      )}
-      {item(
-        'you',
-        'You',
-        <UserAvatar
-          username={username}
-          attention={attention}
-          className={cn('size-6', page === 'you' && 'ring-2 ring-foreground')}
-        />,
-      )}
+        )}
+      </div>
     </nav>
   );
+}
+
+/** SF Symbols for the native bar's tabs, plain and selected. */
+const SYMBOLS: Record<Exclude<PhonePage, 'you'>, [string, string]> = {
+  files: ['folder', 'folder.fill'],
+  bookmarks: ['bookmark', 'bookmark.fill'],
+  search: ['magnifyingglass', 'magnifyingglass'],
+};
+
+/**
+ * The iPhone's tab bar is UIKit's (`TabBar.swift`), floating over the
+ * webview; this tells it what to show and keeps its room. It steps aside
+ * for a pushed note, the keyboard, and any sheet or menu, which the web
+ * draws under it.
+ */
+function NativeFooter() {
+  const page = usePhoneNav((s) => s.page);
+  const noteOpen = usePhoneNav((s) => s.noteOpen);
+  const keyboard = useKeyboard((s) => s.docked);
+  const { username, attention } = useAccountActions();
+  const overlay = useWebOverlay();
+  const [inset, setInset] = useState<number | null>(null);
+
+  useEffect(() => {
+    const listening = nativeTabBar.listen((event) => {
+      if (event.type === 'inset') setInset(event.inset);
+      else choose(event.id as PhonePage);
+    });
+    return () => {
+      void listening.then((listener) => listener.unregister());
+      void nativeTabBar.set([], null, true);
+    };
+  }, []);
+
+  const items = useMemo<TabBarItem[]>(
+    () => [
+      ...PAGES.map(({ id, label }) => {
+        const [symbol, selectedSymbol] = SYMBOLS[id as keyof typeof SYMBOLS];
+        return { id, label, symbol, selectedSymbol };
+      }),
+      username
+        ? { id: 'you', label: 'You', initials: initials(username), badge: attention }
+        : { id: 'you', label: 'You', symbol: 'person.crop.circle', selectedSymbol: 'person.crop.circle.fill', badge: attention },
+    ],
+    [username, attention],
+  );
+  const hidden = noteOpen || keyboard || overlay;
+  useEffect(() => void nativeTabBar.set(items, page, hidden), [items, page, hidden]);
+
+  if (keyboard) return null;
+  // Until the bar says, UIKit's usual height over the home indicator.
+  return (
+    <div
+      aria-hidden
+      className='shrink-0'
+      style={{ height: inset ?? 'calc(49px + env(safe-area-inset-bottom))' }}
+    />
+  );
+}
+
+/** Whether a sheet, dialog or menu is open over the app (`webOverlayOpen`). */
+function useWebOverlay() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const check = () => setOpen(webOverlayOpen());
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true });
+    check();
+    return () => observer.disconnect();
+  }, []);
+  return open;
 }

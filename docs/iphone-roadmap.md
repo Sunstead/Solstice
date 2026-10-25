@@ -356,6 +356,25 @@ pointer down.
 
 ## Phase 2: native controls where the web can't match them
 
+**Where it stands (2026-10-25, branch `iphone-native`).** Built, and the
+Swift compiles for the simulator:
+
+- Alerts: `ask()` (`lib/ask.ts`) is `UIAlertController` in the iOS app
+  (`Pickers.alert`, the `alert` host op) and the app's own alert dialog
+  elsewhere (`AskDialog`, mounted once at the root). Signing out of sync and
+  Reload from disk on the conflict bar ask first, on every platform.
+- Dates: a date value in a note's Properties (`due: 2026-10-25`, with a time
+  or quoted) is a button in the iOS app that opens the inline calendar
+  (`pickDate`: a sheet on a phone, a popover on an iPad). The line is
+  written back as it was written (`lib/frontmatter/dates.ts`).
+- Photos: Insert Image takes any number from Photos (`pickPhotos`, HEIC
+  made JPEG). Ink's own Photos picker is unchanged.
+- Files: New > Import from Files copies picked files into the folder
+  (`pickDocuments`, `fileOperations.importFiles`).
+
+Left for later: adding a date property (only existing ones are pickable),
+and a camera option beside Photos.
+
 The hold sheet (1.5) and the ⋯ sheet stay web, since a sheet is something the
 web side already does well. What's left for the plugin (which already has the
 iPad menu bar in `NativeMenu.swift`, the share sheet and the colour picker) is
@@ -367,6 +386,22 @@ small:
   document import from Files (`UIDocumentPickerViewController`).
 
 ## Phase 3: the tab bar
+
+**Where it stands (2026-10-25, branch `iphone-native`).**
+
+- The web's tab bar (the web on a phone, a narrow window) is a floating
+  capsule of the page blurred, its highlight springing to the tab shown.
+- The iPhone app's is UIKit's (`TabBar.swift`, `can.nativeTabBar`): the four
+  tabs as SF Symbols, You as initials knocked out of a disc (a template, so
+  the bar tints it), a badge when sync needs you, a selection tick. The web
+  sends `tabBar { items, selected, hidden }` (`NativeFooter`); taps, and the
+  bar's height, come back as `tabBar` events. It's hidden while a note is
+  pushed, the keyboard is up, or any sheet, dialog or menu is open
+  (`webOverlayOpen`), since those draw under it.
+- Unlike the decision in 1.4, the native items have labels, as iOS's do.
+- The page keeps the bar's height as a spacer, so lists end above it rather
+  than scrolling under the glass. Letting them run under it needs every
+  page's scroller to pad by the bar's height.
 
 On iOS 26+ the tab bar is a floating Liquid Glass capsule over the content.
 Glass refracts and lenses what's under it; CSS `backdrop-filter` can only

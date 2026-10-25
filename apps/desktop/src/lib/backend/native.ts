@@ -209,3 +209,58 @@ export const nativeHaptics = {
   prepare: () => host({ op: 'haptic' }),
   play: (kind: HapticKind) => host({ op: 'haptic', kind }),
 };
+
+/** One button of a native alert: `cancel` sits apart, `destructive` is red. */
+export type AlertButton = { id: string; label: string; style?: 'default' | 'cancel' | 'destructive' };
+
+/** A date as front matter writes it, with its time only when it has one. */
+export type DateParts = { year: number; month: number; day: number; hour?: number; minute?: number };
+
+/**
+ * The system's alerts and pickers (`Pickers.swift`), where the web's own
+ * would give the app away: a centred confirmation, a date, photos and files
+ * from the Files app. Picked files are copies in the temporary directory,
+ * for the app to copy on into the workspace (`importAttachment`).
+ */
+export const nativePickers = {
+  /** The chosen button's id. */
+  alert: (title: string, message: string | undefined, actions: AlertButton[]) =>
+    invoke<{ id: string }>('plugin:solstice-native|host', { op: 'alert', title, message, actions }).then(
+      (r) => r.id || null,
+    ),
+  /** The calendar (and clock, if `date` has a time), from `anchor` on an iPad; null if put away. */
+  date: (date: DateParts, anchor: Rect | null) =>
+    invoke<{ picked: boolean } & DateParts>('plugin:solstice-native|host', { op: 'pickDate', date, anchor }).then(
+      ({ picked, ...parts }) => (picked ? parts : null),
+    ),
+  photos: () =>
+    invoke<{ paths: string[] }>('plugin:solstice-native|host', { op: 'pickPhotos' }).then((r) => r.paths),
+  documents: () =>
+    invoke<{ paths: string[] }>('plugin:solstice-native|host', { op: 'pickDocuments' }).then((r) => r.paths),
+};
+
+/**
+ * One item of the native tab bar: an SF Symbol (and its selected form), or
+ * initials on a disc (You).
+ */
+export type TabBarItem = {
+  id: string;
+  label: string;
+  symbol?: string;
+  selectedSymbol?: string;
+  initials?: string;
+  badge?: boolean;
+};
+
+export type TabBarEvent = { type: 'select'; id: string } | { type: 'inset'; inset: number };
+
+/**
+ * The iPhone's tab bar (`TabBar.swift`), UIKit's own over the webview: the
+ * web side says what's in it; taps, and how tall it is, come back.
+ */
+export const nativeTabBar = {
+  set: (items: TabBarItem[], selected: string | null, hidden: boolean) =>
+    host({ op: 'tabBar', items, selected: selected ?? undefined, hidden }),
+  listen: (handler: (event: TabBarEvent) => void) =>
+    addPluginListener<TabBarEvent>('solstice-native', 'tabBar', handler),
+};

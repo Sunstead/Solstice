@@ -25,6 +25,7 @@ import { useDeepLinks } from '@/hooks/use-deep-links';
 import { useSyncStatus } from '@/lib/stores/sync';
 import { useTreeMetaSync } from '@/lib/stores/tree-meta';
 import { FileActionDialogs } from '@/components/file-action-dialogs';
+import { AskDialog } from '@/components/ask-dialog';
 import { FileTreeDragLayer } from '@/components/file-tree-drag-layer';
 import { FolderColorDialog } from '@/components/folder-color-dialog';
 import { WorkspaceDialogs } from '@/components/workspace-dialogs';
@@ -191,6 +192,7 @@ export const Route = createRootRoute({
       <DndProvider backend={HTML5Backend}>
         {/* Once for the app: the Explorer, Bookmarks and file menus all ask for them. */}
         <FileActionDialogs />
+        <AskDialog />
         <FileTreeDragLayer />
         <FolderColorDialog />
         {/* Insets: a home-screen app draws under the status bar and, in

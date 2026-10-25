@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 
+import { ask } from '@/lib/ask';
 import { commands } from '@/lib/backend';
-import { can } from '@/lib/backend/platform';
+import { can, deviceNoun } from '@/lib/backend/platform';
 import { signOut } from '@/lib/backend/web/account';
 import { needsAttention } from '@/components/sync/describe';
 import { useSetting } from '@/lib/settings/store';
@@ -55,6 +56,7 @@ export function useAccountActions() {
   };
 
   const leave = async () => {
+    if (!(await confirmSignOut(server))) return;
     setBusy(true);
     setFailure(null);
     if (can.syncSettings) {
@@ -89,4 +91,16 @@ export function useAccountActions() {
     signOut: leave,
     refresh: () => void refresh(server),
   };
+}
+
+/** Signing out stops sync until signing in again, so it asks first. */
+export function confirmSignOut(server: string | null) {
+  return ask({
+    title: 'Sign out?',
+    message: server
+      ? `Your notes stay on this ${deviceNoun}, but stop syncing with ${host(server)} until you sign in again.`
+      : undefined,
+    confirm: 'Sign Out',
+    destructive: true,
+  });
 }

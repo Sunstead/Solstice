@@ -496,6 +496,28 @@ html[data-reduce-motion='true'] *::after {
   z-index: 10;
 }
 
+/* The web's tab bar (where UIKit's isn't): a floating capsule of the page
+   blurred, its highlight springing to the tab shown on the push spring. */
+.phone-tab-capsule {
+  background: color-mix(in oklch, var(--background) 78%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: blur(20px) saturate(1.8);
+  box-shadow:
+    0 6px 24px rgb(0 0 0 / 0.12),
+    inset 0 0 0 0.5px color-mix(in oklch, var(--foreground) 12%, transparent);
+}
+
+.phone-tab-indicator {
+  background: color-mix(in oklch, var(--foreground) 9%, transparent);
+  transition: transform calc(var(--push-ms, 385ms) * 1.2) var(--push-spring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone-tab-indicator {
+    transition: none;
+  }
+}
+
 .phone-bar::after,
 .phone-tab-bar::before {
   content: '';

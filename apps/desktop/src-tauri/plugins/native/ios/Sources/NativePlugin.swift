@@ -64,6 +64,16 @@ struct HostArgs: Decodable {
   let index: Int?
   let width: Double?
   let order: [Int]?
+  /// For `alert`: what it says and its buttons.
+  let title: String?
+  let message: String?
+  let actions: [AlertAction]?
+  /// For `pickDate`: the date to start on.
+  let date: DateParts?
+  /// For `tabBar`: its items, which is selected, and whether it shows.
+  let items: [TabBarItemSpec]?
+  let selected: String?
+  let hidden: Bool?
 }
 
 class NativePlugin: Plugin {
@@ -83,6 +93,7 @@ class NativePlugin: Plugin {
         self.trigger("pencilTap", data: ["x": Double(point.x), "y": Double(point.y)])
       }
       Ink.shared.plugin = self
+      TabBar.shared.plugin = self
       if let parent = webview.superview { Ink.shared.listen(in: parent) }
     }
     let center = NotificationCenter.default
@@ -312,6 +323,40 @@ class NativePlugin: Plugin {
         } catch {
           return invoke.reject("Couldn't make the notebook: \(error.localizedDescription)")
         }
+      case "alert":
+        guard let presenter = self.manager.viewController else { return invoke.reject("Nothing to show it from.") }
+        Pickers.alert(
+          title: args.title ?? "", message: args.message, actions: args.actions ?? [], by: presenter
+        ) { id in
+          invoke.resolve(["id": id ?? ""])
+        }
+        return
+      case "pickDate":
+        guard let date = args.date, let webview = self.webview, let presenter = self.manager.viewController else {
+          return invoke.reject("No date to pick.")
+        }
+        Pickers.date(date, from: self.shareRect(args.anchor, in: webview), in: webview, by: presenter) { parts in
+          guard let parts else { return invoke.resolve(["picked": false]) }
+          var answer: JSObject = ["picked": true, "year": parts.year, "month": parts.month, "day": parts.day]
+          if let hour = parts.hour, let minute = parts.minute {
+            answer["hour"] = hour
+            answer["minute"] = minute
+          }
+          invoke.resolve(answer)
+        }
+        return
+      case "pickPhotos", "pickDocuments":
+        guard let presenter = self.manager.viewController else { return invoke.reject("Nothing to pick from.") }
+        let done: ([String]) -> Void = { paths in invoke.resolve(["paths": paths]) }
+        if args.op == "pickPhotos" {
+          Pickers.photos(by: presenter, done: done)
+        } else {
+          Pickers.documents(by: presenter, done: done)
+        }
+        return
+      case "tabBar":
+        guard let webview = self.webview else { break }
+        TabBar.shared.set(args.items ?? [], selected: args.selected, hidden: args.hidden ?? true, over: webview)
       case "background":
         if let rgb = args.rgb, rgb.count >= 3 {
           host.backgroundColor = UIColor(

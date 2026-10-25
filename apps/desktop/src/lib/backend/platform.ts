@@ -15,6 +15,9 @@ export const shell: Shell = !inTauri
     ? 'mobile'
     : 'desktop';
 
+/** The screen, not the window, tells an iPhone from an iPad. */
+const iPhone = shell === 'mobile' && typeof screen !== 'undefined' && Math.min(screen.width, screen.height) < 600;
+
 export const can = {
   /** Workspaces are folders on this device; on the web they're vaults on the server. */
   localFolders: shell !== 'web',
@@ -63,10 +66,14 @@ export const can = {
   /**
    * More than one tab: everywhere but the iPhone app, which shows one note at
    * a time. A phone-width window elsewhere (a narrow desktop window, the
-   * iPad's Slide Over) keeps its tabs for when it widens. The screen, not
-   * the window, tells an iPhone from an iPad.
+   * iPad's Slide Over) keeps its tabs for when it widens.
    */
-  tabs: !(shell === 'mobile' && typeof screen !== 'undefined' && Math.min(screen.width, screen.height) < 600),
+  tabs: !iPhone,
+  /**
+   * UIKit's own tab bar over the phone layout (`nativeTabBar`): the iPhone
+   * app. Elsewhere the phone layout draws its own.
+   */
+  nativeTabBar: iPhone && platform() === 'ios',
 } as const;
 
 /**

@@ -5,6 +5,9 @@ import type { NodeViewConstructor } from '@milkdown/kit/prose/view';
 import { codeBlockSchema } from '@milkdown/kit/preset/commonmark';
 import { $nodeSchema, $prose, $remark, $view } from '@milkdown/kit/utils';
 
+import { nativePickers } from '@/lib/backend/native';
+import { can } from '@/lib/backend/platform';
+import { findDate, withDate } from './dates';
 import { frontMatterYaml, splitFrontMatter } from './split';
 
 export const FRONTMATTER_MDAST_TYPE = 'solsticeFrontmatter';
@@ -174,11 +177,49 @@ export const frontmatter: MilkdownPlugin[] = [
 
 /**
  * The editor's view: `toDOM`'s `<details>`, with events kept from ProseMirror
- * so the summary toggles instead of selecting the node.
+ * so the summary toggles instead of selecting the node. In the iOS app a
+ * date value is a button for the system's calendar (`pickDate`), which
+ * writes the line back as it was written, changing nothing else.
  */
-export const frontmatterView = $view(frontmatterSchema.node, (): NodeViewConstructor => (node) => {
+export const frontmatterView = $view(frontmatterSchema.node, (): NodeViewConstructor => (node, view, getPos) => {
   const dom = document.createElement('div');
+  let current = node;
+
+  const pick = async (index: number, button: HTMLElement) => {
+    const found = findDate(current.attrs.value.split('\n')[index] ?? '');
+    if (!found) return;
+    const { x, y, width, height } = button.getBoundingClientRect();
+    const parts = await nativePickers.date(found.parts, { x, y, width, height }).catch(() => null);
+    const pos = getPos();
+    if (!parts || pos === undefined || !view.editable) return;
+    const value = withDate(current.attrs.value, index, parts);
+    if (value !== current.attrs.value) view.dispatch(view.state.tr.setNodeMarkup(pos, undefined, { ...current.attrs, value }));
+  };
+
+  /** The YAML, its date values buttons where they can be picked. */
+  const body = (block: string) => {
+    const pre = document.createElement('pre');
+    const lines = block.split('\n').slice(1, -1);
+    if (!can.nativeViews || !view.editable) {
+      pre.textContent = lines.join('\n');
+      return pre;
+    }
+    lines.forEach((line, i) => {
+      if (i > 0) pre.append('\n');
+      const found = findDate(line);
+      if (!found) return pre.append(line);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'solstice-frontmatter-date';
+      button.textContent = found.value;
+      button.addEventListener('click', () => void pick(i + 1, button));
+      pre.append(found.before, button, found.after);
+    });
+    return pre;
+  };
+
   const render = (next: Node) => {
+    current = next;
     const yaml = frontMatterYaml(next.attrs.value);
     const open = dom.querySelector('details')?.open ?? false;
     const details = document.createElement('details');
@@ -191,9 +232,7 @@ export const frontmatterView = $view(frontmatterSchema.node, (): NodeViewConstru
     keys.className = 'solstice-frontmatter-keys';
     keys.textContent = keysOf(yaml).join(', ');
     summary.append(label, keys);
-    const pre = document.createElement('pre');
-    pre.textContent = yaml;
-    details.append(summary, pre);
+    details.append(summary, body(next.attrs.value));
     dom.replaceChildren(details);
   };
   render(node);

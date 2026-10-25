@@ -1,6 +1,7 @@
 import { FileWarning, Trash2 } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
+import { ask } from '@/lib/ask';
 
 type ExternalChangeBarProps = {
   variant: 'conflict' | 'deleted';
@@ -35,7 +36,7 @@ export function ExternalChangeBar({
       </span>
 
       {!deleted && (
-        <Button size='sm' variant='outline' onClick={onReload}>
+        <Button size='sm' variant='outline' onClick={() => void discard(onReload)}>
           Reload from disk
         </Button>
       )}
@@ -51,4 +52,15 @@ export function ExternalChangeBar({
       )}
     </div>
   );
+}
+
+/** Reloading drops what's unsaved, so it asks first. */
+async function discard(reload: () => void) {
+  const yes = await ask({
+    title: 'Discard your changes?',
+    message: "The file on disk replaces what you've written since it was last saved.",
+    confirm: 'Discard Changes',
+    destructive: true,
+  });
+  if (yes) reload();
 }
