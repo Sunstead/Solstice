@@ -2,11 +2,24 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 
 import { pushSpring as spring } from '@/lib/push-spring';
+import { kickSurfaces } from '@/lib/surface-kicks';
 import { motionEnabled } from '@/lib/tab-motion';
 import { cn } from '@/lib/utils';
 
 /** How far the page underneath slides left as one comes over it, as iOS does. */
 const PARALLAX = 0.25;
+
+/**
+ * How much of the page behind and of the scrim, from their right edges, the
+ * pane covers when `share` of it is in: clipped away, so nothing under the
+ * pane is drawn. A native view (a PDF, a drawing) shows through the pushed
+ * page from under the webview, and the file list drew over it.
+ */
+export function covered(share: number, width: number): { behind: number; scrim: number } {
+  return { behind: share * width * (1 - PARALLAX), scrim: share * width };
+}
+
+const clip = (right: number) => `inset(0 ${right}px 0 0)`;
 
 /**
  * A page that slides in over another from the right, the way an iPhone app
@@ -54,10 +67,24 @@ export function PushPane({
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  /** How much of the way in it is, 1 open and 0 gone: the scrim and the page behind follow. */
+  /**
+   * How much of the way in it is, 1 open and 0 gone: the scrim and the page
+   * behind follow, cut where the pane covers them. All the way in, they're
+   * hidden, as UIKit takes a covered view out of the window.
+   */
   const place = (share: number, width: number) => {
-    if (scrim.current) scrim.current.style.opacity = String(share);
-    if (behind?.current) behind.current.style.transform = `translateX(${-PARALLAX * width * share}px)`;
+    const cut = covered(share, width);
+    const away = share >= 1 ? 'hidden' : '';
+    if (scrim.current) {
+      scrim.current.style.opacity = String(share);
+      scrim.current.style.clipPath = share > 0 ? clip(cut.scrim) : '';
+      scrim.current.style.visibility = away || (share > 0 ? '' : 'hidden');
+    }
+    if (behind?.current) {
+      behind.current.style.transform = share > 0 ? `translateX(${-PARALLAX * width * share}px)` : '';
+      behind.current.style.clipPath = share > 0 ? clip(cut.behind) : '';
+      behind.current.style.visibility = away;
+    }
   };
 
   /** The page in view: scrolled past the empty screen to its left. */
@@ -72,12 +99,10 @@ export function PushPane({
     if (!el) return;
     el.style.transform = to === 'open' ? '' : 'translateX(100%)';
     el.style.visibility = to === 'open' ? '' : 'hidden';
-    if (scrim.current) {
-      scrim.current.style.opacity = to === 'open' ? '1' : '0';
-      scrim.current.style.visibility = to === 'open' ? '' : 'hidden';
-    }
-    if (behind?.current) behind.current.style.transform = '';
+    place(to === 'open' ? 1 : 0, el.offsetWidth || window.innerWidth);
     if (to === 'open') rest();
+    // A native view in it is shown or hidden with it.
+    kickSurfaces();
     if (to === 'closed' && !keepMounted) setPresent(false);
   };
 
@@ -94,6 +119,7 @@ export function PushPane({
     const end = to === 'open' ? 0 : width;
     el.style.visibility = '';
     if (scrim.current) scrim.current.style.visibility = '';
+    if (behind?.current) behind.current.style.visibility = '';
     if (to === 'open') rest();
     if (!motionEnabled() || start === end) {
       finish(to);
@@ -102,16 +128,21 @@ export function PushPane({
 
     const { ms, easing } = spring();
     const timing = { duration: ms, easing };
-    const shift = (x: number) => `translateX(${-PARALLAX * width * (1 - x / width)}px)`;
+    const share = (x: number) => 1 - x / width;
+    const shift = (x: number) => `translateX(${-PARALLAX * width * share(x)}px)`;
     const animations = [
       el.animate([{ transform: `translateX(${start}px)` }, { transform: `translateX(${end}px)` }], timing),
     ];
     if (scrim.current) {
-      animations.push(scrim.current.animate([{ opacity: 1 - start / width }, { opacity: 1 - end / width }], timing));
+      const frame = (x: number) => ({ opacity: share(x), clipPath: clip(covered(share(x), width).scrim) });
+      animations.push(scrim.current.animate([frame(start), frame(end)], timing));
     }
     if (behind?.current) {
-      animations.push(behind.current.animate([{ transform: shift(start) }, { transform: shift(end) }], timing));
+      const frame = (x: number) => ({ transform: shift(x), clipPath: clip(covered(share(x), width).behind) });
+      animations.push(behind.current.animate([frame(start), frame(end)], timing));
     }
+    // A native view in the pane follows it while it moves.
+    kickSurfaces();
     // Hold the end state until `finish` sets it for good.
     el.style.transform = `translateX(${end}px)`;
     if (scrim.current) scrim.current.style.opacity = String(1 - end / width);

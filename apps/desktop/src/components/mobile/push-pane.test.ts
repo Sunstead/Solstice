@@ -14,7 +14,7 @@ vi.hoisted(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
 
-import { PushPane } from './push-pane';
+import { covered, PushPane } from './push-pane';
 
 // The settings dialog and the phone's You page push a page only once one is
 // asked for, so the pane mounts already open; Back must still take it away.
@@ -94,6 +94,30 @@ describe('PushPane', () => {
       [{ transform: `translateX(${width}px)` }, { transform: 'translateX(0px)' }],
       expect.anything(),
     );
+  });
+
+  // A native view shows through the pushed page from under the webview, so
+  // nothing under the pane may be drawn: the page behind goes once it's in.
+  it('hides the page behind while it is in, and gives it back', () => {
+    const behind = createRef<HTMLDivElement>();
+    const draw = (open: boolean) =>
+      act(() => {
+        root.render(
+          h('div', null, h('div', { ref: behind }), h(PushPane, { open, onClose: () => {}, behind, keepMounted: true, children: h('p') })),
+        );
+      });
+    draw(true);
+    expect(behind.current!.style.visibility).toBe('hidden');
+    draw(false);
+    expect(behind.current!.style.visibility).toBe('');
+    expect(behind.current!.style.clipPath).toBe('');
+  });
+
+  it('cuts away what the pane covers while it slides', () => {
+    expect(covered(0, 400)).toEqual({ behind: 0, scrim: 0 });
+    // Half in: the pane covers the right 200px of the screen, where the page
+    // behind, moved 50px left, has its right 150px.
+    expect(covered(0.5, 400)).toEqual({ behind: 150, scrim: 200 });
   });
 
   // The pane is a scroll view resting on the page; reaching its left is the

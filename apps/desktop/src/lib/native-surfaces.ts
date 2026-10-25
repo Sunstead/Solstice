@@ -5,6 +5,7 @@ import { nativeSurfaces, type SurfaceEvent } from '@/lib/backend/native';
 import { followInkTools } from '@/lib/ink/native-sync';
 import { useEditingFocus } from '@/lib/keyboard';
 import { getSetting, subscribeToSetting } from '@/lib/settings/store';
+import { kicks, kickSurfaces } from '@/lib/surface-kicks';
 
 /**
  * What the iOS app's native views (`NativeSurface`) share: keeping each on
@@ -33,10 +34,14 @@ export function unmark(el: Element) {
 /**
  * Makes everything painted under the surface see-through (app.css): not only
  * its ancestors, but the siblings stacked beneath it, like flexlayout's
- * tabset, which draws its background apart from the tab's content.
+ * tabset, which draws its background apart from the tab's content. Only on
+ * the surface's own page, though: a phone's note is pushed over the file
+ * list, which must stay as it is (the pushed page hides it, `PushPane`).
  */
 export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): number[] | null {
   const found = new Set<Element>();
+  const page = el.closest('.solstice-push-page, [data-surface-root]');
+  const onPage = (below: Element) => !page || page.contains(below) || below.contains(page);
   // The colour the surface used to sit on: the surface's own backdrop (a
   // PDF's margins), and the host's too, except that under Islands the host
   // shows in the gaps and a pane's rounded corners, which go see-through
@@ -55,6 +60,7 @@ export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): nu
     const at = stack.indexOf(el);
     if (at === -1) continue;
     for (const below of stack.slice(at + 1)) {
+      if (!onPage(below)) continue;
       found.add(below);
       if (!background) {
         background = toRgb(marks.get(below)?.background ?? getComputedStyle(below).backgroundColor);
@@ -131,7 +137,6 @@ let holders = 0;
 let stopHost: (() => void) | null = null;
 let modal = false;
 let sentRects = '';
-const kicks = new Set<() => void>();
 const overSurface = new Set<Element>();
 
 /**
@@ -142,10 +147,10 @@ export function useOverSurface() {
   return useCallback((el: HTMLElement | null) => {
     if (!el) return;
     overSurface.add(el);
-    kicks.forEach((kick) => kick());
+    kickSurfaces();
     return () => {
       overSurface.delete(el);
-      kicks.forEach((kick) => kick());
+      kickSurfaces();
     };
   }, []);
 }
@@ -194,7 +199,7 @@ export function onSurfaceEase(listener: (phase: 'play' | 'end') => void): () => 
  * the webview's where it now is.
  */
 export function overSurfaceMoved() {
-  kicks.forEach((kick) => kick());
+  kickSurfaces();
 }
 
 /**

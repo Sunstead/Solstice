@@ -53,7 +53,7 @@ vi.mock('@/lib/settings/store', () => ({
 }));
 
 import { useEditingFocus } from './keyboard';
-import { follow, retainHost } from './native-surfaces';
+import { follow, retainHost, seeThrough } from './native-surfaces';
 
 describe('web focus, while surfaces are open', () => {
   let release: () => void;
@@ -175,5 +175,43 @@ describe('following a surface', () => {
     const stop = follow(document.createElement('div'), measure);
     expect(framesInASecond(measure)).toBeGreaterThan(10);
     stop();
+  });
+});
+
+// On a phone a note is pushed over the file list (`PushPane`): clearing the
+// list's backgrounds left its rows drawn over the PDF.
+describe('see-through', () => {
+  const build = () => {
+    const shell = document.createElement('div');
+    const home = document.createElement('div');
+    const row = document.createElement('div');
+    const push = document.createElement('div');
+    const page = document.createElement('div');
+    const surface = document.createElement('div');
+    page.className = 'solstice-push-page';
+    home.append(row);
+    page.append(surface);
+    push.append(page);
+    shell.append(home, push);
+    document.body.append(shell);
+    document.elementsFromPoint = () => [surface, page, push, row, home, shell, document.body, document.documentElement];
+    return { shell, home, row, push, page, surface };
+  };
+
+  it("stops at the surface's own pushed page", () => {
+    const { shell, home, row, push, page, surface } = build();
+    const under = new Set<Element>();
+    seeThrough(surface, new DOMRect(0, 0, 100, 100), under);
+    for (const el of [page, push, shell]) expect(el.hasAttribute('data-native-under')).toBe(true);
+    for (const el of [row, home]) expect(el.hasAttribute('data-native-under')).toBe(false);
+    shell.remove();
+  });
+
+  it('marks everything under it elsewhere, as on the iPad', () => {
+    const { shell, row, page, surface } = build();
+    page.className = '';
+    seeThrough(surface, new DOMRect(0, 0, 100, 100), new Set());
+    expect(row.hasAttribute('data-native-under')).toBe(true);
+    shell.remove();
   });
 });
