@@ -20,17 +20,27 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
 
     let last = '';
     let size: { width: number; height: number } | null = null;
+    let held = false;
     const under = new Set<Element>();
     const measure = () => {
       const r = el.getBoundingClientRect();
       const visible = r.width > 0 && r.height > 0 && el.checkVisibility?.() !== false;
-      // Held (`holdSurfaceSizes`), the view only moves with the element.
-      if (!size || !surfaceSizesHeld()) size = { width: r.width, height: r.height };
-      const key = `${r.x},${r.y},${size.width},${size.height},${visible}`;
+      // Held (`holdSurfaceSizes`), the view only moves with the element,
+      // centred across it (a PDF's pages are), and a drawing down it too, so
+      // what's in focus stays there. The first size after is eased in
+      // (`settle`).
+      const holding = surfaceSizesHeld() && size !== null;
+      const settle = held && !holding;
+      held = holding;
+      if (!holding) size = { width: r.width, height: r.height };
+      const { width, height } = size!;
+      const x = holding ? r.x + (r.width - width) / 2 : r.x;
+      const y = holding && kind === 'drawing' ? r.y + (r.height - height) / 2 : r.y;
+      const key = `${x},${y},${width},${height},${visible}`;
       if (key === last) return false;
       last = key;
       const backdrop = visible ? seeThrough(el, r, under) : null;
-      void nativeSurfaces.place(id, { x: r.x, y: r.y, ...size }, visible, backdrop);
+      void nativeSurfaces.place(id, { x, y, width, height }, visible, backdrop, settle);
       return true;
     };
     const stopFollowing = follow(el, measure);

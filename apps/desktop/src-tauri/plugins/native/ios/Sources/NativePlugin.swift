@@ -17,6 +17,8 @@ struct SurfaceArgs: Decodable {
   let width: Double?
   let height: Double?
   let visible: Bool?
+  /// The first frame after a held size (`holdSurfaceSizes`): `settle` to it.
+  let settle: Bool?
   let rgb: [Double]?
   let query: String?
   let caseSensitive: Bool?
@@ -139,8 +141,9 @@ class NativePlugin: Plugin {
         }
       case "frame":
         guard let surface = host.surfaces[args.id] else { break }
-        surface.frame = self.hostRect(
+        let rect = self.hostRect(
           x: args.x ?? 0, y: args.y ?? 0, width: args.width ?? 0, height: args.height ?? 0)
+        if args.settle == true { surface.settle(to: rect) } else { surface.frame = rect }
         surface.isHidden = !(args.visible ?? false)
         // What shows round the content (a PDF's margins): the pane's colour,
         // while the host behind the page may be the window's (Islands).

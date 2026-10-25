@@ -34,9 +34,12 @@ const host = (args: Record<string, unknown>) =>
 
 export const nativeSurfaces = {
   open: (id: string, kind: SurfaceKind, path: string) => surface({ op: 'open', id, kind, path }),
-  /** Where it is, in CSS pixels from the viewport, and whether it shows. */
-  place: (id: string, rect: Rect, visible: boolean, rgb?: number[] | null) =>
-    surface({ op: 'frame', id, ...rect, visible, rgb: rgb ?? undefined }),
+  /**
+   * Where it is, in CSS pixels from the viewport, and whether it shows.
+   * `settle`: the first size after a hold (`holdSurfaceSizes`), eased in.
+   */
+  place: (id: string, rect: Rect, visible: boolean, rgb?: number[] | null, settle?: boolean) =>
+    surface({ op: 'frame', id, ...rect, visible, rgb: rgb ?? undefined, settle: settle || undefined }),
   reload: (id: string) => surface({ op: 'reload', id }),
   close: (id: string) => surface({ op: 'close', id }),
   /** Highlights the matches and shows the first; an empty query clears them. */

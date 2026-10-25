@@ -39,6 +39,51 @@ class SurfaceView: UIView {
   /// The file changed under it (another device, another app).
   func reload() {}
 
+  /// Whether a new width refits the content to it (a PDF's pages), so the
+  /// change is eased as a zoom (`settle`).
+  var refitsToWidth: Bool { false }
+
+  /// Lays the content out for its new frame at once, `scale` times as big
+  /// and scrolled to match, so the zoom `settle` eases shows it throughout.
+  /// Left to itself it refits a few frames on, and the zoom showed the old
+  /// layout scaled first.
+  func refit(by scale: CGFloat) {}
+
+  /// Takes a new size the web side held back while it moved (Zen mode,
+  /// `holdSurfaceSizes`), eased rather than at once. Content that refits to
+  /// its width is laid out anew, then drawn at its old size and place and
+  /// zoomed to the new (one picture: a snapshot faded over it showed two).
+  /// Anything else keeps its content where it is and is revealed outward
+  /// from its old frame as it grows (shrinking, its edges are already under
+  /// the page).
+  func settle(to newFrame: CGRect) {
+    let old = frame
+    guard old.size != newFrame.size, !isHidden, old.width > 0, newFrame.width > 0 else {
+      frame = newFrame
+      return
+    }
+    frame = newFrame
+    let ease: UIView.AnimationOptions = [.curveEaseOut, .beginFromCurrentState]
+    if refitsToWidth {
+      let scale = newFrame.width / old.width
+      refit(by: scale)
+      // About the view's centre: back to the old width, its top where it was.
+      let k = 1 / scale
+      transform = CGAffineTransform(
+        translationX: old.midX - newFrame.midX, y: old.minY + newFrame.height * k / 2 - newFrame.midY
+      ).scaledBy(x: k, y: k)
+      UIView.animate(withDuration: 0.35, delay: 0, options: ease) { self.transform = .identity }
+    } else if newFrame.width > old.width || newFrame.height > old.height {
+      let reveal = UIView(frame: old.offsetBy(dx: -newFrame.minX, dy: -newFrame.minY))
+      reveal.backgroundColor = .black
+      mask = reveal
+      UIView.animate(
+        withDuration: 0.35, delay: 0, options: ease,
+        animations: { reveal.frame = self.bounds },
+        completion: { _ in if self.mask === reveal { self.mask = nil } })
+    }
+  }
+
   /// Writes what's unsaved now (the tab is closing, the app is leaving),
   /// then calls `done`.
   func flush(_ done: @escaping () -> Void = {}) { done() }

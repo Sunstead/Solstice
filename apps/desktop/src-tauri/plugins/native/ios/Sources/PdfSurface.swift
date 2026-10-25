@@ -14,6 +14,8 @@ import os
 /// The Pencil draws from its first touch; a finger scrolls, zooms and
 /// selects text, or draws too with finger drawing on (`Ink`).
 final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupViewController.Delegate {
+  override var refitsToWidth: Bool { true }
+
   /// Everything PaperKit offers, in standard range: a page is printed paper,
   /// and HDR ink has no PDF equivalent.
   private static let features: FeatureSet = {
@@ -758,6 +760,21 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// The width-fitting scale last applied: still showing it means the reader
   /// hasn't zoomed, so a new frame (the sidebar, a rotation) refits.
   private var fitted: CGFloat?
+
+  override func refit(by scale: CGFloat) {
+    // The page point at the top of the view stays there, as the zoom eases
+    // about the top (PDFKit's own refit scrolls elsewhere).
+    let top = CGPoint(x: bounds.midX, y: 0)
+    let page = pdfView.page(for: top, nearest: true)
+    let point = page.map { pdfView.convert(top, to: $0) }
+    layoutIfNeeded()
+    pdfView.layoutIfNeeded()
+    guard let page, let point,
+      let scroll = pdfView.subviews.lazy.compactMap({ $0 as? UIScrollView }).first
+    else { return }
+    let now = pdfView.convert(point, from: page)
+    scroll.contentOffset.y += now.y - top.y
+  }
 
   override func layoutSubviews() {
     super.layoutSubviews()
