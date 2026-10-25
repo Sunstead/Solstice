@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, ChevronDown, CloudDownload, FolderOpen, Plus } from 'lucide-react';
+import { Check, ChevronDown, CloudDownload, FilePlusCorner, FolderOpen, Plus } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -8,6 +8,7 @@ import { useCreateActions } from '@/hooks/use-create-actions';
 import { refreshWorkspaceColors, useWorkspaceChoices } from '@/hooks/use-workspace-choices';
 import { WorkspaceIcon } from '@/components/workspace-icon';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useDirectoryChildren, useFiles } from '@/hooks/use-files';
 import { can } from '@/lib/backend/platform';
 import { useWorkspaceDialogs } from '@/lib/stores/workspace-dialogs';
 import { PhoneHeader, Row, RowGroup } from './phone-parts';
@@ -46,8 +47,9 @@ export function FilesPage({ hidden }: { hidden: boolean }) {
       </PhoneHeader>
       {path ? (
         // `phone` widens the tree to the screen and its rows to a thumb.
-        <div data-phone='true' className='group/files flex min-h-0 flex-1 flex-col'>
+        <div data-phone='true' className='group/files relative flex min-h-0 flex-1 flex-col'>
           <ExplorerTree path={path} />
+          <EmptyWorkspace path={path} onNew={create.find((action) => action.id === 'markdown')?.run} />
         </div>
       ) : (
         !loading && <NoWorkspace />
@@ -120,6 +122,24 @@ export function WorkspacesSheet({ open, onOpenChange }: { open: boolean; onOpenC
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** A workspace with nothing in it yet: a way to start, over the empty tree. */
+function EmptyWorkspace({ path, onNew }: { path: string; onNew?: () => void }) {
+  const loaded = useFiles((s) => s.loadedRoot === path);
+  const empty = useDirectoryChildren(path).length === 0;
+  if (!loaded || !empty) return null;
+  return (
+    <div className='pointer-events-none absolute inset-x-0 top-1/3 flex flex-col items-center gap-3 p-6 text-center'>
+      <FilePlusCorner className='size-10 text-muted-foreground/60' strokeWidth={1.5} />
+      <p className='text-sm text-muted-foreground'>No notes yet</p>
+      {onNew && (
+        <Button className='pointer-events-auto' onClick={onNew}>
+          New Note
+        </Button>
+      )}
+    </div>
   );
 }
 

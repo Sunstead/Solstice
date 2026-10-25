@@ -43,6 +43,7 @@ export function QuickOpenDialog({
 /** A file as quick open lists it: its icon and name, and its folder below. */
 export function QuickOpenItem({ entry, root }: { entry: Pick<FileEntry, 'name' | 'path'>; root: string }) {
   const { relative } = getWorkspaceRelativeSegments(entry.path, root);
+  const folder = relative.split('/').slice(0, -1).join('/');
 
   return (
     <div className='w-full'>
@@ -50,7 +51,7 @@ export function QuickOpenItem({ entry, root }: { entry: Pick<FileEntry, 'name' |
         {createElement(getFileIconFor(entry.name))}
         <FormattedFileName name={entry.name} />
       </div>
-      <p className='text-xs text-muted-foreground truncate max-w-full'>{relative}</p>
+      {folder && <p className='text-xs text-muted-foreground truncate max-w-full'>{folder}</p>}
     </div>
   );
 }

@@ -15,7 +15,7 @@ const PARALLAX = 0.25;
  * pane is drawn. A native view (a PDF, a drawing) shows through the pushed
  * page from under the webview, and the file list drew over it.
  */
-export function covered(share: number, width: number): { behind: number; scrim: number } {
+function covered(share: number, width: number): { behind: number; scrim: number } {
   return { behind: share * width * (1 - PARALLAX), scrim: share * width };
 }
 

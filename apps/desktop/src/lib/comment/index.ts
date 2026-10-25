@@ -3,12 +3,13 @@
  * editor, and left out of read-only views (canvas cards, embeds).
  *
  * They stay plain text in the document, which already round-trips them, so
- * this is decoration only. Inline ones pair within a block; a `%%` left open
+ * this is decoration only. An inline one's `%%` are hidden unless the
+ * selection touches it, as a wikilink's brackets are. Inline ones pair within a block; a `%%` left open
  * runs on through the blocks after it to the next `%%`, which is how a comment
  * spans paragraphs.
  */
 import type { Node as PMNode } from '@milkdown/kit/prose/model';
-import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
+import { Plugin, PluginKey, type Selection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { $prose } from '@milkdown/kit/utils';
 
@@ -28,7 +29,7 @@ function textOf(block: PMNode): string {
   return text;
 }
 
-function decorate(doc: PMNode): DecorationSet {
+export function decorate(doc: PMNode, selection?: Pick<Selection, 'from' | 'to'>): DecorationSet {
   const decorations: Decoration[] = [];
   // Where an unclosed comment began, carried across blocks.
   let openAt: number | null = null;
@@ -42,6 +43,8 @@ function decorate(doc: PMNode): DecorationSet {
     const text = textOf(node);
     const start = pos + 1;
     let from = openAt === null ? null : start;
+    // Carried on from an earlier block, so its opening `%%` isn't here.
+    let carried = openAt !== null;
     let at = 0;
     for (;;) {
       const found = text.indexOf(MARKER, at);
@@ -49,8 +52,14 @@ function decorate(doc: PMNode): DecorationSet {
       if (from === null) {
         from = start + found;
       } else {
-        decorations.push(Decoration.inline(from, start + found + MARKER.length, { class: 'solstice-comment' }));
+        const to = start + found + MARKER.length;
+        decorations.push(Decoration.inline(from, to, { class: 'solstice-comment' }));
+        if (!carried && selection && !(selection.from <= to && selection.to >= from)) {
+          decorations.push(Decoration.inline(from, from + MARKER.length, { class: 'solstice-comment-marker' }));
+          decorations.push(Decoration.inline(to - MARKER.length, to, { class: 'solstice-comment-marker' }));
+        }
         from = null;
+        carried = false;
       }
       at = found + MARKER.length;
     }
@@ -75,8 +84,9 @@ export const commentDecorations = $prose(
     new Plugin<DecorationSet>({
       key: commentKey,
       state: {
-        init: (_, state) => decorate(state.doc),
-        apply: (tr, set) => (tr.docChanged ? decorate(tr.doc) : set),
+        init: (_, state) => decorate(state.doc, state.selection),
+        apply: (tr, set, _old, state) =>
+          tr.docChanged || tr.selectionSet ? decorate(state.doc, state.selection) : set,
       },
       props: {
         decorations: (state) => commentKey.getState(state),

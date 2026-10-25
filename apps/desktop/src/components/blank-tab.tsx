@@ -16,6 +16,8 @@ import React from 'react';
 import { useRecentFiles } from '@/lib/stores/recent-files';
 import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useSetting } from '@/lib/settings/store';
+import { stripPresetExtension } from '@/lib/stores/entry-input';
 import { Keybind } from './keybind';
 
 const actions: { label: string; icon: LucideIcon; commandId: CommandId }[] = [
@@ -74,6 +76,7 @@ function TouchBlankTab() {
   const tabCount = useLayout((s) => (s.model ? allTabs(s.model).length : 0));
   const root = useWorkspace((s) => s.path);
   const recent = useRecent();
+  const showExtensions = useSetting('explorer.showFileExtensions');
 
   // The phone's tab switcher closes tabs; a lone tab has nothing to close to.
   const shown = isMobile || tabCount < 2 ? actions : [...actions, close];
@@ -103,7 +106,7 @@ function TouchBlankTab() {
                   <Row
                     key={path}
                     icon={getFileIconFor(name)}
-                    label={name.replace(/\.md$/, '')}
+                    label={showExtensions ? name : stripPresetExtension(name).name}
                     detail={folder && <span className='max-w-[40%] truncate text-xs text-muted-foreground'>{folder}</span>}
                     onClick={() => useLayout.getState().openFile(path, name)}
                   />

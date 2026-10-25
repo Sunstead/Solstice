@@ -102,7 +102,7 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
  * phone's note) is moved off and `visibility: hidden`, which plain
  * `checkVisibility()` and a rect's size both miss.
  */
-export function shown(el: HTMLElement, r: DOMRect): boolean {
+function shown(el: HTMLElement, r: DOMRect): boolean {
   if (r.width <= 0 || r.height <= 0) return false;
   if (r.right <= 0 || r.bottom <= 0 || r.left >= window.innerWidth || r.top >= window.innerHeight) return false;
   return el.checkVisibility?.({ visibilityProperty: true, opacityProperty: true }) !== false;
