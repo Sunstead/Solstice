@@ -153,6 +153,16 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   /// to show it in (its frame comes from the webview after it opens).
   private var opening: CGRect?
 
+  override var paintsOwnGround: Bool { true }
+  override var easedContent: UIView? { controller?.view }
+
+  /// Its middle stays the drawing's middle at any size (`frame`), so at
+  /// another size it's only moved, by half the difference; the paper round
+  /// it is the surface's own ground, so no edge shows as it moves.
+  override func easeTransform(showing size: CGSize) -> CGAffineTransform? {
+    CGAffineTransform(translationX: (size.width - bounds.width) / 2, y: (size.height - bounds.height) / 2)
+  }
+
   /// What was in view as the size last changed, to keep its middle there.
   private var shownBeforeResize: CGRect?
 

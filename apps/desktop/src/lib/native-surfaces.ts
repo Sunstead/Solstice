@@ -66,7 +66,10 @@ export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): nu
   under.clear();
   for (const below of found) under.add(below);
   const islands = document.documentElement.dataset.islands === 'true';
-  const host = (islands && windowColour()) || background;
+  // In Zen and while it switches, what shows round a moving pane is the
+  // notes' colour, as the page paints there.
+  const zen = easing || document.documentElement.dataset.zen !== undefined;
+  const host = (islands && !zen && windowColour()) || background;
   if (host) void nativeSurfaces.background(host);
   return background;
 }
@@ -150,29 +153,42 @@ export function useOverSurface() {
   }, []);
 }
 
-let sizesHeld = 0;
+let easing = false;
+const easeListeners = new Set<(phase: 'play' | 'end') => void>();
 
 /**
- * Keeps every surface at its size until released, following only where its
- * element is. For a layout change that's then eased by transforms (Zen mode):
- * a new size makes PDFKit and PaperKit lay out and redraw on the main thread,
- * which also composites the page, and the motion froze and jumped. Released,
- * each takes its true size once.
+ * A Zen switch is about to change every surface's size. Each takes its new
+ * size at once (so it always fills its pane), its content held where it was
+ * (`easeHold` natively) until `playSurfaceEase`, then eased on the page's
+ * spring. Resizing during the motion made PDFKit lay out on the main thread
+ * that also composites the page, and it froze.
  */
-export function holdSurfaceSizes(): () => void {
-  sizesHeld++;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    sizesHeld--;
-    if (!sizesHeld) kicks.forEach((kick) => kick());
-  };
+export function beginSurfaceEase() {
+  easing = true;
 }
 
-/** Whether surfaces keep their sizes for now (`holdSurfaceSizes`). */
-export function surfaceSizesHeld(): boolean {
-  return sizesHeld > 0;
+/** The page's motion starts: the held content eases with it. */
+export function playSurfaceEase() {
+  easeListeners.forEach((listener) => listener('play'));
+}
+
+/** The switch is over: anything held is put where it belongs. */
+export function endSurfaceEase() {
+  easing = false;
+  easeListeners.forEach((listener) => listener('end'));
+  // The host's colour goes back to the window's (`seeThrough`).
+  refreshers.forEach((refresh) => refresh());
+}
+
+/** Whether a surface's next size change is a switch's (`beginSurfaceEase`). */
+export function surfaceEasing(): boolean {
+  return easing;
+}
+
+/** Each surface listens for the switch's phases while it's open. */
+export function onSurfaceEase(listener: (phase: 'play' | 'end') => void): () => void {
+  easeListeners.add(listener);
+  return () => easeListeners.delete(listener);
 }
 
 /**

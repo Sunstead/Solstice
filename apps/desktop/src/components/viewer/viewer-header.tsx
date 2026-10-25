@@ -68,15 +68,18 @@ export function ViewerHeader({
         sticky ? 'sticky top-0' : 'relative',
       )}
     >
-      <div className='flex items-center'>{leading}</div>
-      <div className='flex items-center justify-center min-w-0 w-full justify-self-stretch'>
+      {/* Zen's switch eases each part by the edge it's kept by (`zen-motion.ts`). */}
+      <div data-zen-flip='start' className='flex items-center'>
+        {leading}
+      </div>
+      <div data-zen-flip='center' className='flex items-center justify-center min-w-0 w-full justify-self-stretch'>
         <FileBreadcrumb
           filePath={path}
           className='min-w-0 max-w-full'
           onNavigate={(folder) => void revealInExplorer(folder)}
         />
       </div>
-      <div className='flex items-center gap-0.5'>
+      <div data-zen-flip='end' className='flex items-center gap-0.5'>
         <ZenToggle />
         <ShareButton path={path} />
         <FileActionsDropdown path={path} surface={find ? 'editor' : 'viewer'} />

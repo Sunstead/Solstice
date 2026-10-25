@@ -6,8 +6,8 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { toggleZen, useZen, useZenAllowed, useZenAttribute } from '@/lib/zen';
-import { holdSurfaceSizes } from '@/lib/native-surfaces';
-import { paneOrigin, playZen } from '@/lib/zen-motion';
+import { beginSurfaceEase, endSurfaceEase, playSurfaceEase } from '@/lib/native-surfaces';
+import { paneOrigin, playZen, zenMarks, type ZenMarks } from '@/lib/zen-motion';
 
 /**
  * The title bar and sidebar column beside the editor area. A phone has
@@ -30,12 +30,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const column = useRef<HTMLDivElement>(null);
   const inset = useRef<HTMLElement>(null);
   const before = useRef<ReturnType<typeof paneOrigin> | null>(null);
-  const releaseSizes = useRef<(() => void) | null>(null);
+  const marks = useRef<ZenMarks | null>(null);
   useEffect(
     () =>
       useWorkspaceUIStore.subscribe((s, prev) => {
         if (s.zen === prev.zen) return;
         before.current = inset.current && paneOrigin(inset.current);
+        marks.current = inset.current && zenMarks(inset.current);
         // Out of the flow the column would shrink to its contents (the
         // sidebar's width is a placeholder's), and slide out as nothing. As
         // wide as all it draws (the explorer runs past its box), so sliding
@@ -48,23 +49,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         // Set before React commits the switch, or the sidebar's own
         // transitions (and the inset's padding) start, and lag the slide.
         frame.current?.setAttribute('data-zen-moving', '');
-        // A native view (PDF, drawing) takes its new size after the motion.
-        releaseSizes.current?.();
-        releaseSizes.current = holdSurfaceSizes();
+        // A native view (PDF, drawing) eases its content with the page.
+        beginSurfaceEase();
       }),
     [],
   );
   useLayoutEffect(() => {
     const from = before.current;
     before.current = null;
+    const parts = marks.current ?? undefined;
+    marks.current = null;
     const el = inset.current;
     const shell = frame.current;
     const side = column.current;
-    const release = releaseSizes.current;
-    releaseSizes.current = null;
     if (!from || !el) {
       shell?.removeAttribute('data-zen-moving');
-      release?.();
+      endSurfaceEase();
       // Opened in Zen: nothing to slide.
       if (zen) side?.style.setProperty('visibility', 'hidden');
       return;
@@ -75,10 +75,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // Leaving, the pane starts up and to the left of where it lands: what it
     // uncovers on the right and below is the pane's color, not a gap.
     if (shell) shell.style.background = 'var(--background)';
-    void playZen({ inset: el, column: side, entering: zen, before: from }).then(() => {
+    void playZen({ inset: el, column: side, entering: zen, before: from, onPlay: playSurfaceEase, marks: parts }).then(() => {
       shell?.removeAttribute('data-zen-moving');
       if (shell) shell.style.background = '';
-      release?.();
+      endSurfaceEase();
       if (zen) side?.style.setProperty('visibility', 'hidden');
     });
   }, [zen]);

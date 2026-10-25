@@ -39,49 +39,94 @@ class SurfaceView: UIView {
   /// The file changed under it (another device, another app).
   func reload() {}
 
-  /// Whether a new width refits the content to it (a PDF's pages), so the
-  /// change is eased as a zoom (`settle`).
-  var refitsToWidth: Bool { false }
+  /// Whether the surface paints its own ground (a drawing's paper) rather
+  /// than the pane's colour the web side sends with each frame.
+  var paintsOwnGround: Bool { false }
 
-  /// Lays the content out for its new frame at once, `scale` times as big
-  /// and scrolled to match, so the zoom `settle` eases shows it throughout.
-  /// Left to itself it refits a few frames on, and the zoom showed the old
-  /// layout scaled first.
-  func refit(by scale: CGFloat) {}
+  /// The view whose transform eases a resize (`easeHold`): the content the
+  /// surface shows, which it lays out to its bounds.
+  var easedContent: UIView? { nil }
 
-  /// Takes a new size the web side held back while it moved (Zen mode,
-  /// `holdSurfaceSizes`), eased rather than at once. Content that refits to
-  /// its width is laid out anew, then drawn at its old size and place and
-  /// zoomed to the new (one picture: a snapshot faded over it showed two).
-  /// Anything else keeps its content where it is and is revealed outward
-  /// from its old frame as it grows (shrinking, its edges are already under
-  /// the page).
-  func settle(to newFrame: CGRect) {
-    let old = frame
-    guard old.size != newFrame.size, !isHidden, old.width > 0, newFrame.width > 0 else {
-      frame = newFrame
+  /// Notes what's to stay put across a resize for a switch (a PDF's top
+  /// point), before the frame changes.
+  func beforeEaseResize() {}
+
+  /// Lays the content out for the surface's present bounds, what
+  /// `beforeEaseResize` noted kept where it was.
+  func layoutForEase() {}
+
+  /// A transform of `easedContent`, about its centre, that shows the content
+  /// in the present bounds as it looks laid out at `size`, top-left on
+  /// top-left (the web side keeps the pane's top-left). Nil: it needs none.
+  func easeTransform(showing size: CGSize) -> CGAffineTransform? { nil }
+
+  /// A transform about the content's centre that scales it by `k` from its
+  /// top-left corner.
+  func topLeft(scale k: CGFloat) -> CGAffineTransform {
+    CGAffineTransform(translationX: (k - 1) * bounds.width / 2, y: (k - 1) * bounds.height / 2).scaledBy(x: k, y: k)
+  }
+
+  /// While a switch eases: the size the surface keeps (the larger of before
+  /// and after, so it covers its pane throughout, growing or shrinking) and
+  /// the size it takes when it ends.
+  var held: (size: CGSize, target: CGSize)?
+
+  /// Where the web side puts it: during a switch only its origin moves.
+  func place(_ rect: CGRect) {
+    guard let held else {
+      frame = rect
       return
     }
-    frame = newFrame
-    let ease: UIView.AnimationOptions = [.curveEaseOut, .beginFromCurrentState]
-    if refitsToWidth {
-      let scale = newFrame.width / old.width
-      refit(by: scale)
-      // About the view's centre: back to the old width, its top where it was.
-      let k = 1 / scale
-      transform = CGAffineTransform(
-        translationX: old.midX - newFrame.midX, y: old.minY + newFrame.height * k / 2 - newFrame.midY
-      ).scaledBy(x: k, y: k)
-      UIView.animate(withDuration: 0.35, delay: 0, options: ease) { self.transform = .identity }
-    } else if newFrame.width > old.width || newFrame.height > old.height {
-      let reveal = UIView(frame: old.offsetBy(dx: -newFrame.minX, dy: -newFrame.minY))
-      reveal.backgroundColor = .black
-      mask = reveal
-      UIView.animate(
-        withDuration: 0.35, delay: 0, options: ease,
-        animations: { reveal.frame = self.bounds },
-        completion: { _ in if self.mask === reveal { self.mask = nil } })
+    self.held = (held.size, rect.size)
+    frame = CGRect(origin: rect.origin, size: held.size)
+  }
+
+  /// A Zen switch (`beginSurfaceEase`): from here until `easeEnd` the view is
+  /// the larger of its old and new size, its content drawn as it was until
+  /// `easePlay` eases it to how it'll be. Resizing PDFKit during the motion
+  /// froze it; a view the old size left the pane's new room bare, and one the
+  /// new size went short of the pane as it moved.
+  func easeHold(to newFrame: CGRect) {
+    // One switch, one hold: a later one only moves it on.
+    if held != nil { return place(newFrame) }
+    let old = frame.size
+    guard !isHidden, old.width > 0, newFrame.width > 0, old != newFrame.size, let content = easedContent else {
+      return place(newFrame)
     }
+    let size = CGSize(width: max(old.width, newFrame.width), height: max(old.height, newFrame.height))
+    held = (size, newFrame.size)
+    beforeEaseResize()
+    frame = CGRect(origin: newFrame.origin, size: size)
+    clipsToBounds = true
+    setNeedsLayout()
+    layoutIfNeeded()
+    layoutForEase()
+    content.transform = easeTransform(showing: old) ?? .identity
+  }
+
+  /// Eases the held content to how it'll be at its new size, on the push
+  /// spring the page moves on (UIKit's, critically damped, 0.3 s
+  /// perceptual: `--push-ms`).
+  func easePlay() {
+    guard let held, let content = easedContent else { return }
+    let to = easeTransform(showing: held.target) ?? .identity
+    UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState]) {
+      content.transform = to
+    }
+  }
+
+  /// The switch is over: the view takes its new size, laid out for it, which
+  /// shows just what the eased content did.
+  func easeEnd() {
+    guard let held else { return }
+    self.held = nil
+    easedContent?.layer.removeAllAnimations()
+    easedContent?.transform = .identity
+    beforeEaseResize()
+    frame = CGRect(origin: frame.origin, size: held.target)
+    setNeedsLayout()
+    layoutIfNeeded()
+    layoutForEase()
   }
 
   /// Writes what's unsaved now (the tab is closing, the app is leaving),

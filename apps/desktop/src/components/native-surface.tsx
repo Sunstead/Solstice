@@ -1,7 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { nativeSurfaces, type SurfaceKind } from '@/lib/backend/native';
 import { useFindStore } from '@/lib/stores/find';
-import { follow, refreshers, retainHost, seeThrough, surfaceSizesHeld, unmark, useSurfaceStates } from '@/lib/native-surfaces';
+import {
+  follow,
+  onSurfaceEase,
+  refreshers,
+  retainHost,
+  seeThrough,
+  surfaceEasing,
+  unmark,
+  useSurfaceStates,
+} from '@/lib/native-surfaces';
 import { useFileVersion } from '@/lib/viewer/file-version';
 
 /**
@@ -19,30 +28,37 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
     void nativeSurfaces.open(id, kind, path);
 
     let last = '';
-    let size: { width: number; height: number } | null = null;
+    let size = '';
     let held = false;
+    // The motion can start before this surface's resize is measured (a
+    // frame on): its play then waits for the hold.
+    let playing = false;
     const under = new Set<Element>();
     const measure = () => {
       const r = el.getBoundingClientRect();
       const visible = r.width > 0 && r.height > 0 && el.checkVisibility?.() !== false;
-      // Held (`holdSurfaceSizes`), the view only moves with the element,
-      // centred across it (a PDF's pages are), and a drawing down it too, so
-      // what's in focus stays there. The first size after is eased in
-      // (`settle`).
-      const holding = surfaceSizesHeld() && size !== null;
-      const settle = held && !holding;
-      held = holding;
-      if (!holding) size = { width: r.width, height: r.height };
-      const { width, height } = size!;
-      const x = holding ? r.x + (r.width - width) / 2 : r.x;
-      const y = holding && kind === 'drawing' ? r.y + (r.height - height) / 2 : r.y;
-      const key = `${x},${y},${width},${height},${visible}`;
+      const key = `${r.x},${r.y},${r.width},${r.height},${visible}`;
       if (key === last) return false;
+      // A Zen switch's new size: taken at once, the content held where it
+      // was until the page moves (`beginSurfaceEase`).
+      // Rounded: a moving pane's size wobbles in its last decimal place.
+      const now = `${Math.round(r.width)},${Math.round(r.height)}`;
+      const resized = size !== '' && size !== now;
+      const hold = resized && surfaceEasing();
+      if (hold) held = true;
       last = key;
+      size = now;
       const backdrop = visible ? seeThrough(el, r, under) : null;
-      void nativeSurfaces.place(id, { x, y, width, height }, visible, backdrop, settle);
+      void nativeSurfaces.place(id, { x: r.x, y: r.y, width: r.width, height: r.height }, visible, backdrop, hold);
+      if (hold && playing) void nativeSurfaces.ease(id, 'play');
       return true;
     };
+    const stopEase = onSurfaceEase((phase) => {
+      playing = phase === 'play';
+      if (!held) return;
+      if (phase === 'end') held = false;
+      void nativeSurfaces.ease(id, phase);
+    });
     const stopFollowing = follow(el, measure);
     // A new theme: what's under the surface is measured afresh, colours and all.
     const refresh = () => {
@@ -54,6 +70,7 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
     refreshers.add(refresh);
     return () => {
       refreshers.delete(refresh);
+      stopEase();
       stopFollowing();
       for (const below of under) unmark(below);
       void nativeSurfaces.close(id);
