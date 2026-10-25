@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 
 import { pushSpring as spring } from '@/lib/push-spring';
-import { kickSurfaces } from '@/lib/surface-kicks';
+import { kickSurfaces, useOverSurface } from '@/lib/surface-kicks';
 import { motionEnabled } from '@/lib/tab-motion';
 import { cn } from '@/lib/utils';
 
@@ -62,6 +62,7 @@ export function PushPane({
   // animate it a second time.
   const heading = useRef<'open' | 'closed'>(open ? 'open' : 'closed');
   const running = useRef<Animation[]>([]);
+  const edge = useOverSurface();
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -217,6 +218,10 @@ export function PushPane({
       <div ref={pane} inert={!open} className='solstice-push'>
         <div className='solstice-push-dead' aria-hidden />
         <div className={cn('solstice-push-page', className)}>{children}</div>
+        {/* The screen's left edge is going back, whatever is under it: a
+            board or a wide table would take the swipe, and a native view's
+            touches never reach the page at all. */}
+        <div ref={edge} className='solstice-push-edge' aria-hidden />
       </div>
     </>
   );

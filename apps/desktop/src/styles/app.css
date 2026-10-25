@@ -445,6 +445,16 @@ html[data-reduce-motion='true'] *::after {
   scroll-snap-align: start;
 }
 
+.solstice-push-edge {
+  position: absolute;
+  /* Below the page's header, so its Back button takes taps. */
+  top: 3rem;
+  bottom: 0;
+  left: 100%;
+  width: 20px;
+  z-index: 1;
+}
+
 .solstice-push-page {
   display: flex;
   flex-direction: column;

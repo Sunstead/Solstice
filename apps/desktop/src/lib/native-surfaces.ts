@@ -1,11 +1,12 @@
-import { useCallback } from 'react';
 import { create } from 'zustand';
 import { commands } from '@/lib/backend';
 import { nativeSurfaces, type SurfaceEvent } from '@/lib/backend/native';
 import { followInkTools } from '@/lib/ink/native-sync';
 import { useEditingFocus } from '@/lib/keyboard';
 import { getSetting, subscribeToSetting } from '@/lib/settings/store';
-import { kicks, kickSurfaces } from '@/lib/surface-kicks';
+import { kicks, kickSurfaces, overSurface } from '@/lib/surface-kicks';
+
+export { useOverSurface } from '@/lib/surface-kicks';
 
 /**
  * What the iOS app's native views (`NativeSurface`) share: keeping each on
@@ -137,23 +138,6 @@ let holders = 0;
 let stopHost: (() => void) | null = null;
 let modal = false;
 let sentRects = '';
-const overSurface = new Set<Element>();
-
-/**
- * For web content in the page that floats over a surface (the find bar):
- * touches on it stay the webview's.
- */
-export function useOverSurface() {
-  return useCallback((el: HTMLElement | null) => {
-    if (!el) return;
-    overSurface.add(el);
-    kickSurfaces();
-    return () => {
-      overSurface.delete(el);
-      kickSurfaces();
-    };
-  }, []);
-}
 
 let easing = false;
 const easeListeners = new Set<(phase: 'play' | 'end') => void>();
