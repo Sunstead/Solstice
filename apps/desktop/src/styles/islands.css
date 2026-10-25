@@ -307,3 +307,16 @@
 :root[data-islands='true'] [data-dragging='true'] [data-slot='sidebar-rail']::after {
   background-color: var(--island-handle);
 }
+
+/* Zen mode: the pane is the whole screen, so no corners and no ring. The
+   rules above are long enough that only !important outranks every one. */
+:root[data-islands='true'][data-zen] .flexlayout-custom .flexlayout__tabset_content,
+:root[data-islands='true'][data-zen] .flexlayout-custom .flexlayout__tab {
+  --pane-tl: 0px !important;
+  border-radius: 0 !important;
+  clip-path: none !important;
+}
+
+:root[data-islands='true'][data-zen] .flexlayout-custom .flexlayout__tabset::after {
+  display: none;
+}

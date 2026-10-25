@@ -100,6 +100,7 @@ command_id! {
 
     ViewToggleSidebar => "view.toggle_sidebar",
     ViewToggleSourceMode => "view.toggle_source_mode",
+    ViewToggleZenMode => "view.toggle_zen_mode",
     ViewNextTab => "view.next_tab",
     ViewPreviousTab => "view.previous_tab",
 
@@ -569,6 +570,12 @@ pub fn commands_labelled(reveal: &str) -> Vec<CommandMeta> {
             id: CommandId::ViewToggleSourceMode,
             label: "Source mode".into(),
             accelerator: Some("CmdOrCtrl+/".into()),
+            is_overridden: false,
+        },
+        CommandMeta {
+            id: CommandId::ViewToggleZenMode,
+            label: "Zen mode".into(),
+            accelerator: Some("CmdOrCtrl+Shift+Enter".into()),
             is_overridden: false,
         },
         CommandMeta {

@@ -19,10 +19,12 @@ import {
   HardDrive,
   Image as ImageIcon,
   Link,
+  Moon,
   PencilLine,
   Share,
   SquareKanban,
   SquarePlus,
+  Sun,
   Trash,
 } from 'lucide-react';
 
@@ -35,12 +37,21 @@ import type { EntryTarget } from '@/lib/entry-actions';
 import { FILE_TYPE_PRESETS, useEntryInput } from '@/lib/stores/entry-input';
 import { runCommand } from '@/lib/commands';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
-import { useSetting } from '@/lib/settings/store';
+import { setSetting, useSetting } from '@/lib/settings/store';
 import { useLayout } from '@/hooks/use-layout';
-import { isTaskBoard } from '@/lib/embed/kind';
+import { isDrawing, isTaskBoard } from '@/lib/embed/kind';
 import { useTreeMeta } from '@/lib/stores/tree-meta';
 import { useFolderColorDialog } from '@/lib/stores/folder-color-dialog';
 import { treeMetaMenuItems } from '@/lib/tree-meta/menu';
+
+/**
+ * Files that dark paper (`ink.darkPaper`) shows: drawings, and PDFs and
+ * notebooks where they open natively. The page goes dark and the ink's
+ * lightness swaps to stay readable; the file keeps its colours.
+ */
+function hasPaper(path: string): boolean {
+  return isDrawing(path) || (can.nativeViews && path.toLowerCase().endsWith('.pdf'));
+}
 
 /** Whether the focused tab shows its note as source (`view.toggle_source_mode`). */
 function inSourceMode(): boolean {
@@ -157,6 +168,7 @@ export function useEntryMenuItems(
   const treeMetaOpen = useTreeMeta((s) => s.root !== null);
   const bookmarked = useTreeMeta((s) => s.isBookmarked(target.path));
   const folderColor = useTreeMeta((s) => (target.is_dir ? s.folderColor(target.path) : null));
+  const darkPaper = useSetting('ink.darkPaper');
 
   const { path, is_dir: isDir } = target;
   const items: EntryMenuItem[] = [];
@@ -198,7 +210,8 @@ export function useEntryMenuItems(
   // A board (`*.task.md`) shows as a board or its source, never rich text,
   // and only its source has find.
   const board = isTaskBoard(path);
-  if (surface === 'editor' || (surface === 'viewer' && board)) {
+  const paper = surface !== 'tree' && surface !== 'root' && hasPaper(path);
+  if (surface === 'editor' || (surface === 'viewer' && (board || paper))) {
     const source = inSourceMode();
     if (surface === 'editor' && (!board || source)) {
       items.push({
@@ -207,6 +220,15 @@ export function useEntryMenuItems(
         label: 'Find...',
         icon: FileSearch,
         run: () => entryActions.find(path),
+      });
+    }
+    if (paper) {
+      items.push({
+        kind: 'item',
+        id: 'dark-paper',
+        label: darkPaper ? 'Light Paper' : 'Dark Paper',
+        icon: darkPaper ? Sun : Moon,
+        run: () => setSetting('ink.darkPaper', !darkPaper),
       });
     }
     if (path.toLowerCase().endsWith('.md')) {

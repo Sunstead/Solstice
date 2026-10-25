@@ -150,6 +150,44 @@ export function useOverSurface() {
   }, []);
 }
 
+let easing = false;
+const easeListeners = new Set<(phase: 'play' | 'end') => void>();
+
+/**
+ * A Zen switch is about to change every surface's size. Each takes its new
+ * size at once (so it always fills its pane), its content held where it was
+ * (`easeHold` natively) until `playSurfaceEase`, then eased on the page's
+ * spring. Resizing during the motion made PDFKit lay out on the main thread
+ * that also composites the page, and it froze.
+ */
+export function beginSurfaceEase() {
+  easing = true;
+}
+
+/** The page's motion starts: the held content eases with it. */
+export function playSurfaceEase() {
+  easeListeners.forEach((listener) => listener('play'));
+}
+
+/** The switch is over: anything held is put where it belongs. */
+export function endSurfaceEase() {
+  easing = false;
+  easeListeners.forEach((listener) => listener('end'));
+  // The host's colour goes back to the window's (`seeThrough`).
+  refreshers.forEach((refresh) => refresh());
+}
+
+/** Whether a surface's next size change is a switch's (`beginSurfaceEase`). */
+export function surfaceEasing(): boolean {
+  return easing;
+}
+
+/** Each surface listens for the switch's phases while it's open. */
+export function onSurfaceEase(listener: (phase: 'play' | 'end') => void): () => void {
+  easeListeners.add(listener);
+  return () => easeListeners.delete(listener);
+}
+
 /**
  * Web content over a surface moved in a way nothing watched sees (a dragged
  * badge's `translate`): measure again for a few frames, so its touches stay

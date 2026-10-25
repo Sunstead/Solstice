@@ -1,23 +1,12 @@
 /* eslint-disable react-hooks/immutability -- moving DOM nodes (its own and the page behind) is this component's whole job */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 
+import { pushSpring as spring } from '@/lib/push-spring';
 import { motionEnabled } from '@/lib/tab-motion';
 import { cn } from '@/lib/utils';
 
 /** How far the page underneath slides left as one comes over it, as iOS does. */
 const PARALLAX = 0.25;
-/** Used where the stylesheet gives no spring (`--push-spring`, `app.css`). */
-const FALLBACK = { ms: 500, easing: 'cubic-bezier(0.2, 0, 0, 1)' };
-
-function spring(): { ms: number; easing: string } {
-  if (typeof document === 'undefined') return FALLBACK;
-  const style = getComputedStyle(document.documentElement);
-  // WebKit hands a custom property back as it normalises it: 640ms as 0.64s.
-  const raw = style.getPropertyValue('--push-ms').trim();
-  const ms = parseFloat(raw) * (raw.endsWith('ms') ? 1 : 1000);
-  const easing = style.getPropertyValue('--push-spring').trim();
-  return ms && easing ? { ms, easing } : FALLBACK;
-}
 
 /**
  * A page that slides in over another from the right, the way an iPhone app

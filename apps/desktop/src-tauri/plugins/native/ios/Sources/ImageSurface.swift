@@ -96,6 +96,19 @@ final class ImageSurface: SurfaceView, PaperMarkupViewController.Delegate {
   /// when the size changes (it does as the tab settles), unless moved since.
   private var fit: (size: CGSize, frame: CGRect)?
 
+  override var easedContent: UIView? { controller?.view }
+
+  /// The whole image is fitted at any size, its middle in the middle: at
+  /// another size it's scaled by the fits' ratio and moved by half the
+  /// difference.
+  override func easeTransform(showing size: CGSize) -> CGAffineTransform? {
+    guard let image = controller?.markup?.bounds, image.width > 0, image.height > 0 else { return nil }
+    let then = min(size.width / image.width, size.height / image.height)
+    let now = min(bounds.width / image.width, bounds.height / image.height)
+    return CGAffineTransform(translationX: (size.width - bounds.width) / 2, y: (size.height - bounds.height) / 2)
+      .scaledBy(x: then / now, y: then / now)
+  }
+
   override func layoutSubviews() {
     super.layoutSubviews()
     guard let controller, let image = controller.markup?.bounds, bounds.width > 0, bounds.height > 0 else { return }

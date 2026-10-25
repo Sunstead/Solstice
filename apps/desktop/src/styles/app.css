@@ -458,3 +458,11 @@ html[data-reduce-motion='true'] *::after {
 .folder-tint path {
   fill: var(--folder-tint) !important;
 }
+
+/* Zen mode's switch (`app-shell.tsx`): the sidebar's transitions and the
+   editor area's padding would start with the layout change and lag the
+   slide (`zen-motion.ts`), so none run while it does. */
+[data-zen-moving],
+[data-zen-moving] * {
+  transition: none !important;
+}

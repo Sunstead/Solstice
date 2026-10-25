@@ -295,6 +295,12 @@
       "label": "Source mode"
     },
     {
+      "accelerator": "CmdOrCtrl+Shift+Enter",
+      "id": "view.toggle_zen_mode",
+      "is_overridden": false,
+      "label": "Zen mode"
+    },
+    {
       "accelerator": "Alt+Shift+]",
       "id": "view.next_tab",
       "is_overridden": false,
@@ -623,6 +629,14 @@
             "id": "view.toggle_source_mode",
             "is_overridden": false,
             "label": "Source mode"
+          }
+        },
+        {
+          "Command": {
+            "accelerator": "CmdOrCtrl+Shift+Enter",
+            "id": "view.toggle_zen_mode",
+            "is_overridden": false,
+            "label": "Zen mode"
           }
         },
         "Separator",

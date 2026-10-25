@@ -153,6 +153,38 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   /// to show it in (its frame comes from the webview after it opens).
   private var opening: CGRect?
 
+  override var paintsOwnGround: Bool { true }
+  override var easedContent: UIView? { controller?.view }
+
+  /// Its middle stays the drawing's middle at any size (`frame`), so at
+  /// another size it's only moved, by half the difference; the paper round
+  /// it is the surface's own ground, so no edge shows as it moves.
+  override func easeTransform(showing size: CGSize) -> CGAffineTransform? {
+    CGAffineTransform(translationX: (size.width - bounds.width) / 2, y: (size.height - bounds.height) / 2)
+  }
+
+  /// What was in view as the size last changed, to keep its middle there.
+  private var shownBeforeResize: CGRect?
+
+  /// A new size keeps the same point of the drawing in the middle, so what
+  /// was in focus stays in focus (Zen mode, a rotation). PaperKit's canvas
+  /// is resized with it from the top-left, and would drift.
+  override var frame: CGRect {
+    willSet {
+      shownBeforeResize = newValue.size != frame.size && opening == nil ? controller?.contentVisibleFrame : nil
+    }
+    didSet {
+      guard let shown = shownBeforeResize, let controller, oldValue.width > 0, bounds.width > 0 else { return }
+      shownBeforeResize = nil
+      let zoom = shown.width / oldValue.width
+      let size = CGSize(width: bounds.width * zoom, height: bounds.height * zoom)
+      controller.view.layoutIfNeeded()
+      controller.setContentVisibleFrame(
+        CGRect(x: shown.midX - size.width / 2, y: shown.midY - size.height / 2, width: size.width, height: size.height),
+        animated: false)
+    }
+  }
+
   override func layoutSubviews() {
     super.layoutSubviews()
     spinner.center = CGPoint(x: bounds.midX, y: bounds.midY)

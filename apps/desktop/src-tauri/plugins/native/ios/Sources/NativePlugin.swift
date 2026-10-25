@@ -17,6 +17,10 @@ struct SurfaceArgs: Decodable {
   let width: Double?
   let height: Double?
   let visible: Bool?
+  /// A Zen switch's phase for this surface (`beginSurfaceEase`): `hold`
+  /// takes the frame and keeps the content where it was, `play` eases it,
+  /// `end` puts it where it belongs.
+  let ease: String?
   let rgb: [Double]?
   let query: String?
   let caseSensitive: Bool?
@@ -139,15 +143,19 @@ class NativePlugin: Plugin {
         }
       case "frame":
         guard let surface = host.surfaces[args.id] else { break }
-        surface.frame = self.hostRect(
+        let rect = self.hostRect(
           x: args.x ?? 0, y: args.y ?? 0, width: args.width ?? 0, height: args.height ?? 0)
+        if args.ease == "hold" { surface.easeHold(to: rect) } else { surface.place(rect) }
         surface.isHidden = !(args.visible ?? false)
         // What shows round the content (a PDF's margins): the pane's colour,
         // while the host behind the page may be the window's (Islands).
-        if let rgb = args.rgb, rgb.count >= 3 {
+        if let rgb = args.rgb, rgb.count >= 3, !surface.paintsOwnGround {
           surface.backgroundColor = UIColor(
             red: rgb[0] / 255, green: rgb[1] / 255, blue: rgb[2] / 255, alpha: 1)
         }
+      case "ease":
+        guard let surface = host.surfaces[args.id] else { break }
+        if args.ease == "play" { surface.easePlay() } else { surface.easeEnd() }
       case "reload":
         host.surfaces[args.id]?.reload()
       case "find":

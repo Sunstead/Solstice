@@ -166,6 +166,7 @@ fn menu_spec_for(macos: bool) -> Vec<(&'static str, Vec<MenuEntrySpec>)> {
             vec![
                 Command(ViewToggleSidebar),
                 Command(ViewToggleSourceMode),
+                Command(ViewToggleZenMode),
                 Separator,
                 Command(ViewNextTab),
                 Command(ViewPreviousTab),

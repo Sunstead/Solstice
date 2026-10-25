@@ -504,3 +504,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Zen mode (`lib/zen.ts`): the strip goes at once (the motion is
+   `zen-motion.ts`'s transforms); the maximized tabset is all that shows. */
+:root[data-zen] .flexlayout-custom .flexlayout__tabset_tabbar_outer {
+  height: 0;
+  /* flexlayout's own 1.5em would leave a sliver of the tabs. */
+  min-height: 0;
+  overflow: hidden;
+  box-shadow: none;
+}

@@ -160,7 +160,7 @@ describe('islands.css', () => {
     expect(surfaces).toMatch(/cssColour\('--background'\)/);
     expect(surfaces).toMatch(/paper: themeGround\(\) \?\? undefined/);
     expect(readFileSync(path.resolve(__dirname, '../components/native-surface.tsx'), 'utf8')).toMatch(
-      /visible, backdrop\)/,
+      /visible, backdrop[,)]/,
     );
   });
 });

@@ -6,7 +6,6 @@ import { ToolBadge } from '@/components/ink/tool-badge';
 import { NativeSurface } from '@/components/native-surface';
 import { useSurfaceStates } from '@/lib/native-surfaces';
 import { useSetting } from '@/lib/settings/store';
-import { PaperToggle } from './paper-toggle';
 import { ViewerFrame } from './viewer-frame';
 
 /**
@@ -23,12 +22,7 @@ export function NativeDrawing({ path }: { path: string }) {
     <ViewerFrame
       path={path}
       find
-      leading={
-        <>
-          <RibbonToggle />
-          <PaperToggle />
-        </>
-      }
+      leading={<RibbonToggle />}
       ribbon={ribbon && <InkRibbon surface='drawing' />}
     >
       {error && (

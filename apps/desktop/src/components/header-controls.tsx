@@ -46,7 +46,7 @@ export function HeaderControls({ showWorkspaceSwitcher = true }: { showWorkspace
   }, []);
 
   return (
-    <div ref={ref} className='no-drag relative z-30 flex h-10 touch:h-11 items-center'>
+    <div ref={ref} data-header-controls className='no-drag relative z-30 flex h-10 touch:h-11 items-center'>
       {/* macOS has a native menu bar; a browser tab never does. */}
       {/* macOS has the native menu bar; everywhere else draws its own. */}
       {can.appMenu && !(can.windowChrome && isMac) && <AppMenubar />}
@@ -93,7 +93,11 @@ export function HeaderControlsSpacer() {
       // so the pane under the tabs can read it too): the spacer's width,
       // plus the room Islands gives the first tab, which its flare and the
       // pane's corner grow into, so the tabs move as one with the sidebar.
-      const overhang = useControlsEnd.getState().end - el.getBoundingClientRect().left;
+      // The controls are read here as well as kept: Zen's motion moves both
+      // with transforms, and only reading both in one frame agrees.
+      const controls = document.querySelector('[data-header-controls]');
+      const end = controls ? Math.ceil(controls.getBoundingClientRect().right) : useControlsEnd.getState().end;
+      const overhang = end - el.getBoundingClientRect().left;
       layout.style.setProperty('--overhang', `${overhang}px`);
     };
     fit();

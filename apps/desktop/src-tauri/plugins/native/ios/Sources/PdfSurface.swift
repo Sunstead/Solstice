@@ -759,6 +759,86 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// hasn't zoomed, so a new frame (the sidebar, a rotation) refits.
   private var fitted: CGFloat?
 
+  /// The page point at the top of the view, kept there across a switch's
+  /// refit (PDFKit's own scrolls elsewhere).
+  private var easeTop: (page: PDFPage, point: CGPoint)?
+
+  override func beforeEaseResize() {
+    let top = CGPoint(x: pdfView.bounds.midX, y: 0)
+    easeTop = pdfView.page(for: top, nearest: true).map { ($0, pdfView.convert(top, to: $0)) }
+  }
+
+  override func layoutForEase() {
+    guard let (page, point) = easeTop else { return }
+    easeTop = nil
+    pdfView.layoutIfNeeded()
+    if let scroll = pdfView.subviews.lazy.compactMap({ $0 as? UIScrollView }).first {
+      // Within what it can scroll to: a page shorter than the view (a
+      // one-page PDF) sits where PDFKit puts it, not where the point says.
+      let inset = scroll.adjustedContentInset
+      let lowest = -inset.top
+      let highest = max(lowest, scroll.contentSize.height + inset.bottom - scroll.bounds.height)
+      let y = scroll.contentOffset.y + pdfView.convert(point, from: page).y
+      scroll.contentOffset.y = min(max(y, lowest), highest)
+    }
+  }
+
+  /// While a switch eases, a picture of the pages as they were is zoomed
+  /// in the PDF's place, on a cover of the pane's colour as large as the
+  /// pane gets; the PDF itself keeps its size under it and is laid out anew
+  /// once the motion is over, when the cover goes. Laying it out at the
+  /// start held up the motion, and a transformed PDFView broke PaperKit's
+  /// tiled ink.
+  private var picture: UIView?
+  private var cover: UIView?
+  private var pictureScale: CGFloat = 1
+
+  override func easeHold(to newFrame: CGRect) {
+    if held != nil { return place(newFrame) }
+    let old = frame.size
+    guard !isHidden, pdfView.document != nil, old.width > 0, newFrame.width > 0, old != newFrame.size,
+      let shot = pdfView.snapshotView(afterScreenUpdates: false)
+    else { return place(newFrame) }
+    held = (old, newFrame.size)
+    frame = CGRect(origin: newFrame.origin, size: old)
+    let ground = UIView(
+      frame: CGRect(x: 0, y: 0, width: max(old.width, newFrame.width), height: max(old.height, newFrame.height)))
+    ground.backgroundColor = backgroundColor
+    ground.isUserInteractionEnabled = false
+    shot.frame = CGRect(origin: .zero, size: old)
+    ground.addSubview(shot)
+    clipsToBounds = false
+    addSubview(ground)
+    picture = shot
+    cover = ground
+    pictureScale = newFrame.width / old.width
+  }
+
+  override func easePlay() {
+    guard let shot = picture else { return }
+    let k = pictureScale
+    let size = shot.bounds.size
+    UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState]) {
+      shot.transform = CGAffineTransform(translationX: (k - 1) * size.width / 2, y: (k - 1) * size.height / 2)
+        .scaledBy(x: k, y: k)
+    }
+  }
+
+  override func easeEnd() {
+    guard let held else { return }
+    self.held = nil
+    beforeEaseResize()
+    frame = CGRect(origin: frame.origin, size: held.target)
+    setNeedsLayout()
+    layoutIfNeeded()
+    pdfView.layoutIfNeeded()
+    layoutForEase()
+    clipsToBounds = true
+    cover?.removeFromSuperview()
+    cover = nil
+    picture = nil
+  }
+
   override func layoutSubviews() {
     super.layoutSubviews()
     guard pdfView.document != nil, bounds.width > 0 else { return }
