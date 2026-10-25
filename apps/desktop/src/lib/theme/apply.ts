@@ -2,6 +2,9 @@ import { themeById } from '@sunstead/ui/themes';
 import { DEFAULT_LIGHT_THEME_ID, DEFAULT_THEME_ID } from './builtin';
 import type { Theme } from './types';
 import { THEME_TOKENS, isThemeToken } from './tokens';
+import { can } from '@/lib/backend/platform';
+import { nativeSurfaces } from '@/lib/backend/native';
+import { toRgb } from '@/lib/css-colour';
 
 const STORAGE_KEY = 'solstice.theme.lastApplied';
 
@@ -74,6 +77,13 @@ function syncThemeColor() {
   probe.style.cssText = 'position:absolute;visibility:hidden;background:var(--sidebar)';
   document.body.append(probe);
   meta.content = getComputedStyle(probe).backgroundColor;
+  // The iOS app paints the page's colour from its first frame next launch,
+  // before the page has, rather than white.
+  if (can.nativeViews) {
+    probe.style.background = 'var(--background)';
+    const rgb = toRgb(getComputedStyle(probe).backgroundColor);
+    if (rgb) void nativeSurfaces.launchColour(rgb);
+  }
   probe.remove();
 }
 

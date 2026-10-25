@@ -76,6 +76,8 @@ export const nativeSurfaces = {
     invoke('plugin:solstice-native|host', { op: 'notebook', path, template }),
   /** The theme's background, painted behind the see-through webview. */
   background: (rgb: number[]) => host({ op: 'background', rgb }),
+  /** The theme's background, kept for the next launch's first frames. */
+  launchColour: (rgb: number[]) => host({ op: 'launchColour', rgb }),
   listen: (handler: (event: SurfaceEvent) => void) =>
     addPluginListener('solstice-native', 'surface', handler),
 };

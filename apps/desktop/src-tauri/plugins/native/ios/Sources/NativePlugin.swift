@@ -194,6 +194,11 @@ class NativePlugin: Plugin {
 
   @objc public func host(_ invoke: Invoke) throws {
     let args = try invoke.parseArgs(HostArgs.self)
+    // Kept for the next launch, whether or not the host is up yet.
+    if args.op == "launchColour" {
+      if let rgb = args.rgb, rgb.count >= 3 { SurfaceHost.launchColour = rgb }
+      return invoke.resolve()
+    }
     DispatchQueue.main.async {
       guard let host = self.host else { return invoke.resolve() }
       switch args.op {
@@ -307,6 +312,7 @@ class NativePlugin: Plugin {
           host.backgroundColor = UIColor(
             red: rgb[0] / 255, green: rgb[1] / 255, blue: rgb[2] / 255, alpha: 1)
         }
+
       default:
         return invoke.reject("No such operation: \(args.op)")
       }

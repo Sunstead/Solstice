@@ -21,6 +21,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
+  useSidebar,
 } from '@sunstead/ui/components/resizable-sidebar';
 import { cn } from '@/lib/utils';
 import { getFileIconFor } from '@/assets/icons';
@@ -96,7 +97,10 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
   // The active tab's *path*, not its id: a tab keeps its original id across a
   // rename (see `retargetTabs`), so an id comparison stops matching the moment
   // a file is renamed -- and starts matching a new file created at the old path.
-  const activeFilePath = useLayout((s) => s.getActiveFilePath());
+  const shownPath = useLayout((s) => s.getActiveFilePath());
+  // A phone's list marks nothing: the note is over it, and coming back to a
+  // lit row is a desktop's sidebar, not an iPhone's.
+  const activeFilePath = useSidebar().isMobile ? null : shownPath;
   const operation = useEntryInput((s) => s.operation);
   const cancel = useEntryInput((s) => s.cancel);
   const isMac = useIsMac();

@@ -271,11 +271,24 @@ final class SurfaceHost: UIView {
     group.notify(queue: .main, execute: done)
   }
 
+  /// The theme's background as sRGB 0–255, from the page (`launchColour`).
+  static var launchColour: [Double]? {
+    get { UserDefaults.standard.array(forKey: "solstice.launchColour") as? [Double] }
+    set { UserDefaults.standard.set(newValue, forKey: "solstice.launchColour") }
+  }
+
   /// Sits under `webview`, the same size, and makes it see-through.
   static func install(under webview: WKWebView) -> SurfaceHost? {
     guard let parent = webview.superview else { return nil }
     let host = SurfaceHost(frame: webview.frame)
     host.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    // Until the page paints, the see-through webview shows this: the last
+    // theme's colour, not the window's white.
+    if let rgb = launchColour, rgb.count >= 3 {
+      let colour = UIColor(red: rgb[0] / 255, green: rgb[1] / 255, blue: rgb[2] / 255, alpha: 1)
+      host.backgroundColor = colour
+      webview.window?.backgroundColor = colour
+    }
     parent.insertSubview(host, belowSubview: webview)
     webview.isOpaque = false
     webview.backgroundColor = .clear
