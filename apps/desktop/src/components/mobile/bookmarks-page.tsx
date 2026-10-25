@@ -8,7 +8,7 @@ export function BookmarksPage() {
 
   return (
     <div className='absolute inset-0 flex flex-col bg-background'>
-      <PhoneHeader>
+      <PhoneHeader large>
         <PhoneTitle>Bookmarks</PhoneTitle>
       </PhoneHeader>
       {root ? (

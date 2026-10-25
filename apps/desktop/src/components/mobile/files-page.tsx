@@ -27,12 +27,12 @@ export function FilesPage({ hidden }: { hidden: boolean }) {
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
-    <div hidden={hidden} inert={hidden} className='absolute inset-0 flex flex-col bg-sidebar'>
-      <PhoneHeader>
+    <div hidden={hidden} inert={hidden} className='absolute inset-0 flex flex-col bg-background'>
+      <PhoneHeader large>
         <button
           type='button'
           onClick={() => setWorkspacesOpen(true)}
-          className='flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-base font-semibold active:bg-accent'
+          className='phone-title flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-base font-semibold active:bg-accent'
         >
           <span className='truncate'>{activeName ?? 'Solstice'}</span>
           <ChevronDown className='size-4 shrink-0 text-muted-foreground' />

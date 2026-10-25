@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from 'react';
+import { useEffect, useLayoutEffect, useReducer, useRef } from 'react';
 import { Bookmark, Files, Search } from 'lucide-react';
 
 import { useAccountActions } from '@/hooks/use-account-actions';
@@ -23,6 +23,7 @@ import { PushPane } from './push-pane';
 import { BookmarksPage } from './bookmarks-page';
 import { SearchPage } from './search-page';
 import { shownTab } from './tabs';
+import { useScrollEdge } from '@/lib/scroll-edge';
 import { YouPage } from './you-page';
 
 /**
@@ -62,6 +63,13 @@ export function PhoneShell() {
 
   const workspace = useWorkspace((s) => s.path);
   useEffect(() => usePhoneNav.getState().reset(), [workspace]);
+
+  // The phone has one look: Islands and its gaps are the window's
+  // (`islands:` and `islands.css` skip it).
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute('data-phone-layout', '');
+    return () => document.documentElement.removeAttribute('data-phone-layout');
+  }, []);
 
   const shown = model ? shownTab(model) : null;
   const shownId = shown?.getId();
@@ -200,6 +208,7 @@ function AppFooter() {
   const showPage = usePhoneNav((s) => s.showPage);
   const keyboard = useKeyboard((s) => s.docked);
   const { username, attention } = useAccountActions();
+  const edge = useScrollEdge('bottom');
 
   if (keyboard) return null;
 
@@ -221,7 +230,7 @@ function AppFooter() {
   );
 
   return (
-    <nav className='flex shrink-0 border-t bg-sidebar pb-[max(env(safe-area-inset-bottom),0.375rem)]'>
+    <nav ref={edge} className='phone-tab-bar flex shrink-0 bg-background pb-[max(env(safe-area-inset-bottom),0.375rem)]'>
       {PAGES.map(({ id, label, icon: Icon }) => item(id, label, <Icon className='size-6' />))}
       {item(
         'you',

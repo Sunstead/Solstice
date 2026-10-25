@@ -13,6 +13,9 @@ import {
   type SettingReader,
 } from './types';
 
+/** Whether the phone layout is showing (`PhoneShell` marks `<html>`). */
+const phoneLayout = () => typeof document !== 'undefined' && document.documentElement.hasAttribute('data-phone-layout');
+
 /**
  * Heading sizes as exponents of one scale ratio, chosen so the default ratio
  * of 1.25 reproduces the sizes the typeset stylesheet shipped with (1.75em /
@@ -98,6 +101,8 @@ export const settingsRegistry = {
     label: 'Islands',
     default: true,
     domAttr: { name: 'data-islands', format: (v) => String(v) },
+    // The phone has one look (`data-phone-layout`).
+    visibleWhen: () => !phoneLayout(),
   }),
 
   // A border round each island, and the tabs in the classic tab bar's
@@ -110,6 +115,7 @@ export const settingsRegistry = {
     default: false,
     domAttr: { name: 'data-island-borders', format: (v) => String(v) },
     disabledWhen: (get) => !get('appearance.islands'),
+    visibleWhen: () => !phoneLayout(),
   }),
 
   'appearance.workspaceSwitcherLocation': defineEnum({

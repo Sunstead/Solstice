@@ -43,7 +43,7 @@ export function YouPage() {
   return (
     <div className='absolute inset-0 overflow-hidden bg-background'>
       <div ref={page} className='flex h-full flex-col'>
-        <PhoneHeader>
+        <PhoneHeader large>
           <PhoneTitle>You</PhoneTitle>
         </PhoneHeader>
         <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain'>

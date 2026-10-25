@@ -5,19 +5,34 @@ import { WindowControls } from '@/components/window-controls';
 import { useIsFullscreen } from '@/hooks/use-fullscreen';
 import { useIsMac } from '@/hooks/use-platform';
 import { can } from '@/lib/backend/platform';
+import { useScrollEdge } from '@/lib/scroll-edge';
 import { cn } from '@/lib/utils';
 
 /**
- * A phone page's top bar. In a desktop window that narrow it's also the
- * title bar: a drag region, clear of the traffic lights, with window controls.
+ * A phone page's top bar: the page's own colour, no border, with a blurred
+ * fade below once content scrolls under it (`useScrollEdge`). `large` is a
+ * tab's root, whose title is large until the list scrolls. In a desktop
+ * window that narrow it's also the title bar: a drag region, clear of the
+ * traffic lights, with window controls.
  */
-export function PhoneHeader({ children, className }: { children: ReactNode; className?: string }) {
+export function PhoneHeader({
+  children,
+  large = false,
+  className,
+}: {
+  children: ReactNode;
+  large?: boolean;
+  className?: string;
+}) {
   const isMac = useIsMac();
   const isFullscreen = useIsFullscreen();
+  const edge = useScrollEdge('top');
   return (
     <header
+      ref={edge}
       data-tauri-drag-region
-      className={cn('flex h-12 shrink-0 items-center gap-1 border-b bg-sidebar px-1.5', className)}
+      data-large={large || undefined}
+      className={cn('phone-bar flex shrink-0 items-center gap-1 bg-background px-1.5', large ? 'h-14' : 'h-12', className)}
     >
       {/* The traffic lights sit over the top-left corner on macOS. */}
       {can.windowChrome && isMac && !isFullscreen && <span data-tauri-drag-region className='w-16 shrink-0' />}
@@ -27,10 +42,10 @@ export function PhoneHeader({ children, className }: { children: ReactNode; clas
   );
 }
 
-/** A page's title in its header. */
+/** A page's title in its header; in a `large` one, large until the page scrolls. */
 export function PhoneTitle({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <h1 data-tauri-drag-region className={cn('min-w-0 flex-1 truncate px-1.5 text-base font-semibold', className)}>
+    <h1 data-tauri-drag-region className={cn('phone-title min-w-0 flex-1 truncate px-1.5 text-base font-semibold', className)}>
       {children}
     </h1>
   );

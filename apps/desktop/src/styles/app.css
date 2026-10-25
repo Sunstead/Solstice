@@ -25,8 +25,8 @@
 
 /* The Islands layout (`appearance.islands`, `islands.css`): panels on the
    window's color instead of regions split by borders. */
-@custom-variant islands (&:where([data-islands='true'] *));
-@custom-variant island-borders (&:where([data-islands='true'][data-island-borders='true'] *));
+@custom-variant islands (&:where([data-islands='true']:not([data-phone-layout]) *));
+@custom-variant island-borders (&:where([data-islands='true'][data-island-borders='true']:not([data-phone-layout]) *));
 
 @theme inline {
   --font-sans: 'Geist Variable', sans-serif;
@@ -86,7 +86,7 @@
 /* The explorer under Islands is a panel of the notes' color, so its rows'
    hover and active fills are steps off that, not off the sidebar's: the
    themes' --sidebar-accent is tuned for the sidebar and reads too light here. */
-:root[data-islands='true'] .island-panel {
+:root[data-islands='true']:not([data-phone-layout]) .island-panel {
   --sidebar-accent: color-mix(in oklch, var(--foreground) 9%, var(--background));
 }
 
@@ -461,6 +461,63 @@ html[data-reduce-motion='true'] *::after {
   height: 100%;
   background: var(--background);
   box-shadow: -8px 0 24px rgb(0 0 0 / 0.12);
+}
+
+/*
+ * A phone page's bars (`PhoneHeader`, the tab bar; `lib/scroll-edge.ts`):
+ * the page's own colour at rest, with no line, and once content scrolls
+ * under one, a blurred fade off its inner edge, as iOS 26's scroll edge
+ * effect. The fade is a band hung past the bar, so the content's top (or
+ * end) goes soft rather than meeting an edge.
+ */
+.phone-bar,
+.phone-tab-bar {
+  position: relative;
+  z-index: 10;
+}
+
+.phone-bar::after,
+.phone-tab-bar::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  height: 1.25rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.phone-bar::after {
+  top: 100%;
+  background: linear-gradient(var(--background), transparent);
+  mask-image: linear-gradient(black, transparent);
+}
+
+.phone-tab-bar::before {
+  bottom: 100%;
+  background: linear-gradient(transparent, var(--background));
+  mask-image: linear-gradient(transparent, black);
+}
+
+.phone-bar[data-scrolled]::after,
+.phone-tab-bar[data-scrolled]::before {
+  opacity: 1;
+}
+
+/* A tab's root: its title large at rest, shrinking into the bar as the
+   list scrolls (by transform, so nothing below moves). */
+.phone-bar[data-large] .phone-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transform-origin: left center;
+  transition: transform 200ms ease-out;
+}
+
+.phone-bar[data-large][data-scrolled] .phone-title {
+  transform: scale(0.6);
 }
 
 /* A folder in its color (`FolderGlyph`). `folder_open.svg` sets its fill

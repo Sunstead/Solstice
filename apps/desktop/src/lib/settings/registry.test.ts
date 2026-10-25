@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/backend/platform', () => ({ touchFirst: false, can: {}, shell: 'web' }));
@@ -29,7 +30,15 @@ describe('appearance.islandBorders', () => {
     const borders = settingsRegistry['appearance.islandBorders'];
     expect(borders.disabledWhen?.((k) => k === 'appearance.islands')).toBe(false);
     expect(borders.disabledWhen?.(() => false)).toBe(true);
-    expect(borders.visibleWhen).toBeUndefined();
+    expect(borders.visibleWhen?.(() => false)).toBe(true);
+  });
+
+  // The phone has one look: neither Islands row is offered there.
+  it('is hidden with Islands in the phone layout', () => {
+    document.documentElement.setAttribute('data-phone-layout', '');
+    expect(settingsRegistry['appearance.islands'].visibleWhen?.(() => true)).toBe(false);
+    expect(settingsRegistry['appearance.islandBorders'].visibleWhen?.(() => true)).toBe(false);
+    document.documentElement.removeAttribute('data-phone-layout');
   });
 });
 

@@ -15,11 +15,11 @@ const surfaces = readFileSync(path.resolve(__dirname, '../lib/native-surfaces.ts
 describe('islands.css', () => {
   it('is loaded, and only under the setting', () => {
     expect(app).toContain("@import './islands.css';");
-    expect(app).toMatch(/@custom-variant islands \(&:where\(\[data-islands='true'\] \*\)\);/);
+    expect(app).toMatch(/@custom-variant islands \(&:where\(\[data-islands='true'\]:not\(\[data-phone-layout\]\) \*\)\);/);
     const selectors = [...css.matchAll(/^([^@/\s*}][^{]*)\{/gm)].map((m) => m[1].trim());
     expect(selectors.length).toBeGreaterThan(0);
     for (const selector of selectors) {
-      for (const part of selector.split(',')) expect(part.trim(), part).toMatch(/^:root\[data-islands='true'\]/);
+      for (const part of selector.split(',')) expect(part.trim(), part).toMatch(/^:root\[data-islands='true'\]:not\(\[data-phone-layout\]\)/);
     }
   });
 
@@ -99,7 +99,7 @@ describe('islands.css', () => {
   // without, Islands turns them off.
   it('keeps the classic tab bar\'s outlines under island borders', () => {
     expect(css).toMatch(
-      /:root\[data-islands='true'\]:not\(\[data-island-borders='true'\]\) \.flexlayout-custom \.flexlayout__layout \{\s*--color-tab-outline: transparent/,
+      /:root\[data-islands='true'\]:not\(\[data-phone-layout\]\):not\(\[data-island-borders='true'\]\) \.flexlayout-custom \.flexlayout__layout \{\s*--color-tab-outline: transparent/,
     );
     expect(css).toMatch(
       /:not\(\[data-island-borders='true'\]\) \.flexlayout-custom \.flexlayout__tabset_tabbar_outer \{\s*box-shadow: none/,
@@ -139,7 +139,7 @@ describe('islands.css', () => {
   // clears its own background the moment the tabset is `data-native-under`.
   it('lets a native view show through the ring\'s fill', () => {
     expect(css).toMatch(
-      /:root\[data-islands='true'\]\[data-island-borders='true'\] \.flexlayout-custom\s*\.flexlayout__tabset\[data-native-under\]::after \{\s*background: transparent;/,
+      /:root\[data-islands='true'\]:not\(\[data-phone-layout\]\)\[data-island-borders='true'\] \.flexlayout-custom\s*\.flexlayout__tabset\[data-native-under\]::after \{\s*background: transparent;/,
     );
     // app.css's own `data-native-under` rule only reaches elements.
     expect(app).toMatch(/\[data-native-under\] \{[^}]*background: transparent !important/);

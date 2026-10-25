@@ -73,7 +73,8 @@ export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): nu
   for (const below of found) if (!under.has(below)) mark(below);
   under.clear();
   for (const below of found) under.add(below);
-  const islands = document.documentElement.dataset.islands === 'true';
+  const root = document.documentElement;
+  const islands = root.dataset.islands === 'true' && !root.hasAttribute('data-phone-layout');
   const host = (islands && windowColour()) || background;
   if (host) void nativeSurfaces.background(host);
   return background;
