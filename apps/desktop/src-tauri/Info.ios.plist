@@ -12,6 +12,13 @@
 	     already): sheets and tabs animate on the compositor, so they gain. -->
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- The iPhone is portrait only: turned, it's past the phone layout's
+	     768px breakpoint and became the iPad app. The iPad turns freely.
+	     project.yml and gen/apple's Info.plist say the same. -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
 	<!-- The scene lifecycle (tao supports it): iPadOS builds the menu bar, and
 	     windows, around scenes. One scene for now. -->
 	<key>UIApplicationSceneManifest</key>
