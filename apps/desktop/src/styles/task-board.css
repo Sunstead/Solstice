@@ -384,9 +384,13 @@
   resize: none;
   /* Sized to its text (`CardEditor`'s `fit`), so it never needs to scroll. */
   overflow: hidden;
+  /* In a full column the flexbox would squeeze it to a sliver; the column scrolls instead. */
+  flex-shrink: 0;
+  min-height: 2.5rem;
 }
 
 .board-add {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.375rem;

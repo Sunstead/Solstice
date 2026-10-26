@@ -26,6 +26,8 @@ import { useSyncStatus } from '@/lib/stores/sync';
 import { useTreeMetaSync } from '@/lib/stores/tree-meta';
 import { FileActionDialogs } from '@/components/file-action-dialogs';
 import { AskDialog } from '@/components/ask-dialog';
+import { useLaunchActions, useSpotlightIndex, useSystemAccessibility } from '@/lib/launch';
+import { EntrySheet } from '@/components/mobile/entry-sheet';
 import { FileTreeDragLayer } from '@/components/file-tree-drag-layer';
 import { FolderColorDialog } from '@/components/folder-color-dialog';
 import { WorkspaceDialogs } from '@/components/workspace-dialogs';
@@ -93,6 +95,9 @@ export const Route = createRootRoute({
     useThemeEffect();
     useSettingsDomBindings();
     useDeepLinks();
+    useLaunchActions();
+    useSpotlightIndex();
+    useSystemAccessibility();
     useSyncStatus();
     useTreeMetaSync();
     useAppWindows();
@@ -193,6 +198,8 @@ export const Route = createRootRoute({
         {/* Once for the app: the Explorer, Bookmarks and file menus all ask for them. */}
         <FileActionDialogs />
         <AskDialog />
+        {/* Files' and folders' actions on a touch screen or a phone-width window. */}
+        <EntrySheet />
         <FileTreeDragLayer />
         <FolderColorDialog />
         {/* Insets: a home-screen app draws under the status bar and, in

@@ -235,8 +235,8 @@ function TopBookmarks({
       menu: (i, at) => {
         const entry = latest.current.shown[i]?.entry;
         if (!entry) return;
-        // A phone's is the hold sheet (`EntrySheet`).
-        if (latest.current.phone) useEntrySheet.getState().open(entry);
+        // A touch screen's is the hold sheet (`EntrySheet`).
+        if (latest.current.phone || touchFirst) useEntrySheet.getState().open(entry);
         else setMenu({ entry, at });
       },
     });

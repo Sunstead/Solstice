@@ -90,6 +90,28 @@ function usePaneScroll(
   }, [inside, close, quiet]);
 }
 
+/**
+ * A bottom sheet pulled up past its top rubber-bands, and what's under the
+ * pane would show beneath it: its own colour carries on below it instead,
+ * as UIKit's sheets do. A shadow the card's colour, clipped to below the
+ * card, since a shadow (unlike a box) adds nothing to what scrolls.
+ */
+function useGroundBelow(card: HTMLDivElement | null) {
+  useLayoutEffect(() => {
+    if (!card) return;
+    const style = getComputedStyle(card);
+    const ground = style.backgroundColor;
+    // A see-through card (an action sheet's) has nothing to carry on.
+    if (!ground || ground === 'transparent' || /rgba\(.*,\s*0\)$/.test(ground)) return;
+    card.style.boxShadow = `0 0 0 100dvh ${ground}`;
+    card.style.clipPath = `inset(0 0 -100dvh 0 round ${style.borderTopLeftRadius} ${style.borderTopRightRadius} 0 0)`;
+    return () => {
+      card.style.removeProperty('box-shadow');
+      card.style.removeProperty('clip-path');
+    };
+  }, [card]);
+}
+
 /** The popup as a scroll view, with `children` in a card on its frame. */
 export function Pane({
   slot,
@@ -115,6 +137,8 @@ export function Pane({
   // all; a finger's close leaves no ring, and nor should ours.
   const quiet = useRef(false);
   usePaneScroll(frame, close, quiet);
+  const [card, setCard] = useState<HTMLDivElement | null>(null);
+  useGroundBelow(align === 'end' ? card : null);
 
   return (
     <DialogPrimitive.Popup
@@ -140,7 +164,7 @@ export function Pane({
           close.current?.click();
         }}
       >
-        <div data-slot={slot} className={cn('relative', cardClassName)}>
+        <div ref={setCard} data-slot={slot} className={cn('relative', cardClassName)}>
           {children}
         </div>
       </div>

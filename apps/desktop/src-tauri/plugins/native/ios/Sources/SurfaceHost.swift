@@ -39,6 +39,9 @@ class SurfaceView: UIView {
   /// The file changed under it (another device, another app).
   func reload() {}
 
+  /// Back to what's drawn, at its own size (a drawing's Reset View).
+  func recentre() {}
+
   /// Whether the surface paints its own ground (a drawing's paper) rather
   /// than the pane's colour the web side sends with each frame.
   var paintsOwnGround: Bool { false }
@@ -334,7 +337,7 @@ final class SurfaceHost: UIView {
   private static weak var routed: WKWebView?
 
   /// Has the web view's class (wry's) answer nothing to a hit test over a
-  /// shown surface, so UIKit goes on to the host underneath. On the class,
+  /// shown surface or the tab bar, so UIKit goes on to what's underneath. On the class,
   /// for that web view only: never by changing its class (`MethodHooks.swift`).
   private static func routeTouches(of webview: WKWebView) {
     routed = webview
@@ -348,7 +351,7 @@ final class SurfaceHost: UIView {
       let block: @convention(block) (UIView, CGPoint, UIEvent?) -> UIView? = { view, point, event in
         let taken = MainActor.assumeIsolated {
           guard view === routed, let host = SurfaceHost.current else { return false }
-          return host.takesTouch(at: view.convert(point, to: host))
+          return host.takesTouch(at: view.convert(point, to: host)) || TabBar.shared.takesTouch(at: point, in: view)
         }
         return taken ? nil : hitTest(view, selector, point, event)
       }

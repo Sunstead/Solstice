@@ -3,6 +3,12 @@ import { Ellipsis } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
 import { SyncIndicator } from '@/components/sync/status';
+import { RibbonToggle } from '@/components/ink/ribbon-toggle';
+import { ResetViewButton } from '@/components/viewer/native-drawing';
+import { recentreDrawing } from '@/lib/drawing-views';
+import { can } from '@/lib/backend/platform';
+import { embedKind, isDrawing } from '@/lib/embed/kind';
+import { isMarkableImage } from '@/lib/ink/insert';
 import { ShareButton } from '@/components/share-button';
 import { startRename, targetFromPath } from '@/lib/entry-actions';
 import { primeKeyboard } from '@/lib/keyboard-primer';
@@ -25,6 +31,10 @@ export function NoteHeader({ shown }: { shown: TabNode | null }) {
   const page = usePhoneNav((s) => s.page);
   const path = tabPath(shown);
   // The ⋯ is the hold sheet, with what only an open note has on top.
+  // What file-view shows on a native surface, where the viewer's own header is hidden on a phone.
+  const drawing = !!path && can.nativeViews && isDrawing(path);
+  const markable =
+    !!path && can.nativeViews && (drawing || embedKind(path) === 'pdf' || isMarkableImage(path));
   const openActions = () => useEntrySheet.getState().open(path ? targetFromPath(path) : null, 'note');
 
   return (
@@ -52,6 +62,8 @@ export function NoteHeader({ shown }: { shown: TabNode | null }) {
         actions={
           <>
             <SyncIndicator quiet />
+            {drawing && <ResetViewButton className='phone-tint' onClick={() => recentreDrawing(path)} />}
+            {markable && <RibbonToggle className='phone-tint' />}
             {path && <ShareButton path={path} className='phone-tint' />}
             <Button variant='ghost' size='icon' className='phone-tint' onClick={openActions}>
               <Ellipsis />

@@ -19,7 +19,7 @@ export { useOverSurface } from '@/lib/surface-kicks';
 const marks = new Map<Element, { count: number; background: string }>();
 export const refreshers = new Set<() => void>();
 
-function mark(el: Element) {
+export function mark(el: Element) {
   const known = marks.get(el);
   if (known) return void (known.count += 1);
   marks.set(el, { count: 1, background: getComputedStyle(el).backgroundColor });
@@ -320,7 +320,7 @@ function windowColour(): number[] | null {
 }
 
 /** The ground dark paper takes (`ink.darkPaper`): the theme's own background. */
-function themeGround(): number[] | null {
+export function themeGround(): number[] | null {
   return cssColour('--background');
 }
 

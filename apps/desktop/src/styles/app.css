@@ -630,6 +630,14 @@ html[data-reduce-motion='true'] *::after {
   font-weight: 400;
 }
 
+/* A choice's name heads its options, as iOS heads a group: small and muted,
+   so it never reads as one of them. */
+:root[data-phone-layout][data-touch] [data-setting-list] > :has([data-slot='radio-group']) > :first-child label {
+  padding-top: 0.5rem;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
 :root[data-phone-layout][data-touch] [data-setting-list] [data-slot='radio-group'] {
   gap: 0;
   padding-bottom: 0;
@@ -679,4 +687,77 @@ html[data-reduce-motion='true'] *::after {
 [data-zen-moving],
 [data-zen-moving] * {
   transition: none !important;
+}
+
+/* -- Accessibility ---------------------------------------------------------
+   Reduce Motion: sheets fade rather than rise and fall (the push and the tab
+   motion ask `motionEnabled`). The setting, the media query, or the iOS
+   app's own (`data-system-reduce-motion`, from `useSystemAccessibility`). */
+@keyframes solstice-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes solstice-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+:root[data-touch]:is([data-reduce-motion='true'], [data-system-reduce-motion]) .solstice-pane[data-open],
+:root[data-touch]:is([data-reduce-motion='true'], [data-system-reduce-motion]) [data-slot='alert-dialog-content'][data-open] {
+  animation: solstice-fade-in 200ms ease-out;
+}
+
+:root[data-touch]:is([data-reduce-motion='true'], [data-system-reduce-motion]) .solstice-pane[data-closed],
+:root[data-touch]:is([data-reduce-motion='true'], [data-system-reduce-motion]) [data-slot='alert-dialog-content'][data-closed] {
+  animation: solstice-fade-out 150ms ease-in forwards;
+}
+
+:root:is([data-reduce-motion='true'], [data-system-reduce-motion]) .phone-tab-indicator {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-touch] .solstice-pane[data-open],
+  :root[data-touch] [data-slot='alert-dialog-content'][data-open] {
+    animation: solstice-fade-in 200ms ease-out;
+  }
+
+  :root[data-touch] .solstice-pane[data-closed],
+  :root[data-touch] [data-slot='alert-dialog-content'][data-closed] {
+    animation: solstice-fade-out 150ms ease-in forwards;
+  }
+}
+
+/* Reduce Transparency: what's blurred glass is solid. */
+:root[data-reduce-transparency] .phone-bar::after,
+:root[data-reduce-transparency] .phone-tab-bar::before,
+:root[data-reduce-transparency] .phone-tab-capsule,
+:root[data-reduce-transparency] .phone-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root[data-reduce-transparency] .phone-tab-capsule {
+  background: var(--background);
+}
+
+:root[data-reduce-transparency] .phone-glass {
+  background: var(--sidebar);
+}
+
+/* Increase Contrast (or the system asking for more): quiet text and lines
+   step up towards the foreground. */
+:root[data-increase-contrast] {
+  --muted-foreground: color-mix(in oklch, var(--foreground) 82%, var(--background));
+  --border: color-mix(in oklch, var(--foreground) 38%, var(--background));
+}
+
+@media (prefers-contrast: more) {
+  :root[data-theme] {
+    --muted-foreground: color-mix(in oklch, var(--foreground) 82%, var(--background));
+    --border: color-mix(in oklch, var(--foreground) 38%, var(--background));
+  }
 }

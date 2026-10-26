@@ -1,5 +1,6 @@
 import { nativeInk, type InkEvent } from '@/lib/backend/native';
-import { inkDispatch, useInkTools, useInkUi } from '@/lib/stores/ink-tools';
+import { getSetting, subscribeToSetting } from '@/lib/settings/store';
+import { inkDispatch, phoneInk, useInkTools, useInkUi } from '@/lib/stores/ink-tools';
 import { pencilAction, selectedSlot, toNative } from './toolbox';
 
 /**
@@ -12,8 +13,14 @@ export function followInkTools(): () => void {
     const slot = selectedSlot(state);
     if (!before || slot !== selectedSlot(before)) void nativeInk.setTool(toNative(slot));
     if (!before || state.ruler !== before.ruler) void nativeInk.setRuler(state.ruler);
-    if (!before || state.fingerDraws !== before.fingerDraws) void nativeInk.setFingerDraws(state.fingerDraws);
+    if (!phoneInk && (!before || state.fingerDraws !== before.fingerDraws)) void nativeInk.setFingerDraws(state.fingerDraws);
   };
+  // On an iPhone the tools showing is the switch (`phoneInk`).
+  const fingerOnPhone = (on: boolean) => {
+    if (phoneInk) void nativeInk.setFingerDraws(on);
+  };
+  fingerOnPhone(getSetting('ink.ribbon'));
+  const stopRibbon = subscribeToSetting('ink.ribbon', fingerOnPhone);
   // Once what's on disk is in: the native side has its own copy till then.
   const pushWhenHydrated = () => push();
   const stopHydrate = useInkTools.persist.hasHydrated()
@@ -24,6 +31,7 @@ export function followInkTools(): () => void {
   void nativeInk.undoState();
   return () => {
     stopHydrate();
+    stopRibbon();
     unsubscribe();
     void listening.then((listener) => listener.unregister());
     useInkUi.setState({ palette: null });

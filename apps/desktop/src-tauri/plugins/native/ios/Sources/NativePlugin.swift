@@ -74,6 +74,11 @@ struct HostArgs: Decodable {
   let items: [TabBarItemSpec]?
   let selected: String?
   let hidden: Bool?
+  /// For `tabBar`: a web sheet or menu is over it, and takes its touches.
+  let covered: Bool?
+  /// For `spotlight`: a workspace's notes, which replace those indexed for it.
+  let notes: [Launch.Note]?
+  let workspace: String?
 }
 
 class NativePlugin: Plugin {
@@ -94,6 +99,12 @@ class NativePlugin: Plugin {
       }
       Ink.shared.plugin = self
       TabBar.shared.plugin = self
+      Launch.plugin = self
+      Launch.setQuickActions()
+      Launch.hookConnected()
+      AccessibilityStatus.follow { [weak self] status in
+        self?.trigger("accessibility", data: status.mapValues { $0 as JSValue })
+      }
       if let parent = webview.superview { Ink.shared.listen(in: parent) }
     }
     let center = NotificationCenter.default
@@ -169,6 +180,8 @@ class NativePlugin: Plugin {
         if args.ease == "play" { surface.easePlay() } else { surface.easeEnd() }
       case "reload":
         host.surfaces[args.id]?.reload()
+      case "recentre":
+        host.surfaces[args.id]?.recentre()
       case "find":
         // Reading handwriting takes a moment: answered when it's done.
         let surface = host.surfaces[args.id]
@@ -354,9 +367,19 @@ class NativePlugin: Plugin {
           Pickers.documents(by: presenter, done: done)
         }
         return
+      case "launchActions":
+        // What iOS asked of the app before the page was listening.
+        return invoke.resolve(["actions": Launch.take().map { $0.mapValues { $0 as JSValue } }])
+      case "accessibility":
+        return invoke.resolve(AccessibilityStatus.current().mapValues { $0 as JSValue })
+      case "spotlight":
+        guard let workspace = args.workspace else { break }
+        Launch.index(args.notes ?? [], workspace: workspace)
       case "tabBar":
         guard let webview = self.webview else { break }
-        TabBar.shared.set(args.items ?? [], selected: args.selected, hidden: args.hidden ?? true, over: webview)
+        TabBar.shared.set(
+          args.items ?? [], selected: args.selected, hidden: args.hidden ?? true, covered: args.covered ?? false,
+          under: webview)
       case "background":
         if let rgb = args.rgb, rgb.count >= 3 {
           host.backgroundColor = UIColor(

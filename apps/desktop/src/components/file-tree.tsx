@@ -4,6 +4,7 @@ import { useLayout } from '@/hooks/use-layout';
 import {
   useEntryInput,
   FILE_TYPE_PRESETS,
+  getPresetForName,
   stripPresetExtension,
 } from '@/lib/stores/entry-input';
 import { fileOperations } from '@/lib/file-operations';
@@ -231,6 +232,7 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
           >
             <FileIcon />
             <FormattedFileName name={node.name} />
+            <span className='sr-only'>, {kindName(node.name)}</span>
             {bookmarked && <BookmarkedMark />}
           </SidebarMenuButton>
         }
@@ -280,6 +282,8 @@ function FileTreeItem({ node }: { node: FileTreeNode }) {
                     />
                     <FolderGlyph open={node.expanded} color={folderColor} className='size-4 min-w-4' />
                     <FormattedFileName name={node.name} />
+                    {/* VoiceOver says what it is, as Files' rows do. */}
+                    <span className='sr-only'>, folder</span>
                     {bookmarked && <BookmarkedMark />}
                     {phone && <FolderCount path={node.path} />}
                   </SidebarMenuButton>
@@ -344,9 +348,20 @@ export function FormattedFileName({ name }: { name: string }) {
   );
 }
 
+/** What VoiceOver calls a file in the tree: its type's name, or "file". */
+function kindName(name: string): string {
+  const preset = getPresetForName(name);
+  if (!preset) return 'file';
+  // "note", "task board"; "PDF" stays as it's said.
+  return preset.label === preset.label.toUpperCase() ? preset.label : preset.label.toLowerCase();
+}
+
 /** How many things a folder holds, quiet on the row's right, as a phone's lists show it. */
 function FolderCount({ path }: { path: string }) {
-  const count = useFileIndex((s) => s.files.filter((f) => parentPath(f.path) === normalizePath(path)).length);
+  const shown = useSetting('explorer.folderCounts');
+  const count = useFileIndex((s) =>
+    shown ? s.files.filter((f) => parentPath(f.path) === normalizePath(path)).length : 0,
+  );
   if (!count) return null;
   return <span className='ml-auto shrink-0 pl-2 text-[15px] text-muted-foreground tabular-nums'>{count}</span>;
 }

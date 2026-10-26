@@ -482,7 +482,9 @@ export const settingsRegistry = {
     // The ink tools under a drawing's or PDF's header (`InkRibbon`); the
     // header's Tools button flips it too. The Pencil draws either way.
     label: 'Show the ink tools',
-    default: true,
+    // Off: drawing is something iOS's Solstice supports, not what it's for.
+    // The header's Tools button brings them back.
+    default: false,
     visibleWhen: () => can.nativeViews,
   }),
 
@@ -638,6 +640,14 @@ export const settingsRegistry = {
     label: 'Folders left out of search',
     default: '',
     placeholder: 'Archive, Templates/Old',
+  }),
+
+  'explorer.folderCounts': defineBoolean({
+    section: 'explorer',
+    scope: 'global',
+    // On a phone's tree, quiet on each folder's right (`FolderCount`).
+    label: 'Show how many items each folder holds',
+    default: false,
   }),
 
   'explorer.foldersFirst': defineBoolean({

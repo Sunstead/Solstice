@@ -44,6 +44,8 @@ export const nativeSurfaces = {
   /** Eases held content (`play`), or puts it where it belongs (`end`). */
   ease: (id: string, phase: 'play' | 'end') => surface({ op: 'ease', id, ease: phase }),
   reload: (id: string) => surface({ op: 'reload', id }),
+  /** A drawing back to what's drawn, at actual size. */
+  recentre: (id: string) => surface({ op: 'recentre', id }),
   close: (id: string) => surface({ op: 'close', id }),
   /** Highlights the matches and shows the first; an empty query clears them. */
   find: (id: string, query: string, caseSensitive: boolean, wholeWord: boolean) =>
@@ -255,12 +257,45 @@ export type TabBarItem = {
 export type TabBarEvent = { type: 'select'; id: string } | { type: 'inset'; inset: number };
 
 /**
- * The iPhone's tab bar (`TabBar.swift`), UIKit's own over the webview: the
- * web side says what's in it; taps, and how tall it is, come back.
+ * The iPhone's tab bar (`TabBar.swift`), UIKit's own under the see-through
+ * webview: the web side says what's in it and keeps its spot clear; taps,
+ * and how tall it is, come back.
  */
 export const nativeTabBar = {
-  set: (items: TabBarItem[], selected: string | null, hidden: boolean) =>
-    host({ op: 'tabBar', items, selected: selected ?? undefined, hidden }),
+  /** `covered`: a web sheet or menu is over it (it's under the webview), and takes its touches. */
+  set: (items: TabBarItem[], selected: string | null, hidden: boolean, covered = false) =>
+    host({ op: 'tabBar', items, selected: selected ?? undefined, hidden, covered }),
   listen: (handler: (event: TabBarEvent) => void) =>
     addPluginListener<TabBarEvent>('solstice-native', 'tabBar', handler),
+};
+
+/** What iOS asked of the app from outside it (`Launch.swift`). */
+export type LaunchAction = { type: 'shortcut'; id: 'new-note' | 'search' } | { type: 'open'; path: string };
+
+export type SpotlightNote = { path: string; title: string; folder: string };
+
+/**
+ * Home Screen quick actions and Spotlight: what was asked before the page
+ * listened, what's asked after, and the notes Spotlight finds.
+ */
+export const nativeLaunch = {
+  /** Asked once: what came before, and from then on `listen` hears the rest. */
+  take: () =>
+    invoke<{ actions: LaunchAction[] }>('plugin:solstice-native|host', { op: 'launchActions' })
+      .then((r) => r.actions)
+      .catch(() => [] as LaunchAction[]),
+  listen: (handler: (action: LaunchAction) => void) =>
+    addPluginListener<LaunchAction>('solstice-native', 'launch', handler),
+  /** `workspace`'s notes, in place of those Spotlight had for it. */
+  spotlight: (workspace: string, notes: SpotlightNote[]) => host({ op: 'spotlight', workspace, notes }),
+};
+
+/** The system's accessibility settings the page can't query itself. */
+export type AccessibilityState = { reduceTransparency: boolean; increaseContrast: boolean; reduceMotion: boolean };
+
+export const nativeAccessibility = {
+  get: () =>
+    invoke<AccessibilityState>('plugin:solstice-native|host', { op: 'accessibility' }).catch(() => null),
+  listen: (handler: (state: AccessibilityState) => void) =>
+    addPluginListener<AccessibilityState>('solstice-native', 'accessibility', handler),
 };

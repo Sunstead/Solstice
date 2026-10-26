@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { createRef, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
@@ -23,31 +23,29 @@ export function BookmarksPage() {
 }
 
 function BookmarksStack({ root }: { root: string | null }) {
-  // Folders pushed, deepest last; `shown` stays while the last slides away.
-  const [stack, setStack] = useState<string[]>([]);
-  const [shown, setShown] = useState<string | null>(null);
+  // Folders pushed, deepest last, and how many are open: those past it are
+  // sliding away. Each is a pane of its own over the one before, so
+  // swiping one back leaves the rest as they were.
+  const [trail, setTrail] = useState<string[]>([]);
+  const [depth, setDepth] = useState(0);
   const page = useRef<HTMLDivElement>(null);
+  const levels = useMemo(() => Array.from({ length: MAX_DEPTH }, () => createRef<HTMLDivElement>()), []);
 
   // A folder deleted or renamed meanwhile goes back to the nearest one left.
   const missing = useFileIndex((s) => {
     if (s.lastLoadedAt === null) return -1;
     const paths = new Set(s.files.map((f) => normalizePath(f.path)));
-    return stack.findIndex((p) => !paths.has(normalizePath(p)));
+    return trail.slice(0, depth).findIndex((p) => !paths.has(normalizePath(p)));
   });
-  const open = missing === -1 ? stack : stack.slice(0, missing);
+  const openCount = missing === -1 ? depth : missing;
 
   const push = (path: string) => {
-    setStack([...open, path]);
-    setShown(path);
+    if (openCount >= MAX_DEPTH) return;
+    setTrail([...trail.slice(0, openCount), path]);
+    setDepth(openCount + 1);
   };
-  const pop = () => {
-    const rest = open.slice(0, -1);
-    setStack(rest);
-    if (rest.length) setShown(rest[rest.length - 1]);
-  };
-
-  const at = shown ? open.lastIndexOf(shown) : -1;
-  const back = at > 0 ? getFileNameFromPath(open[at - 1]) : 'Bookmarks';
+  /** Level `level` leaves, and everything over it. */
+  const popTo = (level: number) => setDepth((d) => Math.min(d, level));
 
   return (
     <div data-phone-page='bookmarks' className='absolute inset-0 overflow-hidden bg-background'>
@@ -63,12 +61,30 @@ function BookmarksStack({ root }: { root: string | null }) {
           <p className='py-10 text-center text-sm text-muted-foreground'>No workspace open</p>
         )}
       </div>
-      <PushPane open={open.length > 0} onClose={pop} behind={page}>
-        {shown && <FolderPage key={shown} folder={shown} back={back} onBack={pop} onOpenFolder={push} />}
-      </PushPane>
+      {trail.map((folder, i) => (
+        <PushPane
+          key={`${i}:${folder}`}
+          open={i < openCount}
+          appear
+          onClose={() => popTo(i)}
+          behind={i === 0 ? page : levels[i - 1]}
+        >
+          <div ref={levels[i]} className='flex h-full min-h-0 flex-col'>
+            <FolderPage
+              folder={folder}
+              back={i > 0 ? getFileNameFromPath(trail[i - 1]) : 'Bookmarks'}
+              onBack={() => popTo(i)}
+              onOpenFolder={push}
+            />
+          </div>
+        </PushPane>
+      ))}
     </div>
   );
 }
+
+/** How deep folders are pushed; past it, opening another does nothing. */
+const MAX_DEPTH = 24;
 
 function FolderPage({
   folder,

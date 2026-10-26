@@ -395,9 +395,13 @@ small:
   tabs as SF Symbols, You as initials knocked out of a disc (a template, so
   the bar tints it), a badge when sync needs you, a selection tick. The web
   sends `tabBar { items, selected, hidden }` (`NativeFooter`); taps, and the
-  bar's height, come back as `tabBar` events. It's hidden while a note is
-  pushed, the keyboard is up, or any sheet, dialog or menu is open
-  (`webOverlayOpen`), since those draw under it.
+  bar's height, come back as `tabBar` events. It sits *under* the
+  see-through webview: the page clears what it paints over the bar's spot
+  (`data-native-under`), so sheets, menus and their dim draw over it, as
+  Reddit's do, and while one is open (`webOverlayOpen`) it's `covered` and
+  its touches stay the web's. Otherwise touches there fall through the
+  webview to it (`TabBar.takesTouch`, in the webview's hit test). It hides
+  only for a pushed note (whose PDF would be under it) and the keyboard.
 - Unlike the decision in 1.4, the native items have labels, as iOS's do.
 - The page keeps the bar's height as a spacer, so lists end above it rather
   than scrolling under the glass. Letting them run under it needs every
@@ -425,6 +429,41 @@ The plan:
    scroll edge effect is what iOS 26 bars look like at rest anyway.
 
 ## Phase 4: polish and the rest of the platform
+
+**Where it stands (2026-10-25, branch `iphone-native`).**
+
+- VoiceOver: tree rows say what they are (", folder", ", note", ", PDF"),
+  page titles are headings, and a pushed page takes focus at its title as
+  it slides in. Not yet run through the Accessibility Inspector.
+- Reduce Motion: sheets fade instead of rising and falling, and the tab
+  highlight stops springing, from the setting, the media query or the
+  system's own (sent by the app, `useSystemAccessibility`). Reduce
+  Transparency makes the blurred bars solid. Increase Contrast (or
+  `prefers-contrast: more`) steps quiet text and lines towards the
+  foreground. UIKit's own views follow the system by themselves.
+- Ink on iPhone: the ink tools sit at the foot of a drawing or PDF, in reach
+  of a thumb, and a finger draws by default (`defaultToolbox(fingerDraws)`),
+  panning with two. The tools are hidden by default on every device
+  (`ink.ribbon`): the header's Tools button brings them back.
+- Home Screen quick actions (New Note, Search) and Spotlight for note names
+  (`Launch.swift`, `lib/launch.ts`). A cold launch's action or result only
+  reaches tao's scene delegate, which drops it, so the app installs hooks on
+  whatever becomes a scene's delegate before UIKit starts
+  (`tauri_plugin_solstice_native::early()`, first in `run`).
+- State restoration: relaunching returns to the tab, the note open over it,
+  and the settings pages pushed on You (`useRestorePlace`). Scroll positions
+  aren't kept yet.
+
+Left for later, each needing more than the app's own code:
+
+- **Shortcuts actions** (New Note, Append to Note): App Intents have to be
+  in the app target (`gen/apple`), where Xcode extracts their metadata, not
+  in the plugin, which Rust's build links as a static library.
+- **A widget** for bookmarks or recent notes: a WidgetKit extension target,
+  and an App Group so it can read the workspace.
+- **Handoff** to the Mac: the Mac app would need to take the activity too.
+- **Live Text** in images and PDFs: VisionKit's interaction has to share
+  touches with PaperKit's canvas over the same image.
 
 - **VoiceOver:** every control has a label (most do, via `sr-only`), rows
   announce "folder" / "note", headings are headings, pushed pages and sheets

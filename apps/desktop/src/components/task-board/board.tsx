@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
-import { Check, ListPlus, MoreHorizontal, PencilLine, Plus, Square, Trash2, Trash2Icon } from 'lucide-react';
+import { Check, Copy, ListPlus, MoreHorizontal, PencilLine, Plus, Square, Trash2, Trash2Icon } from 'lucide-react';
 
 import { CanvasColorPicker } from '@/components/canvas/canvas-color-picker';
 import { resolveCanvasColor } from '@/lib/canvas/color';
@@ -268,6 +268,15 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
               <DropdownMenuItem onClick={() => change((t) => toggleCard(t, menuTarget.ref))}>
                 {menuCard?.checked ? <Square /> : <Check />}
                 {menuCard?.checked ? 'Mark Not Done' : 'Mark Done'}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  // As editing shows it: the title, then its nested lines.
+                  if (menuCard) void navigator.clipboard.writeText(cardMarkdown(menuCard)).catch(() => {});
+                }}
+              >
+                <Copy />
+                Copy
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant='destructive' onClick={() => change((t) => deleteCard(t, menuTarget.ref))}>

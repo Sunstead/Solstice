@@ -30,6 +30,8 @@ const EASE = 'cubic-bezier(0.2, 0, 0, 1)';
 export function motionEnabled(): boolean {
   if (typeof document === 'undefined') return false;
   if (document.documentElement.dataset.reduceMotion === 'true') return false;
+  // The iOS app's Reduce Motion, as the system has it (`useSystemAccessibility`).
+  if (document.documentElement.hasAttribute('data-system-reduce-motion')) return false;
   return !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
 

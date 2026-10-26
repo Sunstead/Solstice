@@ -7,6 +7,8 @@ import { getFileIconFor } from '@/assets/icons';
 import { useWorkspace } from '@/hooks/use-workspace';
 import type { EntryTarget } from '@/lib/entry-actions';
 import { useEntryMenuItems, type EntryMenuItem } from '@/lib/entry-menu-items';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
+import { can } from '@/lib/backend/platform';
 import { getFileNameFromPath, getRelativePath, normalizePath, parentPath } from '@/lib/path-utils';
 import { useSetting } from '@/lib/settings/store';
 import { stripPresetExtension } from '@/lib/stores/entry-input';
@@ -21,10 +23,9 @@ import { Row, RowGroup } from './phone-parts';
 type Item = Extract<EntryMenuItem, { kind: 'item' }>;
 type Submenu = Extract<EntryMenuItem, { kind: 'submenu' }>;
 
-/** What a phone has no use for: tabs, sides, other apps, paths. */
+/** What a touch screen has no use for: other apps, paths; and on an iPhone, tabs. */
 const LEFT_OUT = new Set([
-  'open-new-tab',
-  'open-to-side',
+  ...(can.tabs ? [] : ['open-new-tab', 'open-to-side']),
   'reveal-in-system',
   'open-in-default-app',
   'save-copy',
@@ -48,7 +49,7 @@ const PHONE_LABELS: Record<string, string> = {
  * rows, Delete alone at the bottom, as Discord's channel sheet. Its items
  * are the entry menu's (`useEntryMenuItems`), so it never offers other
  * things than the menus do elsewhere; this only picks and arranges them.
- * Mounted once, in the phone shell.
+ * Mounted once, at the root: the iPad's file menus are sheets too.
  */
 export function EntrySheet() {
   const shown = useEntrySheet((s) => s.shown);
@@ -80,6 +81,8 @@ function EntryActions({ entry, from, onDone }: { entry: EntryTarget; from: Entry
     nameInDialog: true,
   });
   const [sharing, setSharing] = useState(false);
+  // Back and Forward are the phone's own history of notes.
+  const phone = useIsMobile();
 
   const run = (item: Item) => () => {
     onDone();
@@ -105,7 +108,7 @@ function EntryActions({ entry, from, onDone }: { entry: EntryTarget; from: Entry
     <div className='flex min-h-0 flex-col'>
       <EntryHeader entry={entry} />
       <div className='flex min-h-0 flex-col gap-4 overflow-y-auto px-4 pt-1 pb-4'>
-        {from === 'note' && <HistoryButtons path={entry.path} onDone={onDone} />}
+        {from === 'note' && phone && <HistoryButtons path={entry.path} onDone={onDone} />}
         {quick.size > 0 && (
           <div className='flex gap-2'>
             {QUICK.map((id) => {

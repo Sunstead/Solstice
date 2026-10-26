@@ -13,11 +13,14 @@ struct TabBarItemSpec: Decodable, Equatable {
   let badge: Bool?
 }
 
-/// The iPhone's tab bar: UIKit's own, in iOS 26's floating Liquid Glass,
-/// over the webview (the only native view above it, so its touches are its
-/// own). The web side says what's in it, which is selected and when it's
-/// hidden (a note pushed, the keyboard up, a sheet open); taps go back as
-/// `tabBar` events, and so does how much of the screen's bottom it takes.
+/// The iPhone's tab bar: UIKit's own, in iOS 26's floating Liquid Glass. It
+/// sits *under* the see-through webview, whose page leaves its spot clear,
+/// so the web's sheets and their dim draw over it, as Reddit's do over its
+/// bar. Touches there fall through the webview to it (`takesTouch`) unless
+/// the web says something covers it. The web side says what's in it, which
+/// is selected, when it's hidden (a note pushed, the keyboard up) and when
+/// covered (a sheet, a menu); taps go back as `tabBar` events, and so does
+/// how much of the screen's bottom it takes.
 @MainActor
 final class TabBar: NSObject, UITabBarDelegate {
   static let shared = TabBar()
@@ -26,9 +29,20 @@ final class TabBar: NSObject, UITabBarDelegate {
   private var bar: Bar?
   private var specs: [TabBarItemSpec] = []
   private var hidden = true
+  private var covered = false
 
-  func set(_ specs: [TabBarItemSpec], selected: String?, hidden: Bool, over webview: WKWebView) {
-    guard let bar = bar ?? install(over: webview) else { return }
+  /// Whether a touch at `point` in `view` is the bar's: it's shown, nothing
+  /// of the web's is over it, and the point is on it.
+  func takesTouch(at point: CGPoint, in view: UIView) -> Bool {
+    guard let bar, !hidden, !covered else { return false }
+    return bar.bounds.contains(view.convert(point, to: bar))
+  }
+
+  func set(
+    _ specs: [TabBarItemSpec], selected: String?, hidden: Bool, covered: Bool, under webview: WKWebView
+  ) {
+    self.covered = covered
+    guard let bar = bar ?? install(under: webview) else { return }
     if specs != self.specs {
       self.specs = specs
       bar.setItems(specs.enumerated().map { Self.item($1, tag: $0) }, animated: false)
@@ -37,7 +51,7 @@ final class TabBar: NSObject, UITabBarDelegate {
     show(!hidden)
   }
 
-  private func install(over webview: WKWebView) -> Bar? {
+  private func install(under webview: WKWebView) -> Bar? {
     guard let parent = webview.superview else { return nil }
     let bar = Bar()
     bar.delegate = self
@@ -45,7 +59,8 @@ final class TabBar: NSObject, UITabBarDelegate {
     bar.isHidden = true
     bar.onHeight = { [weak self] inset in self?.plugin?.trigger("tabBar", data: ["type": "inset", "inset": inset]) }
     bar.translatesAutoresizingMaskIntoConstraints = false
-    parent.insertSubview(bar, aboveSubview: webview)
+    // Over the surface host, which is under the webview too.
+    parent.insertSubview(bar, belowSubview: webview)
     NSLayoutConstraint.activate([
       bar.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
       bar.trailingAnchor.constraint(equalTo: parent.trailingAnchor),

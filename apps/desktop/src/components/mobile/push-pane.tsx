@@ -6,6 +6,18 @@ import { kickSurfaces, useOverSurface } from '@/lib/surface-kicks';
 import { motionEnabled } from '@/lib/tab-motion';
 import { cn } from '@/lib/utils';
 
+/**
+ * A page pushed in takes VoiceOver's focus at its title, as UIKit moves it to
+ * a pushed view controller's. Not where something in it already has focus.
+ */
+function announce(pane: HTMLElement) {
+  if (pane.contains(document.activeElement)) return;
+  const title = pane.querySelector<HTMLElement>('.solstice-push-page h1');
+  if (!title) return;
+  title.tabIndex = -1;
+  title.focus({ preventScroll: true });
+}
+
 /** How far the page underneath slides left as one comes over it, as iOS does. */
 const PARALLAX = 0.25;
 
@@ -43,6 +55,7 @@ export function PushPane({
   onClose,
   behind,
   keepMounted = false,
+  appear = false,
   className,
   children,
 }: {
@@ -52,6 +65,8 @@ export function PushPane({
   behind?: RefObject<HTMLElement | null>;
   /** Kept mounted while closed (hidden and inert), so a note keeps its place. */
   keepMounted?: boolean;
+  /** Mounted open, it slides in (a level of a stack pushed), rather than starting in place. */
+  appear?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -60,7 +75,7 @@ export function PushPane({
   const [present, setPresent] = useState(open);
   // Where the pane is headed, so the owner catching up after a swipe doesn't
   // animate it a second time.
-  const heading = useRef<'open' | 'closed'>(open ? 'open' : 'closed');
+  const heading = useRef<'open' | 'closed'>(open && !appear ? 'open' : 'closed');
   const running = useRef<Animation[]>([]);
   const edge = useOverSurface();
   const onCloseRef = useRef(onClose);
@@ -124,6 +139,7 @@ export function PushPane({
     if (to === 'open') rest();
     if (!motionEnabled() || start === end) {
       finish(to);
+      if (to === 'open') announce(el);
       return;
     }
 
@@ -150,7 +166,10 @@ export function PushPane({
     running.current = animations;
     void animations[0].finished.then(
       () => {
-        if (heading.current === to) finish(to);
+        if (heading.current === to) {
+          finish(to);
+          if (to === 'open') announce(el);
+        }
         running.current = [];
       },
       () => {},
@@ -162,7 +181,7 @@ export function PushPane({
   const mounted = present || keepMounted;
   // Only a pane there from the first render starts in place; one mounted by
   // opening slides in.
-  const first = useRef(mounted);
+  const first = useRef(mounted && !appear);
   useLayoutEffect(() => {
     if (!mounted) return;
     if (first.current) {

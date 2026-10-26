@@ -14,15 +14,16 @@ import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { can, touchFirst } from '@/lib/backend/platform';
 import { nativeTabBar, type TabBarItem } from '@/lib/backend/native';
 import { initials } from '@/lib/initials';
-import { webOverlayOpen } from '@/lib/native-surfaces';
+import { mark, themeGround, unmark, webOverlayOpen } from '@/lib/native-surfaces';
+import { nativeSurfaces } from '@/lib/backend/native';
 import { useEntryInput } from '@/lib/stores/entry-input';
 import { usePhoneNav, type PhonePage } from '@/lib/stores/phone-nav';
+import type { SectionId } from '@/lib/settings/sections';
 import { useRevealTarget } from '@/lib/stores/reveal-target';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { cn } from '@/lib/utils';
 import { FilesPage } from './files-page';
 import { NoteHeader } from './note-pane';
-import { EntrySheet } from './entry-sheet';
 import { tabPath } from './phone-history';
 import { PushPane } from './push-pane';
 import { BookmarksPage } from './bookmarks-page';
@@ -71,6 +72,7 @@ export function PhoneShell() {
 
   const workspace = useWorkspace((s) => s.path);
   useEffect(() => usePhoneNav.getState().reset(), [workspace]);
+  useRestorePlace(workspace, !!model);
 
   // The phone has one look: Islands and its gaps are the window's
   // (`islands:` and `islands.css` skip it). Its type follows Dynamic Type.
@@ -161,9 +163,48 @@ export function PhoneShell() {
           </div>
         </PushPane>
       )}
-      <EntrySheet />
     </div>
   );
+}
+
+const PLACE_KEY = 'solstice.phone-place';
+type Place = { workspace: string; page: PhonePage; noteOpen: boolean; sections: SectionId[] };
+let placeRestored = false;
+
+/**
+ * Relaunching comes back to where you were (the tab, the note open over it,
+ * the settings pages pushed on You), as iOS apps restore their state. Kept
+ * per device in local storage, for the workspace it was in; once per launch.
+ */
+function useRestorePlace(workspace: string | null, ready: boolean) {
+  useEffect(() => {
+    if (!workspace || !ready || placeRestored) return;
+    placeRestored = true;
+    try {
+      const place = JSON.parse(localStorage.getItem(PLACE_KEY) ?? 'null') as Place | null;
+      if (place?.workspace === workspace) {
+        const nav = usePhoneNav.getState();
+        nav.showPage(place.page);
+        for (const section of place.sections) nav.pushSection(section);
+        const model = useLayout.getState().model;
+        if (place.noteOpen && model && shownTab(model)) nav.showNote();
+      }
+    } catch {
+      // Nothing kept, or storage refused: start on the files.
+    }
+  }, [workspace, ready]);
+
+  useEffect(() => {
+    if (!workspace) return;
+    return usePhoneNav.subscribe(({ page, noteOpen, sections }) => {
+      if (!placeRestored) return;
+      try {
+        localStorage.setItem(PLACE_KEY, JSON.stringify({ workspace, page, noteOpen, sections } satisfies Place));
+      } catch {
+        // A private window: nothing to come back to, which is fine.
+      }
+    });
+  }, [workspace]);
 }
 
 /**
@@ -321,10 +362,11 @@ const SYMBOLS: Record<Exclude<PhonePage, 'you'>, [string, string]> = {
 };
 
 /**
- * The iPhone's tab bar is UIKit's (`TabBar.swift`), floating over the
- * webview; this tells it what to show and keeps its room. It steps aside
- * for a pushed note, the keyboard, and any sheet or menu, which the web
- * draws under it.
+ * The iPhone's tab bar is UIKit's (`TabBar.swift`), under the see-through
+ * webview: this tells it what to show and keeps its spot clear, painting
+ * nothing there, so sheets, menus and their dim draw over it (it's then
+ * `covered`, and their touches stay theirs). It hides for a pushed note
+ * (whose PDF would be under it) and the keyboard.
  */
 function NativeFooter() {
   const page = usePhoneNav((s) => s.page);
@@ -333,6 +375,7 @@ function NativeFooter() {
   const { username, attention } = useAccountActions();
   const overlay = useWebOverlay();
   const [inset, setInset] = useState<number | null>(null);
+  const [spot, setSpot] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const listening = nativeTabBar.listen((event) => {
@@ -344,6 +387,21 @@ function NativeFooter() {
       void nativeTabBar.set([], null, true);
     };
   }, []);
+
+  // Everything painted under the spot goes see-through (`data-native-under`),
+  // and the host behind is the theme's colour, as the page was. A surface
+  // (a PDF) may have painted it its own while the note was open.
+  useLayoutEffect(() => {
+    if (!spot) return;
+    const r = spot.getBoundingClientRect();
+    const under = document
+      .elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      .filter((el) => el === spot || el.contains(spot));
+    under.forEach(mark);
+    const ground = themeGround();
+    if (ground) void nativeSurfaces.background(ground);
+    return () => under.forEach(unmark);
+  }, [spot, noteOpen]);
 
   const items = useMemo<TabBarItem[]>(
     () => [
@@ -357,13 +415,14 @@ function NativeFooter() {
     ],
     [username, attention],
   );
-  const hidden = noteOpen || keyboard || overlay;
-  useEffect(() => void nativeTabBar.set(items, page, hidden), [items, page, hidden]);
+  const hidden = noteOpen || keyboard;
+  useEffect(() => void nativeTabBar.set(items, page, hidden, overlay), [items, page, hidden, overlay]);
 
   if (keyboard) return null;
   // Until the bar says, UIKit's usual height over the home indicator.
   return (
     <div
+      ref={setSpot}
       aria-hidden
       className='shrink-0'
       style={{ height: inset ?? 'calc(49px + env(safe-area-inset-bottom))' }}
