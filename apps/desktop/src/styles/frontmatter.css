@@ -48,3 +48,11 @@
 .solstice-embed .solstice-frontmatter {
   display: none;
 }
+
+/* A date to pick (the iOS app's calendar), tinted as a link is. */
+.solstice-frontmatter-date {
+  color: var(--primary);
+  font: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}

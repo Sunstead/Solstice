@@ -1,13 +1,6 @@
 import { useState } from 'react';
 
-import { Button } from '@sunstead/ui/components/button';
-import {
-  DialogClose,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { FormLayout } from '@/components/ui/form-sheet';
 import { Input } from '@sunstead/ui/components/input';
 import { Label } from '@sunstead/ui/components/label';
 import { Switch } from '@sunstead/ui/components/switch';
@@ -100,10 +93,12 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
         void create();
       }}
     >
-      <DialogHeader>
-        <DialogTitle>New workspace</DialogTitle>
-        <DialogDescription>
-          {can.localFolders ? (
+      <FormLayout
+        title='New workspace'
+        confirm={linkFailed ? null : { label: busy ? 'Creating…' : 'Create', disabled: !ready }}
+        cancel={linkFailed ? 'Close' : 'Cancel'}
+        description={
+          can.localFolders ? (
             <>
               An empty folder for new notes. To work on a vault that's already on the sync server,{' '}
               <button type='button' className='underline underline-offset-2' onClick={() => showDialog('import')}>
@@ -113,76 +108,62 @@ export function NewWorkspaceForm({ onDone }: { onDone: () => void }) {
             </>
           ) : (
             'A new, empty vault on this server.'
-          )}
-        </DialogDescription>
-      </DialogHeader>
+          )
+        }
+      >
 
-      <div className='grid gap-4 text-sm'>
-        <div className='grid gap-2'>
-          <Label htmlFor='new-workspace-name'>Name</Label>
-          <div className='flex items-center gap-2'>
-            <WorkspaceColorPicker
-              color={color}
-              picked={picked !== null}
-              onChange={setPicked}
-              trigger={
-                <button
-                  type='button'
-                  title='Change color'
-                  disabled={linkFailed}
-                  className='rounded-[28%] outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring'
-                >
-                  <WorkspaceIcon name={trimmed} color={color} size='lg' />
-                </button>
-              }
-            />
-            <Input
-              id='new-workspace-name'
-              value={name}
-              autoFocus
-              disabled={linkFailed}
-              placeholder='Notes'
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {can.pickFolders && <LocationField parent={parent} onParent={setParent} name={trimmed} disabled={linkFailed} />}
-
-        {can.localFolders && (
+        <div className='grid gap-4 text-sm'>
           <div className='grid gap-2'>
-            <div className='flex items-center justify-between gap-4'>
-              <div className='grid gap-0.5'>
-                <Label htmlFor='new-workspace-sync'>Sync with Solstice Sync</Label>
-                {syncing && (
-                  <p className='text-xs text-muted-foreground'>
-                    Makes a new vault called {trimmed || 'this'} on the server.
-                  </p>
-                )}
-              </div>
-              <Switch id='new-workspace-sync' checked={sync} disabled={linkFailed} onCheckedChange={setSync} />
+            <Label htmlFor='new-workspace-name'>Name</Label>
+            <div className='flex items-center gap-2'>
+              <WorkspaceColorPicker
+                color={color}
+                picked={picked !== null}
+                onChange={setPicked}
+                trigger={
+                  <button
+                    type='button'
+                    title='Change color'
+                    disabled={linkFailed}
+                    className='rounded-[28%] outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring'
+                  >
+                    <WorkspaceIcon name={trimmed} color={color} size='lg' />
+                  </button>
+                }
+              />
+              <Input
+                id='new-workspace-name'
+                value={name}
+                autoFocus
+                disabled={linkFailed}
+                placeholder='Notes'
+                onChange={(e) => setName(e.target.value)}
+              />
             </div>
-            {sync && !signedIn && account.loaded && <SyncSignIn account={account} />}
           </div>
-        )}
 
-        {error && <p className='text-destructive select-text'>{error}</p>}
-      </div>
+          {can.pickFolders && <LocationField parent={parent} onParent={setParent} name={trimmed} disabled={linkFailed} />}
 
-      <DialogFooter>
-        {linkFailed ? (
-          <Button type='button' onClick={onDone}>
-            Close
-          </Button>
-        ) : (
-          <>
-            <DialogClose render={<Button type='button' variant='outline'>Cancel</Button>} />
-            <Button type='submit' disabled={!ready}>
-              {busy ? 'Creating…' : 'Create'}
-            </Button>
-          </>
-        )}
-      </DialogFooter>
+          {can.localFolders && (
+            <div className='grid gap-2'>
+              <div className='flex items-center justify-between gap-4'>
+                <div className='grid gap-0.5'>
+                  <Label htmlFor='new-workspace-sync'>Sync with Solstice Sync</Label>
+                  {syncing && (
+                    <p className='text-xs text-muted-foreground'>
+                      Makes a new vault called {trimmed || 'this'} on the server.
+                    </p>
+                  )}
+                </div>
+                <Switch id='new-workspace-sync' checked={sync} disabled={linkFailed} onCheckedChange={setSync} />
+              </div>
+              {sync && !signedIn && account.loaded && <SyncSignIn account={account} />}
+            </div>
+          )}
+
+          {error && <p className='text-destructive select-text'>{error}</p>}
+        </div>
+      </FormLayout>
     </form>
   );
 }

@@ -25,6 +25,9 @@ import { useDeepLinks } from '@/hooks/use-deep-links';
 import { useSyncStatus } from '@/lib/stores/sync';
 import { useTreeMetaSync } from '@/lib/stores/tree-meta';
 import { FileActionDialogs } from '@/components/file-action-dialogs';
+import { AskDialog } from '@/components/ask-dialog';
+import { useLaunchActions, useSpotlightIndex, useSystemAccessibility } from '@/lib/launch';
+import { EntrySheet } from '@/components/mobile/entry-sheet';
 import { FileTreeDragLayer } from '@/components/file-tree-drag-layer';
 import { FolderColorDialog } from '@/components/folder-color-dialog';
 import { WorkspaceDialogs } from '@/components/workspace-dialogs';
@@ -92,6 +95,9 @@ export const Route = createRootRoute({
     useThemeEffect();
     useSettingsDomBindings();
     useDeepLinks();
+    useLaunchActions();
+    useSpotlightIndex();
+    useSystemAccessibility();
     useSyncStatus();
     useTreeMetaSync();
     useAppWindows();
@@ -191,17 +197,20 @@ export const Route = createRootRoute({
       <DndProvider backend={HTML5Backend}>
         {/* Once for the app: the Explorer, Bookmarks and file menus all ask for them. */}
         <FileActionDialogs />
+        <AskDialog />
+        {/* Files' and folders' actions on a touch screen or a phone-width window. */}
+        <EntrySheet />
         <FileTreeDragLayer />
         <FolderColorDialog />
         {/* Insets: a home-screen app draws under the status bar and, in
             landscape, beside the notch. The bottom one is left to what
             scrolls, so content runs under the home indicator. */}
-        <div className='h-dvh bg-sidebar [[data-zen]_&]:bg-background text-foreground flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]'>
+        <div className='h-dvh bg-sidebar [[data-zen]_&]:bg-background [[data-phone-layout]_&]:bg-background text-foreground flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]'>
           {/* The strip under the status bar (the iPad's menu bar), in the
               sidebar's color (the notes' in Zen, to run into the pane): an
               element of its own, since the root goes see-through while a PDF
               or drawing shows through it. */}
-          <div aria-hidden className='pointer-events-none fixed inset-x-0 top-0 h-[env(safe-area-inset-top)] bg-sidebar [[data-zen]_&]:bg-background' />
+          <div aria-hidden className='pointer-events-none fixed inset-x-0 top-0 h-[env(safe-area-inset-top)] bg-sidebar [[data-zen]_&]:bg-background [[data-phone-layout]_&]:bg-background' />
           <SidebarProvider
             key={hydrated ? 'hydrated' : 'initial'}
             open={!sidebarCollapsed}

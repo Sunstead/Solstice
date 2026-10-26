@@ -159,7 +159,10 @@ final class Ink: NSObject {
     // The canvas PaperKit draws through (PencilKit's own, with the public
     // `PKCanvasView.drawingPolicy`): it turns a finger away whatever the
     // gestures take.
-    let policy: PKCanvasViewDrawingPolicy = on ? .anyInput : .default
+    // Off, an iPhone's `.default` still lets a finger draw (Only Draw with
+    // Apple Pencil is off there), and the Draw switch is all it has.
+    let off: PKCanvasViewDrawingPolicy = UIDevice.current.userInterfaceIdiom == .phone ? .pencilOnly : .default
+    let policy: PKCanvasViewDrawingPolicy = on ? .anyInput : off
     for canvas in view.descendants where canvas.responds(to: NSSelectorFromString("setDrawingPolicy:")) {
       canvas.setValue(policy.rawValue, forKey: "drawingPolicy")
     }

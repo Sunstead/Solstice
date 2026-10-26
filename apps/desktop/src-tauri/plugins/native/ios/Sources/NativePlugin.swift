@@ -64,6 +64,21 @@ struct HostArgs: Decodable {
   let index: Int?
   let width: Double?
   let order: [Int]?
+  /// For `alert`: what it says and its buttons.
+  let title: String?
+  let message: String?
+  let actions: [AlertAction]?
+  /// For `pickDate`: the date to start on.
+  let date: DateParts?
+  /// For `tabBar`: its items, which is selected, and whether it shows.
+  let items: [TabBarItemSpec]?
+  let selected: String?
+  let hidden: Bool?
+  /// For `tabBar`: a web sheet or menu is over it, and takes its touches.
+  let covered: Bool?
+  /// For `spotlight`: a workspace's notes, which replace those indexed for it.
+  let notes: [Launch.Note]?
+  let workspace: String?
 }
 
 class NativePlugin: Plugin {
@@ -83,6 +98,13 @@ class NativePlugin: Plugin {
         self.trigger("pencilTap", data: ["x": Double(point.x), "y": Double(point.y)])
       }
       Ink.shared.plugin = self
+      TabBar.shared.plugin = self
+      Launch.plugin = self
+      Launch.setQuickActions()
+      Launch.hookConnected()
+      AccessibilityStatus.follow { [weak self] status in
+        self?.trigger("accessibility", data: status.mapValues { $0 as JSValue })
+      }
       if let parent = webview.superview { Ink.shared.listen(in: parent) }
     }
     let center = NotificationCenter.default
@@ -158,6 +180,8 @@ class NativePlugin: Plugin {
         if args.ease == "play" { surface.easePlay() } else { surface.easeEnd() }
       case "reload":
         host.surfaces[args.id]?.reload()
+      case "recentre":
+        host.surfaces[args.id]?.recentre()
       case "find":
         // Reading handwriting takes a moment: answered when it's done.
         let surface = host.surfaces[args.id]
@@ -194,6 +218,16 @@ class NativePlugin: Plugin {
 
   @objc public func host(_ invoke: Invoke) throws {
     let args = try invoke.parseArgs(HostArgs.self)
+    // Kept for the next launch, whether or not the host is up yet.
+    if args.op == "launchColour" {
+      if let rgb = args.rgb, rgb.count >= 3 { SurfaceHost.launchColour = rgb }
+      return invoke.resolve()
+    }
+    if args.op == "appearance" {
+      SurfaceHost.launchDark = args.on
+      DispatchQueue.main.async { SurfaceHost.applyAppearance(to: self.webview?.window) }
+      return invoke.resolve()
+    }
     DispatchQueue.main.async {
       guard let host = self.host else { return invoke.resolve() }
       switch args.op {
@@ -302,11 +336,56 @@ class NativePlugin: Plugin {
         } catch {
           return invoke.reject("Couldn't make the notebook: \(error.localizedDescription)")
         }
+      case "alert":
+        guard let presenter = self.manager.viewController else { return invoke.reject("Nothing to show it from.") }
+        Pickers.alert(
+          title: args.title ?? "", message: args.message, actions: args.actions ?? [], by: presenter
+        ) { id in
+          invoke.resolve(["id": id ?? ""])
+        }
+        return
+      case "pickDate":
+        guard let date = args.date, let webview = self.webview, let presenter = self.manager.viewController else {
+          return invoke.reject("No date to pick.")
+        }
+        Pickers.date(date, from: self.shareRect(args.anchor, in: webview), in: webview, by: presenter) { parts in
+          guard let parts else { return invoke.resolve(["picked": false]) }
+          var answer: JSObject = ["picked": true, "year": parts.year, "month": parts.month, "day": parts.day]
+          if let hour = parts.hour, let minute = parts.minute {
+            answer["hour"] = hour
+            answer["minute"] = minute
+          }
+          invoke.resolve(answer)
+        }
+        return
+      case "pickPhotos", "pickDocuments":
+        guard let presenter = self.manager.viewController else { return invoke.reject("Nothing to pick from.") }
+        let done: ([String]) -> Void = { paths in invoke.resolve(["paths": paths]) }
+        if args.op == "pickPhotos" {
+          Pickers.photos(by: presenter, done: done)
+        } else {
+          Pickers.documents(by: presenter, done: done)
+        }
+        return
+      case "launchActions":
+        // What iOS asked of the app before the page was listening.
+        return invoke.resolve(["actions": Launch.take().map { $0.mapValues { $0 as JSValue } }])
+      case "accessibility":
+        return invoke.resolve(AccessibilityStatus.current().mapValues { $0 as JSValue })
+      case "spotlight":
+        guard let workspace = args.workspace else { break }
+        Launch.index(args.notes ?? [], workspace: workspace)
+      case "tabBar":
+        guard let webview = self.webview else { break }
+        TabBar.shared.set(
+          args.items ?? [], selected: args.selected, hidden: args.hidden ?? true, covered: args.covered ?? false,
+          beside: webview)
       case "background":
         if let rgb = args.rgb, rgb.count >= 3 {
           host.backgroundColor = UIColor(
             red: rgb[0] / 255, green: rgb[1] / 255, blue: rgb[2] / 255, alpha: 1)
         }
+
       default:
         return invoke.reject("No such operation: \(args.op)")
       }

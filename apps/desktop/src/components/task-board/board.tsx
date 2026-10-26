@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
-import { Check, ListPlus, MoreHorizontal, PencilLine, Plus, Square, Trash2, Trash2Icon } from 'lucide-react';
+import { Check, Copy, ListPlus, MoreHorizontal, PencilLine, Plus, Square, Trash2, Trash2Icon } from 'lucide-react';
 
 import { CanvasColorPicker } from '@/components/canvas/canvas-color-picker';
 import { resolveCanvasColor } from '@/lib/canvas/color';
@@ -24,8 +24,11 @@ import {
   DropdownMenuTrigger,
 } from '@sunstead/ui/components/dropdown-menu';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
+import { useKeyboardRoom } from '@/lib/keyboard';
 import { primeKeyboard } from '@/lib/keyboard-primer';
+import { touchFirst } from '@/lib/backend/platform';
 import { createBoardGesture, type BoardTarget } from '@/lib/task-board/board-gesture';
+import { revealField } from '@/lib/task-board/reveal-field';
 import {
   addCard,
   addColumn,
@@ -45,6 +48,7 @@ import { cardAt, cardMarkdown, parseBoard, type CardRef } from '@/lib/task-board
 import type { BoardStore } from '@/lib/task-board/store';
 import { cn } from '@/lib/utils';
 import { BoardCard, CardEditor } from './board-card';
+import { haptics } from '@/lib/haptics';
 
 type Editing = { kind: 'card'; ref: CardRef } | { kind: 'new-card'; column: number; key?: number } | null;
 type Menu = { target: BoardTarget; x: number; y: number } | null;
@@ -55,6 +59,10 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
   const board = useMemo(() => parseBoard(text), [text]);
   const paged = useIsMobile();
   const rootRef = useRef<HTMLDivElement>(null);
+  // While a field has focus the board ends above the keyboard (nothing else
+  // resizes for it), so a full column's New Card field can be scrolled to.
+  const [roomRef, room] = useKeyboardRoom();
+  useLayoutEffect(() => revealField(document.activeElement), [room]);
 
   const [editing, setEditing] = useState<Editing>(null);
   const [renaming, setRenaming] = useState<number | 'new' | null>(null);
@@ -123,7 +131,13 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
 
   return (
     // Focusable, so a click anywhere on the board brings its keys here.
-    <div className='absolute inset-0 flex flex-col outline-none' tabIndex={-1} onKeyDown={onKeyDown}>
+    <div
+      ref={roomRef}
+      className='absolute inset-0 flex flex-col outline-none'
+      style={{ paddingBottom: room }}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+    >
       {board.title !== null && <h1 className='board-title'>{board.title}</h1>}
 
       <div ref={rootRef} className={cn('board', paged && 'is-paged')} data-board>
@@ -183,8 +197,14 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
                     index={i}
                     path={path}
                     addingSubtask={subtaskOf?.column === c && subtaskOf.card === i}
-                    onToggle={() => change((t) => toggleCard(t, { column: c, card: i }))}
-                    onToggleSubtask={(line) => change((t) => toggleSubtask(t, line))}
+                    onToggle={() => {
+                      haptics.play('select');
+                      change((t) => toggleCard(t, { column: c, card: i }));
+                    }}
+                    onToggleSubtask={(line) => {
+                      haptics.play('select');
+                      change((t) => toggleSubtask(t, line));
+                    }}
                     onDeleteSubtask={(line) => change((t) => deleteSubtask(t, line))}
                     onStartSubtask={() => startSubtask({ column: c, card: i })}
                     onAddSubtask={(title) => change((t) => addSubtask(t, { column: c, card: i }, title))}
@@ -247,7 +267,10 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
             />
           }
         />
-        <DropdownMenuContent className='w-auto min-w-48'>
+        {/* On a touch screen focus stays where an item put it: handed back to
+            the anchor, it would take the keyboard from the field Edit, Add
+            Card or Rename raised it for (`primeKeyboard`). */}
+        <DropdownMenuContent className='w-auto min-w-48' finalFocus={touchFirst ? false : undefined}>
           {menuTarget?.kind === 'card' && (
             <>
               <DropdownMenuItem onClick={afterMenu(() => startEditing({ kind: 'card', ref: menuTarget.ref }))}>
@@ -261,6 +284,15 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
               <DropdownMenuItem onClick={() => change((t) => toggleCard(t, menuTarget.ref))}>
                 {menuCard?.checked ? <Square /> : <Check />}
                 {menuCard?.checked ? 'Mark Not Done' : 'Mark Done'}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  // As editing shows it: the title, then its nested lines.
+                  if (menuCard) void navigator.clipboard.writeText(cardMarkdown(menuCard)).catch(() => {});
+                }}
+              >
+                <Copy />
+                Copy
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant='destructive' onClick={() => change((t) => deleteCard(t, menuTarget.ref))}>

@@ -96,6 +96,23 @@ describe('PushPane', () => {
     );
   });
 
+  // A native view shows through the pushed page from under the webview, so
+  // nothing under the pane may be drawn: the page behind goes once it's in.
+  it('hides the page behind while it is in, and gives it back', () => {
+    const behind = createRef<HTMLDivElement>();
+    const draw = (open: boolean) =>
+      act(() => {
+        root.render(
+          h('div', null, h('div', { ref: behind }), h(PushPane, { open, onClose: () => {}, behind, keepMounted: true, children: h('p') })),
+        );
+      });
+    draw(true);
+    expect(behind.current!.style.visibility).toBe('hidden');
+    draw(false);
+    expect(behind.current!.style.visibility).toBe('');
+    expect(behind.current!.style.clipPath).toBe('');
+  });
+
   // The pane is a scroll view resting on the page; reaching its left is the
   // swipe back, so the owner is told once, and the page leaves with no slide.
   it('goes back when scrolled all the way to the left', () => {

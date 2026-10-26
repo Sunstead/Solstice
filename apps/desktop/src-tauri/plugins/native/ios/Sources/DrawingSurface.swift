@@ -190,17 +190,48 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     spinner.center = CGPoint(x: bounds.midX, y: bounds.midY)
     guard let drawn = opening, let controller, bounds.width > 0, bounds.height > 0 else { return }
     opening = nil
+    controller.view.layoutIfNeeded()
+    Self.hideIndicators(in: controller.view)
     // Starts on what's drawn (or the middle of an empty canvas).
+    look(at: drawn, animated: false)
+  }
+
+  /// What's drawn, at actual size: its middle across, its top down to a
+  /// screen of it; the canvas's middle when there's nothing.
+  private func look(at drawn: CGRect, animated: Bool) {
+    guard let controller else { return }
     let size = bounds.size
     let markup = controller.markup?.bounds ?? .zero
     let centre =
       drawn.isNull || drawn.isEmpty
       ? CGPoint(x: markup.midX, y: markup.midY)
       : CGPoint(x: drawn.midX, y: drawn.minY + min(drawn.height, size.height) / 2)
-    controller.view.layoutIfNeeded()
     controller.setContentVisibleFrame(
       CGRect(x: centre.x - size.width / 2, y: centre.y - size.height / 2, width: size.width, height: size.height),
-      animated: false)
+      animated: animated)
+  }
+
+  /// On a canvas a quarter of a million points across, a scroll indicator
+  /// is a sliver that flings the view far into blank paper at a touch.
+  private static func hideIndicators(in view: UIView) {
+    for scroll in view.subviews(of: UIScrollView.self) {
+      scroll.showsHorizontalScrollIndicator = false
+      scroll.showsVerticalScrollIndicator = false
+    }
+  }
+
+  /// Measured off the main thread, as a save measures it: reading a big
+  /// drawing's elements takes a good part of a second.
+  override func recentre() {
+    guard let markup = controller?.markup else { return }
+    Task { [weak self] in
+      let drawn = await Task.detached(priority: .userInitiated) { () -> CGRect in
+        var content = markup.subelements.strokes.reduce(CGRect.null) { $0.union($1.renderBounds) }
+        if let rest = markup.withoutInk { content = content.union(rest.contentsRenderFrame) }
+        return content
+      }.value
+      self?.look(at: drawn, animated: true)
+    }
   }
 
   /// At least `side` across, from (0, 0) (`grown`). Returns how far what's
@@ -240,6 +271,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
       let visible = controller.contentVisibleFrame
       controller.markup = markup
       controller.setContentVisibleFrame(visible.offsetBy(dx: shift.x, dy: shift.y), animated: false)
+      Self.hideIndicators(in: controller.view)
       surfaceLog.info("grew \(self.id, privacy: .public) to \(Int(markup.bounds.width))")
     }
   }

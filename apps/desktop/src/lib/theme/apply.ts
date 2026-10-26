@@ -2,6 +2,9 @@ import { themeById } from '@sunstead/ui/themes';
 import { DEFAULT_LIGHT_THEME_ID, DEFAULT_THEME_ID } from './builtin';
 import type { Theme } from './types';
 import { THEME_TOKENS, isThemeToken } from './tokens';
+import { can } from '@/lib/backend/platform';
+import { nativeSurfaces } from '@/lib/backend/native';
+import { toRgb } from '@/lib/css-colour';
 
 const STORAGE_KEY = 'solstice.theme.lastApplied';
 
@@ -27,7 +30,8 @@ export interface FirstPaint {
  * these through `var()`, so nothing else has to be told a theme changed.
  *
  * `color-scheme` is left alone, as it always was: setting it would restyle
- * native controls.
+ * native controls. The iOS app tells UIKit instead, which reaches the
+ * keyboard and the system's own views without touching the page.
  */
 export function applyTheme(theme: Theme) {
   const root = document.documentElement;
@@ -50,6 +54,7 @@ export function applyTheme(theme: Theme) {
   for (const [name, value] of vars) root.style.setProperty(name, value);
 
   syncThemeColor();
+  if (can.nativeViews) void nativeSurfaces.appearance(theme.appearance === 'dark');
 
   rememberForFirstPaint({
     theme: builtin.id,
@@ -74,6 +79,13 @@ function syncThemeColor() {
   probe.style.cssText = 'position:absolute;visibility:hidden;background:var(--sidebar)';
   document.body.append(probe);
   meta.content = getComputedStyle(probe).backgroundColor;
+  // The iOS app paints the page's colour from its first frame next launch,
+  // before the page has, rather than white.
+  if (can.nativeViews) {
+    probe.style.background = 'var(--background)';
+    const rgb = toRgb(getComputedStyle(probe).backgroundColor);
+    if (rgb) void nativeSurfaces.launchColour(rgb);
+  }
   probe.remove();
 }
 

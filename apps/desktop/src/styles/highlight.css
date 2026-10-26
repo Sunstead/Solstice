@@ -16,6 +16,17 @@ mark.solstice-highlight {
   font-style: italic;
 }
 
+/* An inline comment's `%%` while the caret is away: zero-sized, not
+   removed, as `.wikilink-hidden`, so the caret can still pass through. */
+.solstice-comment-marker {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
 /* A block's `^id`: there for links, not for reading. */
 .solstice-block-id {
   color: var(--muted-foreground);

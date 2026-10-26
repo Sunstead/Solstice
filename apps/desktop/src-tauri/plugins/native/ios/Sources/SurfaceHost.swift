@@ -39,6 +39,9 @@ class SurfaceView: UIView {
   /// The file changed under it (another device, another app).
   func reload() {}
 
+  /// Back to what's drawn, at its own size (a drawing's Reset View).
+  func recentre() {}
+
   /// Whether the surface paints its own ground (a drawing's paper) rather
   /// than the pane's colour the web side sends with each frame.
   var paintsOwnGround: Bool { false }
@@ -271,25 +274,70 @@ final class SurfaceHost: UIView {
     group.notify(queue: .main, execute: done)
   }
 
+  /// The theme's background as sRGB 0–255, from the page (`launchColour`).
+  static var launchColour: [Double]? {
+    get { UserDefaults.standard.array(forKey: "solstice.launchColour") as? [Double] }
+    set { UserDefaults.standard.set(newValue, forKey: "solstice.launchColour") }
+  }
+
+  /// The theme's appearance (`appearance`), kept for the next launch too, so
+  /// the keyboard, the loupe and every UIKit view match it: the page never
+  /// sets `color-scheme`, which would restyle its own controls.
+  static var launchDark: Bool? {
+    get { UserDefaults.standard.object(forKey: "solstice.launchDark") as? Bool }
+    set { UserDefaults.standard.set(newValue, forKey: "solstice.launchDark") }
+  }
+
+  static func applyAppearance(to window: UIWindow?) {
+    guard let window, let dark = launchDark else { return }
+    window.overrideUserInterfaceStyle = dark ? .dark : .light
+  }
+
   /// Sits under `webview`, the same size, and makes it see-through.
   static func install(under webview: WKWebView) -> SurfaceHost? {
     guard let parent = webview.superview else { return nil }
     let host = SurfaceHost(frame: webview.frame)
     host.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    // Until the page paints, the see-through webview shows this: the last
+    // theme's colour, not the window's white.
+    if let rgb = launchColour, rgb.count >= 3 {
+      let colour = UIColor(red: rgb[0] / 255, green: rgb[1] / 255, blue: rgb[2] / 255, alpha: 1)
+      host.backgroundColor = colour
+      webview.window?.backgroundColor = colour
+    }
+    applyAppearance(to: webview.window)
     parent.insertSubview(host, belowSubview: webview)
     webview.isOpaque = false
     webview.backgroundColor = .clear
     webview.scrollView.backgroundColor = .clear
     current = host
     routeTouches(of: webview)
+    hideFormAccessory(of: webview)
     return host
+  }
+
+  /// Takes away WebKit's bar over the keyboard (previous, next, Done): it
+  /// stacked under the note's own keyboard bar and gave every other field
+  /// away as a web page. The keyboard bar's own button puts the keyboard
+  /// away. On WKContentView's class, which answers for every field.
+  private static func hideFormAccessory(of webview: WKWebView) {
+    guard
+      let content = webview.scrollView.subviews.first(where: { NSStringFromClass(type(of: $0)).hasPrefix("WKContent") })
+    else { return }
+    let cls = realClass(of: content)
+    guard !hooked.contains(ObjectIdentifier(cls)) else { return }
+    hooked.insert(ObjectIdentifier(cls))
+    replaceMethod(of: cls, #selector(getter: UIResponder.inputAccessoryView)) { _ in
+      let block: @convention(block) (UIView) -> UIView? = { _ in nil }
+      return block
+    }
   }
 
   /// The web view whose touches go to the surfaces under it.
   private static weak var routed: WKWebView?
 
   /// Has the web view's class (wry's) answer nothing to a hit test over a
-  /// shown surface, so UIKit goes on to the host underneath. On the class,
+  /// shown surface or the tab bar, so UIKit goes on to what's underneath. On the class,
   /// for that web view only: never by changing its class (`MethodHooks.swift`).
   private static func routeTouches(of webview: WKWebView) {
     routed = webview
@@ -303,7 +351,7 @@ final class SurfaceHost: UIView {
       let block: @convention(block) (UIView, CGPoint, UIEvent?) -> UIView? = { view, point, event in
         let taken = MainActor.assumeIsolated {
           guard view === routed, let host = SurfaceHost.current else { return false }
-          return host.takesTouch(at: view.convert(point, to: host))
+          return host.takesTouch(at: view.convert(point, to: host)) || TabBar.shared.takesTouch(at: point, in: view)
         }
         return taken ? nil : hitTest(view, selector, point, event)
       }

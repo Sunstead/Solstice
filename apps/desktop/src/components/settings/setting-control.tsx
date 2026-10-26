@@ -7,6 +7,7 @@ import { Switch } from '@sunstead/ui/components/switch';
 import { clampToRange } from '@/lib/settings/store';
 import type { AnySettingDef, NumberDef } from '@/lib/settings/types';
 import { FontControl, SelectControl } from './combobox-control';
+import { haptics } from '@/lib/haptics';
 
 /**
  * Controls needing the full row width, which `SettingRow` stacks under the
@@ -31,7 +32,10 @@ export function SettingControl({ def, value, onChange, id }: SettingControlProps
         <Switch
           id={id}
           checked={value as boolean}
-          onCheckedChange={onChange}
+          onCheckedChange={(checked) => {
+            haptics.play('select');
+            onChange(checked);
+          }}
         />
       );
 
@@ -39,7 +43,10 @@ export function SettingControl({ def, value, onChange, id }: SettingControlProps
       return (
         <RadioGroup
           value={value as string}
-          onValueChange={onChange}
+          onValueChange={(next) => {
+            haptics.play('select');
+            onChange(next);
+          }}
           aria-labelledby={id}
           className='pb-2'
         >

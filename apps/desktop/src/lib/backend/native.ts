@@ -44,6 +44,8 @@ export const nativeSurfaces = {
   /** Eases held content (`play`), or puts it where it belongs (`end`). */
   ease: (id: string, phase: 'play' | 'end') => surface({ op: 'ease', id, ease: phase }),
   reload: (id: string) => surface({ op: 'reload', id }),
+  /** A drawing back to what's drawn, at actual size. */
+  recentre: (id: string) => surface({ op: 'recentre', id }),
   close: (id: string) => surface({ op: 'close', id }),
   /** Highlights the matches and shows the first; an empty query clears them. */
   find: (id: string, query: string, caseSensitive: boolean, wholeWord: boolean) =>
@@ -76,6 +78,10 @@ export const nativeSurfaces = {
     invoke('plugin:solstice-native|host', { op: 'notebook', path, template }),
   /** The theme's background, painted behind the see-through webview. */
   background: (rgb: number[]) => host({ op: 'background', rgb }),
+  /** The theme's background, kept for the next launch's first frames. */
+  launchColour: (rgb: number[]) => host({ op: 'launchColour', rgb }),
+  /** The theme's appearance, for UIKit's own views (the keyboard, the loupe, pickers). */
+  appearance: (dark: boolean) => host({ op: 'appearance', on: dark }),
   listen: (handler: (event: SurfaceEvent) => void) =>
     addPluginListener('solstice-native', 'surface', handler),
 };
@@ -182,10 +188,114 @@ export const nativePencilTaps = {
  * The Taptic Engine (`Haptics.swift`), for gestures that lift, drop or
  * cross a slot. Fire and forget: a missed tick is only a missed tick.
  */
-export type HapticKind = 'lift' | 'drop' | 'tick' | 'dismiss' | 'warning';
+/**
+ * `lift`/`drop`/`tick`: a drag. `dismiss`: a sheet let go of. `select`: a
+ * choice changed (a toggle, a checkbox). `hold`: a hold opened something.
+ * `commit`: a swipe passed the point where letting go acts. `light`: a pull
+ * that triggers. `success`/`warning`: something made or moved, or a delete.
+ */
+export type HapticKind =
+  | 'lift'
+  | 'drop'
+  | 'tick'
+  | 'dismiss'
+  | 'warning'
+  | 'select'
+  | 'hold'
+  | 'commit'
+  | 'light'
+  | 'success';
 
 export const nativeHaptics = {
   /** Wakes the engine before a tick that may follow (a press that may lift). */
   prepare: () => host({ op: 'haptic' }),
   play: (kind: HapticKind) => host({ op: 'haptic', kind }),
+};
+
+/** One button of a native alert: `cancel` sits apart, `destructive` is red. */
+export type AlertButton = { id: string; label: string; style?: 'default' | 'cancel' | 'destructive' };
+
+/** A date as front matter writes it, with its time only when it has one. */
+export type DateParts = { year: number; month: number; day: number; hour?: number; minute?: number };
+
+/**
+ * The system's alerts and pickers (`Pickers.swift`), where the web's own
+ * would give the app away: a centred confirmation, a date, photos and files
+ * from the Files app. Picked files are copies in the temporary directory,
+ * for the app to copy on into the workspace (`importAttachment`).
+ */
+export const nativePickers = {
+  /** The chosen button's id. */
+  alert: (title: string, message: string | undefined, actions: AlertButton[]) =>
+    invoke<{ id: string }>('plugin:solstice-native|host', { op: 'alert', title, message, actions }).then(
+      (r) => r.id || null,
+    ),
+  /** The calendar (and clock, if `date` has a time), from `anchor` on an iPad; null if put away. */
+  date: (date: DateParts, anchor: Rect | null) =>
+    invoke<{ picked: boolean } & DateParts>('plugin:solstice-native|host', { op: 'pickDate', date, anchor }).then(
+      ({ picked, ...parts }) => (picked ? parts : null),
+    ),
+  photos: () =>
+    invoke<{ paths: string[] }>('plugin:solstice-native|host', { op: 'pickPhotos' }).then((r) => r.paths),
+  documents: () =>
+    invoke<{ paths: string[] }>('plugin:solstice-native|host', { op: 'pickDocuments' }).then((r) => r.paths),
+};
+
+/**
+ * One item of the native tab bar: an SF Symbol (and its selected form), or
+ * initials on a disc (You).
+ */
+export type TabBarItem = {
+  id: string;
+  label: string;
+  symbol?: string;
+  selectedSymbol?: string;
+  initials?: string;
+  badge?: boolean;
+};
+
+export type TabBarEvent = { type: 'select'; id: string } | { type: 'inset'; inset: number };
+
+/**
+ * The iPhone's tab bar (`TabBar.swift`), UIKit's own under the see-through
+ * webview: the web side says what's in it and keeps its spot clear; taps,
+ * and how tall it is, come back.
+ */
+export const nativeTabBar = {
+  /** `covered`: a web sheet or menu is over it (it's under the webview), and takes its touches. */
+  set: (items: TabBarItem[], selected: string | null, hidden: boolean, covered = false) =>
+    host({ op: 'tabBar', items, selected: selected ?? undefined, hidden, covered }),
+  listen: (handler: (event: TabBarEvent) => void) =>
+    addPluginListener<TabBarEvent>('solstice-native', 'tabBar', handler),
+};
+
+/** What iOS asked of the app from outside it (`Launch.swift`). */
+export type LaunchAction = { type: 'shortcut'; id: 'new-note' | 'search' } | { type: 'open'; path: string };
+
+export type SpotlightNote = { path: string; title: string; folder: string };
+
+/**
+ * Home Screen quick actions and Spotlight: what was asked before the page
+ * listened, what's asked after, and the notes Spotlight finds.
+ */
+export const nativeLaunch = {
+  /** Asked once: what came before, and from then on `listen` hears the rest. */
+  take: () =>
+    invoke<{ actions: LaunchAction[] }>('plugin:solstice-native|host', { op: 'launchActions' })
+      .then((r) => r.actions)
+      .catch(() => [] as LaunchAction[]),
+  listen: (handler: (action: LaunchAction) => void) =>
+    addPluginListener<LaunchAction>('solstice-native', 'launch', handler),
+  /** `workspace`'s notes, in place of those Spotlight had for it. */
+  spotlight: (workspace: string, notes: SpotlightNote[]) => host({ op: 'spotlight', workspace, notes }),
+};
+
+/** The system's accessibility settings the page can't query itself. */
+export type AccessibilityState = { reduceTransparency: boolean; increaseContrast: boolean; reduceMotion: boolean };
+
+export const nativeAccessibility = {
+  get: () =>
+    invoke<AccessibilityState>('plugin:solstice-native|host', { op: 'accessibility' }).catch(() => null),
+  listen: (handler: (state: AccessibilityState) => void) =>
+    addPluginListener<AccessibilityState>('solstice-native', 'accessibility', handler),
 };

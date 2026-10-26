@@ -122,7 +122,8 @@ function slotOf(id: string, kind: ToolKind, color = '#000000'): ToolSlot {
   return slot;
 }
 
-export function defaultToolbox(): Toolbox {
+/** `fingerDraws`: whether a finger draws until said otherwise (an iPhone has no Pencil). */
+export function defaultToolbox(fingerDraws = false): Toolbox {
   const slots = [
     slotOf('pen', 'pen'),
     slotOf('monoline', 'monoline', '#0a84ff'),
@@ -141,7 +142,7 @@ export function defaultToolbox(): Toolbox {
     recents: ['pen'],
     recentColors: [],
     ruler: false,
-    fingerDraws: false,
+    fingerDraws,
     badgeCorner: 'bottom-right',
   };
 }
@@ -250,8 +251,8 @@ export function toolbox<T extends Toolbox>(state: T, action: ToolboxAction): T {
 }
 
 /** What's on disk, made safe: a hand edit or an older shape never breaks the tools. */
-export function sanitize(raw: unknown): Toolbox {
-  if (!raw || typeof raw !== 'object') return defaultToolbox();
+export function sanitize(raw: unknown, fingerDraws = false): Toolbox {
+  if (!raw || typeof raw !== 'object') return defaultToolbox(fingerDraws);
   const input = raw as Record<string, unknown>;
   const slots: ToolSlot[] = [];
   const seen = new Set<string>();
@@ -287,7 +288,7 @@ export function sanitize(raw: unknown): Toolbox {
     recents,
     recentColors,
     ruler: input.ruler === true,
-    fingerDraws: input.fingerDraws === true,
+    fingerDraws: typeof input.fingerDraws === 'boolean' ? input.fingerDraws : fingerDraws,
     badgeCorner: CORNERS.includes(input.badgeCorner as Corner) ? (input.badgeCorner as Corner) : 'bottom-right',
   };
 }

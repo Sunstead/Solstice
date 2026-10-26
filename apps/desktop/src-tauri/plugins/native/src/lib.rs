@@ -62,6 +62,21 @@ fn unavailable() -> String {
     "Only the iOS app has this.".into()
 }
 
+#[cfg(target_os = "ios")]
+extern "C" {
+    fn solstice_native_early();
+}
+
+/// What has to be in place before UIKit connects the app's first scene
+/// (`Launch.swift`): a cold launch's Home Screen quick action or Spotlight
+/// result is only ever handed to that. Call it first thing in `run`.
+pub fn early() {
+    #[cfg(target_os = "ios")]
+    unsafe {
+        solstice_native_early()
+    }
+}
+
 pub trait NativeExt<R: Runtime> {
     fn native(&self) -> &Native<R>;
 }

@@ -138,6 +138,7 @@ fn raise_open_file_limit() {
 pub fn run() {
     #[cfg(target_os = "ios")]
     raise_open_file_limit();
+    tauri_plugin_solstice_native::early();
 
     let builder = specta_builder();
 

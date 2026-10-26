@@ -36,7 +36,7 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
     const under = new Set<Element>();
     const measure = () => {
       const r = el.getBoundingClientRect();
-      const visible = r.width > 0 && r.height > 0 && el.checkVisibility?.() !== false;
+      const visible = shown(el, r);
       const key = `${r.x},${r.y},${r.width},${r.height},${visible}`;
       if (key === last) return false;
       // A Zen switch's new size: taken at once, the content held where it
@@ -49,6 +49,11 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
       last = key;
       size = now;
       const backdrop = visible ? seeThrough(el, r, under) : null;
+      // Hidden: what was see-through for it paints again.
+      if (!visible) {
+        for (const below of under) unmark(below);
+        under.clear();
+      }
       void nativeSurfaces.place(id, { x: r.x, y: r.y, width: r.width, height: r.height }, visible, backdrop, hold);
       if (hold && playing) void nativeSurfaces.ease(id, 'play');
       return true;
@@ -90,6 +95,17 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
   useNativeFind(id, path);
 
   return <div ref={ref} data-native-surface className='h-full w-full' />;
+}
+
+/**
+ * Whether the surface's element is on screen. A closed pushed page (the
+ * phone's note) is moved off and `visibility: hidden`, which plain
+ * `checkVisibility()` and a rect's size both miss.
+ */
+function shown(el: HTMLElement, r: DOMRect): boolean {
+  if (r.width <= 0 || r.height <= 0) return false;
+  if (r.right <= 0 || r.bottom <= 0 || r.left >= window.innerWidth || r.top >= window.innerHeight) return false;
+  return el.checkVisibility?.({ visibilityProperty: true, opacityProperty: true }) !== false;
 }
 
 /** The find bar, searching in the native view. */

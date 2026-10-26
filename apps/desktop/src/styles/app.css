@@ -25,8 +25,8 @@
 
 /* The Islands layout (`appearance.islands`, `islands.css`): panels on the
    window's color instead of regions split by borders. */
-@custom-variant islands (&:where([data-islands='true'] *));
-@custom-variant island-borders (&:where([data-islands='true'][data-island-borders='true'] *));
+@custom-variant islands (&:where([data-islands='true']:not([data-phone-layout]) *));
+@custom-variant island-borders (&:where([data-islands='true'][data-island-borders='true']:not([data-phone-layout]) *));
 
 @theme inline {
   --font-sans: 'Geist Variable', sans-serif;
@@ -86,7 +86,7 @@
 /* The explorer under Islands is a panel of the notes' color, so its rows'
    hover and active fills are steps off that, not off the sidebar's: the
    themes' --sidebar-accent is tuned for the sidebar and reads too light here. */
-:root[data-islands='true'] .island-panel {
+:root[data-islands='true']:not([data-phone-layout]) .island-panel {
   --sidebar-accent: color-mix(in oklch, var(--foreground) 9%, var(--background));
 }
 
@@ -156,7 +156,17 @@
   [data-phone='true'] [data-sidebar='menu-button'],
   [data-phone='true'] [data-sidebar='menu-sub-button'] {
     height: 2.75rem;
-    font-size: 15px;
+    font-size: 17px;
+  }
+
+  /* No indent guides, as iOS's Files list has none. */
+  [data-phone='true'] [data-slot='sidebar-menu-sub'] {
+    border-left-color: transparent;
+  }
+
+  /* A folder's chevron turns on a spring, as a disclosure does. */
+  [data-phone='true'] [data-sidebar='menu-button'] > svg:first-child {
+    transition: rotate 0.35s cubic-bezier(0.34, 1.4, 0.64, 1), transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
   }
 }
 
@@ -205,6 +215,16 @@
 
 [data-slot='scroll-area-thumb'] {
   z-index: 20;
+}
+
+/* A finger gets the system's own indicators, which show only while
+   scrolling, rather than the desktop's thumb, which never goes. */
+:root[data-pointer='touch'] [data-slot='scroll-area-scrollbar'] {
+  display: none;
+}
+
+:root[data-pointer='touch'] [data-slot='scroll-area-viewport'] {
+  scrollbar-width: auto !important;
 }
 
 /*
@@ -261,7 +281,7 @@ html[data-reduce-motion='true'] *::after {
  * system's own scrolling (followed on the compositor, flicked at the finger's
  * speed, rubber-banded) and a swipe far enough closes it. Open and close are a
  * slide of the whole pane on the spring UIKit's sheets use (critically damped;
- * 0.5s perceptual in, 0.38s out), written as `linear()` so it runs on the
+ * 0.5s perceptual in, a quicker 0.28s out), written as `linear()` so it runs on the
  * compositor like any easing: position 1 - (1 + wt) * e^(-wt), w = 2pi / duration,
  * sampled until it is within 0.3% of the end. Reduce motion makes it instant,
  * with everything else.
@@ -269,7 +289,7 @@ html[data-reduce-motion='true'] *::after {
 :root {
   --sheet-ms: 640ms;
   --sheet-spring: linear(0, 0.0131, 0.0468, 0.0943, 0.1504, 0.2113, 0.2741, 0.3366, 0.3974, 0.4555, 0.5102, 0.5612, 0.6083, 0.6514, 0.6906, 0.7261, 0.7581, 0.7868, 0.8125, 0.8354, 0.8557, 0.8737, 0.8896, 0.9036, 0.9159, 0.9268, 0.9363, 0.9446, 0.9519, 0.9583, 0.9638, 0.9687, 0.9729, 0.9765, 0.9797, 0.9825, 0.9849, 0.987, 0.9887, 0.9903, 0.9916, 0.9928, 0.9938, 0.9947, 0.9954, 0.9961, 0.9966, 1);
-  --sheet-fall-ms: 485ms;
+  --sheet-fall-ms: 360ms;
   /* A page pushed over another: UINavigationController's quicker 0.3s perceptual. */
   --push-ms: 385ms;
   --push-spring: linear(0, 0.0131, 0.047, 0.0947, 0.151, 0.2121, 0.275, 0.3377, 0.3986, 0.4568, 0.5116, 0.5626, 0.6097, 0.6528, 0.692, 0.7274, 0.7594, 0.788, 0.8136, 0.8364, 0.8567, 0.8746, 0.8904, 0.9044, 0.9167, 0.9274, 0.9369, 0.9452, 0.9524, 0.9587, 0.9642, 0.969, 0.9732, 0.9768, 0.98, 0.9827, 0.9851, 0.9871, 0.9889, 0.9904, 0.9918, 0.9929, 0.9939, 0.9948, 0.9955, 0.9961, 0.9967, 1);
@@ -331,6 +351,13 @@ html[data-reduce-motion='true'] *::after {
 
 :root[data-touch] .solstice-pane[data-closed] {
   animation: solstice-pane-fall var(--sheet-fall-ms) var(--sheet-fall) forwards;
+}
+
+/* Closing, it's gone for every touch at once: the end of its fall, with
+   nothing left to see, mustn't catch a swipe and come back. */
+:root[data-touch] .solstice-pane[data-closed],
+:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='sheet-overlay'])[data-closed] {
+  pointer-events: none;
 }
 
 /* Swiped away, it has already left: nothing to play. */
@@ -445,12 +472,232 @@ html[data-reduce-motion='true'] *::after {
   scroll-snap-align: start;
 }
 
+.solstice-push-edge {
+  position: absolute;
+  /* Below the page's header, so its Back button takes taps. */
+  top: 3rem;
+  bottom: 0;
+  left: 100%;
+  width: 20px;
+  z-index: 1;
+}
+
 .solstice-push-page {
   display: flex;
   flex-direction: column;
   height: 100%;
   background: var(--background);
   box-shadow: -8px 0 24px rgb(0 0 0 / 0.12);
+}
+
+/*
+ * A phone page's bars (`PhoneHeader`, the tab bar; `lib/scroll-edge.ts`):
+ * the page's own colour at rest, with no line, and once content scrolls
+ * under one, a blurred fade off its inner edge, as iOS 26's scroll edge
+ * effect. The fade is a band hung past the bar, so the content's top (or
+ * end) goes soft rather than meeting an edge.
+ */
+.phone-bar,
+.phone-tab-bar {
+  position: relative;
+  z-index: 10;
+}
+
+/* The web's tab bar (where UIKit's isn't): a floating capsule of the page
+   blurred, its highlight springing to the tab shown on the push spring. */
+.phone-tab-capsule {
+  background: color-mix(in oklch, var(--background) 78%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: blur(20px) saturate(1.8);
+  box-shadow:
+    0 6px 24px rgb(0 0 0 / 0.12),
+    inset 0 0 0 0.5px color-mix(in oklch, var(--foreground) 12%, transparent);
+}
+
+.phone-tab-indicator {
+  background: color-mix(in oklch, var(--foreground) 9%, transparent);
+  transition: transform calc(var(--push-ms, 385ms) * 1.2) var(--push-spring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone-tab-indicator {
+    transition: none;
+  }
+}
+
+.phone-bar::after,
+.phone-tab-bar::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  height: 1.25rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.phone-bar::after {
+  top: 100%;
+  background: linear-gradient(var(--background), transparent);
+  mask-image: linear-gradient(black, transparent);
+}
+
+.phone-tab-bar::before {
+  bottom: 100%;
+  background: linear-gradient(transparent, var(--background));
+  mask-image: linear-gradient(transparent, black);
+}
+
+.phone-bar[data-scrolled]::after,
+.phone-tab-bar[data-scrolled]::before {
+  opacity: 1;
+}
+
+.phone-bar[data-fadeless]::after {
+  content: none;
+}
+
+/* The iPhone's native tab bar floats over the pages (`NativeFooter`): what
+   scrolls on them runs on under its glass, and can scroll clear of it, the
+   last row a little above it (`TabBarRoom`). A spacer, not padding: WebKit
+   leaves a flex scroll view's bottom padding out of what it scrolls. */
+.tab-bar-room {
+  display: none;
+  flex: none;
+}
+
+:root[data-native-tab-bar] .tab-bar-room {
+  display: block;
+  height: calc(var(--tab-bar-inset, 0px) + 1.5rem);
+}
+
+/* A tab's root: its title large at rest, shrinking into the bar as the
+   list scrolls (by transform, so nothing below moves). */
+.phone-bar[data-large] .phone-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transform-origin: left center;
+  transition: transform 200ms ease-out;
+}
+
+.phone-bar[data-large][data-scrolled] .phone-title {
+  transform: scale(0.6);
+}
+
+/* On a touch phone the chrome is the system's font (SF Pro on iOS, with its
+   tracking at each size), and so is a note unless one is set. */
+:root[data-phone-layout][data-touch] {
+  --font-sans: system-ui, -apple-system, sans-serif;
+}
+
+/* A phone's grouped rows (`RowGroup`): hairlines between them, inset past
+   the icon as UIKit's are, so the icons read as a column. */
+.phone-rows > * + * {
+  background-image: linear-gradient(var(--border), var(--border));
+  background-size: calc(100% - 2.75rem) 0.5px;
+  background-position: right top;
+  background-repeat: no-repeat;
+}
+
+/* A held row dips as its sheet comes up (`useHold`). */
+[data-held] {
+  scale: 0.97;
+  background-color: var(--accent);
+  transition: scale 120ms ease-out, background-color 120ms ease-out;
+}
+
+/* A phone's text fields are iOS's: filled, rounded, with no outline or
+   focus ring (the caret says where typing goes). An error still shows red. */
+:root[data-phone-layout][data-touch] :is([data-slot='input-group'], [data-slot='input']) {
+  border-color: transparent;
+  background-color: var(--muted);
+  border-radius: 0.625rem;
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+:root[data-phone-layout][data-touch] :is([data-slot='input-group'], [data-slot='input']):is([aria-invalid='true'], :has([aria-invalid='true'])) {
+  border-color: var(--destructive);
+}
+
+/* A phone's floating glass (the keyboard bar): the sidebar's colour, mostly
+   opaque, blurring what's behind, with a hairline rim. */
+.phone-glass {
+  background: color-mix(in oklab, var(--sidebar) 82%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow:
+    inset 0 0 0 0.5px var(--border),
+    0 4px 16px rgb(0 0 0 / 0.18);
+}
+
+/* A phone's settings are iOS's grouped rows: each group a rounded card, a
+   row at least 44pt with its label at body size, a choice of a few a list
+   with a checkmark on the one in effect rather than radio buttons. */
+:root[data-phone-layout][data-touch] [data-setting-list] {
+  border-radius: 0.75rem;
+  background: var(--card);
+  padding-inline: 1rem;
+}
+
+:root[data-phone-layout][data-touch] [data-setting-list] > * {
+  display: flex;
+  min-height: 2.75rem;
+  flex-direction: column;
+  justify-content: center;
+}
+
+:root[data-phone-layout][data-touch] [data-setting-list] label {
+  font-size: 17px;
+  font-weight: 400;
+}
+
+/* A choice's name heads its options, as iOS heads a group: small and muted,
+   so it never reads as one of them. */
+:root[data-phone-layout][data-touch] [data-setting-list] > :has([data-slot='radio-group']) > :first-child label {
+  padding-top: 0.5rem;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+:root[data-phone-layout][data-touch] [data-setting-list] [data-slot='radio-group'] {
+  gap: 0;
+  padding-bottom: 0;
+}
+
+:root[data-phone-layout][data-touch] [data-setting-list] [data-slot='radio-group'] > label {
+  min-height: 2.75rem;
+  border: 0;
+  border-top: 0.5px solid var(--border);
+  border-radius: 0;
+  background: none;
+  padding-inline: 0;
+}
+
+:root[data-phone-layout][data-touch] [data-setting-list] [data-slot='radio-group-item'] {
+  display: none;
+}
+
+:root[data-phone-layout][data-touch] [data-setting-list] [data-slot='radio-group'] > label:has([data-checked])::after {
+  content: '';
+  margin-left: auto;
+  width: 1.125rem;
+  height: 1.125rem;
+  background: var(--primary);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* What can be tapped in a bar (Back, New, Done) takes the accent, as UIKit
+   tints it. */
+.phone-tint {
+  color: var(--primary);
+}
+
+.phone-tint:disabled {
+  color: var(--muted-foreground);
 }
 
 /* A folder in its color (`FolderGlyph`). `folder_open.svg` sets its fill
@@ -465,4 +712,77 @@ html[data-reduce-motion='true'] *::after {
 [data-zen-moving],
 [data-zen-moving] * {
   transition: none !important;
+}
+
+/* -- Accessibility ---------------------------------------------------------
+   Reduce Motion: sheets fade rather than rise and fall (the push and the tab
+   motion ask `motionEnabled`). The setting, the media query, or the iOS
+   app's own (`data-system-reduce-motion`, from `useSystemAccessibility`). */
+@keyframes solstice-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes solstice-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+:root[data-touch]:is([data-reduce-motion='true'], [data-system-reduce-motion]) .solstice-pane[data-open],
+:root[data-touch]:is([data-reduce-motion='true'], [data-system-reduce-motion]) [data-slot='alert-dialog-content'][data-open] {
+  animation: solstice-fade-in 200ms ease-out;
+}
+
+:root[data-touch]:is([data-reduce-motion='true'], [data-system-reduce-motion]) .solstice-pane[data-closed],
+:root[data-touch]:is([data-reduce-motion='true'], [data-system-reduce-motion]) [data-slot='alert-dialog-content'][data-closed] {
+  animation: solstice-fade-out 150ms ease-in forwards;
+}
+
+:root:is([data-reduce-motion='true'], [data-system-reduce-motion]) .phone-tab-indicator {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-touch] .solstice-pane[data-open],
+  :root[data-touch] [data-slot='alert-dialog-content'][data-open] {
+    animation: solstice-fade-in 200ms ease-out;
+  }
+
+  :root[data-touch] .solstice-pane[data-closed],
+  :root[data-touch] [data-slot='alert-dialog-content'][data-closed] {
+    animation: solstice-fade-out 150ms ease-in forwards;
+  }
+}
+
+/* Reduce Transparency: what's blurred glass is solid. */
+:root[data-reduce-transparency] .phone-bar::after,
+:root[data-reduce-transparency] .phone-tab-bar::before,
+:root[data-reduce-transparency] .phone-tab-capsule,
+:root[data-reduce-transparency] .phone-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root[data-reduce-transparency] .phone-tab-capsule {
+  background: var(--background);
+}
+
+:root[data-reduce-transparency] .phone-glass {
+  background: var(--sidebar);
+}
+
+/* Increase Contrast (or the system asking for more): quiet text and lines
+   step up towards the foreground. */
+:root[data-increase-contrast] {
+  --muted-foreground: color-mix(in oklch, var(--foreground) 82%, var(--background));
+  --border: color-mix(in oklch, var(--foreground) 38%, var(--background));
+}
+
+@media (prefers-contrast: more) {
+  :root[data-theme] {
+    --muted-foreground: color-mix(in oklch, var(--foreground) 82%, var(--background));
+    --border: color-mix(in oklch, var(--foreground) 38%, var(--background));
+  }
 }

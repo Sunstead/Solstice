@@ -35,7 +35,7 @@ export function ToolAttributes({ slot }: { slot: ToolSlot }) {
               aria-checked={slot.width === width}
               aria-label={`Width ${width}`}
               className={cn(
-                'grid size-9 place-items-center rounded-full',
+                'grid size-9 place-items-center rounded-full touch:size-11',
                 slot.width === width ? 'bg-accent ring-1 ring-foreground/20' : 'hover:bg-accent/60',
               )}
               onClick={() => inkDispatch({ type: 'setWidth', width })}

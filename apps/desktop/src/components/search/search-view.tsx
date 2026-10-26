@@ -5,19 +5,23 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { CaseSensitive, ChevronRight, WholeWord } from 'lucide-react';
+import { CaseSensitive, Check, ChevronRight, WholeWord } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { Button } from '@sunstead/ui/components/button';
 import { Input } from '@sunstead/ui/components/input';
 import type { FileHits, Hit, Jump } from '@/bindings';
 import { getFileIconFor } from '@/assets/icons';
+import { EntryMenuTrigger } from '@/components/entry-menu-trigger';
 import { FormattedFileName } from '@/components/file-tree';
 import { useLayout } from '@/hooks/use-layout';
 import { getFileNameFromPath, getRelativePath } from '@/lib/path-utils';
 import { openSearchHit } from '@/lib/search/jump';
 import { matchNames, type NameMatch } from '@/lib/search/names';
 import { useSetting } from '@/lib/settings/store';
+import { touchFirst } from '@/lib/backend/platform';
+import { useScrollEdge } from '@/lib/scroll-edge';
+import { TabBarRoom } from '@/components/mobile/tab-bar-room';
 import { parseExcludes, useSearchStore } from '@/lib/stores/search';
 import { selectAllFiles, useFileIndex } from '@/lib/stores/use-file-index';
 import { cn } from '@/lib/utils';
@@ -38,30 +42,33 @@ const open = (path: string) =>
  * Full-text search of the workspace: the field and its two options, files
  * whose names match, then every file whose insides do, each hit a line that
  * opens the file there. The sidebar's Search view and the phone's Search page.
- * `empty` shows before anything's typed; `autoFocus` focuses the field on
- * arrival (the phone's page, where the keyboard should come up with it).
+ * `empty` shows before anything's typed. `bar` is the phone's page, where
+ * the field is the bottom of its top bar: the fade of results scrolling
+ * under it hangs below the field, not across it.
  */
 export function SearchView({
   root,
   empty,
-  autoFocus,
+  bar = false,
 }: {
   root: string;
   empty?: ReactNode;
-  autoFocus?: boolean;
+  bar?: boolean;
 }) {
   useSearchRunner(root);
   const query = useSearchStore((s) => s.query);
   const results = useSearchStore((s) => s.results);
   const pending = useSearchStore((s) => s.pending);
   const error = useSearchStore((s) => s.error);
+  const edge = useScrollEdge('top');
 
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
-      <div className='px-2 pb-2'>
-        <SearchField autoFocus={autoFocus} />
+      <div ref={bar ? edge : undefined} className={cn('px-2 pb-2', bar && 'phone-bar bg-background')}>
+        <SearchField />
       </div>
-      <div className='min-h-0 flex-1 overflow-y-auto px-2 pb-4'>
+      {/* Dragging the results puts the keyboard away, as iOS's lists do. */}
+      <div className='min-h-0 flex-1 overflow-y-auto px-2 pb-4' onTouchMove={touchFirst ? blurField : undefined}>
         {!query ? (
           (empty ?? <span />)
         ) : (
@@ -79,6 +86,7 @@ export function SearchView({
             )}
           </>
         )}
+        <TabBarRoom />
       </div>
     </div>
   );
@@ -101,7 +109,12 @@ function useSearchRunner(root: string) {
   }, [root, query, caseSensitive, wholeWord, exclude, files]);
 }
 
-function SearchField({ autoFocus }: { autoFocus?: boolean }) {
+function blurField() {
+  const field = document.activeElement;
+  if (field instanceof HTMLInputElement && field.dataset.searchField !== undefined) field.blur();
+}
+
+function SearchField() {
   const query = useSearchStore((s) => s.query);
   const setQuery = useSearchStore((s) => s.setQuery);
   const caseSensitive = useSearchStore((s) => s.caseSensitive);
@@ -110,6 +123,7 @@ function SearchField({ autoFocus }: { autoFocus?: boolean }) {
   const toggleWholeWord = useSearchStore((s) => s.toggleWholeWord);
   const focusNonce = useSearchStore((s) => s.focusNonce);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(false);
 
   // Find in Files: a frame later, once the view it switched to has mounted.
   useEffect(() => {
@@ -119,47 +133,65 @@ function SearchField({ autoFocus }: { autoFocus?: boolean }) {
   }, [focusNonce]);
 
   return (
-    <div className='relative flex items-center'>
-      <Input
-        ref={inputRef}
-        value={query}
-        autoFocus={autoFocus}
-        placeholder='Search'
-        aria-label='Search in files'
-        autoCapitalize='off'
-        autoCorrect='off'
-        spellCheck={false}
-        enterKeyHint='search'
-        className='h-8 pr-16 touch:h-10'
-        onChange={(event) => setQuery(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' && query) {
-            event.preventDefault();
-            setQuery('');
-          }
-        }}
-      />
-      {/* As the find bar has them, so they read the same. */}
-      <div className='absolute right-1 flex items-center gap-0.5'>
-        <Button
-          size='icon-xs'
-          variant={caseSensitive ? 'default' : 'ghost'}
-          aria-label='Match case'
-          aria-pressed={caseSensitive}
-          onClick={toggleCaseSensitive}
-        >
-          <CaseSensitive />
-        </Button>
-        <Button
-          size='icon-xs'
-          variant={wholeWord ? 'default' : 'ghost'}
-          aria-label='Match whole word'
-          aria-pressed={wholeWord}
-          onClick={toggleWholeWord}
-        >
-          <WholeWord />
-        </Button>
+    <div className='flex items-center gap-2'>
+      <div className='relative flex min-w-0 flex-1 items-center'>
+        <Input
+          ref={inputRef}
+          data-search-field
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          value={query}
+          placeholder='Search'
+          aria-label='Search in files'
+          autoCapitalize='off'
+          autoCorrect='off'
+          spellCheck={false}
+          enterKeyHint='search'
+          className='h-8 pr-16 touch:h-10'
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && query) {
+              event.preventDefault();
+              setQuery('');
+            }
+          }}
+        />
+        {/* As the find bar has them, so they read the same. */}
+        <div className='absolute right-1 flex items-center gap-0.5'>
+          <Button
+            size='icon-xs'
+            variant={caseSensitive ? 'default' : 'ghost'}
+            aria-label='Match case'
+            aria-pressed={caseSensitive}
+            onClick={toggleCaseSensitive}
+          >
+            <CaseSensitive />
+          </Button>
+          <Button
+            size='icon-xs'
+            variant={wholeWord ? 'default' : 'ghost'}
+            aria-label='Match whole word'
+            aria-pressed={wholeWord}
+            onClick={toggleWholeWord}
+          >
+            <WholeWord />
+          </Button>
+        </div>
       </div>
+      {/* Puts the keyboard away, keeping the query: a check, as iOS's own
+          Done is now, rather than Cancel's clearing. */}
+      {touchFirst && focused && (
+        <button
+          type='button'
+          aria-label='Done'
+          className='flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground active:opacity-60'
+          // Kept from taking focus, or the field's blur would unmount it mid-tap.
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => inputRef.current?.blur()}
+        >
+          <Check className='size-5' strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 }
@@ -234,17 +266,22 @@ function NameMatches({ root }: { root: string }) {
 function NameRow({ match, root }: { match: NameMatch; root: string }) {
   const { entry } = match;
   return (
-    <button type='button' className={ROW} onClick={() => open(entry.path)}>
-      {createElement(getFileIconFor(entry.name), {
-        className: 'size-4 shrink-0',
-      })}
-      <span className='min-w-0 truncate'>
-        <FormattedFileName name={entry.name} />
-      </span>
-      <span className='min-w-0 flex-1 truncate text-xs text-muted-foreground'>
-        {folderOf(entry.path, root)}
-      </span>
-    </button>
+    <EntryMenuTrigger
+      entry={entry}
+      render={
+        <button type='button' className={ROW} onClick={() => open(entry.path)}>
+          {createElement(getFileIconFor(entry.name), {
+            className: 'size-4 shrink-0',
+          })}
+          <span className='min-w-0 truncate'>
+            <FormattedFileName name={entry.name} />
+          </span>
+          <span className='min-w-0 flex-1 truncate text-xs text-muted-foreground'>
+            {folderOf(entry.path, root)}
+          </span>
+        </button>
+      }
+    />
   );
 }
 
@@ -262,29 +299,34 @@ function FileGroup({ file, root }: { file: FileHits; root: string }) {
   return (
     // Off-screen groups skip layout and paint: thousands of rows stay cheap.
     <section className='[content-visibility:auto] [contain-intrinsic-size:auto_6rem]'>
-      <button
-        type='button'
-        className={ROW}
-        aria-expanded={!collapsed}
-        onClick={() => setCollapsed(!collapsed)}
-      >
-        <ChevronRight
-          className={cn(
-            'size-3.5 shrink-0 text-muted-foreground transition-transform',
-            !collapsed && 'rotate-90',
-          )}
-        />
-        {createElement(getFileIconFor(name), { className: 'size-4 shrink-0' })}
-        <span className='min-w-0 truncate font-medium'>
-          <FormattedFileName name={name} />
-        </span>
-        <span className='min-w-0 flex-1 truncate text-xs text-muted-foreground'>
-          {folderOf(file.path, root)}
-        </span>
-        <span className='shrink-0 rounded-full bg-muted px-1.5 text-xs tabular-nums text-muted-foreground'>
-          {file.count}
-        </span>
-      </button>
+      <EntryMenuTrigger
+        entry={{ path: file.path, name, is_dir: false }}
+        render={
+          <button
+            type='button'
+            className={ROW}
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            <ChevronRight
+              className={cn(
+                'size-3.5 shrink-0 text-muted-foreground transition-transform',
+                !collapsed && 'rotate-90',
+              )}
+            />
+            {createElement(getFileIconFor(name), { className: 'size-4 shrink-0' })}
+            <span className='min-w-0 truncate font-medium'>
+              <FormattedFileName name={name} />
+            </span>
+            <span className='min-w-0 flex-1 truncate text-xs text-muted-foreground'>
+              {folderOf(file.path, root)}
+            </span>
+            <span className='shrink-0 rounded-full bg-muted px-1.5 text-xs tabular-nums text-muted-foreground'>
+              {file.count}
+            </span>
+          </button>
+        }
+      />
       {!collapsed && (
         <div className='pl-5'>
           {file.hits.map((hit, index) => (

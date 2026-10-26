@@ -13,6 +13,9 @@ import {
   type SettingReader,
 } from './types';
 
+/** Whether the phone layout is showing (`PhoneShell` marks `<html>`). */
+const phoneLayout = () => typeof document !== 'undefined' && document.documentElement.hasAttribute('data-phone-layout');
+
 /**
  * Heading sizes as exponents of one scale ratio, chosen so the default ratio
  * of 1.25 reproduces the sizes the typeset stylesheet shipped with (1.75em /
@@ -98,6 +101,8 @@ export const settingsRegistry = {
     label: 'Islands',
     default: true,
     domAttr: { name: 'data-islands', format: (v) => String(v) },
+    // The phone has one look (`data-phone-layout`).
+    visibleWhen: () => !phoneLayout(),
   }),
 
   // A border round each island, and the tabs in the classic tab bar's
@@ -110,6 +115,7 @@ export const settingsRegistry = {
     default: false,
     domAttr: { name: 'data-island-borders', format: (v) => String(v) },
     disabledWhen: (get) => !get('appearance.islands'),
+    visibleWhen: () => !phoneLayout(),
   }),
 
   'appearance.workspaceSwitcherLocation': defineEnum({
@@ -123,6 +129,8 @@ export const settingsRegistry = {
       { value: 'explorer-sidebar', label: 'Explorer sidebar' },
     ],
     default: 'icon-sidebar',
+    // A phone has none of these places: its workspace is Files' title.
+    visibleWhen: () => !phoneLayout(),
   }),
 
   'appearance.reduceMotion': defineBoolean({
@@ -439,6 +447,7 @@ export const settingsRegistry = {
     // One document at a time suits a tablet, as GoodNotes and Safari do it;
     // splits are for a mouse. A phone shows one note whichever this is.
     default: touchFirst ? 'single' : 'split',
+    visibleWhen: () => !phoneLayout(),
   }),
 
   'ink.notebookTemplate': defineEnum({
@@ -473,7 +482,9 @@ export const settingsRegistry = {
     // The ink tools under a drawing's or PDF's header (`InkRibbon`); the
     // header's Tools button flips it too. The Pencil draws either way.
     label: 'Show the ink tools',
-    default: true,
+    // Off: drawing is something iOS's Solstice supports, not what it's for.
+    // The header's Tools button brings them back.
+    default: false,
     visibleWhen: () => can.nativeViews,
   }),
 
@@ -629,6 +640,14 @@ export const settingsRegistry = {
     label: 'Folders left out of search',
     default: '',
     placeholder: 'Archive, Templates/Old',
+  }),
+
+  'explorer.folderCounts': defineBoolean({
+    section: 'explorer',
+    scope: 'global',
+    // On a phone's tree, quiet on each folder's right (`FolderCount`).
+    label: 'Show how many items each folder holds',
+    default: false,
   }),
 
   'explorer.foldersFirst': defineBoolean({

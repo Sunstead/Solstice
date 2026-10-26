@@ -4,6 +4,7 @@ import { targetFromPath } from '@/lib/entry-actions';
 import { touchFirst } from '@/lib/backend/platform';
 import { Button } from '@sunstead/ui/components/button';
 import { useEntryMenuItems, type EntryMenuSurface } from '@/lib/entry-menu-items';
+import { useEntrySheet } from '@/lib/stores/entry-sheet';
 import { EntryMenuItems } from './entry-menu-items';
 import {
   DropdownMenu,
@@ -27,7 +28,8 @@ const components = {
 /**
  * Actions for the file the editor has open. The items themselves come from
  * `useEntryMenuItems`, the same source the explorer's context menu renders,
- * so the two can never offer different things for the same file.
+ * so the two can never offer different things for the same file. On a touch
+ * screen it's the hold sheet (`EntrySheet`), as a note's ⋯ is on a phone.
  */
 export function FileActionsDropdown({
   path,
@@ -37,6 +39,21 @@ export function FileActionsDropdown({
   surface?: EntryMenuSurface;
 }) {
   const items = useEntryMenuItems(targetFromPath(path), { surface });
+
+  if (touchFirst) {
+    return (
+      <Button
+        variant='ghost'
+        size='icon-sm'
+        // Share is in the sheet here, not a button of its own: its popover points at this.
+        data-share-anchor={path}
+        onClick={() => useEntrySheet.getState().open(targetFromPath(path), 'note')}
+      >
+        <MoreVertical />
+        <span className='sr-only'>More</span>
+      </Button>
+    );
+  }
 
   return (
     <DropdownMenu>

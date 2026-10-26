@@ -4,7 +4,7 @@ import { createBadgeGesture, type BadgeGesture } from '@/lib/ink/badge-gesture';
 import { badgeLook, selectedSlot, TOOL_LABELS } from '@/lib/ink/toolbox';
 import { useOverSurface } from '@/lib/native-surfaces';
 import { setSetting } from '@/lib/settings/store';
-import { inkDispatch, useInkTools } from '@/lib/stores/ink-tools';
+import { inkDispatch, phoneInk, useInkTools } from '@/lib/stores/ink-tools';
 import { ToolIcon } from './tool-icon';
 
 /**
@@ -15,6 +15,11 @@ import { ToolIcon } from './tool-icon';
  * the ribbon back.
  */
 export function ToolBadge() {
+  // An iPhone's header switch is the tools and the finger's drawing together: hidden is off.
+  return phoneInk ? null : <Badge />;
+}
+
+function Badge() {
   const slot = useInkTools(selectedSlot);
   const corner = useInkTools((s) => s.badgeCorner);
   const overSurface = useOverSurface();

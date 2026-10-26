@@ -9,7 +9,16 @@ import {
   type Toolbox,
   type ToolboxAction,
 } from '@/lib/ink/toolbox';
+import { can } from '@/lib/backend/platform';
 import { createScopedStorage } from './scoped-storage';
+
+/**
+ * An iPhone: no Pencil, so a finger is the pen, and showing the tools
+ * (`ink.ribbon`) is what makes it draw, with no button of its own
+ * (`native-sync.ts`); hidden, a finger pans.
+ */
+export const phoneInk = can.nativeViews && !can.tabs;
+const FINGER_DRAWS = phoneInk;
 
 type InkToolsState = Toolbox & { dispatch: (action: ToolboxAction) => void };
 
@@ -41,7 +50,7 @@ const pick = ({
 export const useInkTools = create<InkToolsState>()(
   persist<InkToolsState, [], [], Toolbox>(
     (set) => ({
-      ...defaultToolbox(),
+      ...defaultToolbox(FINGER_DRAWS),
       dispatch: (action: ToolboxAction) => set((state) => toolbox(state, action)),
     }),
     {
@@ -49,7 +58,7 @@ export const useInkTools = create<InkToolsState>()(
       storage: createJSONStorage(() => createScopedStorage('ink-tools.json', 'global')),
       partialize: pick,
       // Hand-editable on disk, so read through `sanitize`.
-      merge: (persisted, current) => ({ ...current, ...sanitize(persisted) }),
+      merge: (persisted, current) => ({ ...current, ...sanitize(persisted, FINGER_DRAWS) }),
     },
   ),
 );

@@ -4,6 +4,7 @@ import type { EditorView } from '@milkdown/kit/prose/view';
 import { $prose } from '@milkdown/kit/utils';
 
 import { closestFromEvent } from '@/lib/editor/event-target';
+import { haptics } from '@/lib/haptics';
 
 /**
  * Clickable checkboxes for GFM task list items.
@@ -79,6 +80,7 @@ const taskListPlugin = $prose(
 
             // Prevents the caret from being placed in the gutter as well.
             event.preventDefault();
+            haptics.play('select');
             view.dispatch(
               view.state.tr.setNodeMarkup(pos, undefined, {
                 ...listItem.attrs,

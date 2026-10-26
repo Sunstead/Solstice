@@ -11,7 +11,7 @@
  * the window's bottom.
  */
 
-:root[data-islands='true'] {
+:root[data-islands='true']:not([data-phone-layout]) {
   --island-gap: 6px;
   --island-radius: var(--radius-lg, 0.625rem);
   /* A gap being hovered or dragged (the sidebar's rail, the splitters): a
@@ -21,7 +21,7 @@
 }
 
 /* Splitters are the gaps: flexlayout sizes them from --splitter-size. */
-:root[data-islands='true'] .flexlayout__layout {
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout__layout {
   --splitter-size: var(--island-gap);
   --color-splitter: transparent;
   --color-splitter-hover: transparent;
@@ -29,30 +29,30 @@
 }
 
 /* A hovered or dragged splitter draws the line down its middle. */
-:root[data-islands='true']:not([data-pointer='touch']) .flexlayout__splitter:hover,
-:root[data-islands='true'] .flexlayout__splitter_drag {
+:root[data-islands='true']:not([data-phone-layout]):not([data-pointer='touch']) .flexlayout__splitter:hover,
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout__splitter_drag {
   background: linear-gradient(var(--island-handle), var(--island-handle)) center / var(--island-handle-width) 100%
     no-repeat;
 }
 
-:root[data-islands='true']:not([data-pointer='touch']) .flexlayout__splitter_vert:hover,
-:root[data-islands='true'] .flexlayout__splitter_drag:has(.flexlayout__splitter_handle_vert) {
+:root[data-islands='true']:not([data-phone-layout]):not([data-pointer='touch']) .flexlayout__splitter_vert:hover,
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout__splitter_drag:has(.flexlayout__splitter_handle_vert) {
   background-size: 100% var(--island-handle-width);
 }
 
 /* The layout fills its own box, inside the inset's gap, not the inset. */
-:root[data-islands='true'] .flexlayout-custom {
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom {
   position: relative;
 }
 
 /* No outlines (unless `appearance.islandBorders` keeps the classic tab
    bar's, below): the selected tab keeps its curve (the flares fill with the
    note's colour) and is one piece with its pane. */
-:root[data-islands='true']:not([data-island-borders='true']) .flexlayout-custom .flexlayout__layout {
+:root[data-islands='true']:not([data-phone-layout]):not([data-island-borders='true']) .flexlayout-custom .flexlayout__layout {
   --color-tab-outline: transparent;
 }
 
-:root[data-islands='true']:not([data-island-borders='true']) .flexlayout-custom .flexlayout__tabset_tabbar_outer {
+:root[data-islands='true']:not([data-phone-layout]):not([data-island-borders='true']) .flexlayout-custom .flexlayout__tabset_tabbar_outer {
   box-shadow: none;
 }
 
@@ -61,13 +61,13 @@
    window's top edge needs it (those carry data-tauri-drag-region,
    applyTopEdgeDragRegions): a pane docked below another runs its tabs up to
    the divider. With island borders the 2px stays, clear of the ring. */
-:root[data-islands='true'] .flexlayout-custom
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom
   .flexlayout__tabset_tabbar_outer:not([data-tauri-drag-region])
   .flexlayout__tabset_tabbar_inner_tab_container_top {
   padding-top: 0;
 }
 
-:root[data-islands='true']:not([data-island-borders='true']) .flexlayout-custom
+:root[data-islands='true']:not([data-phone-layout]):not([data-island-borders='true']) .flexlayout-custom
   .flexlayout__tabset_tabbar_outer:not([data-tauri-drag-region])
   .flexlayout__tabset_tabbar_inner_tab_container_top {
   border-top: 0;
@@ -79,23 +79,23 @@
  * two are one shape. Content layers are their tab's (`/t0` is a tabset's
  * first), and only the selected one shows.
  */
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container {
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container {
   padding-left: 0;
 }
 
 /* The divider flexlayout puts before every tab. A selected tab has no
    margins, so it lands on the edge; an unselected one keeps its 2px
    (selecting never changes a tab's room: tab-motion.ts). */
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container > .flexlayout__tabset_tab_spacer:first-child {
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__tabset_tabbar_inner_tab_container > .flexlayout__tabset_tab_spacer:first-child {
   display: none;
 }
 
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset:not(:has(.header-controls-spacer))
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__tabset:not(:has(.header-controls-spacer))
   .flexlayout__tab_button--selected[data-layout-path$='/tb0']::before {
   display: none;
 }
 
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tab[data-layout-path$='/t0'] {
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__tab[data-layout-path$='/t0'] {
   --pane-tl: 0px;
   border-top-left-radius: 0;
 }
@@ -111,19 +111,19 @@
  * (header-controls.tsx); the room is in the tabs' padding, inside the strip
  * that clips the flare.
  */
-:root[data-islands='true'] .flexlayout-custom .flexlayout__layout {
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__layout {
   --tabs-room: calc(var(--tab-curve-r) + var(--island-radius));
   /* How far the first tab is from the pane's edge, and the room's share. */
   --tabs-offset: max(0px, var(--overhang, -100vw) + var(--tabs-room));
   --tabs-pad: clamp(0px, var(--overhang, -100vw) + var(--tabs-room), var(--tabs-room));
 }
 
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset:has(.header-controls-spacer)
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__tabset:has(.header-controls-spacer)
   .flexlayout__tabset_tabbar_inner_tab_container {
   padding-left: var(--tabs-pad);
 }
 
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset:has(.header-controls-spacer)
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__tabset:has(.header-controls-spacer)
   .flexlayout__tab_button--selected[data-layout-path$='/tb0']::before {
   --flare: min(var(--tabs-offset), var(--tab-curve-r));
   left: calc(var(--flare) * -1);
@@ -140,9 +140,9 @@
 /* The top-left pane is the first child at every level (findCornerTabset),
    so a path of only zeros, or else the maximized one, the only one showing.
    Its corner rounds only past the flare, so the two never meet. */
-:root[data-islands='true'] .flexlayout-custom
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom
   .flexlayout__tab[data-layout-path$='/ts0/t0']:not([data-layout-path*='1']):not([data-layout-path*='2']):not([data-layout-path*='3']):not([data-layout-path*='4']):not([data-layout-path*='5']):not([data-layout-path*='6']):not([data-layout-path*='7']):not([data-layout-path*='8']):not([data-layout-path*='9']),
-:root[data-islands='true'] .flexlayout-custom
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom
   .flexlayout__layout:has(.flexlayout__tabset-maximized)
   .flexlayout__tab[data-layout-path$='/t0'] {
   --pane-tl: clamp(0px, var(--tabs-offset) - var(--tab-curve-r), var(--island-radius));
@@ -153,8 +153,8 @@
    bottom, so the content fills the screen there (app-shell.tsx drops the
    inset's padding on those sides). Their corners that side are square; the
    top-left is the rules' above. */
-:root[data-islands='true'][data-touch] .flexlayout-custom .flexlayout__tabset_content,
-:root[data-islands='true'][data-touch] .flexlayout-custom .flexlayout__tab {
+:root[data-islands='true']:not([data-phone-layout])[data-touch] .flexlayout-custom .flexlayout__tabset_content,
+:root[data-islands='true']:not([data-phone-layout])[data-touch] .flexlayout-custom .flexlayout__tab {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
   border-bottom-left-radius: 0;
@@ -162,12 +162,12 @@
 
 /* The pane: the tab's content, a layer of its own over the tabset, and the
    tabset's empty body under it (seen while a pane has no tab). */
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tab {
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__tab {
   --pane-tl: var(--island-radius);
 }
 
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tabset_content,
-:root[data-islands='true'] .flexlayout-custom .flexlayout__tab {
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__tabset_content,
+:root[data-islands='true']:not([data-phone-layout]) .flexlayout-custom .flexlayout__tab {
   border-radius: var(--island-radius);
   overflow: hidden;
   background: var(--background);
@@ -187,27 +187,27 @@
  * room grows. The explorer's border is its own (`island-borders:`,
  * app-sidebar.tsx).
  */
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tabset_tabbar_outer {
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom .flexlayout__tabset_tabbar_outer {
   background: transparent;
   box-shadow: none;
 }
 
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tabset {
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom .flexlayout__tabset {
   isolation: isolate;
   --pane-tl: var(--island-radius);
 }
 
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom
   .flexlayout__tabset:has(.flexlayout__tab_button--selected[data-layout-path$='/tb0']) {
   --pane-tl: 0px;
 }
 
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom
   .flexlayout__tabset:has(.header-controls-spacer):has(.flexlayout__tab_button--selected[data-layout-path$='/tb0']) {
   --pane-tl: clamp(0px, var(--tabs-offset) - var(--tab-curve-r), var(--island-radius));
 }
 
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tabset::after {
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom .flexlayout__tabset::after {
   content: '';
   position: absolute;
   z-index: -1;
@@ -224,14 +224,14 @@
    header is a layer above the ring and would otherwise paint over the ring's
    left side, so the tab is held 1px off that edge — the same standoff the
    content has — and the border shows. */
-:root[data-islands='true'][data-island-borders='true'][data-touch] .flexlayout-custom .flexlayout__tabset::after {
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'][data-touch] .flexlayout-custom .flexlayout__tabset::after {
   inset: 43px 0 0;
   border-right-width: 0;
   border-bottom-width: 0;
   border-radius: var(--pane-tl) 0 0 0;
 }
 
-:root[data-islands='true'][data-island-borders='true'][data-touch] .flexlayout-custom .flexlayout__tab {
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'][data-touch] .flexlayout-custom .flexlayout__tab {
   clip-path: inset(0 0 0 1px round max(0px, calc(var(--pane-tl) - 1px)) 0 0 0);
 }
 
@@ -240,17 +240,17 @@
    `data-native-under` — so its fill is cleared here, or it sits on top of the
    native layer and hides it. The border stays: it is the island's own edge.
    Specificity has to outrank the ring rule above, hence the full prefix. */
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom
   .flexlayout__tabset[data-native-under]::after {
   background: transparent;
 }
 
 /* The ring paints the empty pane's colour; the layer paints the tab's. */
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tabset_content {
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom .flexlayout__tabset_content {
   background: transparent;
 }
 
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom .flexlayout__tab {
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom .flexlayout__tab {
   clip-path: inset(
     0 1px 1px round max(0px, calc(var(--pane-tl) - 1px)) calc(var(--island-radius) - 1px)
       calc(var(--island-radius) - 1px)
@@ -262,7 +262,7 @@
    In the pane the controls overhang that gives way as the tab leaves the edge
    (--tabs-offset), and the flare takes the line. Its padding gives back what
    the shift moved, so the icon, title and close button stay where they were. */
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom
   .flexlayout__tab_button--selected[data-layout-path$='/tb0'] {
   --tab-edge: 1px;
   translate: var(--tab-edge) 0;
@@ -270,7 +270,7 @@
   padding-right: calc(4px + 0.125rem + var(--tab-edge));
 }
 
-:root[data-islands='true'][data-island-borders='true'] .flexlayout-custom
+:root[data-islands='true']:not([data-phone-layout])[data-island-borders='true'] .flexlayout-custom
   .flexlayout__tabset:has(.header-controls-spacer)
   .flexlayout__tab_button--selected[data-layout-path$='/tb0'] {
   --tab-edge: clamp(0px, calc(1px - var(--tabs-offset)), 1px);
@@ -283,15 +283,15 @@
  * margin, its line against the editor. The margin moves it: the rail is
  * positioned by `right`, which sunstead-ui sets per pointer.
  */
-:root[data-islands='true'] [data-slot='sidebar-rail'] {
+:root[data-islands='true']:not([data-phone-layout]) [data-slot='sidebar-rail'] {
   margin-right: calc(var(--island-gap) / -2);
 }
 
-:root[data-islands='true'] [data-state='collapsed'] [data-slot='sidebar-rail'] {
+:root[data-islands='true']:not([data-phone-layout]) [data-state='collapsed'] [data-slot='sidebar-rail'] {
   margin-right: calc(var(--island-gap) / 2);
 }
 
-:root[data-islands='true'] [data-slot='sidebar-rail']::after {
+:root[data-islands='true']:not([data-phone-layout]) [data-slot='sidebar-rail']::after {
   left: calc(50% - var(--island-handle-width) / 2);
   width: var(--island-handle-width);
   bottom: var(--island-gap);
@@ -299,24 +299,24 @@
   transition: background-color 0.1s ease-in 0.05s;
 }
 
-:root[data-islands='true'] [data-state='collapsed'] [data-slot='sidebar-rail']::after {
+:root[data-islands='true']:not([data-phone-layout]) [data-state='collapsed'] [data-slot='sidebar-rail']::after {
   left: calc(50% + var(--island-gap) / 2 - var(--island-handle-width));
 }
 
-:root[data-islands='true']:not([data-pointer='touch']) [data-slot='sidebar-rail']:hover::after,
-:root[data-islands='true'] [data-dragging='true'] [data-slot='sidebar-rail']::after {
+:root[data-islands='true']:not([data-phone-layout]):not([data-pointer='touch']) [data-slot='sidebar-rail']:hover::after,
+:root[data-islands='true']:not([data-phone-layout]) [data-dragging='true'] [data-slot='sidebar-rail']::after {
   background-color: var(--island-handle);
 }
 
 /* Zen mode: the pane is the whole screen, so no corners and no ring. The
    rules above are long enough that only !important outranks every one. */
-:root[data-islands='true'][data-zen] .flexlayout-custom .flexlayout__tabset_content,
-:root[data-islands='true'][data-zen] .flexlayout-custom .flexlayout__tab {
+:root[data-islands='true']:not([data-phone-layout])[data-zen] .flexlayout-custom .flexlayout__tabset_content,
+:root[data-islands='true']:not([data-phone-layout])[data-zen] .flexlayout-custom .flexlayout__tab {
   --pane-tl: 0px !important;
   border-radius: 0 !important;
   clip-path: none !important;
 }
 
-:root[data-islands='true'][data-zen] .flexlayout-custom .flexlayout__tabset::after {
+:root[data-islands='true']:not([data-phone-layout])[data-zen] .flexlayout-custom .flexlayout__tabset::after {
   display: none;
 }

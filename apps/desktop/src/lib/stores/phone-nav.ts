@@ -16,6 +16,8 @@ const HISTORY = 50;
 interface PhoneNavState {
   page: PhonePage;
   noteOpen: boolean;
+  /** The open note is being swiped most of the way back: the tab bar comes in already. */
+  noteLeaving: boolean;
   /** Settings sections pushed on the You page, deepest last. */
   sections: SectionId[];
   /** The section on screen: the top one, or the last while it slides away. */
@@ -26,8 +28,11 @@ interface PhoneNavState {
   showPage: (page: PhonePage) => void;
   showNote: () => void;
   goHome: () => void;
+  setNoteLeaving: (leaving: boolean) => void;
   pushSection: (id: SectionId) => void;
   popSection: () => void;
+  /** Back to You's own page, past every section pushed on it. */
+  popSections: () => void;
 
   /** Records leaving `from` for another note, unless that was a step through history. */
   left: (from: string) => void;
@@ -42,14 +47,16 @@ let stepping = false;
 export const usePhoneNav = create<PhoneNavState>((set, get) => ({
   page: 'files',
   noteOpen: false,
+  noteLeaving: false,
   sections: [],
   section: null,
   back: [],
   forward: [],
 
   showPage: (page) => set({ page }),
-  showNote: () => set({ noteOpen: true }),
-  goHome: () => set({ noteOpen: false }),
+  showNote: () => set({ noteOpen: true, noteLeaving: false }),
+  goHome: () => set({ noteOpen: false, noteLeaving: false }),
+  setNoteLeaving: (leaving) => set((s) => (s.noteLeaving === leaving ? s : { noteLeaving: leaving })),
   pushSection: (id) =>
     set((s) => (s.sections[s.sections.length - 1] === id ? s : { sections: [...s.sections, id], section: id })),
   popSection: () =>
@@ -57,6 +64,8 @@ export const usePhoneNav = create<PhoneNavState>((set, get) => ({
       const sections = s.sections.slice(0, -1);
       return { sections, section: sections[sections.length - 1] ?? s.section };
     }),
+
+  popSections: () => set((s) => (s.sections.length ? { sections: [] } : s)),
 
   left: (from) => {
     if (stepping) {
@@ -80,6 +89,6 @@ export const usePhoneNav = create<PhoneNavState>((set, get) => ({
 
   reset: () => {
     stepping = false;
-    set({ noteOpen: false, sections: [], back: [], forward: [] });
+    set({ noteOpen: false, noteLeaving: false, sections: [], back: [], forward: [] });
   },
 }));

@@ -1,4 +1,5 @@
-import { useEffect, useReducer, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { Actions, type Model } from 'flexlayout-react';
 import { Bookmark, Files, Search } from 'lucide-react';
 
 import { useAccountActions } from '@/hooks/use-account-actions';
@@ -10,9 +11,14 @@ import { useLayout } from '@/hooks/use-layout';
 import { useLayoutSession } from '@/hooks/use-layout-session';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
-import { touchFirst } from '@/lib/backend/platform';
+import { can, touchFirst } from '@/lib/backend/platform';
+import { nativeTabBar, type TabBarItem } from '@/lib/backend/native';
+import { haptics } from '@/lib/haptics';
+import { initials } from '@/lib/initials';
+import { webOverlayOpen } from '@/lib/native-surfaces';
 import { useEntryInput } from '@/lib/stores/entry-input';
 import { usePhoneNav, type PhonePage } from '@/lib/stores/phone-nav';
+import type { SectionId } from '@/lib/settings/sections';
 import { useRevealTarget } from '@/lib/stores/reveal-target';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { cn } from '@/lib/utils';
@@ -22,7 +28,9 @@ import { tabPath } from './phone-history';
 import { PushPane } from './push-pane';
 import { BookmarksPage } from './bookmarks-page';
 import { SearchPage } from './search-page';
-import { shownTab } from './tabs';
+import { allTabs, shownTab } from './tabs';
+import { useScrollEdge } from '@/lib/scroll-edge';
+import { followDynamicType } from '@/lib/dynamic-type';
 import { YouPage } from './you-page';
 
 /**
@@ -36,6 +44,26 @@ import { YouPage } from './you-page';
  * replaces the note that was showing (`openInPlace`) rather than piling up
  * tabs nobody sees; the tab switcher still has them all.
  */
+/**
+ * A file opened: its note pushed in, with a light tap, as a row's push is in
+ * iOS apps. One open can be seen twice (asked for, then shown), so one tap.
+ */
+let tapped = 0;
+function openNote() {
+  const now = performance.now();
+  if (now - tapped > 250) haptics.play('light');
+  tapped = now;
+  usePhoneNav.getState().showNote();
+}
+
+/** How little of a note is left in view, swiping it back, when the tab bar comes in. */
+const BAR_BACK = 0.6;
+
+/** A swiped note's share in view: the tab bar returns well before it's gone. */
+function slide(share: number) {
+  usePhoneNav.getState().setNoteLeaving(share < BAR_BACK);
+}
+
 export function PhoneShell() {
   const model = useLayout((s) => s.model);
   const [, redraw] = useReducer((n: number) => n + 1, 0);
@@ -50,8 +78,10 @@ export function PhoneShell() {
     const listener = () => {
       handleModelChange(model);
       redraw();
+      if (!can.tabs) queueMicrotask(() => keepOnlyShown(model));
     };
     model.addChangeListener(listener);
+    if (!can.tabs) keepOnlyShown(model);
     return () => model.removeChangeListener(listener);
   }, [model, handleModelChange]);
 
@@ -62,26 +92,38 @@ export function PhoneShell() {
 
   const workspace = useWorkspace((s) => s.path);
   useEffect(() => usePhoneNav.getState().reset(), [workspace]);
+  useRestorePlace(workspace, !!model);
+
+  // The phone has one look: Islands and its gaps are the window's
+  // (`islands:` and `islands.css` skip it). Its type follows Dynamic Type.
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute('data-phone-layout', '');
+    const stopFollowing = touchFirst ? followDynamicType() : () => {};
+    return () => {
+      stopFollowing();
+      document.documentElement.removeAttribute('data-phone-layout');
+    };
+  }, []);
 
   const shown = model ? shownTab(model) : null;
   const shownId = shown?.getId();
   const shownPath = tabPath(shown);
 
   // Opening something (a file, a search result, a link) shows it. Not what
-  // the layout restored at launch: that starts on the files.
-  const seen = useRef<string | undefined>(undefined);
+  // a layout restored (at launch, or switching workspace): that stays on the
+  // page you were on.
+  const seen = useRef<{ model: Model | null; id: string | undefined }>({ model: null, id: undefined });
   useEffect(() => {
-    if (seen.current !== undefined && shownId !== undefined && shownId !== seen.current) {
-      usePhoneNav.getState().showNote();
-    }
-    seen.current = shownId;
-  }, [shownId]);
+    const last = seen.current;
+    if (last.model === model && last.id !== undefined && shownId !== undefined && shownId !== last.id) openNote();
+    seen.current = { model, id: shownId };
+  }, [model, shownId]);
 
   // Opening the note already showing changes nothing in the layout: this does.
   const opened = useLayout((s) => s.opened);
   const openedAtMount = useRef(opened);
   useEffect(() => {
-    if (opened !== openedAtMount.current) usePhoneNav.getState().showNote();
+    if (opened !== openedAtMount.current) openNote();
   }, [opened]);
 
   // Leaving a note for another is a step to go back through.
@@ -131,11 +173,11 @@ export function PhoneShell() {
           {page === 'search' && <SearchPage />}
           {page === 'you' && <YouPage />}
         </div>
-        <AppFooter />
+        {can.nativeTabBar ? <NativeFooter /> : <AppFooter />}
       </div>
       {model && (
-        <PushPane open={noteOpen} onClose={goHome} behind={home} keepMounted>
-          <NoteHeader model={model} shown={shown} />
+        <PushPane open={noteOpen} onClose={goHome} onSlide={slide} behind={home} keepMounted>
+          <NoteHeader shown={shown} />
           <div className='relative min-h-0 flex-1 bg-background'>
             {shown ? <TabContent key={shownId} node={shown} /> : <BlankTab tabId='' />}
           </div>
@@ -145,11 +187,67 @@ export function PhoneShell() {
   );
 }
 
+const PLACE_KEY = 'solstice.phone-place';
+type Place = { workspace: string; page: PhonePage; noteOpen: boolean; sections: SectionId[] };
+let placeRestored = false;
+
 /**
- * A swipe left on the files brings back the note, as Discord's does. Only
+ * Relaunching comes back to where you were (the tab, the note open over it,
+ * the settings pages pushed on You), as iOS apps restore their state. Kept
+ * per device in local storage, for the workspace it was in; once per launch.
+ */
+function useRestorePlace(workspace: string | null, ready: boolean) {
+  useEffect(() => {
+    if (!workspace || !ready || placeRestored) return;
+    placeRestored = true;
+    try {
+      const place = JSON.parse(localStorage.getItem(PLACE_KEY) ?? 'null') as Place | null;
+      if (place?.workspace === workspace) {
+        const nav = usePhoneNav.getState();
+        nav.showPage(place.page);
+        for (const section of place.sections) nav.pushSection(section);
+        const model = useLayout.getState().model;
+        if (place.noteOpen && model && shownTab(model)) nav.showNote();
+      }
+    } catch {
+      // Nothing kept, or storage refused: start on the files.
+    }
+  }, [workspace, ready]);
+
+  useEffect(() => {
+    if (!workspace) return;
+    return usePhoneNav.subscribe(({ page, noteOpen, sections }) => {
+      if (!placeRestored) return;
+      try {
+        localStorage.setItem(PLACE_KEY, JSON.stringify({ workspace, page, noteOpen, sections } satisfies Place));
+      } catch {
+        // A private window: nothing to come back to, which is fine.
+      }
+    });
+  }, [workspace]);
+}
+
+/**
+ * The iPhone shows one note at a time (`can.tabs`): whatever else the model
+ * holds (restored from a wider window, opened in a new tab) goes. Only the
+ * shown tab is ever mounted here, so nothing unsaved goes with them.
+ */
+function keepOnlyShown(model: Model) {
+  const shown = shownTab(model);
+  for (const tab of allTabs(model)) {
+    if (tab !== shown) model.doAction(Actions.deleteTab(tab.getId()));
+  }
+}
+
+/**
+ * A swipe left from the screen's right edge brings back the note, as
+ * Discord's does; anywhere else a sideways drag is the page's own. Only
  * sideways drags are the app's (`touch-action: pan-y`); scrolling stays the
  * browser's.
  */
+/** How near the right edge a swipe back to the note starts. */
+const EDGE = 24;
+
 function useSwipeToNote(enabled: boolean) {
   const start = useRef<{ x: number; y: number; id: number } | null>(null);
   const swiped = useRef(false);
@@ -158,6 +256,11 @@ function useSwipeToNote(enabled: boolean) {
     style: { touchAction: 'pan-y' },
     onPointerDown: (e: React.PointerEvent) => {
       if (e.pointerType === 'mouse') return;
+      const width = e.currentTarget instanceof HTMLElement ? e.currentTarget.clientWidth : window.innerWidth;
+      if (e.clientX < width - EDGE) {
+        start.current = null;
+        return;
+      }
       start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
       swiped.current = false;
     },
@@ -194,12 +297,38 @@ const PAGES: { id: PhonePage; label: string; icon: typeof Files }[] = [
   { id: 'search', label: 'Search', icon: Search },
 ];
 
-/** Files, Bookmarks, Search and You, along the bottom; hidden while the keyboard's up. */
+/**
+ * Tapping the tab already shown, as UIKit's: back to its root if something's
+ * pushed on it, else its list to the top.
+ */
+function toRoot(page: PhonePage) {
+  const nav = usePhoneNav.getState();
+  if (page === 'you' && nav.sections.length) return nav.popSections();
+  const root = document.querySelector(`[data-phone-page='${page}']`);
+  if (!root) return;
+  for (const el of root.querySelectorAll<HTMLElement>('*')) {
+    if (el.scrollTop > 0 && el.scrollHeight > el.clientHeight) el.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+/** A tab bar's tap: the tab, or the tab already shown back to its root. */
+function choose(page: PhonePage) {
+  const nav = usePhoneNav.getState();
+  if (nav.page === page) toRoot(page);
+  else nav.showPage(page);
+}
+
+/**
+ * Files, Bookmarks, Search and You, along the bottom, as a floating capsule
+ * whose highlight springs to the tab shown; hidden while the keyboard's up.
+ * Where there's no native one (`NativeFooter`): the web on a phone, a narrow
+ * window.
+ */
 function AppFooter() {
   const page = usePhoneNav((s) => s.page);
-  const showPage = usePhoneNav((s) => s.showPage);
   const keyboard = useKeyboard((s) => s.docked);
   const { username, attention } = useAccountActions();
+  const edge = useScrollEdge('bottom');
 
   if (keyboard) return null;
 
@@ -210,28 +339,127 @@ function AppFooter() {
       type='button'
       aria-label={label}
       aria-current={page === id ? 'page' : undefined}
-      onClick={() => showPage(id)}
+      onClick={() => choose(id)}
       className={cn(
-        'flex min-h-12 flex-1 items-center justify-center py-2.5 text-muted-foreground',
+        'relative flex min-h-11 flex-1 items-center justify-center text-muted-foreground',
         page === id && 'text-foreground',
       )}
     >
       {icon}
     </button>
   );
+  const index = Math.max(0, [...PAGES.map((p) => p.id), 'you'].indexOf(page));
 
   return (
-    <nav className='flex shrink-0 border-t bg-sidebar pb-[max(env(safe-area-inset-bottom),0.375rem)]'>
-      {PAGES.map(({ id, label, icon: Icon }) => item(id, label, <Icon className='size-6' />))}
-      {item(
-        'you',
-        'You',
-        <UserAvatar
-          username={username}
-          attention={attention}
-          className={cn('size-6', page === 'you' && 'ring-2 ring-foreground')}
-        />,
-      )}
+    <nav ref={edge} className='phone-tab-bar shrink-0 px-5 pt-1.5 pb-[max(env(safe-area-inset-bottom),0.5rem)]'>
+      <div className='phone-tab-capsule relative flex rounded-full p-1'>
+        <span
+          aria-hidden
+          className='phone-tab-indicator absolute inset-y-1 left-1 w-[calc((100%-0.5rem)/4)] rounded-full'
+          style={{ transform: `translateX(${index * 100}%)` }}
+        />
+        {PAGES.map(({ id, label, icon: Icon }) =>
+          item(
+            id,
+            label,
+            // The tab shown is drawn heavier, Bookmarks filled, as UIKit fills them.
+            <Icon
+              className={cn('size-6', page === id && id === 'bookmarks' && 'fill-current')}
+              strokeWidth={page === id ? 2.4 : 1.8}
+            />,
+          ),
+        )}
+        {item(
+          'you',
+          'You',
+          <UserAvatar
+            username={username}
+            attention={attention}
+            className={cn('size-6', page === 'you' && 'ring-2 ring-foreground')}
+          />,
+        )}
+      </div>
     </nav>
   );
+}
+
+/** SF Symbols for the native bar's tabs, plain and selected. */
+const SYMBOLS: Record<Exclude<PhonePage, 'you'>, [string, string]> = {
+  files: ['folder', 'folder.fill'],
+  bookmarks: ['bookmark', 'bookmark.fill'],
+  search: ['magnifyingglass', 'magnifyingglass'],
+};
+
+/**
+ * The iPhone's tab bar is UIKit's (`TabBar.swift`), floating over the
+ * webview: this tells it what to show. It takes no room here: the pages run
+ * on under its glass, and what scrolls on them ends above it
+ * (`--tab-bar-inset`, `[data-native-tab-bar]` in app.css). While a sheet,
+ * menu or their dim is up it's `covered`, and drops under the webview so
+ * they draw over it. It hides for a pushed note (whose PDF would be under
+ * it) and the keyboard, and comes back as soon as a swipe has taken most of
+ * the note away (`noteLeaving`), not once it's gone.
+ */
+function NativeFooter() {
+  const page = usePhoneNav((s) => s.page);
+  const noteOpen = usePhoneNav((s) => s.noteOpen && !s.noteLeaving);
+  const keyboard = useKeyboard((s) => s.docked);
+  const { username, attention } = useAccountActions();
+  const overlay = useWebOverlay();
+  const [inset, setInset] = useState<number | null>(null);
+
+  useEffect(() => {
+    const listening = nativeTabBar.listen((event) => {
+      if (event.type === 'inset') setInset(event.inset);
+      else choose(event.id as PhonePage);
+    });
+    return () => {
+      void listening.then((listener) => listener.unregister());
+      void nativeTabBar.set([], null, true);
+    };
+  }, []);
+
+  // Until the bar says, UIKit's usual height over the home indicator.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-native-tab-bar', '');
+    root.style.setProperty(
+      '--tab-bar-inset',
+      keyboard ? '0px' : inset !== null ? `${inset}px` : 'calc(49px + env(safe-area-inset-bottom))',
+    );
+    return () => {
+      root.removeAttribute('data-native-tab-bar');
+      root.style.removeProperty('--tab-bar-inset');
+    };
+  }, [inset, keyboard]);
+
+  const items = useMemo<TabBarItem[]>(
+    () => [
+      ...PAGES.map(({ id, label }) => {
+        const [symbol, selectedSymbol] = SYMBOLS[id as keyof typeof SYMBOLS];
+        return { id, label, symbol, selectedSymbol };
+      }),
+      username
+        ? { id: 'you', label: 'You', initials: initials(username), badge: attention }
+        : { id: 'you', label: 'You', symbol: 'person.crop.circle', selectedSymbol: 'person.crop.circle.fill', badge: attention },
+    ],
+    [username, attention],
+  );
+  const hidden = noteOpen || keyboard;
+  useEffect(() => void nativeTabBar.set(items, page, hidden, overlay), [items, page, hidden, overlay]);
+
+  return null;
+}
+
+/** Whether a sheet, dialog or menu is open over the app (`webOverlayOpen`). */
+function useWebOverlay() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const check = () => setOpen(webOverlayOpen());
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true });
+    check();
+    return () => observer.disconnect();
+  }, []);
+  return open;
 }

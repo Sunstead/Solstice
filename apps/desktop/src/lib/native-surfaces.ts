@@ -1,10 +1,13 @@
-import { useCallback } from 'react';
 import { create } from 'zustand';
 import { commands } from '@/lib/backend';
 import { nativeSurfaces, type SurfaceEvent } from '@/lib/backend/native';
 import { followInkTools } from '@/lib/ink/native-sync';
 import { useEditingFocus } from '@/lib/keyboard';
+import { toRgb } from '@/lib/css-colour';
 import { getSetting, subscribeToSetting } from '@/lib/settings/store';
+import { kicks, kickSurfaces, overSurface } from '@/lib/surface-kicks';
+
+export { useOverSurface } from '@/lib/surface-kicks';
 
 /**
  * What the iOS app's native views (`NativeSurface`) share: keeping each on
@@ -16,7 +19,7 @@ import { getSetting, subscribeToSetting } from '@/lib/settings/store';
 const marks = new Map<Element, { count: number; background: string }>();
 export const refreshers = new Set<() => void>();
 
-function mark(el: Element) {
+export function mark(el: Element) {
   const known = marks.get(el);
   if (known) return void (known.count += 1);
   marks.set(el, { count: 1, background: getComputedStyle(el).backgroundColor });
@@ -33,10 +36,14 @@ export function unmark(el: Element) {
 /**
  * Makes everything painted under the surface see-through (app.css): not only
  * its ancestors, but the siblings stacked beneath it, like flexlayout's
- * tabset, which draws its background apart from the tab's content.
+ * tabset, which draws its background apart from the tab's content. Only on
+ * the surface's own page, though: a phone's note is pushed over the file
+ * list, which must stay as it is (the pushed page hides it, `PushPane`).
  */
 export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): number[] | null {
   const found = new Set<Element>();
+  const page = el.closest('.solstice-push-page, [data-surface-root]');
+  const onPage = (below: Element) => !page || page.contains(below) || below.contains(page);
   // The colour the surface used to sit on: the surface's own backdrop (a
   // PDF's margins), and the host's too, except that under Islands the host
   // shows in the gaps and a pane's rounded corners, which go see-through
@@ -55,6 +62,7 @@ export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): nu
     const at = stack.indexOf(el);
     if (at === -1) continue;
     for (const below of stack.slice(at + 1)) {
+      if (!onPage(below)) continue;
       found.add(below);
       if (!background) {
         background = toRgb(marks.get(below)?.background ?? getComputedStyle(below).backgroundColor);
@@ -65,7 +73,8 @@ export function seeThrough(el: HTMLElement, r: DOMRect, under: Set<Element>): nu
   for (const below of found) if (!under.has(below)) mark(below);
   under.clear();
   for (const below of found) under.add(below);
-  const islands = document.documentElement.dataset.islands === 'true';
+  const root = document.documentElement;
+  const islands = root.dataset.islands === 'true' && !root.hasAttribute('data-phone-layout');
   const host = (islands && windowColour()) || background;
   if (host) void nativeSurfaces.background(host);
   return background;
@@ -131,24 +140,6 @@ let holders = 0;
 let stopHost: (() => void) | null = null;
 let modal = false;
 let sentRects = '';
-const kicks = new Set<() => void>();
-const overSurface = new Set<Element>();
-
-/**
- * For web content in the page that floats over a surface (the find bar):
- * touches on it stay the webview's.
- */
-export function useOverSurface() {
-  return useCallback((el: HTMLElement | null) => {
-    if (!el) return;
-    overSurface.add(el);
-    kicks.forEach((kick) => kick());
-    return () => {
-      overSurface.delete(el);
-      kicks.forEach((kick) => kick());
-    };
-  }, []);
-}
 
 let easing = false;
 const easeListeners = new Set<(phase: 'play' | 'end') => void>();
@@ -194,21 +185,26 @@ export function onSurfaceEase(listener: (phase: 'play' | 'end') => void): () => 
  * the webview's where it now is.
  */
 export function overSurfaceMoved() {
-  kicks.forEach((kick) => kick());
+  kickSurfaces();
 }
 
 /**
  * Whether a menu, popover or dialog is open: they mount in their own nodes
  * under `<body>`, beside `#root`. While one is, the webview takes every touch,
- * so a tap outside it closes it, as it would on the web.
+ * so a tap outside it closes it, as it would on the web (and the native tab
+ * bar, over the webview, steps aside).
  */
-function checkOverlays() {
-  const open = [...document.body.children].some(
+export function webOverlayOpen(): boolean {
+  return [...document.body.children].some(
     (el) =>
       el.id !== 'root' &&
       !(el instanceof HTMLScriptElement || el instanceof HTMLStyleElement) &&
       el.getBoundingClientRect().width > 0,
   );
+}
+
+function checkOverlays() {
+  const open = webOverlayOpen();
   const rects = [...overSurface]
     .map((el) => el.getBoundingClientRect())
     .filter((r) => r.width > 0 && r.height > 0)
@@ -324,7 +320,7 @@ function windowColour(): number[] | null {
 }
 
 /** The ground dark paper takes (`ink.darkPaper`): the theme's own background. */
-function themeGround(): number[] | null {
+export function themeGround(): number[] | null {
   return cssColour('--background');
 }
 
@@ -337,16 +333,4 @@ function cssColour(variable: string): number[] | null {
   const colour = getComputedStyle(probe).backgroundColor;
   probe.remove();
   return toRgb(colour);
-}
-
-/** Any CSS colour (themes use oklch) as sRGB, by painting it; none if see-through. */
-function toRgb(color: string): number[] | null {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 1;
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  context.fillStyle = color;
-  context.fillRect(0, 0, 1, 1);
-  const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data;
-  return a === 0 ? null : [r, g, b];
 }

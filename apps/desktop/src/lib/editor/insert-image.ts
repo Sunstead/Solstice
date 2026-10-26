@@ -1,3 +1,5 @@
+import { nativePickers } from '@/lib/backend/native';
+import { can } from '@/lib/backend/platform';
 import { open } from '@/lib/backend/shell';
 import { editorViewCtx } from '@milkdown/kit/core';
 import type { Ctx } from '@milkdown/kit/ctx';
@@ -18,8 +20,8 @@ const IMAGE_EXTENSIONS = [
 ];
 
 /**
- * Picks image files, copies them into the workspace, and inserts them at the
- * caret.
+ * Picks image files (in the iOS app, from Photos), copies them into the
+ * workspace, and inserts them at the caret.
  *
  * Takes a `runAction` rather than an editor so ownership of the Milkdown
  * context stays with the caller -- this module never holds an editor instance.
@@ -28,10 +30,12 @@ export async function insertImagesFromDialog(
   runAction: (fn: (ctx: Ctx) => void) => void,
   notePath: string,
 ) {
-  const picked = await open({
-    multiple: true,
-    filters: [{ name: 'Images', extensions: IMAGE_EXTENSIONS }],
-  });
+  const picked = can.nativeViews
+    ? await nativePickers.photos().catch(() => [])
+    : await open({
+        multiple: true,
+        filters: [{ name: 'Images', extensions: IMAGE_EXTENSIONS }],
+      });
 
   if (!picked) return;
 

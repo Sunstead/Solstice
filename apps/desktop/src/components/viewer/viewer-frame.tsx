@@ -1,4 +1,5 @@
 import { ViewerHeader } from './viewer-header';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
 type ViewerFrameProps = {
@@ -6,7 +7,7 @@ type ViewerFrameProps = {
   find?: boolean;
   /** Extra controls for the header's left cell. */
   leading?: React.ReactNode;
-  /** A strip under the header, outside the content (the ink tools). */
+  /** A strip under the header, outside the content (the ink tools); at the foot on a phone, as Notes' markup tools are, in reach of a thumb. */
   ribbon?: React.ReactNode;
   /** Floating panel, centred over the bottom of the content. */
   toolbar?: React.ReactNode;
@@ -32,10 +33,11 @@ export function ViewerFrame({
   children,
   ...props
 }: ViewerFrameProps) {
+  const phone = useIsMobile();
   return (
     <div className='flex h-full w-full flex-col overflow-hidden' {...props}>
       <ViewerHeader path={path} find={find} leading={leading} />
-      {ribbon}
+      {!phone && ribbon}
 
       <div className={cn('relative min-h-0 flex-1', className)}>
         {children}
@@ -48,6 +50,7 @@ export function ViewerFrame({
           </div>
         )}
       </div>
+      {phone && ribbon && <div className='shrink-0 pb-[env(safe-area-inset-bottom)]'>{ribbon}</div>}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Button } from '@sunstead/ui/components/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@sunstead/ui/components/collapsible';
 import { Input } from '@sunstead/ui/components/input';
 import { Label } from '@sunstead/ui/components/label';
+import { confirmSignOut } from '@/hooks/use-account-actions';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { setSetting, useSetting } from '@/lib/settings/store';
 import { useAccount } from '@/lib/stores/account';
@@ -104,7 +105,11 @@ export function SyncPane() {
             </div>
             {info?.auth === 'oidc' &&
               (info.signed_in ? (
-                <Button variant='outline' size='sm' disabled={busy} onClick={() => void run(() => commands.syncSignOut(server))}>
+                <Button variant='outline' size='sm' disabled={busy} onClick={() =>
+                    void confirmSignOut(server).then((yes) => {
+                      if (yes) void run(() => commands.syncSignOut(server));
+                    })
+                  }>
                   Sign out
                 </Button>
               ) : (

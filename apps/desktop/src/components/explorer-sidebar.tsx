@@ -10,6 +10,7 @@ import {
 } from '@sunstead/ui/components/resizable-sidebar';
 import { FileTree } from './file-tree';
 import { ContextMenu, ContextMenuTrigger } from '@sunstead/ui/components/context-menu';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
 import { useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@sunstead/ui/components/dropdown-menu';
 import { useDragHoverStore } from '@/hooks/use-drag-hover';
+import { TabBarRoom } from '@/components/mobile/tab-bar-room';
 
 export function ExplorerSidebar() {
   const path = useWorkspace((s) => s.path);
@@ -84,45 +86,45 @@ export function ExplorerTree({ path }: { path: string }) {
   dropOnRoot(rootDropRef);
 
   const hoverTargetPath = useDragHoverStore((s) => s.hoverTargetPath);
+  const phone = useIsMobile();
   const isDropDestination = hoverTargetPath === path;
 
+  const tree = (
+    <SidebarGroup
+      ref={rootDropRef}
+      className={cn('h-full py-0', (isDropDestination || (isRootOver && canDropOnRoot)) && 'bg-accent/30')}
+    >
+      <SidebarGroupContent className='max-w-(--sidebar-width) group-data-[phone=true]/files:max-w-none'>
+        <SidebarMenu className='max-w-(--sidebar-width) gap-0 group-data-[phone=true]/files:max-w-none'>
+          <FileTree path={path} />
+        </SidebarMenu>
+      </SidebarGroupContent>
+      <TabBarRoom />
+    </SidebarGroup>
+  );
+
+  // On a phone the rows' holds are the hold sheet, and the + makes things:
+  // a menu on the empty space under them would open with every hold.
+  if (phone) return <SidebarContent>{tree}</SidebarContent>;
+
   return (
-    <>
-      <SidebarContent>
-        <ContextMenu>
-          <ContextMenuTrigger
-            render={
-              <SidebarGroup
-                ref={rootDropRef}
-                className={cn(
-                  'h-full py-0',
-                  (isDropDestination || (isRootOver && canDropOnRoot)) &&
-                    'bg-accent/30',
-                )}
-              >
-                <SidebarGroupContent className='max-w-(--sidebar-width) group-data-[phone=true]/files:max-w-none'>
-                  <SidebarMenu className='max-w-(--sidebar-width) gap-0 group-data-[phone=true]/files:max-w-none'>
-                    <FileTree path={path} />
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            }
-          />
-          <FileTreeItemContextMenuContent
-            surface='root'
-            renameEnabled={false}
-            deleteEnabled={false}
-            moveEnabled={false}
-            node={{
-              name: path,
-              path,
-              is_dir: true,
-              childrenLoaded: true,
-              expanded: true,
-            }}
-          />
-        </ContextMenu>
-      </SidebarContent>
-    </>
+    <SidebarContent>
+      <ContextMenu>
+        <ContextMenuTrigger render={tree} />
+        <FileTreeItemContextMenuContent
+          surface='root'
+          renameEnabled={false}
+          deleteEnabled={false}
+          moveEnabled={false}
+          node={{
+            name: path,
+            path,
+            is_dir: true,
+            childrenLoaded: true,
+            expanded: true,
+          }}
+        />
+      </ContextMenu>
+    </SidebarContent>
   );
 }

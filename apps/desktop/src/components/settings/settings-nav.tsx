@@ -1,5 +1,7 @@
 import { Row } from '@/components/mobile/phone-parts';
-import { settingsSections, type SectionId } from '@/lib/settings/sections';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
+import { touchFirst } from '@/lib/backend/platform';
+import { settingsSections, shownOnPhone, type SectionId } from '@/lib/settings/sections';
 import { customPanes } from './panes';
 import { SettingsPane } from './settings-pane';
 
@@ -8,9 +10,11 @@ import { SettingsPane } from './settings-pane';
  * phone's You page and the touch dialog (Discord's and Goodnotes' way).
  */
 export function SettingsSectionList({ onOpen }: { onOpen: (id: SectionId) => void }) {
+  const phone = useIsMobile() && touchFirst;
+  const sections = phone ? settingsSections.filter((section) => shownOnPhone(section.id)) : settingsSections;
   return (
-    <div className='flex flex-col divide-y overflow-hidden rounded-xl border bg-card'>
-      {settingsSections.map((section) => (
+    <div className='phone-rows flex flex-col overflow-hidden rounded-xl bg-card'>
+      {sections.map((section) => (
         <Row key={section.id} icon={section.icon} label={section.label} chevron onClick={() => onOpen(section.id)} />
       ))}
     </div>

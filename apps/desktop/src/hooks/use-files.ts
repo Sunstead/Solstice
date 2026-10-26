@@ -31,6 +31,8 @@ function pruneSubtree(
 
 type FilesState = {
   entries: Record<string, FileTreeNode>;
+  /** The root whose entries are in, so an empty list means an empty folder. */
+  loadedRoot: string | null;
 
   reset: () => void;
   loadRoot: (root: string) => Promise<void>;
@@ -109,12 +111,14 @@ const fetchVisibleEntries = async (path: string): Promise<FileEntry[] | null> =>
 
 export const useFiles = create<FilesState>((set, get) => ({
   entries: {},
+  loadedRoot: null,
 
-  reset: () => set({ entries: {} }),
+  reset: () => set({ entries: {}, loadedRoot: null }),
 
   loadRoot: async (root) => {
     // Without the root, every saved folder would look deleted.
     if (!(await get().loadDirectory(root))) return;
+    set({ loadedRoot: root });
     await get().restoreExpandedFolders(root);
   },
 

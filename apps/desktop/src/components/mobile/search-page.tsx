@@ -12,19 +12,20 @@ import { PhoneHeader, PhoneTitle } from './phone-parts';
 /**
  * Search as a page: the sidebar's Search view, with the files opened lately
  * before anything's typed. Quick open on a phone too, since files whose names
- * match come first.
+ * match come first. The field isn't focused on arrival: the keyboard would
+ * cover the tab bar and the recent files.
  */
 export function SearchPage() {
   const root = useWorkspace((s) => s.path);
 
   return (
-    <div className='absolute inset-0 flex flex-col bg-background'>
-      <PhoneHeader>
+    <div data-phone-page='search' className='absolute inset-0 flex flex-col bg-background'>
+      <PhoneHeader large fade={false}>
         <PhoneTitle>Search</PhoneTitle>
       </PhoneHeader>
       {root ? (
         <div className='flex min-h-0 flex-1 flex-col pt-2'>
-          <SearchView root={root} empty={<RecentFiles root={root} />} autoFocus />
+          <SearchView root={root} empty={<RecentFiles root={root} />} bar />
         </div>
       ) : (
         <p className='py-10 text-center text-sm text-muted-foreground'>No workspace open</p>
