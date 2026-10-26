@@ -25,6 +25,7 @@ import {
 } from '@sunstead/ui/components/dropdown-menu';
 import { EntryMenuItems } from '@/components/entry-menu-items';
 import { EntryMenuTrigger } from '@/components/entry-menu-trigger';
+import { TabBarRoom } from '@/components/mobile/tab-bar-room';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { useCreateActions } from '@/hooks/use-create-actions';
 import { useFileTreeDrag, useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
@@ -107,6 +108,7 @@ export function BookmarksView({
             onOpenFolder={onOpenFolder ?? ((path) => setTrail([path]))}
           />
         )}
+        <TabBarRoom />
       </div>
     </div>
   );
@@ -118,6 +120,7 @@ export function BookmarkFolder({ folder, onOpenFolder }: { folder: string; onOpe
   return (
     <div className='flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4'>
       <FolderContents folder={folder} index={index} onOpenFolder={onOpenFolder} />
+      <TabBarRoom />
     </div>
   );
 }

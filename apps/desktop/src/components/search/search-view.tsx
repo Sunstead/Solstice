@@ -5,7 +5,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { CaseSensitive, ChevronRight, WholeWord } from 'lucide-react';
+import { CaseSensitive, Check, ChevronRight, WholeWord } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { Button } from '@sunstead/ui/components/button';
@@ -20,6 +20,8 @@ import { openSearchHit } from '@/lib/search/jump';
 import { matchNames, type NameMatch } from '@/lib/search/names';
 import { useSetting } from '@/lib/settings/store';
 import { touchFirst } from '@/lib/backend/platform';
+import { useScrollEdge } from '@/lib/scroll-edge';
+import { TabBarRoom } from '@/components/mobile/tab-bar-room';
 import { parseExcludes, useSearchStore } from '@/lib/stores/search';
 import { selectAllFiles, useFileIndex } from '@/lib/stores/use-file-index';
 import { cn } from '@/lib/utils';
@@ -40,28 +42,30 @@ const open = (path: string) =>
  * Full-text search of the workspace: the field and its two options, files
  * whose names match, then every file whose insides do, each hit a line that
  * opens the file there. The sidebar's Search view and the phone's Search page.
- * `empty` shows before anything's typed; `autoFocus` focuses the field on
- * arrival (the phone's page, where the keyboard should come up with it).
+ * `empty` shows before anything's typed. `bar` is the phone's page, where
+ * the field is the bottom of its top bar: the fade of results scrolling
+ * under it hangs below the field, not across it.
  */
 export function SearchView({
   root,
   empty,
-  autoFocus,
+  bar = false,
 }: {
   root: string;
   empty?: ReactNode;
-  autoFocus?: boolean;
+  bar?: boolean;
 }) {
   useSearchRunner(root);
   const query = useSearchStore((s) => s.query);
   const results = useSearchStore((s) => s.results);
   const pending = useSearchStore((s) => s.pending);
   const error = useSearchStore((s) => s.error);
+  const edge = useScrollEdge('top');
 
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
-      <div className='px-2 pb-2'>
-        <SearchField autoFocus={autoFocus} />
+      <div ref={bar ? edge : undefined} className={cn('px-2 pb-2', bar && 'phone-bar bg-background')}>
+        <SearchField />
       </div>
       {/* Dragging the results puts the keyboard away, as iOS's lists do. */}
       <div className='min-h-0 flex-1 overflow-y-auto px-2 pb-4' onTouchMove={touchFirst ? blurField : undefined}>
@@ -82,6 +86,7 @@ export function SearchView({
             )}
           </>
         )}
+        <TabBarRoom />
       </div>
     </div>
   );
@@ -109,7 +114,7 @@ function blurField() {
   if (field instanceof HTMLInputElement && field.dataset.searchField !== undefined) field.blur();
 }
 
-function SearchField({ autoFocus }: { autoFocus?: boolean }) {
+function SearchField() {
   const query = useSearchStore((s) => s.query);
   const setQuery = useSearchStore((s) => s.setQuery);
   const caseSensitive = useSearchStore((s) => s.caseSensitive);
@@ -136,7 +141,6 @@ function SearchField({ autoFocus }: { autoFocus?: boolean }) {
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           value={query}
-          autoFocus={autoFocus}
           placeholder='Search'
           aria-label='Search in files'
           autoCapitalize='off'
@@ -174,16 +178,18 @@ function SearchField({ autoFocus }: { autoFocus?: boolean }) {
           </Button>
         </div>
       </div>
-      {/* iOS's Cancel without the clearing: otherwise the keyboard covers the results. */}
+      {/* Puts the keyboard away, keeping the query: a check, as iOS's own
+          Done is now, rather than Cancel's clearing. */}
       {touchFirst && focused && (
         <button
           type='button'
-          className='shrink-0 px-1 text-[17px] text-primary active:opacity-60'
+          aria-label='Done'
+          className='flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground active:opacity-60'
           // Kept from taking focus, or the field's blur would unmount it mid-tap.
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => inputRef.current?.blur()}
         >
-          Done
+          <Check className='size-5' strokeWidth={2.5} />
         </button>
       )}
     </div>

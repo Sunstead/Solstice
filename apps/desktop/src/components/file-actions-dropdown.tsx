@@ -45,6 +45,8 @@ export function FileActionsDropdown({
       <Button
         variant='ghost'
         size='icon-sm'
+        // Share is in the sheet here, not a button of its own: its popover points at this.
+        data-share-anchor={path}
         onClick={() => useEntrySheet.getState().open(targetFromPath(path), 'note')}
       >
         <MoreVertical />

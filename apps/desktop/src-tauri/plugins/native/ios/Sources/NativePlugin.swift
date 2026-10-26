@@ -379,7 +379,7 @@ class NativePlugin: Plugin {
         guard let webview = self.webview else { break }
         TabBar.shared.set(
           args.items ?? [], selected: args.selected, hidden: args.hidden ?? true, covered: args.covered ?? false,
-          under: webview)
+          beside: webview)
       case "background":
         if let rgb = args.rgb, rgb.count >= 3 {
           host.backgroundColor = UIColor(

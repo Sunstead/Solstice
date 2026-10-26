@@ -13,7 +13,7 @@ import { fileActions, shareAsLabel } from '@/lib/share/targets';
 import { cn } from '@/lib/utils';
 
 /**
- * Share, in a file's header, where iPad apps put it: straight to the share
+ * Share, in a file's header on a computer (touch screens have it in ⋯): straight to the share
  * sheet, or first a choice of what to send (a note as PDF or Markdown).
  * Nothing where there's no share sheet. Its box is where the sheet points,
  * from here and from the file's menus (`data-share-anchor`).

@@ -76,6 +76,17 @@ export const settingsSections = [
 
 export type SectionId = (typeof settingsSections)[number]['id'];
 
+/**
+ * The sections a touch phone leaves out: shortcuts are for a hardware
+ * keyboard, which an iPhone almost never has, and their table needs a
+ * wider screen than a phone's.
+ */
+const NOT_ON_PHONE: readonly SectionId[] = ['keybindings'];
+
+export function shownOnPhone(id: SectionId): boolean {
+  return !NOT_ON_PHONE.includes(id);
+}
+
 export function getSection(id: SectionId): SettingsSection {
   return settingsSections.find((s) => s.id === id)!;
 }

@@ -13,9 +13,9 @@ import { useWorkspace } from '@/hooks/use-workspace';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { can, touchFirst } from '@/lib/backend/platform';
 import { nativeTabBar, type TabBarItem } from '@/lib/backend/native';
+import { haptics } from '@/lib/haptics';
 import { initials } from '@/lib/initials';
-import { mark, themeGround, unmark, webOverlayOpen } from '@/lib/native-surfaces';
-import { nativeSurfaces } from '@/lib/backend/native';
+import { webOverlayOpen } from '@/lib/native-surfaces';
 import { useEntryInput } from '@/lib/stores/entry-input';
 import { usePhoneNav, type PhonePage } from '@/lib/stores/phone-nav';
 import type { SectionId } from '@/lib/settings/sections';
@@ -44,6 +44,26 @@ import { YouPage } from './you-page';
  * replaces the note that was showing (`openInPlace`) rather than piling up
  * tabs nobody sees; the tab switcher still has them all.
  */
+/**
+ * A file opened: its note pushed in, with a light tap, as a row's push is in
+ * iOS apps. One open can be seen twice (asked for, then shown), so one tap.
+ */
+let tapped = 0;
+function openNote() {
+  const now = performance.now();
+  if (now - tapped > 250) haptics.play('light');
+  tapped = now;
+  usePhoneNav.getState().showNote();
+}
+
+/** How little of a note is left in view, swiping it back, when the tab bar comes in. */
+const BAR_BACK = 0.6;
+
+/** A swiped note's share in view: the tab bar returns well before it's gone. */
+function slide(share: number) {
+  usePhoneNav.getState().setNoteLeaving(share < BAR_BACK);
+}
+
 export function PhoneShell() {
   const model = useLayout((s) => s.model);
   const [, redraw] = useReducer((n: number) => n + 1, 0);
@@ -90,20 +110,20 @@ export function PhoneShell() {
   const shownPath = tabPath(shown);
 
   // Opening something (a file, a search result, a link) shows it. Not what
-  // the layout restored at launch: that starts on the files.
-  const seen = useRef<string | undefined>(undefined);
+  // a layout restored (at launch, or switching workspace): that stays on the
+  // page you were on.
+  const seen = useRef<{ model: Model | null; id: string | undefined }>({ model: null, id: undefined });
   useEffect(() => {
-    if (seen.current !== undefined && shownId !== undefined && shownId !== seen.current) {
-      usePhoneNav.getState().showNote();
-    }
-    seen.current = shownId;
-  }, [shownId]);
+    const last = seen.current;
+    if (last.model === model && last.id !== undefined && shownId !== undefined && shownId !== last.id) openNote();
+    seen.current = { model, id: shownId };
+  }, [model, shownId]);
 
   // Opening the note already showing changes nothing in the layout: this does.
   const opened = useLayout((s) => s.opened);
   const openedAtMount = useRef(opened);
   useEffect(() => {
-    if (opened !== openedAtMount.current) usePhoneNav.getState().showNote();
+    if (opened !== openedAtMount.current) openNote();
   }, [opened]);
 
   // Leaving a note for another is a step to go back through.
@@ -156,7 +176,7 @@ export function PhoneShell() {
         {can.nativeTabBar ? <NativeFooter /> : <AppFooter />}
       </div>
       {model && (
-        <PushPane open={noteOpen} onClose={goHome} behind={home} keepMounted>
+        <PushPane open={noteOpen} onClose={goHome} onSlide={slide} behind={home} keepMounted>
           <NoteHeader shown={shown} />
           <div className='relative min-h-0 flex-1 bg-background'>
             {shown ? <TabContent key={shownId} node={shown} /> : <BlankTab tabId='' />}
@@ -220,10 +240,14 @@ function keepOnlyShown(model: Model) {
 }
 
 /**
- * A swipe left on the files brings back the note, as Discord's does. Only
+ * A swipe left from the screen's right edge brings back the note, as
+ * Discord's does; anywhere else a sideways drag is the page's own. Only
  * sideways drags are the app's (`touch-action: pan-y`); scrolling stays the
  * browser's.
  */
+/** How near the right edge a swipe back to the note starts. */
+const EDGE = 24;
+
 function useSwipeToNote(enabled: boolean) {
   const start = useRef<{ x: number; y: number; id: number } | null>(null);
   const swiped = useRef(false);
@@ -232,6 +256,11 @@ function useSwipeToNote(enabled: boolean) {
     style: { touchAction: 'pan-y' },
     onPointerDown: (e: React.PointerEvent) => {
       if (e.pointerType === 'mouse') return;
+      const width = e.currentTarget instanceof HTMLElement ? e.currentTarget.clientWidth : window.innerWidth;
+      if (e.clientX < width - EDGE) {
+        start.current = null;
+        return;
+      }
       start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
       swiped.current = false;
     },
@@ -362,20 +391,22 @@ const SYMBOLS: Record<Exclude<PhonePage, 'you'>, [string, string]> = {
 };
 
 /**
- * The iPhone's tab bar is UIKit's (`TabBar.swift`), under the see-through
- * webview: this tells it what to show and keeps its spot clear, painting
- * nothing there, so sheets, menus and their dim draw over it (it's then
- * `covered`, and their touches stay theirs). It hides for a pushed note
- * (whose PDF would be under it) and the keyboard.
+ * The iPhone's tab bar is UIKit's (`TabBar.swift`), floating over the
+ * webview: this tells it what to show. It takes no room here: the pages run
+ * on under its glass, and what scrolls on them ends above it
+ * (`--tab-bar-inset`, `[data-native-tab-bar]` in app.css). While a sheet,
+ * menu or their dim is up it's `covered`, and drops under the webview so
+ * they draw over it. It hides for a pushed note (whose PDF would be under
+ * it) and the keyboard, and comes back as soon as a swipe has taken most of
+ * the note away (`noteLeaving`), not once it's gone.
  */
 function NativeFooter() {
   const page = usePhoneNav((s) => s.page);
-  const noteOpen = usePhoneNav((s) => s.noteOpen);
+  const noteOpen = usePhoneNav((s) => s.noteOpen && !s.noteLeaving);
   const keyboard = useKeyboard((s) => s.docked);
   const { username, attention } = useAccountActions();
   const overlay = useWebOverlay();
   const [inset, setInset] = useState<number | null>(null);
-  const [spot, setSpot] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const listening = nativeTabBar.listen((event) => {
@@ -388,20 +419,19 @@ function NativeFooter() {
     };
   }, []);
 
-  // Everything painted under the spot goes see-through (`data-native-under`),
-  // and the host behind is the theme's colour, as the page was. A surface
-  // (a PDF) may have painted it its own while the note was open.
+  // Until the bar says, UIKit's usual height over the home indicator.
   useLayoutEffect(() => {
-    if (!spot) return;
-    const r = spot.getBoundingClientRect();
-    const under = document
-      .elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2)
-      .filter((el) => el === spot || el.contains(spot));
-    under.forEach(mark);
-    const ground = themeGround();
-    if (ground) void nativeSurfaces.background(ground);
-    return () => under.forEach(unmark);
-  }, [spot, noteOpen]);
+    const root = document.documentElement;
+    root.setAttribute('data-native-tab-bar', '');
+    root.style.setProperty(
+      '--tab-bar-inset',
+      keyboard ? '0px' : inset !== null ? `${inset}px` : 'calc(49px + env(safe-area-inset-bottom))',
+    );
+    return () => {
+      root.removeAttribute('data-native-tab-bar');
+      root.style.removeProperty('--tab-bar-inset');
+    };
+  }, [inset, keyboard]);
 
   const items = useMemo<TabBarItem[]>(
     () => [
@@ -418,16 +448,7 @@ function NativeFooter() {
   const hidden = noteOpen || keyboard;
   useEffect(() => void nativeTabBar.set(items, page, hidden, overlay), [items, page, hidden, overlay]);
 
-  if (keyboard) return null;
-  // Until the bar says, UIKit's usual height over the home indicator.
-  return (
-    <div
-      ref={setSpot}
-      aria-hidden
-      className='shrink-0'
-      style={{ height: inset ?? 'calc(49px + env(safe-area-inset-bottom))' }}
-    />
-  );
+  return null;
 }
 
 /** Whether a sheet, dialog or menu is open over the app (`webOverlayOpen`). */

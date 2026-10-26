@@ -24,7 +24,11 @@ import { cn } from '@/lib/utils';
  */
 export type PaneAlign = 'center' | 'end' | 'top';
 
-/** How far from the top is "gone": the dead screen has come all the way down. */
+/**
+ * How far from the top is "gone" at the least: the dead screen has come all
+ * the way down. It's gone sooner once the card is below the screen's edge, so
+ * a flick's tail, with nothing left to see, can't be caught and pulled back.
+ */
 const GONE = 1;
 
 function usePaneScroll(
@@ -60,7 +64,10 @@ function usePaneScroll(
         if (share < 1) overlay.style.opacity = String(share);
         else overlay.style.removeProperty('opacity');
       }
-      if (!ready || closing || el.scrollTop > GONE) return;
+      if (!ready || closing) return;
+      const card = inside.firstElementChild;
+      const offScreen = !!card && card.getBoundingClientRect().top >= el.getBoundingClientRect().bottom - 1;
+      if (el.scrollTop > GONE && !offScreen) return;
       // Swiped away. Closing from here has no exit to play: it has left.
       closing = true;
       el.dataset.swiped = '';
@@ -93,21 +100,32 @@ function usePaneScroll(
 /**
  * A bottom sheet pulled up past its top rubber-bands, and what's under the
  * pane would show beneath it: its own colour carries on below it instead,
- * as UIKit's sheets do. A shadow the card's colour, clipped to below the
- * card, since a shadow (unlike a box) adds nothing to what scrolls.
+ * as UIKit's sheets do. Nothing the card paints can: WebKit draws a scroll
+ * view's content only within its bounds, and the band is outside them. So
+ * the pane itself (which doesn't scroll) paints a strip of the card's colour
+ * at its foot while it's pulled past the end, a little taller than the pull
+ * so a frame's lag never shows a sliver; the card covers the rest of it.
  */
 function useGroundBelow(card: HTMLDivElement | null) {
   useLayoutEffect(() => {
-    if (!card) return;
-    const style = getComputedStyle(card);
-    const ground = style.backgroundColor;
+    const pane = card?.parentElement?.parentElement;
+    if (!card || !pane) return;
+    const ground = getComputedStyle(card).backgroundColor;
     // A see-through card (an action sheet's) has nothing to carry on.
     if (!ground || ground === 'transparent' || /rgba\(.*,\s*0\)$/.test(ground)) return;
-    card.style.boxShadow = `0 0 0 100dvh ${ground}`;
-    card.style.clipPath = `inset(0 0 -100dvh 0 round ${style.borderTopLeftRadius} ${style.borderTopRightRadius} 0 0)`;
+    let shown = 0;
+    const onScroll = () => {
+      const past = pane.scrollTop - (pane.scrollHeight - pane.clientHeight);
+      const strip = past > 0.5 ? Math.ceil(past) + 48 : 0;
+      if (strip === shown) return;
+      shown = strip;
+      if (strip) pane.style.background = `linear-gradient(to top, ${ground} ${strip}px, transparent ${strip}px)`;
+      else pane.style.removeProperty('background');
+    };
+    pane.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      card.style.removeProperty('box-shadow');
-      card.style.removeProperty('clip-path');
+      pane.removeEventListener('scroll', onScroll);
+      pane.style.removeProperty('background');
     };
   }, [card]);
 }

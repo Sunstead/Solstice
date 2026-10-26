@@ -38,9 +38,30 @@ export function primeKeyboard(): void {
     (document.getElementById('root') ?? document.body).appendChild(field);
   }
   field.focus({ preventScroll: true });
+  holdFocus(field);
   // If no field takes over (the dialog never opened), let the keyboard go.
   clearTimeout(release);
   release = window.setTimeout(() => {
     if (document.activeElement === field) field?.blur();
   }, 2000);
+}
+
+/**
+ * Keeps the hidden field focused for the rest of the tap. A menu closing
+ * pulls focus back to its item as the tap is handled (Base UI's do), and the
+ * keyboard went with it: the real field then focuses outside the tap, and
+ * iOS raises nothing. Taken back now, it's still the tap's. A text field
+ * taking over is the point, and is let be.
+ */
+function holdFocus(primer: HTMLInputElement) {
+  let left = 3;
+  const keep = (event: FocusEvent) => {
+    const to = event.target;
+    if (to === primer || left === 0) return;
+    if (to instanceof HTMLElement && (to.isContentEditable || to.matches('input, textarea'))) return;
+    left -= 1;
+    primer.focus({ preventScroll: true });
+  };
+  document.addEventListener('focusin', keep, true);
+  setTimeout(() => document.removeEventListener('focusin', keep, true), 0);
 }

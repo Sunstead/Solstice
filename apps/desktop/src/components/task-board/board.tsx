@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { Check, Copy, ListPlus, MoreHorizontal, PencilLine, Plus, Square, Trash2, Trash2Icon } from 'lucide-react';
 
@@ -24,8 +24,11 @@ import {
   DropdownMenuTrigger,
 } from '@sunstead/ui/components/dropdown-menu';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
+import { useKeyboardRoom } from '@/lib/keyboard';
 import { primeKeyboard } from '@/lib/keyboard-primer';
+import { touchFirst } from '@/lib/backend/platform';
 import { createBoardGesture, type BoardTarget } from '@/lib/task-board/board-gesture';
+import { revealField } from '@/lib/task-board/reveal-field';
 import {
   addCard,
   addColumn,
@@ -56,6 +59,10 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
   const board = useMemo(() => parseBoard(text), [text]);
   const paged = useIsMobile();
   const rootRef = useRef<HTMLDivElement>(null);
+  // While a field has focus the board ends above the keyboard (nothing else
+  // resizes for it), so a full column's New Card field can be scrolled to.
+  const [roomRef, room] = useKeyboardRoom();
+  useLayoutEffect(() => revealField(document.activeElement), [room]);
 
   const [editing, setEditing] = useState<Editing>(null);
   const [renaming, setRenaming] = useState<number | 'new' | null>(null);
@@ -124,7 +131,13 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
 
   return (
     // Focusable, so a click anywhere on the board brings its keys here.
-    <div className='absolute inset-0 flex flex-col outline-none' tabIndex={-1} onKeyDown={onKeyDown}>
+    <div
+      ref={roomRef}
+      className='absolute inset-0 flex flex-col outline-none'
+      style={{ paddingBottom: room }}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+    >
       {board.title !== null && <h1 className='board-title'>{board.title}</h1>}
 
       <div ref={rootRef} className={cn('board', paged && 'is-paged')} data-board>
@@ -254,7 +267,10 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
             />
           }
         />
-        <DropdownMenuContent className='w-auto min-w-48'>
+        {/* On a touch screen focus stays where an item put it: handed back to
+            the anchor, it would take the keyboard from the field Edit, Add
+            Card or Rename raised it for (`primeKeyboard`). */}
+        <DropdownMenuContent className='w-auto min-w-48' finalFocus={touchFirst ? false : undefined}>
           {menuTarget?.kind === 'card' && (
             <>
               <DropdownMenuItem onClick={afterMenu(() => startEditing({ kind: 'card', ref: menuTarget.ref }))}>

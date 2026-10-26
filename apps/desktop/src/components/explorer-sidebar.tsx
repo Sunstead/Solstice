@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@sunstead/ui/components/dropdown-menu';
 import { useDragHoverStore } from '@/hooks/use-drag-hover';
+import { TabBarRoom } from '@/components/mobile/tab-bar-room';
 
 export function ExplorerSidebar() {
   const path = useWorkspace((s) => s.path);
@@ -98,6 +99,7 @@ export function ExplorerTree({ path }: { path: string }) {
           <FileTree path={path} />
         </SidebarMenu>
       </SidebarGroupContent>
+      <TabBarRoom />
     </SidebarGroup>
   );
 

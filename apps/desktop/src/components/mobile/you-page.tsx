@@ -18,6 +18,7 @@ import { useSync } from '@/lib/stores/sync';
 import { WorkspacesSheet } from './files-page';
 import { PhoneHeader, PhoneTitle, PushedHeader, Row, RowGroup } from './phone-parts';
 import { PushPane } from './push-pane';
+import { TabBarRoom } from './tab-bar-room';
 
 /**
  * You: the account, the workspace, and settings, one section per row, each
@@ -71,6 +72,7 @@ export function YouPage() {
               )}
             </section>
           </div>
+          <TabBarRoom />
         </div>
       </div>
       <PushPane open={sections.length > 0} onClose={popSection} behind={page}>
@@ -97,6 +99,7 @@ function SectionPage({ id, back, onBack }: { id: SectionId; back: string; onBack
         <div className='mx-auto max-w-xl px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
           <SettingsSectionBody id={id} />
         </div>
+        <TabBarRoom />
       </div>
     </>
   );

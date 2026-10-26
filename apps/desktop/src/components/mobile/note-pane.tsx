@@ -9,7 +9,6 @@ import { recentreDrawing } from '@/lib/drawing-views';
 import { can } from '@/lib/backend/platform';
 import { embedKind, isDrawing } from '@/lib/embed/kind';
 import { isMarkableImage } from '@/lib/ink/insert';
-import { ShareButton } from '@/components/share-button';
 import { startRename, targetFromPath } from '@/lib/entry-actions';
 import { primeKeyboard } from '@/lib/keyboard-primer';
 import { useSetting } from '@/lib/settings/store';
@@ -23,7 +22,7 @@ const PAGE_NAMES: Record<PhonePage, string> = { files: 'Files', bookmarks: 'Book
 
 /**
  * The note's top bar, as Notes keeps it: back to the page it came from, its
- * name, share and ⋯. Sync shows only when it has something to say.
+ * name and ⋯ (Share is in it). Sync shows only when it has something to say.
  */
 export function NoteHeader({ shown }: { shown: TabNode | null }) {
   const showExtensions = useSetting('explorer.showFileExtensions');
@@ -64,8 +63,7 @@ export function NoteHeader({ shown }: { shown: TabNode | null }) {
             <SyncIndicator quiet />
             {drawing && <ResetViewButton className='phone-tint' onClick={() => recentreDrawing(path)} />}
             {markable && <RibbonToggle className='phone-tint' />}
-            {path && <ShareButton path={path} className='phone-tint' />}
-            <Button variant='ghost' size='icon' className='phone-tint' onClick={openActions}>
+            <Button variant='ghost' size='icon' className='phone-tint' data-share-anchor={path ?? undefined} onClick={openActions}>
               <Ellipsis />
               <span className='sr-only'>More</span>
             </Button>

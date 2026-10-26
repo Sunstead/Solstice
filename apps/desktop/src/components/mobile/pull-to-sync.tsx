@@ -6,8 +6,20 @@ import { haptics } from '@/lib/haptics';
 import { useSync } from '@/lib/stores/sync';
 import { cn } from '@/lib/utils';
 
-/** How far past the top a list is pulled before letting go syncs. */
-const PULL = 64;
+/**
+ * How far past the top a list is pulled (in the rubber band's own points,
+ * which lag the finger: this is about twice as far for the finger) before
+ * letting go syncs.
+ */
+const PULL = 80;
+/** The first of the pull that shows nothing: a bounce, or a scroll that overshot. */
+const SLACK = 16;
+/**
+ * How far back from `PULL` it must be pushed to call it off, so a finger
+ * easing off as it lifts (or the bounce starting before the lift is heard)
+ * doesn't.
+ */
+const CANCEL = 32;
 
 /**
  * Pull down at the top of a list to sync, in a linked workspace, as Mail
@@ -15,6 +27,10 @@ const PULL = 64;
  * whichever list scrolls inside (read from its negative `scrollTop`, on the
  * capture phase), so nothing here moves the list; the arrow sits behind it
  * and shows in the gap the pull opens.
+ *
+ * Only a finger's pull counts (a flick's bounce at the top shows nothing),
+ * and it syncs on letting go all the way down: pushed back up first, it's
+ * called off.
  */
 export function PullToSync({ children, className }: { children: ReactNode; className?: string }) {
   const linked = useSync((s) => s.info !== null);
@@ -27,6 +43,7 @@ export function PullToSync({ children, className }: { children: ReactNode; class
 
   const release = () => {
     touching.current = false;
+    setPull(0);
     if (!armed.current) return;
     armed.current = false;
     setSyncing(true);
@@ -40,13 +57,16 @@ export function PullToSync({ children, className }: { children: ReactNode; class
       onTouchEnd={release}
       onTouchCancel={release}
       onScrollCapture={(event) => {
+        if (!touching.current) return;
         const el = event.target as HTMLElement;
         const past = Math.max(0, -el.scrollTop);
-        setPull(Math.min(past / PULL, 1));
-        if (touching.current && past >= PULL && !armed.current) {
+        if (!armed.current && past >= PULL) {
           armed.current = true;
           haptics.play('light');
+        } else if (armed.current && past < PULL - CANCEL) {
+          armed.current = false;
         }
+        setPull(armed.current ? 1 : Math.min(Math.max(past - SLACK, 0) / (PULL - SLACK), 1));
       }}
     >
       <div
@@ -55,7 +75,7 @@ export function PullToSync({ children, className }: { children: ReactNode; class
         style={{ opacity: syncing ? 1 : pull }}
       >
         <RefreshCw
-          className={cn('size-5', syncing && 'animate-spin')}
+          className={cn('size-5', syncing && 'animate-spin', !syncing && pull >= 1 && 'text-foreground')}
           style={syncing ? undefined : { rotate: `${pull * 270}deg` }}
         />
       </div>

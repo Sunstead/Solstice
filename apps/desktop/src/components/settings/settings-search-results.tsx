@@ -1,5 +1,7 @@
 import { searchSettings } from '@/lib/settings/search';
-import { getSection, type SectionId } from '@/lib/settings/sections';
+import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
+import { touchFirst } from '@/lib/backend/platform';
+import { getSection, shownOnPhone, type SectionId } from '@/lib/settings/sections';
 import { useSettingReader } from '@/lib/settings/store';
 import { useSettingsDialog } from '@/lib/stores/settings-dialog';
 import { SettingList } from './setting-list';
@@ -20,7 +22,11 @@ export function SettingsSearchResults({
   const read = useSettingReader();
   const setActiveSection = useSettingsDialog((s) => s.setActiveSection);
   const open = onOpenSection ?? setActiveSection;
-  const { sections, groups, total } = searchSettings(query, read);
+  const phone = useIsMobile() && touchFirst;
+  const found = searchSettings(query, read);
+  const { total } = found;
+  const sections = phone ? found.sections.filter(shownOnPhone) : found.sections;
+  const groups = phone ? found.groups.filter((group) => shownOnPhone(group.section)) : found.groups;
 
   if (total === 0 && sections.length === 0) {
     return (

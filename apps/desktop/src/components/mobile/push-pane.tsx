@@ -56,6 +56,7 @@ export function PushPane({
   behind,
   keepMounted = false,
   appear = false,
+  onSlide,
   className,
   children,
 }: {
@@ -67,6 +68,8 @@ export function PushPane({
   keepMounted?: boolean;
   /** Mounted open, it slides in (a level of a stack pushed), rather than starting in place. */
   appear?: boolean;
+  /** How much of it is in, 1 to 0, as a swipe takes it back (and 1 or 0 once it settles). */
+  onSlide?: (share: number) => void;
   className?: string;
   children: ReactNode;
 }) {
@@ -79,9 +82,11 @@ export function PushPane({
   const running = useRef<Animation[]>([]);
   const edge = useOverSurface();
   const onCloseRef = useRef(onClose);
+  const onSlideRef = useRef(onSlide);
   useEffect(() => {
     onCloseRef.current = onClose;
-  }, [onClose]);
+    onSlideRef.current = onSlide;
+  }, [onClose, onSlide]);
 
   /**
    * How much of the way in it is, 1 open and 0 gone: the scrim and the page
@@ -89,6 +94,7 @@ export function PushPane({
    * hidden, as UIKit takes a covered view out of the window.
    */
   const place = (share: number, width: number) => {
+    onSlideRef.current?.(share);
     const cut = covered(share, width);
     const away = share >= 1 ? 'hidden' : '';
     if (scrim.current) {

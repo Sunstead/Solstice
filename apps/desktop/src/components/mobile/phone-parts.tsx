@@ -11,17 +11,20 @@ import { cn } from '@/lib/utils';
 /**
  * A phone page's top bar: the page's own colour, no border, with a blurred
  * fade below once content scrolls under it (`useScrollEdge`). `large` is a
- * tab's root, whose title is large until the list scrolls. In a desktop
+ * tab's root, whose title is large until the list scrolls. `fade={false}`
+ * leaves the fade to a bar below it (Search's field). In a desktop
  * window that narrow it's also the title bar: a drag region, clear of the
  * traffic lights, with window controls.
  */
 export function PhoneHeader({
   children,
   large = false,
+  fade = true,
   className,
 }: {
   children: ReactNode;
   large?: boolean;
+  fade?: boolean;
   className?: string;
 }) {
   const isMac = useIsMac();
@@ -32,6 +35,7 @@ export function PhoneHeader({
       ref={edge}
       data-tauri-drag-region
       data-large={large || undefined}
+      data-fadeless={!fade || undefined}
       className={cn('phone-bar flex shrink-0 items-center gap-1 bg-background px-1.5', large ? 'h-14' : 'h-12', className)}
     >
       {/* The traffic lights sit over the top-left corner on macOS. */}
@@ -55,7 +59,8 @@ export function PhoneTitle({ children, className }: { children: ReactNode; class
  * A pushed page's bar, as UIKit's: back on the left carrying the previous
  * page's name, the title centred and semibold, and buttons on the right.
  * The two sides share the room left over equally, so the title stays in the
- * middle.
+ * middle, until the buttons need more: then they keep their width and the
+ * title gives way, truncated, rather than running under them.
  */
 export function PushedHeader({
   back,
@@ -73,8 +78,8 @@ export function PushedHeader({
       <div className='flex min-w-0 flex-1 basis-0'>
         <PhoneBack label={back} onClick={onBack} />
       </div>
-      <PhoneTitle className='max-w-[55%] flex-none px-1 text-center text-[17px]'>{title}</PhoneTitle>
-      <div className='flex min-w-0 flex-1 basis-0 items-center justify-end gap-0.5'>{actions}</div>
+      <PhoneTitle className='max-w-[55%] flex-initial px-1 text-center text-[17px]'>{title}</PhoneTitle>
+      <div className='flex flex-1 basis-0 items-center justify-end gap-0.5'>{actions}</div>
     </PhoneHeader>
   );
 }

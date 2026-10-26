@@ -6,6 +6,7 @@ import { FindBar } from '@/components/find-bar';
 import { useOverSurface } from '@/lib/native-surfaces';
 import { revealInExplorer } from '@/lib/entry-actions';
 import { useFindStore } from '@/lib/stores/find';
+import { touchFirst } from '@/lib/backend/platform';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 
@@ -81,7 +82,7 @@ export function ViewerHeader({
       </div>
       <div data-zen-flip='end' className='flex items-center gap-0.5'>
         <ZenToggle />
-        <ShareButton path={path} />
+        {!touchFirst && <ShareButton path={path} />}
         <FileActionsDropdown path={path} surface={find ? 'editor' : 'viewer'} />
       </div>
 

@@ -4,6 +4,7 @@ import { Check, ListPlus, X } from 'lucide-react';
 import { StaticMarkdown } from '@/components/canvas/static-markdown';
 import { openWikilink } from '@/lib/wikilink';
 import type { Card } from '@/lib/task-board/parse';
+import { revealField } from '@/lib/task-board/reveal-field';
 import { cn } from '@/lib/utils';
 
 /** A mouse's second click edits, so its first waits this long to tick. */
@@ -198,6 +199,7 @@ export function CardEditor({
     if (!field) return;
     field.style.height = 'auto';
     field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
+    revealField(field);
   };
 
   useEffect(() => {

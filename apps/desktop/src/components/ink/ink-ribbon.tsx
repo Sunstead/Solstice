@@ -389,7 +389,9 @@ function PhoneInkBar({ surface }: { surface: MarkupSurface }) {
           <span className='sr-only'>Redo</span>
         </Button>
 
-        <div className='flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none]'>
+        {/* The bar's full height: a scroll view clips both ways, and the
+            tool in hand rises out of the row. */}
+        <div className='flex min-w-0 flex-1 items-center self-stretch overflow-x-auto [scrollbar-width:none]'>
           <div ref={row} className='mx-auto flex w-max items-center gap-1 touch-pan-x'>
             {slots.map((s, index) => (
               <button

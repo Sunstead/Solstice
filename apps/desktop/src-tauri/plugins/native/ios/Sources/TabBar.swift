@@ -14,10 +14,11 @@ struct TabBarItemSpec: Decodable, Equatable {
 }
 
 /// The iPhone's tab bar: UIKit's own, in iOS 26's floating Liquid Glass. It
-/// sits *under* the see-through webview, whose page leaves its spot clear,
-/// so the web's sheets and their dim draw over it, as Reddit's do over its
-/// bar. Touches there fall through the webview to it (`takesTouch`) unless
-/// the web says something covers it. The web side says what's in it, which
+/// sits over the webview, so the page scrolls on under it and the glass is
+/// of what's really there. While the web says something covers it (a sheet,
+/// a menu) it drops under the webview, so the sheet and its dim draw over
+/// it, as Reddit's do over its bar; touches there then stay the web's
+/// (`takesTouch` says no). The web side says what's in it, which
 /// is selected, when it's hidden (a note pushed, the keyboard up) and when
 /// covered (a sheet, a menu); taps go back as `tabBar` events, and so does
 /// how much of the screen's bottom it takes.
@@ -39,10 +40,13 @@ final class TabBar: NSObject, UITabBarDelegate {
   }
 
   func set(
-    _ specs: [TabBarItemSpec], selected: String?, hidden: Bool, covered: Bool, under webview: WKWebView
+    _ specs: [TabBarItemSpec], selected: String?, hidden: Bool, covered: Bool, beside webview: WKWebView
   ) {
+    guard let bar = bar ?? install(over: webview) else { return }
+    if covered != self.covered, let parent = bar.superview, parent === webview.superview {
+      if covered { parent.insertSubview(bar, belowSubview: webview) } else { parent.insertSubview(bar, aboveSubview: webview) }
+    }
     self.covered = covered
-    guard let bar = bar ?? install(under: webview) else { return }
     if specs != self.specs {
       self.specs = specs
       bar.setItems(specs.enumerated().map { Self.item($1, tag: $0) }, animated: false)
@@ -51,7 +55,7 @@ final class TabBar: NSObject, UITabBarDelegate {
     show(!hidden)
   }
 
-  private func install(under webview: WKWebView) -> Bar? {
+  private func install(over webview: WKWebView) -> Bar? {
     guard let parent = webview.superview else { return nil }
     let bar = Bar()
     bar.delegate = self
@@ -59,8 +63,8 @@ final class TabBar: NSObject, UITabBarDelegate {
     bar.isHidden = true
     bar.onHeight = { [weak self] inset in self?.plugin?.trigger("tabBar", data: ["type": "inset", "inset": inset]) }
     bar.translatesAutoresizingMaskIntoConstraints = false
-    // Over the surface host, which is under the webview too.
-    parent.insertSubview(bar, belowSubview: webview)
+    // Placed over or under the webview by `set`, as it's covered or not.
+    parent.insertSubview(bar, aboveSubview: webview)
     NSLayoutConstraint.activate([
       bar.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
       bar.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
@@ -71,13 +75,14 @@ final class TabBar: NSObject, UITabBarDelegate {
   }
 
   /// Fades and drops, as UIKit's bar leaves under a pushed page, and takes
-  /// no touches meanwhile.
+  /// no touches meanwhile. It comes back quicker than it goes: coming back
+  /// is the end of a swipe already under way.
   private func show(_ on: Bool) {
     guard let bar, on == hidden else { return }
     hidden = !on
     bar.isUserInteractionEnabled = on
     if on { bar.isHidden = false }
-    UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState]) {
+    UIView.animate(springDuration: on ? 0.2 : 0.3, bounce: 0, options: [.beginFromCurrentState]) {
       bar.alpha = on ? 1 : 0
       bar.transform = on ? .identity : CGAffineTransform(translationX: 0, y: 12)
     } completion: { _ in

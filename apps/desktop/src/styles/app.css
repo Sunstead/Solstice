@@ -281,7 +281,7 @@ html[data-reduce-motion='true'] *::after {
  * system's own scrolling (followed on the compositor, flicked at the finger's
  * speed, rubber-banded) and a swipe far enough closes it. Open and close are a
  * slide of the whole pane on the spring UIKit's sheets use (critically damped;
- * 0.5s perceptual in, 0.38s out), written as `linear()` so it runs on the
+ * 0.5s perceptual in, a quicker 0.28s out), written as `linear()` so it runs on the
  * compositor like any easing: position 1 - (1 + wt) * e^(-wt), w = 2pi / duration,
  * sampled until it is within 0.3% of the end. Reduce motion makes it instant,
  * with everything else.
@@ -289,7 +289,7 @@ html[data-reduce-motion='true'] *::after {
 :root {
   --sheet-ms: 640ms;
   --sheet-spring: linear(0, 0.0131, 0.0468, 0.0943, 0.1504, 0.2113, 0.2741, 0.3366, 0.3974, 0.4555, 0.5102, 0.5612, 0.6083, 0.6514, 0.6906, 0.7261, 0.7581, 0.7868, 0.8125, 0.8354, 0.8557, 0.8737, 0.8896, 0.9036, 0.9159, 0.9268, 0.9363, 0.9446, 0.9519, 0.9583, 0.9638, 0.9687, 0.9729, 0.9765, 0.9797, 0.9825, 0.9849, 0.987, 0.9887, 0.9903, 0.9916, 0.9928, 0.9938, 0.9947, 0.9954, 0.9961, 0.9966, 1);
-  --sheet-fall-ms: 485ms;
+  --sheet-fall-ms: 360ms;
   /* A page pushed over another: UINavigationController's quicker 0.3s perceptual. */
   --push-ms: 385ms;
   --push-spring: linear(0, 0.0131, 0.047, 0.0947, 0.151, 0.2121, 0.275, 0.3377, 0.3986, 0.4568, 0.5116, 0.5626, 0.6097, 0.6528, 0.692, 0.7274, 0.7594, 0.788, 0.8136, 0.8364, 0.8567, 0.8746, 0.8904, 0.9044, 0.9167, 0.9274, 0.9369, 0.9452, 0.9524, 0.9587, 0.9642, 0.969, 0.9732, 0.9768, 0.98, 0.9827, 0.9851, 0.9871, 0.9889, 0.9904, 0.9918, 0.9929, 0.9939, 0.9948, 0.9955, 0.9961, 0.9967, 1);
@@ -351,6 +351,13 @@ html[data-reduce-motion='true'] *::after {
 
 :root[data-touch] .solstice-pane[data-closed] {
   animation: solstice-pane-fall var(--sheet-fall-ms) var(--sheet-fall) forwards;
+}
+
+/* Closing, it's gone for every touch at once: the end of its fall, with
+   nothing left to see, mustn't catch a swipe and come back. */
+:root[data-touch] .solstice-pane[data-closed],
+:root[data-touch] :is([data-slot='dialog-overlay'], [data-slot='sheet-overlay'])[data-closed] {
+  pointer-events: none;
 }
 
 /* Swiped away, it has already left: nothing to play. */
@@ -546,6 +553,24 @@ html[data-reduce-motion='true'] *::after {
 .phone-bar[data-scrolled]::after,
 .phone-tab-bar[data-scrolled]::before {
   opacity: 1;
+}
+
+.phone-bar[data-fadeless]::after {
+  content: none;
+}
+
+/* The iPhone's native tab bar floats over the pages (`NativeFooter`): what
+   scrolls on them runs on under its glass, and can scroll clear of it, the
+   last row a little above it (`TabBarRoom`). A spacer, not padding: WebKit
+   leaves a flex scroll view's bottom padding out of what it scrolls. */
+.tab-bar-room {
+  display: none;
+  flex: none;
+}
+
+:root[data-native-tab-bar] .tab-bar-room {
+  display: block;
+  height: calc(var(--tab-bar-inset, 0px) + 1.5rem);
 }
 
 /* A tab's root: its title large at rest, shrinking into the bar as the
