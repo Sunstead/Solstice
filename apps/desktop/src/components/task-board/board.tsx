@@ -64,6 +64,7 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
   const [roomRef, room] = useKeyboardRoom();
   useLayoutEffect(() => revealField(document.activeElement), [room]);
 
+  const editScroll = useRef<number>(undefined);
   const [editing, setEditing] = useState<Editing>(null);
   const [renaming, setRenaming] = useState<number | 'new' | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -89,6 +90,11 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
 
   const startEditing = (next: Editing) => {
     primeKeyboard();
+    const list =
+      next?.kind === 'card'
+        ? rootRef.current?.querySelector<HTMLElement>(`[data-column-index="${next.ref.column}"] [data-column-scroll]`)
+        : null;
+    editScroll.current = list?.scrollTop;
     setEditing(next);
   };
   const startSubtask = (ref: CardRef) => {
@@ -184,6 +190,7 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
                   <CardEditor
                     key={`${i}:edit`}
                     initial={cardMarkdown(card)}
+                    scrollTop={editScroll.current}
                     onSave={(markdown) => {
                       setEditing(null);
                       change((t) => editCard(t, { column: c, card: i }, markdown));
@@ -192,7 +199,9 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
                   />
                 ) : (
                   <BoardCard
-                    key={`${i}:${card.start}`}
+                    // By position, not line: a card added elsewhere moves every later `start`,
+                    // and remounting them lets a scrolled column forget where it was.
+                    key={i}
                     card={card}
                     index={i}
                     path={path}

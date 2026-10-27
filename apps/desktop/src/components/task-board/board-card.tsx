@@ -182,8 +182,11 @@ export function CardEditor({
   placeholder,
   onSave,
   onCancel,
+  scrollTop,
 }: {
   initial: string;
+  /** The column's scroll before this replaced a card: the swap can shorten the list and clamp it. */
+  scrollTop?: number;
   placeholder?: string;
   /** `next`: kept with Return, so another can follow. */
   onSave: (markdown: string, next: boolean) => void;
@@ -194,19 +197,22 @@ export function CardEditor({
 
   // `scrollHeight` leaves out the borders, which a border-box height takes in:
   // without them one line overflows by two pixels and scrolls.
-  const fit = () => {
+  const fit = (reveal = true) => {
     const field = ref.current;
     if (!field) return;
     field.style.height = 'auto';
     field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
-    revealField(field);
+    if (reveal) revealField(field);
   };
 
   useEffect(() => {
     const field = ref.current;
     if (!field) return;
-    fit();
-    field.focus();
+    // An edited card is already in view; only a new card's field can need scrolling to.
+    fit(initial === '');
+    field.focus({ preventScroll: true });
+    const list = field.closest<HTMLElement>('[data-column-scroll]');
+    if (list && scrollTop !== undefined) list.scrollTop = scrollTop;
     field.setSelectionRange(field.value.length, field.value.length);
   }, []);
 
@@ -225,7 +231,7 @@ export function CardEditor({
       defaultValue={initial}
       placeholder={placeholder}
       rows={1}
-      onInput={fit}
+      onInput={() => fit()}
       onBlur={() => settle(true)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
