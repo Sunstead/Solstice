@@ -4,6 +4,7 @@ import { Ellipsis, Redo2, Undo2 } from 'lucide-react';
 
 import { nativeInk } from '@/lib/backend/native';
 import { haptics } from '@/lib/haptics';
+import { usePaperColor } from '@/lib/ink/paper-color';
 import { arcDirection, bandPath, fan, place, polar, type Point } from '@/lib/ink/radial';
 import {
   INK_PALETTE,
@@ -114,6 +115,7 @@ type Item =
   { type: 'undo' } | { type: 'redo' } | { type: 'tool'; slot: ToolSlot } | { type: 'colors' } | { type: 'more' };
 
 function Arc({ page, direction }: { page: PalettePage; direction: number }) {
+  const onPaper = usePaperColor();
   const slots = useInkTools((s) => s.slots);
   const recents = useInkTools((s) => s.recents);
   const recentColors = useInkTools((s) => s.recentColors);
@@ -147,7 +149,7 @@ function Arc({ page, direction }: { page: PalettePage; direction: number }) {
           label={color}
           on={slot.color === color}
           onPress={() => inkDispatch({ type: 'setColor', color })}
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: onPaper(color) }}
         />
       )),
       <Round
@@ -240,7 +242,7 @@ function Arc({ page, direction }: { page: PalettePage; direction: number }) {
               <span
                 className='size-6 rounded-full ring-1 ring-foreground/20'
                 style={{
-                  backgroundColor: hasInk(slot.kind) ? slot.color : undefined,
+                  backgroundColor: hasInk(slot.kind) ? onPaper(slot.color) : undefined,
                 }}
               />
             </Round>
@@ -334,11 +336,12 @@ function Fanned({ children }: { children: React.ReactNode }) {
 
 /** A slot's icon, with its color beneath for an ink. */
 function SlotFace({ slot }: { slot: ToolSlot }) {
+  const onPaper = usePaperColor();
   return (
     <span className='flex flex-col items-center'>
       <ToolIcon kind={slot.kind} className='size-5' />
       {hasInk(slot.kind) && (
-        <span className='mt-0.5 h-1 w-4 rounded-full' style={{ backgroundColor: slot.color, opacity: slot.opacity }} />
+        <span className='mt-0.5 h-1 w-4 rounded-full' style={{ backgroundColor: onPaper(slot.color), opacity: slot.opacity }} />
       )}
     </span>
   );

@@ -20,6 +20,7 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '@
 import { touchFirst } from '@/lib/backend/platform';
 import { nativeInk, type Rect } from '@/lib/backend/native';
 import type { MarkupSurface } from '@/lib/ink/insert';
+import { usePaperColor } from '@/lib/ink/paper-color';
 import { createSlotGesture } from '@/lib/ink/slot-gesture';
 import { INK_PALETTE, TOOL_KINDS, TOOL_LABELS, hasInk, selectedSlot, type ToolSlot } from '@/lib/ink/toolbox';
 import { inkDispatch, phoneInk, useInkTools, useInkUi } from '@/lib/stores/ink-tools';
@@ -87,6 +88,7 @@ function useSlotRow() {
 }
 
 function WideInkRibbon({ surface }: { surface: MarkupSurface }) {
+  const onPaper = usePaperColor();
   const slots = useInkTools((s) => s.slots);
   const selected = useInkTools((s) => s.selected);
   const recentColors = useInkTools((s) => s.recentColors);
@@ -155,7 +157,7 @@ function WideInkRibbon({ surface }: { surface: MarkupSurface }) {
                 {hasInk(s.kind) && (
                   <span
                     className='absolute bottom-1 h-1 w-4 rounded-full ring-1 ring-foreground/15'
-                    style={{ backgroundColor: s.color, opacity: s.opacity }}
+                    style={{ backgroundColor: onPaper(s.color), opacity: s.opacity }}
                   />
                 )}
                 <span className='sr-only'>{TOOL_LABELS[s.kind]}</span>
@@ -189,7 +191,7 @@ function WideInkRibbon({ surface }: { surface: MarkupSurface }) {
                     'size-6 shrink-0 rounded-full ring-1 ring-foreground/20 ring-inset disabled:opacity-40',
                     on && 'outline-2 outline-offset-2 outline-foreground',
                   )}
-                  style={{ backgroundColor: color }}
+                  style={{ backgroundColor: onPaper(color) }}
                   onClick={() => inkDispatch({ type: 'setColor', color })}
                 />
               );
@@ -366,6 +368,7 @@ function SlotSheet({ id, onClose }: { id: string | null; onClose: () => void }) 
  * tools is what makes a finger draw (`phoneInk`).
  */
 function PhoneInkBar({ surface }: { surface: MarkupSurface }) {
+  const onPaper = usePaperColor();
   const slots = useInkTools((s) => s.slots);
   const selected = useInkTools((s) => s.selected);
   const ruler = useInkTools((s) => s.ruler);
@@ -411,7 +414,7 @@ function PhoneInkBar({ surface }: { surface: MarkupSurface }) {
                 {hasInk(s.kind) && (
                   <span
                     className='absolute bottom-1.5 h-1 w-5 rounded-full ring-1 ring-foreground/15'
-                    style={{ backgroundColor: s.color, opacity: s.opacity }}
+                    style={{ backgroundColor: onPaper(s.color), opacity: s.opacity }}
                   />
                 )}
                 <span className='sr-only'>{TOOL_LABELS[s.kind]}</span>
@@ -439,7 +442,7 @@ function PhoneInkBar({ surface }: { surface: MarkupSurface }) {
         >
           <span
             className='size-8 rounded-full ring-2 ring-foreground/20 ring-offset-2 ring-offset-background'
-            style={{ backgroundColor: hasInk(slot.kind) ? slot.color : 'var(--muted)' }}
+            style={{ backgroundColor: hasInk(slot.kind) ? onPaper(slot.color) : 'var(--muted)' }}
           />
           <span className='sr-only'>Color and Width</span>
         </button>
@@ -475,6 +478,7 @@ function InkSheet({
   slot: ToolSlot;
   colorButton: React.RefObject<HTMLButtonElement | null>;
 }) {
+  const onPaper = usePaperColor();
   const recentColors = useInkTools((s) => s.recentColors);
   const colors = [...INK_PALETTE, ...recentColors];
   return (
@@ -509,7 +513,7 @@ function InkSheet({
                       'size-11 rounded-full ring-1 ring-foreground/20 ring-inset',
                       on && 'outline-2 outline-offset-3 outline-foreground',
                     )}
-                    style={{ backgroundColor: color }}
+                    style={{ backgroundColor: onPaper(color) }}
                     onClick={() => inkDispatch({ type: 'setColor', color })}
                   />
                 );
