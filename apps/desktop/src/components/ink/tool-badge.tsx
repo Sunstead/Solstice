@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
 
 import { createBadgeGesture, type BadgeGesture } from '@/lib/ink/badge-gesture';
 import { badgeLook, selectedSlot, TOOL_LABELS } from '@/lib/ink/toolbox';
+import { usePaperColor } from '@/lib/ink/paper-color';
 import { useOverSurface } from '@/lib/native-surfaces';
 import { setSetting } from '@/lib/settings/store';
 import { inkDispatch, phoneInk, useInkTools } from '@/lib/stores/ink-tools';
@@ -21,12 +22,13 @@ export function ToolBadge() {
 
 function Badge() {
   const slot = useInkTools(selectedSlot);
+  const onPaper = usePaperColor();
   const corner = useInkTools((s) => s.badgeCorner);
   const overSurface = useOverSurface();
   const area = useRef<HTMLDivElement>(null);
   const badge = useRef<HTMLButtonElement | null>(null);
   const gesture = useRef<BadgeGesture | null>(null);
-  const look = badgeLook(slot);
+  const look = badgeLook({ ...slot, color: onPaper(slot.color) });
   const label = `Show Tools (${TOOL_LABELS[slot.kind]})`;
 
   const ref = useCallback(

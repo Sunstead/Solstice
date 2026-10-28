@@ -12,12 +12,14 @@ import os
 /// Saved as an SVG (`DrawingFile`) whose markup is read back here.
 final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
   /// The canvas is at least this big, what's drawn in its middle, and grows
-  /// by half again when the view nears an edge. Its size costs nothing; a
-  /// growth reloads the canvas, which in a big drawing takes a second. It
-  /// starts at (0, 0): PaperKit's visible frame is counted from there
-  /// whatever the markup's origin, so with any other the view opened far
-  /// from the drawing and the Pencil's line missed its strokes.
-  private static let side: CGFloat = 262_144
+  /// by half again when the view nears an edge (a growth reloads the canvas,
+  /// which in a big drawing takes a second). Kept no bigger than the drawing
+  /// needs: on a canvas hundreds of thousands of points across PaperKit
+  /// redraws tiles wrong (blurred, or in the wrong colour) until the next
+  /// full redraw. It starts at (0, 0): PaperKit's visible frame is counted
+  /// from there whatever the markup's origin, so with any other the view
+  /// opened far from the drawing and the Pencil's line missed its strokes.
+  private static let side: CGFloat = 16_384
   private static let signposts = OSSignposter(subsystem: "app.solstice", category: "DrawingSurface")
   private static let features: FeatureSet = {
     var features = FeatureSet.latest
@@ -84,7 +86,7 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
           var contents = try DrawingFile.read(contentsOf: url)
           // Made roomy here: moving every stroke takes a moment.
           if var markup = contents.markup {
-            let shift = Self.roomy(&markup)
+            let shift = Self.roomy(&markup, around: contents.drawn)
             contents.markup = markup
             contents.drawn = contents.drawn?.offsetBy(dx: shift.x, dy: shift.y)
           }
@@ -234,12 +236,21 @@ final class DrawingSurface: SurfaceView, PaperMarkupViewController.Delegate {
     }
   }
 
-  /// At least `side` across, from (0, 0) (`grown`). Returns how far what's
-  /// drawn moved.
+  /// `side` across and a `side` more than what's drawn, from (0, 0), what's
+  /// drawn moved into the middle (`grown`'s, when the file doesn't say where
+  /// it is). A canvas saved bigger than that by an older build shrinks.
+  /// Returns how far what's drawn moved.
   @discardableResult
-  nonisolated static func roomy(_ markup: inout PaperMarkup) -> CGPoint {
-    let b = markup.bounds
-    return grown(&markup, to: CGSize(width: max(b.width, side), height: max(b.height, side)))
+  nonisolated static func roomy(_ markup: inout PaperMarkup, around drawn: CGRect?) -> CGPoint {
+    guard let drawn, !drawn.isNull, !drawn.isEmpty, drawn.width.isFinite, drawn.height.isFinite else {
+      let b = markup.bounds
+      return grown(&markup, to: CGSize(width: max(b.width, side), height: max(b.height, side)))
+    }
+    let size = CGSize(width: drawn.width + side, height: drawn.height + side)
+    let shift = CGPoint(x: size.width / 2 - drawn.midX, y: size.height / 2 - drawn.midY)
+    markup.transformContent(CGAffineTransform(translationX: shift.x, y: shift.y))
+    markup.bounds = CGRect(origin: .zero, size: size)
+    return shift
   }
 
   /// `size` from (0, 0), what was there moved into its middle. Returns how
