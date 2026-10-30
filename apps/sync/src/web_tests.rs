@@ -26,6 +26,7 @@ async fn serve(auth: AuthMode, public_url: Option<&str>) -> Server {
         state_dir: dir.path().join("state"),
         public_url: public_url.map(|u| u.parse().unwrap()),
         web_dir: None,
+        source_url: crate::config::DEFAULT_SOURCE_URL.into(),
         auth,
     };
     let db = crate::db::Db::open(&config.state_dir).unwrap();

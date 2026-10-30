@@ -31,6 +31,8 @@ pub struct AppState {
     pub public_url: Option<url::Url>,
     pub cookie: auth::web::CookieSpec,
     pub web_dir: Option<PathBuf>,
+    /// Where the server's source is (`/v1/info`).
+    pub source_url: String,
 }
 
 impl AppState {
@@ -44,6 +46,7 @@ impl AppState {
             public_url: config.public_url.clone(),
             cookie: auth::web::CookieSpec::for_url(config.public_url.as_ref()),
             web_dir: config.web_dir.clone(),
+            source_url: config.source_url.clone(),
         }
     }
 }

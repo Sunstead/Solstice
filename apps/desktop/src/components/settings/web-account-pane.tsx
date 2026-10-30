@@ -5,6 +5,7 @@ import { useSync } from '@/lib/stores/sync';
 import { SyncStatusLine } from '@/components/sync/status';
 import { UserAvatar } from '@/components/user-avatar';
 import { Card, Heading } from './pane-parts';
+import { SourceLink } from './source-link';
 
 /**
  * The Account section in the browser: the web app is the server, so there's
@@ -33,6 +34,7 @@ export function WebAccountPane() {
                 Signed in as <span className='font-medium'>{username ?? '…'}</span>
               </p>
               <p className='truncate text-muted-foreground'>{location.host}</p>
+              <SourceLink />
             </div>
             <Button
               variant='outline'

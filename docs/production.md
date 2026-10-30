@@ -30,11 +30,11 @@ comes after encrypted solo vaults work.
 | Hosting | One VPS in US East with offsite backups: **recommended, open.** |
 | Public sign-in | Needs an identity provider other than the self-hosted Authentik: **open.** |
 | Collaboration | After encrypted solo vaults: plain vaults first, encrypted later (`docs/e2ee.md`). **Open.** |
-| Server licence | MIT today. AGPL for `apps/sync` is the option if resale of the hosted service is a worry; decide before outside contributors. **Open.** |
+| Licence | AGPL-3.0-or-later for the app, the server and the sync crates; `solstice-core`, `solstice-pdf` and `solstice-search` stay MIT; CLA for contributors (`LICENSING.md`). **Decided.** |
 
 ## Where things stand (checked 2026-10-27)
 
-- MIT licence, copyright "Sunstead"; every crate and package says MIT.
+- AGPL-3.0-or-later, copyright Sunstead LLC (three shared crates are MIT); see `LICENSING.md`. Releases up to `sync-v0.5.0` and `app-v0.8.0` stay MIT. The CLA is a draft for an attorney to read before the first outside PR.
 - CI runs lint, tests, build, cargo test and clippy. Release workflows exist
   for the desktop app (macOS universal `.dmg`, Windows `.exe` and `.msi`, into a
   draft release), the sync image (`ghcr.io/sunstead/solstice-sync`) and app icons.
@@ -71,8 +71,12 @@ first.
       short: what the app stores, what sync stores, what encrypted vaults hide.
 - [ ] **A support email** on the domain, with SPF, DKIM and DMARC set up so
       receipts and invitations don't land in spam.
-- [ ] **Licence decisions.** MIT is fine for the App Store. Decide the
-      server's licence (above) and whether to ask contributors for a CLA.
+- [x] **Licence decisions.** AGPL for the app, server and sync crates, a CLA
+      for contributors (`LICENSING.md`, `CLA.md`). As sole copyright holder,
+      Sunstead can ship its own App Store build under its own terms.
+- [ ] **Licence paperwork.** A lawyer reads `CLA.md` before the first outside
+      PR, and the author signs a one-page confirmation that their commits are
+      licensed or assigned to Sunstead LLC.
 
 ## Stage 1: sunstead.net
 

@@ -23,7 +23,14 @@ pub struct Config {
     /// `SOLSTICE_WEB_DIR`: the built web app, served at `/`. The image sets
     /// it; unset, `/` says the server is running.
     pub web_dir: Option<PathBuf>,
+    /// `SOLSTICE_SOURCE_URL`: where this server's source is, which the AGPL
+    /// asks a server's users to be offered. Default the upstream repository;
+    /// a modified server points it at its own.
+    pub source_url: String,
 }
+
+/// The upstream source, for servers that run it unmodified.
+pub const DEFAULT_SOURCE_URL: &str = "https://github.com/Sunstead/Solstice";
 
 #[derive(Debug, Clone)]
 pub enum AuthMode {
@@ -134,6 +141,9 @@ impl Config {
             bind,
             public_url,
             web_dir: env.get("SOLSTICE_WEB_DIR").map(PathBuf::from),
+            source_url: env
+                .get("SOLSTICE_SOURCE_URL")
+                .unwrap_or_else(|| DEFAULT_SOURCE_URL.into()),
             notes_dir: env
                 .get("SOLSTICE_NOTES_DIR")
                 .map(PathBuf::from)
@@ -171,6 +181,17 @@ mod tests {
         assert!(matches!(c.auth, AuthMode::Dev { ref username } if username == "pwb"));
         assert_eq!(c.bind.port(), 8080);
         assert_eq!(c.notes_dir, PathBuf::from(".data/notes"));
+        assert_eq!(c.source_url, DEFAULT_SOURCE_URL);
+    }
+
+    #[test]
+    fn source_url_can_point_at_a_fork() {
+        let c = config(&[
+            ("SOLSTICE_DEV_USER", "pwb"),
+            ("SOLSTICE_SOURCE_URL", "https://git.example/fork"),
+        ])
+        .unwrap();
+        assert_eq!(c.source_url, "https://git.example/fork");
     }
 
     #[test]

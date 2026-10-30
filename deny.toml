@@ -1,0 +1,32 @@
+# cargo-deny: dependency licences. The AGPL crates can include permissive and
+# weak-copyleft code, not GPL-2.0-only or anything that forbids it. Run
+# `cargo deny check licenses` from the root.
+
+[graph]
+# Apps ship to desktop, iOS and the server image.
+all-features = true
+
+[licenses]
+confidence-threshold = 0.9
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "CC0-1.0",
+  "MPL-2.0",
+  "0BSD",
+  "BSL-1.0",
+  "OpenSSL",
+  "CDLA-Permissive-2.0",
+  "AGPL-3.0-or-later",
+]
+
+[licenses.private]
+# The workspace's own crates are not published.
+ignore = true

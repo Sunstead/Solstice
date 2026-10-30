@@ -4,6 +4,7 @@ import { useUpdates, type UpdateStatus } from '@/lib/stores/updates';
 import { useAppVersion } from '@/hooks/use-app-version';
 import { Card, Heading } from './pane-parts';
 import { SettingsPane } from './settings-pane';
+import { SourceLink } from './source-link';
 
 function describe(status: UpdateStatus, version: string | undefined, lastChecked: Date | null) {
   switch (status.state) {
@@ -44,6 +45,7 @@ export function AboutPane() {
                   {line}
                 </p>
               )}
+              <SourceLink />
             </div>
             {can.updates &&
               (update ? (

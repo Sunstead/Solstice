@@ -43,6 +43,7 @@ COPY --from=build /solstice-sync /usr/local/bin/solstice-sync
 COPY --from=build --chown=1000:1000 /state /state
 COPY --from=build --chown=1000:1000 /notes /notes
 COPY --from=web /src/apps/desktop/dist /usr/share/solstice/web
+COPY --from=build /src/LICENSE /usr/share/licenses/solstice-sync/LICENSE
 ENV SOLSTICE_STATE_DIR=/state \
     SOLSTICE_NOTES_DIR=/notes \
     SOLSTICE_WEB_DIR=/usr/share/solstice/web

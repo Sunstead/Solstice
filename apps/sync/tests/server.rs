@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use solstice_sync::{content_hash, Content, Event, Frame, Session, Vault};
-use solstice_sync_server::config::{AuthMode, Config};
+use solstice_sync_server::config::{AuthMode, Config, DEFAULT_SOURCE_URL};
 use solstice_sync_server::{app, db::Db, AppState};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Message;
@@ -27,6 +27,7 @@ async fn start(root: &Path) -> Server {
         state_dir: root.join("state"),
         public_url: None,
         web_dir: None,
+        source_url: DEFAULT_SOURCE_URL.into(),
         auth: AuthMode::Dev {
             username: "pwb".into(),
         },
@@ -180,6 +181,21 @@ async fn eventually(what: &str, check: impl Fn() -> bool) {
         );
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
+}
+
+#[tokio::test]
+async fn info_says_where_the_source_is() {
+    let root = tempfile::tempdir().unwrap();
+    let server = start(root.path()).await;
+
+    let info: serde_json::Value = reqwest::get(format!("{}/v1/info", server.base))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(info["source"], DEFAULT_SOURCE_URL);
+    server.stop().await;
 }
 
 #[tokio::test]

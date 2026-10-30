@@ -2,7 +2,7 @@
 name = "solstice-sync-server"
 version = "0.5.0"
 edition = "2021"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 description = "Solstice Sync's server: vaults as plain files plus Yjs state, synced over WebSocket."
 publish = false
 

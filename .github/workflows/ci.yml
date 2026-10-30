@@ -53,3 +53,8 @@ jobs:
           swift test --package-path apps/desktop/src-tauri/plugins/native/SurfaceCore
       - name: Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      # The AGPL crates can only include dependencies under compatible licences.
+      - name: Dependency licences
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses

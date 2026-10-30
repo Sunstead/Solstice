@@ -64,6 +64,7 @@ async fn info(State(state): State<AppState>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "protocol": PROTOCOL,
+        "source": state.source_url,
         "auth": auth,
     }))
 }
@@ -475,6 +476,7 @@ mod tests {
             state_dir: root.join("state"),
             public_url: None,
             web_dir: None,
+            source_url: crate::config::DEFAULT_SOURCE_URL.into(),
             auth: AuthMode::Oidc(OidcConfig {
                 issuer: issuer.into(),
                 client_id: "solstice".into(),

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use solstice_sync::TreeOp;
 use solstice_sync_client::{link, tree_file, unlink, Client, NoTokens, Status};
-use solstice_sync_server::config::{AuthMode, Config};
+use solstice_sync_server::config::{AuthMode, Config, DEFAULT_SOURCE_URL};
 use solstice_sync_server::{app, db::Db, AppState};
 
 struct Server {
@@ -23,6 +23,7 @@ async fn start_server(root: &Path) -> Server {
         state_dir: root.join("server/state"),
         public_url: None,
         web_dir: None,
+        source_url: DEFAULT_SOURCE_URL.into(),
         auth: AuthMode::Dev {
             username: "pwb".into(),
         },

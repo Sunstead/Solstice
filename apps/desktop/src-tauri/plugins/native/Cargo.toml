@@ -3,7 +3,7 @@ name = "tauri-plugin-solstice-native"
 version = "0.1.0"
 description = "Solstice's native iOS pieces: the sign-in sheet, and native views under the webview"
 edition = "2021"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 links = "tauri-plugin-solstice-native"
 
 [dependencies]

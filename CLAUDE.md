@@ -15,14 +15,21 @@ apps/
   desktop/        the Tauri app (@solstice/desktop): src/ (React), src-tauri/ (Rust)
   sync/           Solstice Sync's server (solstice-sync-server, bin `solstice-sync`)
 crates/
-  solstice-core/  vault paths, wikilinks, front matter: pure Rust, shared by app, Sync and Atlas
+  solstice-core/  vault paths, wikilinks, front matter: pure Rust, shared by app, Sync and Atlas (MIT)
   solstice-sync/  the sync engine (Yjs via yrs): notes, manifest, protocol, merge review; no I/O
                   (design and decisions: docs/sync.md)
   solstice-sync-fs/      a synced vault's folder: scan, write, attachments, disk edits in
   solstice-sync-client/  a device's side: link a folder, keep it synced (used by src-tauri/src/sync/)
-  solstice-search/       full-text search of a folder: extract, index, query (app and Sync)
+  solstice-search/       full-text search of a folder: extract, index, query (app and Sync) (MIT)
+  solstice-pdf/          PDF reading and writing for the iPad's markup (MIT)
 packages/         shared TS packages (none yet)
 ```
+
+**Licensing:** everything is AGPL-3.0-or-later except `solstice-core`, `solstice-pdf` and
+`solstice-search`, which are MIT and carry their own `LICENSE` (`LICENSING.md`). An MIT crate
+must never depend on an AGPL one; new manifests say which. Pull requests need the CLA
+(`CLA.md`). A modified server sets `SOLSTICE_SOURCE_URL`, which `/v1/info` returns as `source`
+and Settings > About links (`SourceLink`).
 
 The root is an npm workspace (`apps/*`, `packages/*`) and a Cargo workspace;
 `target/` and `node_modules/` live at the root. Below, `src/` and `src-tauri/`
