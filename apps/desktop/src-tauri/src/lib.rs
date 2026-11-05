@@ -91,6 +91,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             sync::sync_vault_names,
             windows::get_window_init,
             open_files::take_pending_opens,
+            open_files::allow_outside_file,
             external_drop::take_dropped_paths,
             windows::list_windows,
             windows::open_window,

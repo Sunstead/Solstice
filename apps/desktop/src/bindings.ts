@@ -214,6 +214,11 @@ export const commands = {
 	getWindowInit: () => __TAURI_INVOKE<WindowInit>("get_window_init"),
 	/**  The files (and links) waiting for this window, once. */
 	takePendingOpens: () => __TAURI_INVOKE<string[]>("take_pending_opens"),
+	/**
+	 *  `grant`, for a tab from outside the workspace a layout brings back (a
+	 *  relaunch), which never came through `route`.
+	 */
+	allowOutsideFile: (path: string) => __TAURI_INVOKE<void>("allow_outside_file", { path }),
 	/**  The files the last drop on a window carried, once. */
 	takeDroppedPaths: () => __TAURI_INVOKE<string[]>("take_dropped_paths"),
 	listWindows: () => __TAURI_INVOKE<WindowEntry[]>("list_windows"),

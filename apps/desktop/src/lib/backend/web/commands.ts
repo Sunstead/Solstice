@@ -245,6 +245,7 @@ export const webCommands: Commands = {
   // Nothing outside the browser opens files in it.
   takePendingOpens: () => Promise.resolve([]),
   takeDroppedPaths: () => Promise.resolve([]),
+  allowOutsideFile: () => Promise.resolve(),
   focusFullWindowFor: () => Promise.resolve(false),
   beginTabDrag: () => Promise.resolve(),
   endTabDrag: () => Promise.resolve(null),

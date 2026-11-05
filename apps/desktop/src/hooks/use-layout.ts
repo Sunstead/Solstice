@@ -11,7 +11,8 @@ import {
   getStoredLayout,
   setStoredLayout,
 } from '@/lib/stores/workspace-layout';
-import { getFileNameFromPath, normalizePath } from '@/lib/path-utils';
+import { getFileNameFromPath, isWithin, normalizePath } from '@/lib/path-utils';
+import { commands } from '@/lib/backend';
 import { markEntering } from '@/lib/tab-motion';
 import { getSetting } from '@/lib/settings/store';
 import { useRecentFiles } from '@/lib/stores/recent-files';
@@ -205,6 +206,17 @@ export function isReplacingBlankTab(): boolean {
   return replacingBlankTab;
 }
 
+/** Every file a tab has open, once each. */
+function tabPathsOf(model: Model): string[] {
+  const paths = new Set<string>();
+  model.visitNodes((node) => {
+    if (node.getType() !== 'tab') return;
+    const config = (node as TabNode).getConfig() as { path?: string } | undefined;
+    if (config?.path) paths.add(config.path);
+  });
+  return [...paths];
+}
+
 export const useLayout = create<LayoutState>((set, get) => ({
   model: null,
   workspacePath: null,
@@ -251,6 +263,13 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
       syncTabsetDeletion(model);
       if (shell === 'mobile') rerootTabs(model, path);
+      // Files opened from outside the workspace show their images once
+      // their folders are allowed again (`allow_outside_file`).
+      await Promise.all(
+        tabPathsOf(model)
+          .filter((file) => !isWithin(file, path))
+          .map((file) => commands.allowOutsideFile(file).catch(() => {})),
+      );
 
       set({
         model,
@@ -494,19 +513,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
   listTabPaths: () => {
     const { model } = get();
-    if (!model) return [];
-
-    const paths = new Set<string>();
-
-    model.visitNodes((node) => {
-      if (node.getType() !== 'tab') return;
-      const config = (node as TabNode).getConfig() as
-        | { path?: string }
-        | undefined;
-      if (config?.path) paths.add(config.path);
-    });
-
-    return [...paths];
+    return model ? tabPathsOf(model) : [];
   },
 
   getActiveFilePath: () => {

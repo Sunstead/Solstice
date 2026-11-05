@@ -25,8 +25,12 @@ fn note(paths: Vec<String>) {
 /// The files the last drop on a window carried, once.
 #[tauri::command]
 #[specta::specta]
-pub fn take_dropped_paths() -> Vec<String> {
-    std::mem::take(&mut *DROPPED.lock().unwrap())
+pub fn take_dropped_paths(app: tauri::AppHandle) -> Vec<String> {
+    let paths = std::mem::take(&mut *DROPPED.lock().unwrap());
+    for path in &paths {
+        crate::open_files::grant(&app, std::path::Path::new(path));
+    }
+    paths
 }
 
 /// Starts watching a window's webview for drops.

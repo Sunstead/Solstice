@@ -62,8 +62,7 @@ pub fn route(app: &AppHandle, paths: Vec<PathBuf>) {
                 },
             },
         };
-        // Outside every workspace, an image or PDF needs the asset protocol.
-        let _ = app.asset_protocol_scope().allow_file(&path);
+        grant(app, &path);
         by_window.entry(label).or_default().push(path.to_string_lossy().into_owned());
     }
     let pending = app.state::<PendingOpens>();
@@ -75,10 +74,28 @@ pub fn route(app: &AppHandle, paths: Vec<PathBuf>) {
     }
 }
 
+/// What a file from outside shows needs the asset protocol: the file (an
+/// image, a PDF), and a note's own folder, where its images are.
+pub fn grant<R: tauri::Runtime>(app: &tauri::AppHandle<R>, path: &Path) {
+    let scope = app.asset_protocol_scope();
+    let _ = scope.allow_file(path);
+    let note = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"));
+    if let (true, Some(folder)) = (note, path.parent()) {
+        let _ = scope.allow_directory(folder, true);
+    }
+}
+
 /// `solstice://` links, to the window in front only (the plugin's own event
 /// reaches every window, and each would open the link), through the same
 /// queue as files; the page tells them apart by their scheme.
+/// Only the app's own links: on macOS the plugin also hears Finder's
+/// `file://` opens, which `RunEvent::Opened` routes as files.
+pub fn solstice_links(urls: Vec<String>) -> Vec<String> {
+    urls.into_iter().filter(|url| url.starts_with("solstice:")).collect()
+}
+
 pub fn route_links(app: &AppHandle, urls: Vec<String>) {
+    let urls = solstice_links(urls);
     if urls.is_empty() {
         return;
     }
@@ -87,6 +104,14 @@ pub fn route_links(app: &AppHandle, urls: Vec<String>) {
     app.state::<PendingOpens>().push(&label, urls);
     OpenFilesQueued.emit_to(app, &label).ok();
     windows::focus(app, &label);
+}
+
+/// `grant`, for a tab from outside the workspace a layout brings back (a
+/// relaunch), which never came through `route`.
+#[tauri::command]
+#[specta::specta]
+pub fn allow_outside_file(app: AppHandle, path: String) {
+    grant(&app, Path::new(&path));
 }
 
 /// The files (and links) waiting for this window, once.
@@ -177,6 +202,14 @@ mod tests {
             WindowEntry { label: "w-3".into(), kind: WindowKind::Full, workspace: None, bounds: None },
         ];
         assert_eq!(owning_window(Path::new("/notes/a.md"), &windows), None);
+    }
+
+    #[test]
+    fn keeps_only_solstice_links() {
+        // On macOS the deep-link plugin also hears Finder's `file://` opens,
+        // which `RunEvent::Opened` already routes as files.
+        let urls = vec!["solstice://open?vault=a&path=b".to_string(), "file:///tmp/a.md".to_string(), "https://x".to_string()];
+        assert_eq!(solstice_links(urls), vec!["solstice://open?vault=a&path=b"]);
     }
 
     #[test]
