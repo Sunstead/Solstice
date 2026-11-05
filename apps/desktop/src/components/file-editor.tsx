@@ -59,7 +59,7 @@ export function FileEditor({ path, source = false }: FileEditorProps) {
     <ScrollArea ref={roomRef} className='h-full' style={{ paddingBottom: room }}>
       {/* Its end scrolls clear of the home indicator. */}
       <div className='flex flex-col min-h-full pb-[env(safe-area-inset-bottom)]'>
-        <ViewerHeader path={path} sticky find />
+        <ViewerHeader path={path} sticky find ownFind={source} />
         {/* Zen's switch eases the column by where its text starts. */}
         <div data-zen-flip='text' className='typeset w-full flex-1 flex flex-col relative'>
           {source ? (

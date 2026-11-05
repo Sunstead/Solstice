@@ -10,6 +10,8 @@ import Video from './file-types/video.svg?react';
 import Audio from './file-types/audio.svg?react';
 import Drawing from './file-types/drawing.svg?react';
 import Task from './file-types/task.svg?react';
+import Code from './file-types/code.svg?react';
+import Text from './file-types/text.svg?react';
 import Folder from './file-types/folder.svg?react';
 import FolderOpen from './file-types/folder_open.svg?react';
 import Default from './file-types/file.svg?react';
@@ -37,6 +39,63 @@ export const fileIconRegistry: Record<string, SvgComponent> = {
   m4a: Audio,
   ogg: Audio,
   flac: Audio,
+  // Code and plain text open in a code tab (`fileViewKind`).
+  py: Code,
+  js: Code,
+  mjs: Code,
+  cjs: Code,
+  jsx: Code,
+  ts: Code,
+  tsx: Code,
+  rs: Code,
+  go: Code,
+  c: Code,
+  h: Code,
+  cpp: Code,
+  hpp: Code,
+  cc: Code,
+  cs: Code,
+  java: Code,
+  kt: Code,
+  swift: Code,
+  rb: Code,
+  php: Code,
+  lua: Code,
+  sh: Code,
+  bash: Code,
+  zsh: Code,
+  ps1: Code,
+  sql: Code,
+  html: Code,
+  htm: Code,
+  css: Code,
+  scss: Code,
+  sass: Code,
+  less: Code,
+  xml: Code,
+  yaml: Code,
+  yml: Code,
+  toml: Code,
+  ini: Code,
+  vue: Code,
+  dart: Code,
+  scala: Code,
+  r: Code,
+  jl: Code,
+  hs: Code,
+  ex: Code,
+  exs: Code,
+  erl: Code,
+  clj: Code,
+  pl: Code,
+  m: Code,
+  mm: Code,
+  txt: Text,
+  log: Text,
+  csv: Text,
+  tsv: Text,
+  env: Text,
+  conf: Text,
 };
 
 export function getFolderIcon(open: boolean = false) {

@@ -355,7 +355,7 @@ export type Hit = {
 /**  Where a hit is, as its file's view goes there. */
 export type Jump = 
 /**
- *  In a note's text, zero-based, the column in UTF-16 units. `ordinal`
+ *  In a note's or text file's text, zero-based, the column in UTF-16 units. `ordinal`
  *  is the hit's index among the rich editor's find matches (which see
  *  comments but not front matter or link destinations), or `None` when
  *  the hit is where the rich editor has no text.
@@ -378,7 +378,9 @@ export type KeymapChanged = null;
 /**  The kinds of file whose insides are searched. */
 export type Kind = 
 /**  Markdown, task boards included. */
-"note" | "canvas" | "drawing" | "pdf";
+"note" | "canvas" | "drawing" | "pdf" | 
+/**  Code and plain text: what the app opens in a code tab. */
+"text";
 
 /**
  *  A registry command was activated from the native menu bar -- either by

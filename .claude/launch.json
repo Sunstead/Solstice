@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sync-8090",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["SOLSTICE_DEV_USER=dev", "SOLSTICE_BIND=127.0.0.1:8090", "SOLSTICE_STATE_DIR=/private/tmp/claude-501/-Users-pwb-Documents-Code-Solstice--claude-worktrees-stoic-wiles-813574/17bc9456-571e-47df-9d03-18ed00ee7d46/scratchpad/sync/state", "SOLSTICE_NOTES_DIR=/private/tmp/claude-501/-Users-pwb-Documents-Code-Solstice--claude-worktrees-stoic-wiles-813574/17bc9456-571e-47df-9d03-18ed00ee7d46/scratchpad/sync/notes", "cargo", "run", "-p", "solstice-sync-server"],
+      "port": 8090
+    },
+    {
+      "name": "web-1430",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["SOLSTICE_SYNC_URL=http://127.0.0.1:8090", "npx", "-w", "@solstice/desktop", "vite", "--port", "1430"],
+      "port": 1430
+    }
+  ]
+}

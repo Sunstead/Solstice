@@ -6,10 +6,17 @@ import { BlankTab } from '@/components/blank-tab';
 export function TabContent({ node }: { node: TabNode }) {
   const component = node.getComponent();
   if (component === 'editor') {
-    const config = node.getConfig() as { path?: string; mode?: 'source' } | undefined;
+    const config = node.getConfig() as { path?: string; mode?: 'source'; language?: string } | undefined;
     // Not necessarily an editor: FileView picks a viewer for non-markdown
     // files, which the tab component name predates.
-    return <FileView path={config?.path ?? ''} source={config?.mode === 'source'} />;
+    return (
+      <FileView
+        path={config?.path ?? ''}
+        source={config?.mode === 'source'}
+        tabId={node.getId()}
+        language={config?.language}
+      />
+    );
   }
   if (component === 'blank') {
     return <BlankTab tabId={node.getId()} />;

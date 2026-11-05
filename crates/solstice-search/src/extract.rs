@@ -12,13 +12,15 @@ pub enum Kind {
     Canvas,
     Drawing,
     Pdf,
+    /// Code and plain text: what the app opens in a code tab.
+    Text,
 }
 
 /// Where in its file a segment's text is.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Place {
-    /// A note's whole text.
+    /// A note's or text file's whole text.
     Text,
     /// A canvas card, by its id.
     Card { id: String },
@@ -56,8 +58,24 @@ pub fn kind_of(name: &str) -> Option<Kind> {
         Some(Kind::Drawing)
     } else if name.ends_with(".pdf") {
         Some(Kind::Pdf)
+    } else if is_text(&name) {
+        Some(Kind::Text)
     } else {
         None
+    }
+}
+
+/// The app's code tab extensions (`searchedTextExtensions` in
+/// `lib/embed/kind.ts` checks they agree), and files with none.
+fn is_text(name: &str) -> bool {
+    static EXTENSIONS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    let base = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    match base.rfind('.') {
+        None | Some(0) => true,
+        Some(dot) => EXTENSIONS
+            .get_or_init(|| serde_json::from_str(include_str!("text_extensions.json")).unwrap_or_default())
+            .binary_search_by(|e| e.as_str().cmp(&base[dot + 1..]))
+            .is_ok(),
     }
 }
 
@@ -69,6 +87,7 @@ pub fn extract(kind: Kind, bytes: &[u8]) -> Doc {
         Kind::Canvas => canvas(bytes),
         Kind::Drawing => drawing(&String::from_utf8_lossy(bytes)),
         Kind::Pdf => pdf(bytes),
+        Kind::Text => text(bytes),
     };
     Doc {
         kind,
@@ -78,6 +97,18 @@ pub fn extract(kind: Kind, bytes: &[u8]) -> Doc {
 
 fn segment(place: Place, text: String) -> Segment {
     Segment { place, text, skip: Vec::new() }
+}
+
+/// Binary has a NUL early on, or isn't UTF-8: an extensionless file may be
+/// anything.
+fn text(bytes: &[u8]) -> Vec<Segment> {
+    if bytes[..bytes.len().min(8192)].contains(&0) {
+        return Vec::new();
+    }
+    match std::str::from_utf8(bytes) {
+        Ok(text) => vec![segment(Place::Text, text.to_owned())],
+        Err(_) => Vec::new(),
+    }
 }
 
 fn note(text: &str) -> Vec<Segment> {

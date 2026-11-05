@@ -17,15 +17,11 @@ export function toPx(value: string): number {
   return parseFloat(value)
 }
 
+/** The file name's last extension; none for a dotfile (`.env`). */
 export function getFileExtension(filename: string): string {
-  const lastDotIndex = filename.lastIndexOf('.');
-  
-  // Return empty string if no dot exists or if it's a hidden file like ".htaccess"
-  if (lastDotIndex <= 0) {
-    return '';
-  }
-  
-  return filename.substring(lastDotIndex + 1);
+  const name = filename.slice(filename.search(/[^\\/]*$/));
+  const lastDotIndex = name.lastIndexOf('.');
+  return lastDotIndex <= 0 ? '' : name.substring(lastDotIndex + 1);
 }
 /**
  * What kind of file a name is, out of `known`: a two-part extension

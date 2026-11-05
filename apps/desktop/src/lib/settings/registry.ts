@@ -558,8 +558,16 @@ export const settingsRegistry = {
     section: 'editor',
     group: 'Writing',
     scope: 'global',
-    label: 'Line numbers in code blocks',
+    label: 'Line numbers in code',
     default: true,
+  }),
+
+  'code.wrapLines': defineBoolean({
+    section: 'editor',
+    group: 'Writing',
+    scope: 'global',
+    label: 'Wrap long lines in code files',
+    default: false,
   }),
 
   'links.openExternalInBrowser': defineBoolean({
