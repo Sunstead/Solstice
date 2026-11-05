@@ -47,11 +47,12 @@ export const commands = {
 	 */
 	saveAttachment: (dir: string, fileName: string, contents: number[]) => typedError<string, string>(__TAURI_INVOKE("save_attachment", { dir, fileName, contents })),
 	/**
-	 *  Copies a file that is already on disk into `into_dir`, under a free name,
-	 *  and returns where it landed.
+	 *  Copies a file or folder that is already on disk into `into_dir`, under a
+	 *  free name, and returns where it landed.
 	 * 
-	 *  The counterpart to `save_attachment` for the file-picker path: the bytes
-	 *  stay in the backend rather than making a round trip through the webview.
+	 *  The counterpart to `save_attachment` for the file-picker path and for
+	 *  files dropped from another app: the bytes stay in the backend rather than
+	 *  making a round trip through the webview.
 	 */
 	importAttachment: (from: string, intoDir: string) => typedError<string, string>(__TAURI_INVOKE("import_attachment", { from, intoDir })),
 	listWorkspaceFilesRecursive: (path: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_workspace_files_recursive", { path })),
@@ -219,8 +220,11 @@ export const commands = {
 	 *  relaunch), which never came through `route`.
 	 */
 	allowOutsideFile: (path: string) => __TAURI_INVOKE<void>("allow_outside_file", { path }),
-	/**  The files the last drop on a window carried, once. */
-	takeDroppedPaths: () => __TAURI_INVOKE<string[]>("take_dropped_paths"),
+	/**
+	 *  What the last drop on a window carried, once: files and folders, or with
+	 *  `files_only` just the files (a tab can't show a folder).
+	 */
+	takeDroppedPaths: (filesOnly: boolean) => __TAURI_INVOKE<string[]>("take_dropped_paths", { filesOnly }),
 	listWindows: () => __TAURI_INVOKE<WindowEntry[]>("list_windows"),
 	/**
 	 *  Opens a window, and returns its label. A full window of a workspace that

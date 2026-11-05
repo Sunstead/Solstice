@@ -28,7 +28,6 @@ vi.mock('@/components/file-tree', () => ({
 vi.mock('@/components/file-tree-context-menu-content', () => ({ FileTreeItemContextMenuContent: () => null }));
 vi.mock('@/hooks/use-file-tree-dnd', () => ({
   useFileTreeDrop: () => ({ drop: () => {}, isOver: false, canDrop: false }),
-  useOsFileDrop: () => () => {},
 }));
 vi.mock('@/hooks/use-create-actions', () => ({ useCreateActions: () => [] }));
 vi.mock('@/hooks/use-workspace', () => ({ useWorkspace: () => null }));

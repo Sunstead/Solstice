@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { getEmptyImage, NativeTypes } from 'react-dnd-html5-backend';
-import { commands } from '@/lib/backend';
-import { can } from '@/lib/backend/platform';
-import { openExternalFiles } from '@/lib/open-files';
 import { canMove, type MovableEntry } from '@/lib/file-operations';
 import { fileOperations } from '@/lib/file-operations';
 import { useDragHoverStore } from '@/hooks/use-drag-hover';
@@ -65,6 +62,11 @@ export function useFileTreeDrag(node: MovableEntry) {
   return { drag, isDragging };
 }
 
+/** What react-dnd's HTML5 backend carries for files from another app. */
+interface NativeFiles {
+  files: File[];
+}
+
 interface UseFileTreeDropOptions {
   /** Called when a valid drag hovers this target for a bit, e.g. to expand a collapsed folder. */
   autoExpand?: () => void;
@@ -75,7 +77,8 @@ interface UseFileTreeDropOptions {
 /**
  * Turns an element into a drop target that moves the dragged entry into
  * `targetParentPath`. Pass a folder's own path to drop *into* it, or a
- * file's parent path to drop the dragged entry alongside it.
+ * file's parent path to drop the dragged entry alongside it. Files dragged
+ * in from another app are copied there.
  */
 export function useFileTreeDrop(
   targetParentPath: string,
@@ -87,13 +90,13 @@ export function useFileTreeDrop(
   const clearHoverTarget = useDragHoverStore((s) => s.clearHoverTarget);
 
   const [{ isOver, canDrop }, drop] = useDrop<
-    MovableEntry,
+    MovableEntry | NativeFiles,
     unknown,
     DropCollectedProps
   >(
     () => ({
-      accept: FILE_TREE_ITEM_TYPE,
-      canDrop: (item) => canMove(item, targetParentPath),
+      accept: [FILE_TREE_ITEM_TYPE, NativeTypes.FILE],
+      canDrop: (item) => 'files' in item || canMove(item, targetParentPath),
       drop: (item, monitor) => {
         // Drop targets nest (a file's row sits inside its folder's children
         // container, which sits inside the root). react-dnd calls every
@@ -104,7 +107,8 @@ export function useFileTreeDrop(
         // target whose path *does* differ, moving the entry up a level
         // instead of leaving it in place.
         if (monitor.didDrop()) return;
-        fileOperations.move(item, targetParentPath);
+        if ('files' in item) void fileOperations.copyDropped(targetParentPath, item.files);
+        else fileOperations.move(item, targetParentPath);
       },
       collect: (monitor) => ({
         isOver: monitor.isOver({ shallow: true }),
@@ -178,19 +182,5 @@ export function useFileTreeExternalDropZone() {
     [],
   );
 
-  return drop;
-}
-
-/**
- * Files from another app dropped on the tree open as tabs, wherever they
- * are (the rows only take the tree's own entries). Connect it around the
- * tree.
- */
-export function useOsFileDrop() {
-  const [, drop] = useDrop(() => ({
-    accept: NativeTypes.FILE,
-    canDrop: () => can.dropToOpen,
-    drop: () => void commands.takeDroppedPaths().then(openExternalFiles),
-  }));
   return drop;
 }

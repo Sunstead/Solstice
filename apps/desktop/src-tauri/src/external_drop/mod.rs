@@ -22,11 +22,13 @@ fn note(paths: Vec<String>) {
     *DROPPED.lock().unwrap() = paths;
 }
 
-/// The files the last drop on a window carried, once.
+/// What the last drop on a window carried, once: files and folders, or with
+/// `files_only` just the files (a tab can't show a folder).
 #[tauri::command]
 #[specta::specta]
-pub fn take_dropped_paths(app: tauri::AppHandle) -> Vec<String> {
+pub fn take_dropped_paths(app: tauri::AppHandle, files_only: bool) -> Vec<String> {
     let paths = std::mem::take(&mut *DROPPED.lock().unwrap());
+    let paths: Vec<String> = paths.into_iter().filter(|p| !files_only || std::path::Path::new(p).is_file()).collect();
     for path in &paths {
         crate::open_files::grant(&app, std::path::Path::new(path));
     }

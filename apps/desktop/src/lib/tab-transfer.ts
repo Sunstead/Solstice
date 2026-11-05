@@ -126,7 +126,7 @@ export function refuseStrayTabDrops() {
  * drag ends over another app, and flexlayout's overlay then stays up,
  * taking every click.
  */
-function endLayoutDrag(root: ParentNode) {
+export function endLayoutDrag(root: ParentNode) {
   root.querySelector('.flexlayout__tab_button')?.dispatchEvent(new DragEvent('dragend', { bubbles: true }));
 }
 
