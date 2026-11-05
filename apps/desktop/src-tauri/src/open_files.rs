@@ -122,13 +122,23 @@ pub fn take_pending_opens(window: tauri::Window, pending: tauri::State<PendingOp
 }
 
 /// The files among a launch's arguments: not the program, flags or links
-/// (`solstice://` goes to the deep-link plugin), relative ones taken from
-/// where it was launched, and only those that exist.
+/// (`solstice://` goes to the deep-link plugin), `file://` URIs as their
+/// paths, relative ones taken from where it was launched, and only those
+/// that exist.
 pub fn paths_from_args(args: &[String], cwd: &Path) -> Vec<PathBuf> {
     args.iter()
         .skip(1)
-        .filter(|arg| !arg.starts_with('-') && !arg.contains("://"))
-        .map(|arg| cwd.join(arg))
+        .filter(|arg| !arg.starts_with('-'))
+        .filter_map(|arg| {
+            // A Linux file manager passes files as `file://` URIs (`%U`).
+            if arg.starts_with("file://") {
+                tauri::Url::parse(arg).ok()?.to_file_path().ok()
+            } else if arg.contains("://") {
+                None
+            } else {
+                Some(cwd.join(arg))
+            }
+        })
         .filter(|path| path.is_file())
         .collect()
 }
@@ -166,6 +176,17 @@ mod tests {
             .map(|s| s.to_string())
             .collect();
         assert_eq!(paths_from_args(&args, dir.path()), vec![dir.path().join("a.md"), dir.path().join("sub/b.md")]);
+    }
+
+    #[test]
+    fn takes_file_uris_as_a_linux_file_manager_passes_them() {
+        // `Exec=solstice %U`: files come as URIs, links as themselves.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a b.md"), "").unwrap();
+        let uri = tauri::Url::from_file_path(dir.path().join("a b.md")).unwrap().to_string();
+        assert!(uri.contains("%20"));
+        let args = vec!["solstice".to_string(), uri, "solstice://open?vault=x&path=y".to_string()];
+        assert_eq!(paths_from_args(&args, Path::new("/")), vec![dir.path().join("a b.md")]);
     }
 
     #[test]
