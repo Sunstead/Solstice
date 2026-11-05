@@ -38,11 +38,17 @@ export type ZenMarks = Map<HTMLElement, { x: number; top: number }>;
 export function zenMarks(inset: HTMLElement): ZenMarks {
   return new Map(
     [...inset.querySelectorAll<HTMLElement>('[data-zen-flip]')].map((el) => {
-      const r = el.getBoundingClientRect();
-      return [el, { x: anchorX(el, r), top: r.top }];
+      // Mid-motion a header part is shown by its copy (`flipMarks`).
+      const copy = copies.get(el);
+      const shown = copy?.isConnected ? copy : el;
+      const r = shown.getBoundingClientRect();
+      return [el, { x: anchorX(shown, r), top: r.top }];
     }),
   );
 }
+
+/** Each hidden header part's moving copy, while `flipMarks` shows one. */
+const copies = new WeakMap<HTMLElement, HTMLElement>();
 
 /**
  * The x a part is kept by (`data-zen-flip`): its left edge, right edge or
@@ -51,7 +57,7 @@ export function zenMarks(inset: HTMLElement): ZenMarks {
  * centred only once the pane is wider than the line length).
  */
 function anchorX(el: HTMLElement, r: DOMRectReadOnly): number {
-  const anchor = el.dataset.zenFlip;
+  const anchor = el.dataset.zenFlip ?? el.dataset.zenCopy;
   if (anchor === 'text') {
     const text = el.querySelector<HTMLElement>('.ProseMirror, .cm-content');
     return text ? text.getBoundingClientRect().left + parseFloat(getComputedStyle(text).paddingLeft) : r.left;
@@ -109,22 +115,33 @@ export function bandPieces(panes: BandPane[], offset: { x: number; y: number }):
   return pieces;
 }
 
+/** A layer of the editor area for the motion's own parts; `zen-layer` marks it as ours. */
+function motionLayer(inset: HTMLElement, z: number): HTMLElement {
+  const layer = document.createElement('div');
+  layer.setAttribute('aria-hidden', '');
+  layer.dataset.zenLayer = '';
+  layer.style.cssText = `position:absolute;inset:0;pointer-events:none;z-index:${z}`;
+  inset.append(layer);
+  return layer;
+}
+
 /**
  * Paints `bandPieces` the notes' colour in a layer of the editor area, so
  * they ride with it, until the returned function: entering, the strip the
  * tab row left above the header; leaving, the room a narrower pane will
  * fill. Without it the window shows there, and under a native view that's
  * the host, the sidebar's colour under Islands. Laid out anew as flexlayout
- * moves the panes, a frame late.
+ * moves the panes, a frame late, and as it mounts or shows them (leaving,
+ * the panes Zen's maximize hid).
  */
 function paintBand(inset: HTMLElement, offset: { x: number; y: number }): () => void {
-  const layer = document.createElement('div');
-  layer.setAttribute('aria-hidden', '');
-  layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:20';
-  inset.append(layer);
+  const layer = motionLayer(inset, 20);
+  const watch = new ResizeObserver(() => place());
   const place = () => {
     const box = inset.getBoundingClientRect();
-    const panes = [...inset.querySelectorAll<HTMLElement>('.flexlayout__tab')].flatMap((el) => {
+    const tabs = [...inset.querySelectorAll<HTMLElement>('.flexlayout__tab')];
+    for (const el of tabs) watch.observe(el);
+    const panes = tabs.flatMap((el) => {
       const r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) return [];
       const view = el.querySelector('[data-native-surface]')?.getBoundingClientRect();
@@ -140,11 +157,15 @@ function paintBand(inset: HTMLElement, offset: { x: number; y: number }): () => 
     );
   };
   place();
-  const watch = new ResizeObserver(place);
   watch.observe(inset);
-  for (const el of inset.querySelectorAll('.flexlayout__tab')) watch.observe(el);
+  // Our own layers change too; only flexlayout's changes lay the band out anew.
+  const mounted = new MutationObserver((records) => {
+    if (records.some((r) => !(r.target as Element).closest?.('[data-zen-layer]'))) place();
+  });
+  mounted.observe(inset, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class'] });
   return () => {
     watch.disconnect();
+    mounted.disconnect();
     layer.remove();
   };
 }
@@ -157,11 +178,16 @@ type ZenParts = {
   entering: boolean;
   /** `paneOrigin` before the switch. */
   before: Point;
+  /** The column's `translate` before the switch, mid-motion or not. */
+  columnFrom?: string;
   /** Called as the motion starts, after its held first frame. */
   onPlay?: () => void;
   /** `zenMarks` before the switch: each part eased from where it was. */
   marks?: ZenMarks;
 };
+
+/** A switch in motion: over when `finished` settles, or stopped by `cancel`. */
+export type ZenRun = { finished: Promise<unknown>; cancel: () => void };
 
 /**
  * Eases each marked part from where it was to where it lands, on top of the
@@ -173,18 +199,21 @@ type ZenParts = {
  * late), each is measured again before that frame paints, so no part jumps.
  */
 function flipMarks(inset: HTMLElement, marks: ZenMarks, timing: KeyframeAnimationOptions) {
-  const layer = document.createElement('div');
-  layer.setAttribute('aria-hidden', '');
-  layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:30';
-  inset.append(layer);
+  const layer = motionLayer(inset, 30);
   const held: Animation[] = [];
   const hidden = new Set<HTMLElement>();
+  const unhide = () => {
+    hidden.forEach((el) => {
+      el.style.visibility = '';
+      copies.delete(el);
+    });
+    hidden.clear();
+  };
   const place = () => {
     held.splice(0).forEach((a) => a.cancel());
     layer.replaceChildren();
     // A part hidden by an earlier pass may not move in this one.
-    hidden.forEach((el) => (el.style.visibility = ''));
-    hidden.clear();
+    unhide();
     const box = inset.getBoundingClientRect();
     for (const [el, before] of marks) {
       if (!el.isConnected) continue;
@@ -197,6 +226,7 @@ function flipMarks(inset: HTMLElement, marks: ZenMarks, timing: KeyframeAnimatio
       if (el.dataset.zenFlip !== 'text') {
         moved = el.cloneNode(true) as HTMLElement;
         moved.removeAttribute('data-zen-flip');
+        if (el.dataset.zenFlip) moved.dataset.zenCopy = el.dataset.zenFlip;
         // The original may be hidden already (an earlier pass).
         Object.assign(moved.style, {
           visibility: 'visible',
@@ -211,6 +241,7 @@ function flipMarks(inset: HTMLElement, marks: ZenMarks, timing: KeyframeAnimatio
         layer.append(moved);
         el.style.visibility = 'hidden';
         hidden.add(el);
+        copies.set(el, moved);
       }
       const animation = moved.animate(keyframes, timing);
       animation.pause();
@@ -222,63 +253,79 @@ function flipMarks(inset: HTMLElement, marks: ZenMarks, timing: KeyframeAnimatio
   watch.observe(inset);
   for (const el of inset.querySelectorAll('.flexlayout__tab')) watch.observe(el);
   for (const el of marks.keys()) watch.observe(el);
-  return (): Promise<void> => {
+  const done = () => {
     watch.disconnect();
-    held.forEach((a) => a.play());
-    return Promise.all(held.map((a) => a.finished.catch(() => undefined))).then(() => {
-      hidden.forEach((el) => (el.style.visibility = ''));
-      // Styled now, while `data-zen-moving` still turns transitions off: a
-      // button's `transition-all` takes `visibility` too, and WebKit paints
-      // the first frame of hidden-to-visible hidden, so the parts blinked.
-      void inset.offsetHeight;
-      layer.remove();
-    });
+    unhide();
+    // Styled now, while `data-zen-moving` still turns transitions off: a
+    // button's `transition-all` takes `visibility` too, and WebKit paints
+    // the first frame of hidden-to-visible hidden, so the parts blinked.
+    void inset.offsetHeight;
+    layer.remove();
+  };
+  return {
+    play: (): Promise<void> => {
+      watch.disconnect();
+      held.forEach((a) => a.play());
+      return Promise.all(held.map((a) => a.finished.catch(() => undefined))).then(done);
+    },
+    /** Another switch: the copies go and the originals show where they are. */
+    cancel: () => {
+      held.forEach((a) => a.cancel());
+      done();
+    },
   };
 }
 
 /**
- * Plays the switch; resolves once it has (at once when there's nothing to
- * move). The first frame is held until the main thread has painted twice:
- * the switch's own work (flexlayout maximizing, the editor laying out at its
- * new size, a native view following) can take longer than the whole motion on
- * an iPad, and an animation whose clock ran through it was over unseen.
+ * Plays the switch; `finished` settles once it has (at once when there's
+ * nothing to move), or once `cancel` has stopped it for the next switch,
+ * which takes over from where this left everything. The first frame is held
+ * until the main thread has painted twice: the switch's own work
+ * (flexlayout maximizing, the editor laying out at its new size, a native
+ * view following) can take longer than the whole motion on an iPad, and an
+ * animation whose clock ran through it was over unseen.
  */
-export function playZen({ inset, column, entering, before, onPlay, marks }: ZenParts): Promise<unknown> {
+export function playZen({ inset, column, entering, before, columnFrom, onPlay, marks }: ZenParts): ZenRun {
   const { x, y } = paneOffset(before, paneOrigin(inset));
-  if (x === 0 && y === 0) return Promise.resolve();
+  if (x === 0 && y === 0) return { finished: Promise.resolve(), cancel: () => {} };
 
   const timing = pushTiming();
   // Reduce Motion: a crossfade in place of the slide, as iOS does.
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const shown = '0';
+  const away = '-100% 0';
+  const from = columnFrom && columnFrom !== 'none' ? columnFrom : entering ? shown : away;
   const animations = reduced
     ? [inset.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' })]
     : [
         inset.animate([{ transform: `translate(${x}px, ${y}px)` }, { transform: 'none' }], timing),
         // `translate`, not `transform`: it's what the column's
         // `-translate-x-full` sets in Zen, and the two would add up.
-        ...(column
-          ? [
-              column.animate(
-                entering
-                  ? [{ translate: '0' }, { translate: '-100% 0' }]
-                  : [{ translate: '-100% 0' }, { translate: '0' }],
-                timing,
-              ),
-            ]
-          : []),
+        ...(column ? [column.animate([{ translate: from }, { translate: entering ? away : shown }], timing)] : []),
       ];
   for (const a of animations) a.pause();
   const moved = animations[0].finished.catch(() => undefined);
-  if (!reduced) void moved.then(paintBand(inset, { x, y }));
-  const playMarks = marks && !reduced ? flipMarks(inset, marks, timing) : null;
+  const unpaint = reduced ? null : paintBand(inset, { x, y });
+  if (unpaint) void moved.then(unpaint);
+  const flips = marks?.size && !reduced ? flipMarks(inset, marks, timing) : null;
   // Over once the header's parts are back too (`flipMarks`).
   let landed: Promise<unknown> = moved;
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
+  let frame = requestAnimationFrame(() => {
+    frame = requestAnimationFrame(() => {
+      frame = 0;
       animations.forEach((a) => a.play());
-      if (playMarks) landed = Promise.all([moved, playMarks()]);
+      if (flips) landed = Promise.all([moved, flips.play()]);
       onPlay?.();
-    }),
-  );
-  return moved.then(() => landed);
+    });
+  });
+  return {
+    finished: moved.then(() => landed),
+    cancel: () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      animations.forEach((a) => a.cancel());
+      unpaint?.();
+      flips?.cancel();
+    },
+  };
 }

@@ -6,8 +6,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { registerCommand, unregisterCommand } from '@/lib/commands';
 import { useWorkspaceUIStore } from '@/lib/stores/workspace-ui-store';
 import { toggleZen, useZen, useZenAllowed, useZenAttribute } from '@/lib/zen';
-import { beginSurfaceEase, endSurfaceEase, playSurfaceEase } from '@/lib/native-surfaces';
-import { paneOrigin, playZen, zenMarks, type ZenMarks } from '@/lib/zen-motion';
+import { createZenController, type ZenController } from '@/lib/zen-controller';
 
 /**
  * The title bar and sidebar column beside the editor area. A phone has
@@ -24,60 +23,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => unregisterCommand('view.toggle_zen_mode');
   }, [zenAllowed]);
 
-  // Where the pane was, read as the switch is asked for, before React lays
-  // the new mode out; the motion eases from there (`zen-motion.ts`).
+  // The switch is read as it's asked for, before React lays the new mode
+  // out, and eased from there once it has (`zen-controller.ts`).
   const frame = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
   const inset = useRef<HTMLElement>(null);
-  const before = useRef<ReturnType<typeof paneOrigin> | null>(null);
-  const marks = useRef<ZenMarks | null>(null);
+  const zenMotion = useRef<ZenController>(null);
+  // Made in the first effect that needs it: it holds the refs, read only there.
+  const motion = () => (zenMotion.current ??= createZenController({ frame, inset, column }));
   useEffect(
     () =>
       useWorkspaceUIStore.subscribe((s, prev) => {
-        if (s.zen === prev.zen) return;
-        before.current = inset.current && paneOrigin(inset.current);
-        marks.current = inset.current && zenMarks(inset.current);
-        // Out of the flow the column would shrink to its contents (the
-        // sidebar's width is a placeholder's), and slide out as nothing. As
-        // wide as all it draws (the explorer runs past its box), so sliding
-        // it a whole width takes every bit off screen.
-        const side = column.current;
-        if (s.zen && side) {
-          const right = Math.max(...[...side.querySelectorAll('*')].map((el) => el.getBoundingClientRect().right));
-          side.style.setProperty('--zen-column', `${Math.max(side.offsetWidth, right - side.getBoundingClientRect().left)}px`);
-        }
-        // Set before React commits the switch, or the sidebar's own
-        // transitions (and the inset's padding) start, and lag the slide.
-        frame.current?.setAttribute('data-zen-moving', '');
-        // A native view (PDF, drawing) eases its content with the page.
-        beginSurfaceEase();
+        // Not allowed here, the flag is inert and no commit would end it.
+        if (zenAllowed && s.zen !== prev.zen) motion().prepare(s.zen);
       }),
-    [],
+    [zenAllowed],
   );
-  useLayoutEffect(() => {
-    const from = before.current;
-    before.current = null;
-    const parts = marks.current ?? undefined;
-    marks.current = null;
-    const el = inset.current;
-    const shell = frame.current;
-    const side = column.current;
-    if (!from || !el) {
-      shell?.removeAttribute('data-zen-moving');
-      endSurfaceEase();
-      // Opened in Zen: nothing to slide.
-      if (zen) side?.style.setProperty('visibility', 'hidden');
-      return;
-    }
-    // Shown for the slide; hidden once off screen, where a sliver of the
-    // explorer would otherwise stay at the edge.
-    side?.style.removeProperty('visibility');
-    void playZen({ inset: el, column: side, entering: zen, before: from, onPlay: playSurfaceEase, marks: parts }).then(() => {
-      shell?.removeAttribute('data-zen-moving');
-      endSurfaceEase();
-      if (zen) side?.style.setProperty('visibility', 'hidden');
-    });
-  }, [zen]);
+  useLayoutEffect(() => motion().play(zen), [zen]);
 
   return (
     // Clips the editor area while it eases in from under the tab strip.

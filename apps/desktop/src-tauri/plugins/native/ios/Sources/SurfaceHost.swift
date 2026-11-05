@@ -1,4 +1,5 @@
 import ObjectiveC
+import SurfaceCore
 import Tauri
 import UIKit
 import WebKit
@@ -69,64 +70,88 @@ class SurfaceView: UIView {
     CGAffineTransform(translationX: (k - 1) * bounds.width / 2, y: (k - 1) * bounds.height / 2).scaledBy(x: k, y: k)
   }
 
-  /// While a switch eases: the size the surface keeps (the larger of before
-  /// and after, so it covers its pane throughout, growing or shrinking) and
-  /// the size it takes when it ends.
-  var held: (size: CGSize, target: CGSize)?
+  /// A Zen switch's hold (`EaseState`): the size kept (every size since it
+  /// began, so it covers its pane throughout) and the size it takes at the end.
+  var ease = EaseState()
 
-  /// Where the web side puts it: during a switch only its origin moves.
+  /// Where the web side puts it: during a switch, a new size holds on.
   func place(_ rect: CGRect) {
-    guard let held else {
+    guard ease.isHeld else {
       frame = rect
       return
     }
-    self.held = (held.size, rect.size)
-    frame = CGRect(origin: rect.origin, size: held.size)
+    easeHold(to: rect)
   }
 
-  /// A Zen switch (`beginSurfaceEase`): from here until `easeEnd` the view is
-  /// the larger of its old and new size, its content drawn as it was until
-  /// `easePlay` eases it to how it'll be. Resizing PDFKit during the motion
-  /// froze it; a view the old size left the pane's new room bare, and one the
-  /// new size went short of the pane as it moved.
+  /// A Zen switch (`beginSurfaceEase`): from here until `easeEnd` the view
+  /// keeps the largest size it's been given, its content drawn as it was
+  /// until `easePlay` eases it to how it'll be. Resizing PDFKit during the
+  /// motion froze it; a view the old size left the pane's new room bare, and
+  /// one the new size went short of the pane as it moved.
   func easeHold(to newFrame: CGRect) {
-    // One switch, one hold: a later one only moves it on.
-    if held != nil { return place(newFrame) }
-    let old = frame.size
-    guard !isHidden, old.width > 0, newFrame.width > 0, old != newFrame.size, let content = easedContent else {
-      return place(newFrame)
+    let canBegin = !isHidden && easedContent != nil
+    switch ease.hold(from: frame.size, to: newFrame.size, canBegin: canBegin) {
+    case .none:
+      frame = newFrame
+    case .began:
+      beforeEaseResize()
+      frame = CGRect(origin: newFrame.origin, size: ease.size)
+      clipsToBounds = true
+      setNeedsLayout()
+      layoutIfNeeded()
+      layoutForEase()
+      easedContent?.transform = easeTransform(showing: ease.from) ?? .identity
+    case .kept(let grew, let interrupted):
+      if interrupted, let content = easedContent { freeze(content) }
+      guard grew, let content = easedContent else {
+        frame.origin = newFrame.origin
+        return
+      }
+      // Larger still (flexlayout lays a pane out a frame late): laid out at
+      // the union, the content kept where it shows. Once moved, it's kept by
+      // its middle, which the layout moves by half the growth.
+      let shown = content.transform
+      let old = bounds.size
+      beforeEaseResize()
+      frame = CGRect(origin: newFrame.origin, size: ease.size)
+      setNeedsLayout()
+      layoutIfNeeded()
+      layoutForEase()
+      content.transform =
+        ease.played
+        ? shown.concatenating(
+          CGAffineTransform(translationX: (old.width - bounds.width) / 2, y: (old.height - bounds.height) / 2))
+        : easeTransform(showing: ease.from) ?? .identity
     }
-    let size = CGSize(width: max(old.width, newFrame.width), height: max(old.height, newFrame.height))
-    held = (size, newFrame.size)
-    beforeEaseResize()
-    frame = CGRect(origin: newFrame.origin, size: size)
-    clipsToBounds = true
-    setNeedsLayout()
-    layoutIfNeeded()
-    layoutForEase()
-    content.transform = easeTransform(showing: old) ?? .identity
   }
 
-  /// Eases the held content to how it'll be at its new size, on the push
+  /// Stops `view` where it shows now: a new switch takes over mid-motion.
+  func freeze(_ view: UIView) {
+    if let shown = view.layer.presentation()?.affineTransform() { view.transform = shown }
+    view.layer.removeAllAnimations()
+  }
+
+  /// Eases the held content to how it'll be at its latest size, on the push
   /// spring the page moves on (UIKit's, critically damped, 0.3 s
-  /// perceptual: `--push-ms`).
+  /// perceptual: `--push-ms`); played again, on from where it is.
   func easePlay() {
-    guard let held, let content = easedContent else { return }
-    let to = easeTransform(showing: held.target) ?? .identity
+    let step = ease.play()
+    guard step != .none, let content = easedContent else { return }
+    if step == .restart { freeze(content) }
+    let to = easeTransform(showing: ease.target) ?? .identity
     UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState]) {
       content.transform = to
     }
   }
 
-  /// The switch is over: the view takes its new size, laid out for it, which
-  /// shows just what the eased content did.
+  /// The latest switch is over: the view takes its new size, laid out for
+  /// it, which shows just what the eased content did.
   func easeEnd() {
-    guard let held else { return }
-    self.held = nil
+    guard let target = ease.end() else { return }
     easedContent?.layer.removeAllAnimations()
     easedContent?.transform = .identity
     beforeEaseResize()
-    frame = CGRect(origin: frame.origin, size: held.target)
+    frame = CGRect(origin: frame.origin, size: target)
     setNeedsLayout()
     layoutIfNeeded()
     layoutForEase()
