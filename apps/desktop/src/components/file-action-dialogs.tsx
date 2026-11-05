@@ -1,5 +1,6 @@
 import { Trash2Icon } from 'lucide-react';
-import { useIsMac } from '@/hooks/use-platform';
+import { usePlatform } from '@/hooks/use-platform';
+import { trashName } from '@/lib/trash-name';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { usePhoneSheets } from '@/hooks/use-phone-sheets';
 import { shell } from '@/lib/backend/platform';
@@ -34,7 +35,7 @@ import {
  * and avoids mounting a Dialog + full Command/file-index instance per row.
  */
 export function FileActionDialogs() {
-  const isMac = useIsMac();
+  const platform = usePlatform();
   const deleteTarget = useFileActionDialog((s) => s.deleteTarget);
   const moveTarget = useFileActionDialog((s) => s.moveTarget);
   const closeDelete = useFileActionDialog((s) => s.closeDelete);
@@ -43,9 +44,7 @@ export function FileActionDialogs() {
   const phone = usePhoneSheets();
 
   const itemName = deleteTarget?.is_dir ? 'folder' : 'file';
-  // Named for what the user will go looking in if they change their mind. A
-  // phone's trash is the workspace's own.
-  const trashName = shell === 'mobile' ? "workspace's trash" : isMac ? 'system trash' : 'Recycle Bin';
+  const trash = trashName(shell, platform);
   const remove = () => {
     if (deleteTarget) {
       haptics.play('warning');
@@ -59,7 +58,7 @@ export function FileActionDialogs() {
       {phone ? (
         <DeleteSheet
           name={deleteTarget?.name ?? null}
-          description={`This ${itemName} will be moved to the ${trashName}.`}
+          description={`This ${itemName} will be moved to the ${trash}.`}
           onDelete={remove}
           onCancel={closeDelete}
         />
@@ -75,7 +74,7 @@ export function FileActionDialogs() {
               </AlertDialogMedia>
               <AlertDialogTitle>Delete {itemName}?</AlertDialogTitle>
               <AlertDialogDescription>
-                This {itemName} will be moved to the {trashName}.
+                This {itemName} will be moved to the {trash}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
