@@ -135,7 +135,7 @@ in the simulator unless it says otherwise:
   - Dynamic Type scales the whole UI's root size, clamped to 0.82 to 1.35×
     (`lib/dynamic-type.ts`). Not tried at other text sizes.
   - Holds: a folder's colours are swatches inline in the sheet rather than
-    a page pushed inside it. A task board card's hold keeps its own menu.
+    a page pushed inside it. A task board card's or column's hold, and a tab's, open the same bottom sheet (`ActionMenu`).
   - Import from sync, Move and folder colour open as bottom sheets, but
     still use the desktop's header and buttons. Only the name dialog and New
     Workspace have the Cancel / title / confirm bar (`FormLayout`).

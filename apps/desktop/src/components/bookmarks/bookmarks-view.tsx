@@ -26,12 +26,14 @@ import {
 import { EntryMenuItems } from '@/components/entry-menu-items';
 import { EntryMenuTrigger } from '@/components/entry-menu-trigger';
 import { TabBarRoom } from '@/components/mobile/tab-bar-room';
+import { useSheetMenus } from '@/hooks/use-sheet-menus';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { useCreateActions } from '@/hooks/use-create-actions';
 import { useFileTreeDrag, useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { useLayout } from '@/hooks/use-layout';
 import { touchFirst } from '@/lib/backend/platform';
 import { useEntryMenuItems } from '@/lib/entry-menu-items';
+import { useHold } from '@/lib/hold';
 import { createSlotGesture } from '@/lib/ink/slot-gesture';
 import { getFileNameFromPath, getRelativePath, normalizePath, parentPath } from '@/lib/path-utils';
 import { useSetting } from '@/lib/settings/store';
@@ -316,7 +318,7 @@ function FolderContents({
     [index, folder, showHidden, foldersFirst],
   );
   const { drop } = useFileTreeDrop(folder);
-  const phone = useIsMobile();
+  const sheets = useSheetMenus();
   const area = useRef<HTMLDivElement>(null);
   useEffect(() => {
     drop(area);
@@ -325,9 +327,10 @@ function FolderContents({
   // Its own empty space is the folder: a right click there is its menu, as
   // the Explorer's empty space is the workspace's.
   const self: FileEntry = { path: folder, name: getFileNameFromPath(folder), is_dir: true };
+  const hold = useHold(() => useEntrySheet.getState().open(self, 'list'));
 
   const contents = (
-    <div ref={area} className='grow'>
+    <div ref={area} className='grow' {...(sheets ? hold : {})}>
       {entries.length === 0 ? (
         <p className='px-4 py-10 text-center text-sm text-muted-foreground'>This folder is empty.</p>
       ) : (
@@ -339,8 +342,9 @@ function FolderContents({
       )}
     </div>
   );
-  // A phone's holds are the cards' sheets; a menu here would open with each.
-  if (phone) return contents;
+  // Where menus are sheets, a hold here is the folder's (the cards' own win:
+  // `useHold`); a context menu would open with every card's hold too.
+  if (sheets) return contents;
 
   return (
     <ContextMenu>

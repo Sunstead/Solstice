@@ -30,3 +30,19 @@ describe('touch menu rows', () => {
     expect(rule[2]).toMatch(/min-height:\s*2\.75rem/);
   });
 });
+
+// Off a phone (an iPad), a bottom sheet is a constant width at the bottom's
+// middle, not the screen's width.
+describe('bottom sheets off a phone', () => {
+  const wide = app.match(/@media \(min-width: 768px\)\s*\{\s*\.solstice-pane-frame\[data-align='end'\] > \[data-slot='sheet-content'\]\s*\{([^}]*)\}/);
+
+  it('caps a bottom sheet’s width from the phone breakpoint up', () => {
+    expect(wide).toBeTruthy();
+    expect(wide![1]).toMatch(/max-width:\s*28rem/);
+  });
+
+  it('leaves a phone’s sheets the full width', () => {
+    const outside = app.replace(wide?.[0] ?? '', '');
+    expect(outside).not.toMatch(/\[data-slot='sheet-content'\][^{]*\{[^}]*max-width/);
+  });
+});

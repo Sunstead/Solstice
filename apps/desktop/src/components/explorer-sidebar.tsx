@@ -10,7 +10,10 @@ import {
 } from '@sunstead/ui/components/resizable-sidebar';
 import { FileTree } from './file-tree';
 import { ContextMenu, ContextMenuTrigger } from '@sunstead/ui/components/context-menu';
-import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
+import { useSheetMenus } from '@/hooks/use-sheet-menus';
+import { useHold } from '@/lib/hold';
+import { getFileNameFromPath } from '@/lib/path-utils';
+import { useEntrySheet } from '@/lib/stores/entry-sheet';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
 import { useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { cn } from '@/lib/utils';
@@ -86,12 +89,16 @@ export function ExplorerTree({ path }: { path: string }) {
   dropOnRoot(rootDropRef);
 
   const hoverTargetPath = useDragHoverStore((s) => s.hoverTargetPath);
-  const phone = useIsMobile();
+  const sheets = useSheetMenus();
   const isDropDestination = hoverTargetPath === path;
+  const hold = useHold(() =>
+    useEntrySheet.getState().open({ path, name: getFileNameFromPath(path), is_dir: true }, 'root'),
+  );
 
   const tree = (
     <SidebarGroup
       ref={rootDropRef}
+      {...(sheets ? hold : {})}
       className={cn('h-full py-0', (isDropDestination || (isRootOver && canDropOnRoot)) && 'bg-accent/30')}
     >
       <SidebarGroupContent className='max-w-(--sidebar-width) group-data-[phone=true]/files:max-w-none'>
@@ -103,9 +110,10 @@ export function ExplorerTree({ path }: { path: string }) {
     </SidebarGroup>
   );
 
-  // On a phone the rows' holds are the hold sheet, and the + makes things:
-  // a menu on the empty space under them would open with every hold.
-  if (phone) return <SidebarContent>{tree}</SidebarContent>;
+  // Where menus are sheets (iPhone, iPad), a hold on the empty space is the
+  // workspace's sheet. Not a context menu: on touch, Base UI's would open
+  // with every hold on a row as well as the row's own sheet.
+  if (sheets) return <SidebarContent>{tree}</SidebarContent>;
 
   return (
     <SidebarContent>

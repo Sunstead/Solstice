@@ -1,9 +1,8 @@
 import { cloneElement, type ReactElement, type ReactNode } from 'react';
 
 import { ContextMenu, ContextMenuTrigger } from '@sunstead/ui/components/context-menu';
-import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import type { EntryTarget } from '@/lib/entry-actions';
-import { touchFirst } from '@/lib/backend/platform';
+import { useSheetMenus } from '@/hooks/use-sheet-menus';
 import { useHold } from '@/lib/hold';
 import { useEntrySheet, type EntrySheetFrom } from '@/lib/stores/entry-sheet';
 
@@ -25,9 +24,9 @@ export function EntryMenuTrigger({
   /** The menu on a computer; without one, only a touch screen has actions here. */
   menu?: ReactNode;
 }) {
-  const phone = useIsMobile();
+  const sheets = useSheetMenus();
   const hold = useHold(() => useEntrySheet.getState().open(entry, from));
-  if (phone || touchFirst) return cloneElement(render, hold);
+  if (sheets) return cloneElement(render, hold);
   if (!menu) return render;
   return (
     <ContextMenu>

@@ -1,4 +1,5 @@
 import { haptics } from '@/lib/haptics';
+import { swallowClickNow, swallowLiftClick } from '@/lib/hold';
 import { cardTarget, columnTarget, type ColumnLayout } from './drop-target';
 import type { CardRef } from './parse';
 
@@ -120,9 +121,13 @@ export function createBoardGesture(root: HTMLElement, { moveCard, moveColumn, me
     press = null;
   };
 
-  const openMenu = () => {
+  /** `down`: the finger is still on the card (else this is its lift). */
+  const openMenu = (down: boolean) => {
     if (!press || press.dragging || press.menuOpened) return;
     press.menuOpened = true;
+    // The menu may be a sheet over the whole board: the lift's click mustn't close it.
+    if (down) swallowLiftClick();
+    else swallowClickNow();
     menu(press.target, { x: press.lastX, y: press.lastY });
   };
 
@@ -265,7 +270,7 @@ export function createBoardGesture(root: HTMLElement, { moveCard, moveColumn, me
       if (!press) return;
       lift();
       haptics.play('lift');
-      stillTimer = window.setTimeout(openMenu, STILL_MS);
+      stillTimer = window.setTimeout(() => openMenu(true), STILL_MS);
     }, HOLD_MS);
   };
 
@@ -298,7 +303,7 @@ export function createBoardGesture(root: HTMLElement, { moveCard, moveColumn, me
         haptics.play('drop');
         moveColumn(target.column, to);
       }
-    } else if (lifted) openMenu();
+    } else if (lifted) openMenu(false);
     swallowClick = lifted || dragging;
     reset();
   };
