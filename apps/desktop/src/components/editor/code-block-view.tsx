@@ -12,7 +12,8 @@ import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { openSearchPanel, search } from '@codemirror/search';
 import { bracketMatching, indentOnInput } from '@codemirror/language';
 import { redo, undo } from '@milkdown/kit/prose/history';
-import { Selection, TextSelection } from '@milkdown/kit/prose/state';
+import { TextSelection } from '@milkdown/kit/prose/state';
+import { codeToParagraphs, leaveBlock } from '@/lib/editor/block-edges';
 import { exitCode } from '@milkdown/kit/prose/commands';
 import { Check, ChevronsUpDown, Copy } from 'lucide-react';
 
@@ -99,7 +100,7 @@ function syncScrollerHeight(cm: EditorView) {
  * integration goes wrong.
  */
 export const CodeBlockView: React.FC = () => {
-  const { node, view, getPos } = useNodeViewContext();
+  const { node, view, getPos, selected } = useNodeViewContext();
   const scopeId = useId();
 
   const hostRef = useRef<HTMLDivElement>(null);
@@ -202,22 +203,7 @@ export const CodeBlockView: React.FC = () => {
 
         const base = getPosRef.current();
         if (base === undefined) return false;
-
-        const size = nodeRef.current.nodeSize;
-        const target = dir < 0 ? base : base + size;
-        const next = Selection.near(view.state.doc.resolve(target), dir);
-
-        // With nothing on that side, `Selection.near` lands back in the
-        // block: a paragraph is made there instead, as math blocks do.
-        if (next.from >= base && next.from <= base + size) {
-          const paragraph = view.state.schema.nodes.paragraph?.createAndFill();
-          if (!paragraph) return false;
-          const tr = view.state.tr.insert(target, paragraph);
-          tr.setSelection(TextSelection.create(tr.doc, target + 1));
-          view.dispatch(tr.scrollIntoView());
-        } else {
-          view.dispatch(view.state.tr.setSelection(next).scrollIntoView());
-        }
+        if (!leaveBlock(base, dir)(view.state, view.dispatch)) return false;
         view.focus();
         return true;
       };
@@ -253,20 +239,16 @@ export const CodeBlockView: React.FC = () => {
             { key: 'Mod-Shift-z', run: () => redo(view.state, view.dispatch) },
             { key: 'Mod-y', run: () => redo(view.state, view.dispatch) },
             {
+              // At the very start (or in an empty block): paragraphs, one
+              // per line, as Backspace at a heading's start makes it text.
               key: 'Backspace',
               run: (cm) => {
-                if (cm.state.doc.length > 0) return false;
+                const main = cm.state.selection.main;
+                if (!main.empty || main.head > 0) return false;
 
                 const base = getPosRef.current();
                 if (base === undefined) return false;
-
-                const tr = view.state.tr.delete(
-                  base,
-                  base + nodeRef.current.nodeSize,
-                );
-                tr.setSelection(Selection.near(tr.doc.resolve(base), -1));
-
-                view.dispatch(tr);
+                if (!codeToParagraphs(base)(view.state, view.dispatch)) return false;
                 view.focus();
                 return true;
               },
@@ -415,7 +397,7 @@ export const CodeBlockView: React.FC = () => {
   // from being editable.
   return (
     <div
-      className='solstice-code-block'
+      className={cn('solstice-code-block', selected && 'is-selected')}
       data-not-typeset
       contentEditable={false}
     >

@@ -1,16 +1,9 @@
-import type { Node } from '@milkdown/kit/prose/model';
 import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
 import { $prose } from '@milkdown/kit/utils';
 
-/**
- * Whether the caret can't be put after `node` by clicking below it: a code
- * block (CodeMirror takes the click), a table, or a block with no text of
- * its own (an embed, a formula, a rule).
- */
-export function endsInATrap(node: Node | null): boolean {
-  if (!node) return false;
-  return node.type.name === 'code_block' || node.type.name === 'table' || node.isAtom;
-}
+import { endsInATrap } from './block-edges';
+
+export { endsInATrap };
 
 /**
  * A click or tap below the last block, when that block is one the caret

@@ -1,5 +1,6 @@
 import type { Attrs, Node as PMNode, NodeType, ResolvedPos } from '@milkdown/kit/prose/model';
 import { Selection, type Command, type EditorState, type Transaction } from '@milkdown/kit/prose/state';
+import { joinTextblockBackward } from '@milkdown/kit/prose/commands';
 import { liftListItem, splitListItem, wrapInList } from '@milkdown/kit/prose/schema-list';
 
 /** The node types the list commands work with, from the editor's schema. */
@@ -141,15 +142,10 @@ function caretAtItemStart(state: EditorState, listItem: NodeType): boolean {
   return $from.node(depth).type === listItem && $from.index(depth) === 0;
 }
 
-/** Whether the item at `depth` sits in a list that's itself in an item. */
-function isNested($pos: ResolvedPos, depth: number, listItem: NodeType): boolean {
-  return depth >= 3 && $pos.node(depth - 2).type === listItem;
-}
-
 /**
- * Enter in a list, as notes apps do it: an empty nested item steps out a
- * level (still a task, if it was one), and a task's new item starts
- * unchecked. Everything else is the preset's.
+ * Enter in a list, as notes apps do it: an empty item steps out a level
+ * (still a task, if it was one; a paragraph from the top level), and a task's
+ * new item starts unchecked. Everything else is the preset's.
  */
 export function listEnter(listItem: NodeType): Command {
   return (state, dispatch) => {
@@ -160,10 +156,7 @@ export function listEnter(listItem: NodeType): Command {
     if (item.type !== listItem) return false;
 
     const blank = $from.parent.content.size === 0 && item.childCount === 1;
-    if (blank) {
-      if (!isNested($from, depth, listItem)) return false;
-      return liftListItem(listItem)(state, dispatch);
-    }
+    if (blank) return liftAndRenumber(listItem)(state, dispatch);
 
     if (item.attrs.checked == null) return false;
     return splitListItem(listItem, { ...item.attrs, checked: false })(state, dispatch);
@@ -177,7 +170,85 @@ export function listEnter(listItem: NodeType): Command {
  */
 export function listBackspace(listItem: NodeType): Command {
   return (state, dispatch) => {
-    if (!caretAtItemStart(state, listItem)) return false;
-    return liftListItem(listItem)(state, dispatch);
+    if (caretAtItemStart(state, listItem)) return liftAndRenumber(listItem)(state, dispatch);
+    return joinBetweenLists(state, dispatch);
+  };
+}
+
+/**
+ * Lifts the item at the caret a level. Out of the middle of a numbered list,
+ * the items after it go on counting from those before, as in Google Docs.
+ */
+function liftAndRenumber(listItem: NodeType): Command {
+  return (state, dispatch) => {
+    let lifted: Transaction | null = null;
+    if (!liftListItem(listItem)(state, (tr) => (lifted = tr))) return false;
+    if (!dispatch) return true;
+    const tr: Transaction = lifted!;
+    const $at = tr.selection.$from;
+    const depth = $at.depth - 1;
+    if (depth >= 0 && $at.node(depth).type !== listItem) {
+      const parent = $at.node(depth);
+      const index = $at.index(depth);
+      const before = index > 0 ? parent.child(index - 1) : null;
+      const after = index + 1 < parent.childCount ? parent.child(index + 1) : null;
+      if (before && after && before.type === after.type && after.attrs.order != null) {
+        tr.setNodeMarkup($at.after(), undefined, { ...after.attrs, order: (before.attrs.order ?? 1) + before.childCount });
+      }
+    }
+    dispatch(tr);
+    return true;
+  };
+}
+
+/**
+ * Backspace at the start of a paragraph between two lists of a kind joins it
+ * to the item above, and the lists become one again.
+ */
+const joinBetweenLists: Command = (state, dispatch) => {
+  const { $from, empty } = state.selection;
+  if (!empty || $from.parentOffset !== 0 || $from.depth < 1) return false;
+  const depth = $from.depth - 1;
+  const parent = $from.node(depth);
+  const index = $from.index(depth);
+  const before = index > 0 ? parent.child(index - 1) : null;
+  const after = index + 1 < parent.childCount ? parent.child(index + 1) : null;
+  if (!before || !after || before.type !== after.type || !before.type.spec.content?.includes('listItem')) return false;
+  if ($from.parent.childCount > 0 && $from.parent.type.spec.code) return false;
+  let joined: Transaction | null = null;
+  if (!joinTextblockBackward(state, (tr) => (joined = tr))) return false;
+  if (!dispatch) return true;
+  const tr: Transaction = joined!;
+  // The paragraph's gone into the list above, so the two lists now touch.
+  const boundary = tr.mapping.map($from.after());
+  const $boundary = tr.doc.resolve(boundary);
+  if ($boundary.nodeBefore?.type === before.type && $boundary.nodeAfter?.type === before.type) tr.join(boundary);
+  dispatch(tr);
+  return true;
+};
+
+/**
+ * Delete at the end of a line next to a list pulls the next line up into it,
+ * whatever lists it crosses: the end of an item takes the next item's text,
+ * and its sub-items with it.
+ */
+export function listDelete(listItem: NodeType): Command {
+  return (state, dispatch) => {
+    const { $from, empty } = state.selection;
+    if (!empty || !$from.parent.isTextblock || $from.parent.type.spec.code) return false;
+    if ($from.parentOffset !== $from.parent.content.size) return false;
+    const next = Selection.findFrom(state.doc.resolve($from.after()), 1, true);
+    if (!next || next.$from.parent.type.spec.code || next.$from.parentOffset !== 0) return false;
+    const inItem = ($pos: ResolvedPos) => itemDepth($pos, listItem) !== null;
+    if (!inItem($from) && !inItem(next.$from)) return false;
+    // Only structure between them: an atom there is the block rules' to take.
+    let blocked = false;
+    state.doc.nodesBetween($from.pos, next.from, (node) => {
+      if (node.isAtom || node.isLeaf) blocked = true;
+      return !blocked;
+    });
+    if (blocked) return false;
+    dispatch?.(state.tr.delete($from.pos, next.from).scrollIntoView());
+    return true;
   };
 }

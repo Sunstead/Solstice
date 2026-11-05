@@ -1,6 +1,5 @@
 import type { Ctx, MilkdownPlugin } from '@milkdown/kit/ctx';
-import { chainCommands, deleteSelection, joinTextblockBackward, selectNodeBackward } from '@milkdown/kit/prose/commands';
-import { InputRule, undoInputRule } from '@milkdown/kit/prose/inputrules';
+import { InputRule } from '@milkdown/kit/prose/inputrules';
 import { findWrapping } from '@milkdown/kit/prose/transform';
 import {
   bulletListKeymap,
@@ -11,52 +10,18 @@ import {
   paragraphSchema,
 } from '@milkdown/kit/preset/commonmark';
 import { keymap } from '@milkdown/kit/prose/keymap';
-import { Plugin } from '@milkdown/kit/prose/state';
 import { $inputRule, $prose } from '@milkdown/kit/utils';
 
-import { listBackspace, listEnter } from './list-commands';
+import { listEnter } from './list-commands';
 
 /**
- * Enter and Backspace in lists (`listEnter`, `listBackspace`). A `$prose`
- * keymap: those run before Milkdown's assembled one, so these go first and
- * fall through to the preset's list keys when they don't apply. (Not
- * `$shortcut`: the editor doesn't wait for one, so it can miss the keymap.)
+ * Enter in lists (`listEnter`). A `$prose` keymap: those run before
+ * Milkdown's assembled one, so this goes first and falls through to the
+ * preset's list keys when it doesn't apply. (Not `$shortcut`: the editor
+ * doesn't wait for one, so it can miss the keymap.) Backspace and Delete are
+ * `delete-keys.ts`'s.
  */
-const listKeys = $prose((ctx) => {
-  const listItem = listItemSchema.type(ctx);
-  const backspace = listBackspace(listItem);
-  return keymap({
-    Enter: listEnter(listItem),
-    Backspace: backspace,
-    // iOS shifts at the start of a line, so its Backspace there is
-    // Shift-Backspace, which ProseMirror's base keymap answers with
-    // `joinBackward`, not Milkdown's Backspace (it nests the line in the list
-    // above). Both get the same.
-    'Shift-Backspace': chainCommands(backspace, undoInputRule, deleteSelection, joinTextblockBackward, selectNodeBackward),
-  });
-});
-
-/**
- * The same Backspace from an on-screen keyboard. iOS often sends no keydown
- * for it (predictive text holds a composition open), and WebKit's own merge
- * of the item into the one above is what ProseMirror then reads back: a
- * bullet-less paragraph inside it. `beforeinput` comes first, and cancels.
- */
-const listBackspaceInput = $prose(
-  (ctx) =>
-    new Plugin({
-      props: {
-        handleDOMEvents: {
-          beforeinput: (view, event) => {
-            if ((event as InputEvent).inputType !== 'deleteContentBackward') return false;
-            if (!listBackspace(listItemSchema.type(ctx))(view.state, view.dispatch)) return false;
-            event.preventDefault();
-            return true;
-          },
-        },
-      },
-    }),
-);
+const listKeys = $prose((ctx) => keymap({ Enter: listEnter(listItemSchema.type(ctx)) }));
 
 /**
  * `[ ] ` or `[x] ` at the start of a paragraph makes a task. The gfm preset's
@@ -84,7 +49,7 @@ const taskFromParagraph = $inputRule(
     }),
 );
 
-export const listEditing: MilkdownPlugin[] = [listKeys, listBackspaceInput, taskFromParagraph].flat();
+export const listEditing: MilkdownPlugin[] = [listKeys, taskFromParagraph].flat();
 
 /** The preset's list keys as the note editor has them. Call in `.config`. */
 export function configureListKeys(ctx: Ctx) {
