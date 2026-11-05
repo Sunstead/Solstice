@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { Actions, DockLocation, TabNode, TabSetNode, type Model } from 'flexlayout-react';
 
 import { haptics } from '@/lib/haptics';
+import { swallowClickNow, swallowLiftClick } from '@/lib/hold';
 import { motionEnabled, roomOf } from '@/lib/tab-motion';
 import { clamp, dropIndex, lag, shifts, targetIndex } from '@/lib/tab-reorder';
 
@@ -216,13 +217,17 @@ export function createTabGesture({ model, open }: TabGestureOptions) {
     h.button.style.opacity = '0';
     haptics.play('lift');
     void ease(ghost, { scale: String(LIFTED_SCALE) }, 240);
-    menuTimer = window.setTimeout(openMenu, MENU_MS);
+    menuTimer = window.setTimeout(() => openMenu(true), MENU_MS);
   };
 
-  const openMenu = () => {
+  /** `down`: the finger is still on the tab (else this is its lift). */
+  const openMenu = (down: boolean) => {
     const h = hold;
     if (!h?.strip || h.phase !== 'lifted') return;
     cancelTimers();
+    // The menu may be a sheet over the whole screen: the lift's click mustn't close it.
+    if (down) swallowLiftClick();
+    else swallowClickNow();
     h.phase = 'menu';
     const rect = h.strip.rects[h.strip.from] ?? h.button.getBoundingClientRect();
     // Below the lifted tab, where the finger isn't.
@@ -305,7 +310,7 @@ export function createTabGesture({ model, open }: TabGestureOptions) {
     swallowUntil = performance.now() + SWALLOW_MS;
     if (h.phase === 'dragging') return drop(h);
     // Let go before the menu came: a hold all the same.
-    if (h.phase === 'lifted') openMenu();
+    if (h.phase === 'lifted') openMenu(false);
   };
 
   const onCancel = (event: PointerEvent) => {

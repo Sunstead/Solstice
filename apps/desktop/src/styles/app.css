@@ -334,6 +334,16 @@ html[data-reduce-motion='true'] *::after {
   align-items: flex-end;
 }
 
+/* Off a phone (an iPad, from useIsMobile's breakpoint), a bottom sheet keeps
+   one width at the bottom's middle, as UIKit's form sheets do, rather than
+   spanning the screen. */
+@media (min-width: 768px) {
+  .solstice-pane-frame[data-align='end'] > [data-slot='sheet-content'] {
+    max-width: 28rem;
+    border-inline: 1px solid var(--border);
+  }
+}
+
 .solstice-pane-frame[data-align='top'] {
   align-items: flex-start;
   padding-top: 12dvh;

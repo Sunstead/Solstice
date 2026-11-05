@@ -4,8 +4,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
+  // A computer: a fine pointer, so menus are dropdowns (`touchFirst` false).
   window.matchMedia ??= ((query: string) => ({
-    matches: false,
+    matches: query === '(any-pointer: fine)',
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},

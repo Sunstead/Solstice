@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
-import { Copy, ListPlus, MoreHorizontal, PencilLine, Plus, Trash2, Trash2Icon } from 'lucide-react';
+import { MoreHorizontal, Plus, Trash2Icon } from 'lucide-react';
 
 import { CanvasColorPicker } from '@/components/canvas/canvas-color-picker';
 import { resolveCanvasColor } from '@/lib/canvas/color';
@@ -16,13 +16,7 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from '@sunstead/ui/components/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@sunstead/ui/components/dropdown-menu';
+import { ActionMenu, type ActionMenuRequest } from '@/components/ui/action-menu';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { useKeyboardRoom } from '@/lib/keyboard';
 import { primeKeyboard } from '@/lib/keyboard-primer';
@@ -43,7 +37,8 @@ import {
   setColumnColor,
   toggleSubtask,
 } from '@/lib/task-board/edit';
-import { cardAt, cardMarkdown, parseBoard, type CardRef } from '@/lib/task-board/parse';
+import { cardAt, cardMarkdown, parseBoard, plainTitle, type CardRef } from '@/lib/task-board/parse';
+import { cardMenuActions, columnMenuActions } from '@/lib/task-board/menu';
 import type { BoardStore } from '@/lib/task-board/store';
 import { cn } from '@/lib/utils';
 import { BoardCard, CardEditor } from './board-card';
@@ -110,13 +105,45 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
    * hands back as it goes would blur the field at once. The keyboard is
    * raised now, in the tap.
    */
-  const afterMenu = (run: () => void) => () => {
+  const afterMenu = (run: () => void) => {
     primeKeyboard();
     setTimeout(run, 0);
   };
 
-  const menuTarget = menuAt?.target;
-  const menuCard = menuTarget?.kind === 'card' ? cardAt(board, menuTarget.ref) : null;
+  const menuShown = ((): ActionMenuRequest | null => {
+    if (!menuAt) return null;
+    const { target, x, y } = menuAt;
+    if (target.kind === 'card') {
+      const card = cardAt(board, target.ref);
+      if (!card) return null;
+      const groups = cardMenuActions({
+        edit: () => afterMenu(() => startEditing({ kind: 'card', ref: target.ref })),
+        addSubtask: () => afterMenu(() => startSubtask(target.ref)),
+        // As editing shows it: the title, then its nested lines.
+        copy: () => void navigator.clipboard.writeText(cardMarkdown(card)).catch(() => {}),
+        remove: () => change((t) => deleteCard(t, target.ref)),
+      });
+      return { title: plainTitle(card.title) || 'Card', groups, x, y, modal: false };
+    }
+    const column = board.columns[target.column];
+    if (!column) return null;
+    const groups = columnMenuActions({
+      addCard: () => afterMenu(() => startEditing({ kind: 'new-card', column: target.column })),
+      rename: () => afterMenu(() => startRenaming(target.column)),
+      colors: (
+        <CanvasColorPicker
+          className='px-1.5 py-1'
+          value={column.color ?? undefined}
+          onPick={(color) => {
+            setMenu(null);
+            change((t) => setColumnColor(t, target.column, color ?? null));
+          }}
+        />
+      ),
+      remove: () => setDeleting(target.column),
+    });
+    return { title: column.name || 'Untitled', groups, x, y, modal: false };
+  })();
 
   /*
    * Undo bound here as well as through the command system, as the canvas
@@ -259,76 +286,15 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
         </div>
       </div>
 
-      <DropdownMenu open={menu !== null} onOpenChange={(open) => !open && setMenu(null)} modal={false}>
-        <DropdownMenuTrigger
-          nativeButton={false}
-          render={
-            <span
-              aria-hidden
-              tabIndex={-1}
-              className='pointer-events-none fixed size-px'
-              style={{ left: menuAt?.x ?? 0, top: menuAt?.y ?? 0 }}
-            />
-          }
-        />
-        {/* On a touch screen focus stays where an item put it: handed back to
-            the anchor, it would take the keyboard from the field Edit, Add
-            Card or Rename raised it for (`primeKeyboard`). */}
-        <DropdownMenuContent className='w-auto min-w-48' finalFocus={touchFirst ? false : undefined}>
-          {menuTarget?.kind === 'card' && (
-            <>
-              <DropdownMenuItem onClick={afterMenu(() => startEditing({ kind: 'card', ref: menuTarget.ref }))}>
-                <PencilLine />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={afterMenu(() => startSubtask(menuTarget.ref))}>
-                <ListPlus />
-                Add Sub-task
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  // As editing shows it: the title, then its nested lines.
-                  if (menuCard) void navigator.clipboard.writeText(cardMarkdown(menuCard)).catch(() => {});
-                }}
-              >
-                <Copy />
-                Copy
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant='destructive' onClick={() => change((t) => deleteCard(t, menuTarget.ref))}>
-                <Trash2 />
-                Delete Card
-              </DropdownMenuItem>
-            </>
-          )}
-          {menuTarget?.kind === 'column' && (
-            <>
-              <DropdownMenuItem onClick={afterMenu(() => startEditing({ kind: 'new-card', column: menuTarget.column }))}>
-                <Plus />
-                Add Card
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={afterMenu(() => startRenaming(menuTarget.column))}>
-                <PencilLine />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <CanvasColorPicker
-                className='px-1.5 py-1'
-                value={board.columns[menuTarget.column]?.color ?? undefined}
-                onPick={(color) => {
-                  setMenu(null);
-                  change((t) => setColumnColor(t, menuTarget.column, color ?? null));
-                }}
-              />
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant='destructive' onClick={() => setDeleting(menuTarget.column)}>
-                <Trash2 />
-                Delete Column
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* On a touch screen focus stays where an item put it: handed back to
+          the anchor, it would take the keyboard from the field Edit, Add
+          Card or Rename raised it for (`primeKeyboard`). */}
+      <ActionMenu
+        open={menu !== null}
+        shown={menuShown}
+        onClose={() => setMenu(null)}
+        finalFocus={touchFirst ? false : undefined}
+      />
 
       <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent size='sm'>

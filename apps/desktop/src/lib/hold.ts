@@ -13,19 +13,31 @@ const SLOP = 8;
  * the click would close it. Only one that comes with the lift: iOS often
  * sends none after a long press, and the next tap is the user's.
  */
-function swallowLiftClick() {
-  document.addEventListener(
-    'pointerup',
-    () => {
-      const swallow = (event: MouseEvent) => {
-        event.preventDefault();
-        event.stopPropagation();
-      };
-      document.addEventListener('click', swallow, { capture: true, once: true });
-      window.setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 80);
-    },
-    { capture: true, once: true },
-  );
+export function swallowLiftClick() {
+  document.addEventListener('pointerup', swallowClickNow, { capture: true, once: true });
+}
+
+/** The same, where the finger has just lifted (a menu opened by the lift itself). */
+export function swallowClickNow() {
+  const swallow = (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  document.addEventListener('click', swallow, { capture: true, once: true });
+  window.setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 80);
+}
+
+/**
+ * Presses (and right clicks) a hold has taken: holds nest (a list's empty
+ * space around its rows), and only the innermost, which sees the event
+ * first, opens its menu.
+ */
+const claimed = new WeakSet<Event>();
+
+function claim(event: Event): boolean {
+  if (claimed.has(event)) return false;
+  claimed.add(event);
+  return true;
 }
 
 /**
@@ -33,6 +45,7 @@ function swallowLiftClick() {
  * when it's recognised the item dips (`data-held`, app.css) and the impact
  * haptic plays, then `onHold` runs. Moving first never holds, and the click
  * the lift would make is swallowed. A mouse's right click does the same.
+ * Inside another hold's element, only this one's runs.
  */
 export function useHold(onHold: () => void) {
   const press = useRef<{ x: number; y: number; id: number; el: HTMLElement; timer: number } | null>(null);
@@ -53,7 +66,7 @@ export function useHold(onHold: () => void) {
 
   return {
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
-      if (e.pointerType === 'mouse' || !e.isPrimary) return;
+      if (e.pointerType === 'mouse' || !e.isPrimary || !claim(e.nativeEvent)) return;
       cancel();
       held.current = false;
       haptics.prepare();
@@ -78,7 +91,7 @@ export function useHold(onHold: () => void) {
     onPointerCancel: cancel,
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault();
-      if (held.current) return;
+      if (held.current || !claim(e.nativeEvent)) return;
       latest.current();
     },
   };

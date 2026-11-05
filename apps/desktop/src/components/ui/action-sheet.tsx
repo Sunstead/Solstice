@@ -1,19 +1,11 @@
-import { useState, type ComponentType } from 'react';
+import { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Row, RowGroup } from '@/components/mobile/phone-parts';
+import type { Action } from '@/lib/menu-actions';
 
-/** One choice in an action sheet; one with `items` opens them in its place. */
-export type Action = {
-  id: string;
-  label: string;
-  icon?: ComponentType<{ className?: string }>;
-  destructive?: boolean;
-  disabled?: boolean;
-  onSelect?: () => void;
-  items?: Action[];
-};
+export type { Action };
 
 /**
  * What a menu at the finger is on a computer, as a bottom sheet on a touch
@@ -71,7 +63,12 @@ export function ActionSheet({
         <div className='flex min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-4'>
           {shown.map((group, i) => (
             <RowGroup key={i} tone='sheet'>
-              {group.map((action) => (
+              {group.map((action) =>
+                action.content ? (
+                  <div key={action.id} className='px-3 py-2.5'>
+                    {action.content}
+                  </div>
+                ) : (
                 <Row
                   key={action.id}
                   icon={action.icon}
@@ -81,7 +78,8 @@ export function ActionSheet({
                   chevron={!!action.items}
                   onClick={choose(action)}
                 />
-              ))}
+                ),
+              )}
             </RowGroup>
           ))}
         </div>

@@ -1,19 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Actions, TabNode, TabSetNode } from 'flexlayout-react';
-import { AppWindow, ArrowRightToLine, Plus, SquareArrowOutUpRight, X } from 'lucide-react';
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '@sunstead/ui/components/dropdown-menu';
+import { ActionMenu, type ActionMenuRequest } from '@/components/ui/action-menu';
 import { can } from '@/lib/backend/platform';
 import { getFileNameFromPath } from '@/lib/path-utils';
+import { tabMenuActions } from '@/lib/tab-menu-actions';
 import { moveTabToNewWindow, moveTabToWindow, useSiblingWindows } from '@/lib/tab-transfer';
 import { useLayout } from '@/hooks/use-layout';
 import { closeTab } from '@/lib/tab-motion';
@@ -28,7 +19,10 @@ function tabsAfter(tab: TabNode): TabNode[] {
   return children.slice(children.indexOf(tab) + 1).filter((n): n is TabNode => n instanceof TabNode);
 }
 
-/** A tab's menu: New Tab to the Right, Close Tabs to the Right, Close Tab. */
+/**
+ * A tab's menu (`tabMenuActions`): a dropdown at the pointer on a computer,
+ * the bottom sheet on a touch screen, from a hold as from a right click.
+ */
 export function TabMenu({
   request,
   onClose,
@@ -37,96 +31,46 @@ export function TabMenu({
   onClose: () => void;
 }) {
   const model = useLayout((s) => s.model);
+  const siblings = useSiblingWindows();
   // Kept while the menu animates out, so it doesn't jump to the corner.
   const [at, setAt] = useState(request);
   if (request && request !== at) setAt(request);
 
-  const tab = at && model ? model.getNodeById(at.tabId) : undefined;
-  const node = tab instanceof TabNode ? tab : null;
-  const after = node ? tabsAfter(node) : [];
-  const siblings = useSiblingWindows();
+  const shown = useMemo((): ActionMenuRequest | null => {
+    if (!at) return null;
+    // From a hold, the tab may be on its way somewhere: a modal menu's
+    // backdrop would take the drag from flexlayout. A right click's menu
+    // stays modal, so a click outside only closes it, as on macOS.
+    const place = { x: at.x, y: at.y, modal: !at.held };
+    const tab = model?.getNodeById(at.tabId);
+    if (!model || !(tab instanceof TabNode)) return { title: '', groups: [], ...place };
+    const after = tabsAfter(tab);
+    const groups = tabMenuActions(
+      {
+        tabsAfter: after.length,
+        canClose: tab.isEnableClose(),
+        multiWindow: can.multiWindow,
+        siblings: siblings.map((w, i) => ({
+          label: w.label,
+          name: w.kind.type === 'full' ? `${getFileNameFromPath(w.workspace ?? '')} (main window)` : `Window ${i + 1}`,
+        })),
+      },
+      {
+        newTabToRight: () => {
+          const parent = tab.getParent();
+          if (!(parent instanceof TabSetNode)) return;
+          useLayout.getState().newBlankTab(parent.getId(), parent.getChildren().indexOf(tab) + 1);
+        },
+        // At once, without each one's close motion: several easing out
+        // together would fight over the strip.
+        closeToRight: () => after.forEach((t) => model.doAction(Actions.deleteTab(t.getId()))),
+        moveToNewWindow: () => moveTabToNewWindow(model, tab.getId()),
+        moveToWindow: (label) => moveTabToWindow(model, tab.getId(), label),
+        close: () => closeTab(model, tab.getId(), { pointer: false }),
+      },
+    );
+    return { title: tab.getName(), groups, ...place };
+  }, [at, model, siblings]);
 
-  const newTabToRight = () => {
-    if (!node) return;
-    const parent = node.getParent();
-    if (!(parent instanceof TabSetNode)) return;
-    useLayout.getState().newBlankTab(parent.getId(), parent.getChildren().indexOf(node) + 1);
-  };
-
-  const closeToRight = () => {
-    if (!model) return;
-    // At once, without each one's close motion: several easing out together
-    // would fight over the strip.
-    for (const t of after) model.doAction(Actions.deleteTab(t.getId()));
-  };
-
-  return (
-    <DropdownMenu
-      open={request !== null}
-      onOpenChange={(open) => !open && onClose()}
-      // From a hold, the tab may be on its way somewhere: a modal menu's
-      // backdrop would take the drag from flexlayout. A right click's menu
-      // stays modal, so a click outside only closes it, as on macOS.
-      modal={!at?.held}
-    >
-      <DropdownMenuTrigger
-        nativeButton={false}
-        render={
-          <span
-            aria-hidden
-            tabIndex={-1}
-            className='pointer-events-none fixed size-px'
-            style={{ left: at?.x ?? 0, top: at?.y ?? 0 }}
-          />
-        }
-      />
-      <DropdownMenuContent className='w-auto min-w-52'>
-        <DropdownMenuItem onClick={newTabToRight}>
-          <Plus />
-          New Tab to the Right
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={after.length === 0} onClick={closeToRight}>
-          <ArrowRightToLine />
-          Close Tabs to the Right
-        </DropdownMenuItem>
-        {can.multiWindow && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => model && node && moveTabToNewWindow(model, node.getId())}>
-              <SquareArrowOutUpRight />
-              Move to New Window
-            </DropdownMenuItem>
-            {siblings.length > 0 && (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <AppWindow />
-                  Move to Window
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  {siblings.map((w, i) => (
-                    <DropdownMenuItem
-                      key={w.label}
-                      onClick={() => model && node && moveTabToWindow(model, node.getId(), w.label)}
-                    >
-                      {w.kind.type === 'full'
-                        ? `${getFileNameFromPath(w.workspace ?? '')} (main window)`
-                        : `Window ${i + 1}`}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )}
-          </>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          disabled={!node?.isEnableClose()}
-          onClick={() => model && node && closeTab(model, node.getId(), { pointer: false })}
-        >
-          <X />
-          Close Tab
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  return <ActionMenu open={request !== null} shown={shown} onClose={onClose} />;
 }

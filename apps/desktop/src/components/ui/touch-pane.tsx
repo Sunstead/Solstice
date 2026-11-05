@@ -119,8 +119,10 @@ function useGroundBelow(card: HTMLDivElement | null) {
       const strip = past > 0.5 ? Math.ceil(past) + 48 : 0;
       if (strip === shown) return;
       shown = strip;
-      if (strip) pane.style.background = `linear-gradient(to top, ${ground} ${strip}px, transparent ${strip}px)`;
-      else pane.style.removeProperty('background');
+      if (!strip) return pane.style.removeProperty('background');
+      // Only under the card: off a phone it's narrower than the screen.
+      const left = card.offsetLeft;
+      pane.style.background = `linear-gradient(to top, ${ground} ${strip}px, transparent ${strip}px) ${left}px 0 / ${card.offsetWidth}px 100% no-repeat`;
     };
     pane.addEventListener('scroll', onScroll, { passive: true });
     return () => {

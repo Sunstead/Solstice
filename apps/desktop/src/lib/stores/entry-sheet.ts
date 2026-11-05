@@ -4,10 +4,11 @@ import type { EntryTarget } from '@/lib/entry-actions';
 
 /**
  * Where a hold sheet was opened: the tree (which is already the file's place,
- * so it doesn't offer to show it there), another list, or a note's ⋯ (which
- * adds what only an open note has, and may have no file: a blank page).
+ * so it doesn't offer to show it there), the tree's empty space (the
+ * workspace itself), another list, or a note's ⋯ (which adds what only an
+ * open note has, and may have no file: a blank page).
  */
-export type EntrySheetFrom = 'tree' | 'list' | 'note';
+export type EntrySheetFrom = 'tree' | 'root' | 'list' | 'note';
 
 /** The phone's hold sheet (`EntrySheet`): what it's for, while it shows. */
 interface EntrySheetState {

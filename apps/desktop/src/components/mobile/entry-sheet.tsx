@@ -77,7 +77,7 @@ export function EntrySheet() {
 
 function EntryActions({ entry, from, onDone }: { entry: EntryTarget; from: EntrySheetFrom; onDone: () => void }) {
   const items = useEntryMenuItems(entry, {
-    surface: from === 'note' ? 'editor' : 'tree',
+    surface: from === 'note' ? 'editor' : from === 'root' ? 'root' : 'tree',
     nameInDialog: true,
   });
   const [sharing, setSharing] = useState(false);
@@ -96,7 +96,7 @@ function EntryActions({ entry, from, onDone }: { entry: EntryTarget; from: Entry
   let remove: Item | null = null;
   for (const item of items) {
     if (item.kind === 'separator') groups.push([]);
-    else if (LEFT_OUT.has(item.id) || (from === 'tree' && item.id === 'reveal-in-explorer')) continue;
+    else if (LEFT_OUT.has(item.id) || (from !== 'list' && from !== 'note' && item.id === 'reveal-in-explorer')) continue;
     else if (QUICK.includes(item.id)) quick.set(item.id, item);
     else if (item.id === 'folder-color' && item.kind === 'submenu') color = item;
     else if (item.id === 'delete' && item.kind === 'item') remove = item;
@@ -175,7 +175,8 @@ function EntryHeader({ entry }: { entry: EntryTarget }) {
   );
   const name = entry.name || getFileNameFromPath(entry.path);
   const shownName = entry.is_dir || showExtensions ? name : stripPresetExtension(name).name;
-  const folder = root ? getRelativePath(parentPath(entry.path), root) || getFileNameFromPath(root) : '';
+  const isRoot = !!root && normalizePath(entry.path) === normalizePath(root);
+  const folder = root && !isRoot ? getRelativePath(parentPath(entry.path), root) || getFileNameFromPath(root) : '';
   const detail = entry.is_dir ? [folder, `${count} ${count === 1 ? 'item' : 'items'}`].filter(Boolean).join(' · ') : folder;
 
   return (
