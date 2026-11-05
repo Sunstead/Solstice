@@ -374,11 +374,40 @@ fn free_attachment_path(parent: &Path, name: &str) -> Result<PathBuf, String> {
     Err(format!("Could not find a free name to save \"{name}\" under."))
 }
 
-/// Copies a file that is already on disk into `into_dir`, under a free name,
-/// and returns where it landed.
+/// Copies a file or folder that is already on disk into `dir`, under a free
+/// name so nothing there is overwritten, and returns where it landed.
+fn copy_into(source: &Path, dir: &Path) -> Result<PathBuf, String> {
+    let name = source
+        .file_name()
+        .ok_or("Cannot import an entry with no name.")?
+        .to_string_lossy()
+        .into_owned();
+
+    if !source.exists() {
+        return Err(format!("\"{}\" doesn't exist.", source.display()));
+    }
+    // Copying a folder into itself would never finish.
+    if source.is_dir() && dir.starts_with(source) {
+        return Err(format!("\"{name}\" can't be copied into itself."));
+    }
+
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let destination = free_attachment_path(dir, &name)?;
+
+    if source.is_dir() {
+        copy_dir_recursive(source, &destination)?;
+    } else {
+        fs::copy(source, &destination).map_err(|e| e.to_string())?;
+    }
+    Ok(destination)
+}
+
+/// Copies a file or folder that is already on disk into `into_dir`, under a
+/// free name, and returns where it landed.
 ///
-/// The counterpart to `save_attachment` for the file-picker path: the bytes
-/// stay in the backend rather than making a round trip through the webview.
+/// The counterpart to `save_attachment` for the file-picker path and for
+/// files dropped from another app: the bytes stay in the backend rather than
+/// making a round trip through the webview.
 #[tauri::command]
 #[specta::specta]
 pub fn import_attachment(
@@ -386,25 +415,58 @@ pub fn import_attachment(
     from: String,
     into_dir: String
 ) -> Result<String, String> {
-    let source = Path::new(&from);
-
-    if !source.is_file() {
-        return Err(format!("\"{from}\" is not a file."));
-    }
-
-    let name = source
-        .file_name()
-        .ok_or("Cannot import an entry with no name.")?
-        .to_string_lossy()
-        .into_owned();
-
-    let dir = Path::new(&into_dir);
-    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-
-    let destination = free_attachment_path(dir, &name)?;
-
-    fs::copy(source, &destination).map_err(|e| e.to_string())?;
+    let destination = copy_into(Path::new(&from), Path::new(&into_dir))?;
     note_self_write(&app, &destination);
 
     Ok(destination.to_string_lossy().into_owned())
+}
+
+#[cfg(test)]
+mod copy_tests {
+    use super::*;
+
+    #[test]
+    fn copies_a_file_in_under_its_own_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let from = dir.path().join("a.md");
+        let into = dir.path().join("notes");
+        fs::write(&from, "hi").unwrap();
+        let to = copy_into(&from, &into).unwrap();
+        assert_eq!(to, into.join("a.md"));
+        assert_eq!(fs::read_to_string(to).unwrap(), "hi");
+        assert!(from.exists(), "a copy leaves the original");
+    }
+
+    #[test]
+    fn never_overwrites_what_is_there() {
+        let dir = tempfile::tempdir().unwrap();
+        let from = dir.path().join("a.md");
+        let into = dir.path().join("notes");
+        fs::create_dir(&into).unwrap();
+        fs::write(&from, "new").unwrap();
+        fs::write(into.join("a.md"), "old").unwrap();
+        let to = copy_into(&from, &into).unwrap();
+        assert_eq!(to, into.join("a 1.md"));
+        assert_eq!(fs::read_to_string(into.join("a.md")).unwrap(), "old");
+    }
+
+    #[test]
+    fn copies_a_folder_with_what_is_in_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let from = dir.path().join("trip");
+        let into = dir.path().join("notes");
+        fs::create_dir_all(from.join("img")).unwrap();
+        fs::write(from.join("img/a.png"), "x").unwrap();
+        let to = copy_into(&from, &into).unwrap();
+        assert_eq!(fs::read_to_string(to.join("img/a.png")).unwrap(), "x");
+    }
+
+    #[test]
+    fn refuses_to_copy_a_folder_into_itself() {
+        let dir = tempfile::tempdir().unwrap();
+        let from = dir.path().join("trip");
+        fs::create_dir_all(from.join("sub")).unwrap();
+        assert!(copy_into(&from, &from.join("sub")).is_err());
+        assert!(!from.join("sub/trip").exists());
+    }
 }

@@ -41,10 +41,11 @@ import { watchStickyDock } from '@/lib/tab-dock';
 import { TabMenu } from './tab-menu';
 import { useTabLongPress, type TabMenuRequest } from '@/lib/tab-long-press';
 import { ownsDrag, soleStrip, useTabGesture } from '@/lib/tab-gesture';
-import { incomingDrag, useTabTransfer } from '@/lib/tab-transfer';
+import { endLayoutDrag, incomingDrag, useTabTransfer } from '@/lib/tab-transfer';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { commands } from '@/lib/backend';
-import { fillDropped, isOsFileDrag } from '@/lib/external-drop';
+import { fillDropped, isOsFileDrag, undoLayoutDrop, watchShiftDrops } from '@/lib/external-drop';
+import { watchLayoutDrags } from '@/lib/layout-drag-end';
 
 /** A tab's name; on mount, it grows its button in if the tab was just opened. */
 function TabLabel({ id, children }: { id: string; children: string }) {
@@ -134,6 +135,17 @@ export default function FlexLayoutRoot() {
 
   // Tabs dragged out to a window of their own, or in from another window.
   useTabTransfer(containerRef, model);
+
+  useEffect(() => {
+    const stopDrags = watchLayoutDrags(window, () => {
+      if (containerRef.current) endLayoutDrag(containerRef.current);
+    });
+    const stopShift = watchShiftDrops(() => useLayout.getState().model);
+    return () => {
+      stopDrags();
+      stopShift();
+    };
+  }, []);
 
   // Stable, so swapping the close icon for a save spinner is driven by
   // TabCloseIcon's own subscription rather than by re-rendering every tab.
@@ -275,16 +287,13 @@ export default function FlexLayoutRoot() {
       const entry = useFileTreeDragState.getState().draggedEntry;
       // Files from another app: a placeholder where they land, then a tab
       // each once the drop says which (`fillDropped`).
-      // Not where it entered over a note's text, which takes it in itself
-      // (`attachmentPasteDrop`).
-      const intoText = (event.target as Element | null)?.closest?.('.ProseMirror, .cm-editor');
-      if (!entry && can.dropToOpen && isOsFileDrag(event.dataTransfer) && !intoText) {
+      if (!entry && can.dropToOpen && isOsFileDrag(event.dataTransfer)) {
         return {
           json: { id: makeDraggedTabId(), name: 'Opening…', component: 'blank' },
           onDrop: (node?: { getId(): string }) => {
             const m = useLayout.getState().model;
-            if (!node || !m) return;
-            void commands.takeDroppedPaths().then((paths) => fillDropped(m, node.getId(), paths));
+            if (!node || !m || undoLayoutDrop(m, node.getId())) return;
+            void commands.takeDroppedPaths(true).then((paths) => fillDropped(m, node.getId(), paths));
           },
         };
       }
@@ -302,8 +311,10 @@ export default function FlexLayoutRoot() {
         // Called once this specific drag's drop completes (or is
         // cancelled) — the natural place to clear the tracked drag entry,
         // since it's scoped to this drag rather than a global Layout event.
-        onDrop: () => {
+        onDrop: (node?: { getId(): string }) => {
           useFileTreeDragState.getState().setDraggedEntry(null);
+          const m = useLayout.getState().model;
+          if (node && m) undoLayoutDrop(m, node.getId());
         },
       };
     },

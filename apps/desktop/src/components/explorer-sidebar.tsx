@@ -12,7 +12,7 @@ import { FileTree } from './file-tree';
 import { ContextMenu, ContextMenuTrigger } from '@sunstead/ui/components/context-menu';
 import { useIsMobile } from '@sunstead/ui/hooks/use-mobile';
 import { FileTreeItemContextMenuContent } from './file-tree-context-menu-content';
-import { useFileTreeDrop, useOsFileDrop } from '@/hooks/use-file-tree-dnd';
+import { useFileTreeDrop } from '@/hooks/use-file-tree-dnd';
 import { cn } from '@/lib/utils';
 import { Button } from '@sunstead/ui/components/button';
 import { Plus } from 'lucide-react';
@@ -89,8 +89,6 @@ export function ExplorerTree({ path }: { path: string }) {
   const phone = useIsMobile();
   const isDropDestination = hoverTargetPath === path;
 
-  const dropFiles = useOsFileDrop();
-
   const tree = (
     <SidebarGroup
       ref={rootDropRef}
@@ -111,29 +109,22 @@ export function ExplorerTree({ path }: { path: string }) {
 
   return (
     <SidebarContent>
-      <div
-        ref={(el) => {
-          dropFiles(el);
-        }}
-        className='contents'
-      >
-        <ContextMenu>
-          <ContextMenuTrigger render={tree} />
-          <FileTreeItemContextMenuContent
-            surface='root'
-            renameEnabled={false}
-            deleteEnabled={false}
-            moveEnabled={false}
-            node={{
-              name: path,
-              path,
-              is_dir: true,
-              childrenLoaded: true,
-              expanded: true,
-            }}
-          />
-        </ContextMenu>
-      </div>
+      <ContextMenu>
+        <ContextMenuTrigger render={tree} />
+        <FileTreeItemContextMenuContent
+          surface='root'
+          renameEnabled={false}
+          deleteEnabled={false}
+          moveEnabled={false}
+          node={{
+            name: path,
+            path,
+            is_dir: true,
+            childrenLoaded: true,
+            expanded: true,
+          }}
+        />
+      </ContextMenu>
     </SidebarContent>
   );
 }

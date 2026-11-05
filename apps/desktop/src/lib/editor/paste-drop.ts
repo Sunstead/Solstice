@@ -1,10 +1,15 @@
 import { $prose } from '@milkdown/kit/utils';
-import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
+import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import type { Ctx } from '@milkdown/kit/ctx';
 
+import { useWorkspace } from '@/hooks/use-workspace';
+import { wikiEmbedSchema } from '@/lib/embed/schema';
 import { imageWithSize } from '@/lib/image/schema';
+import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { saveAttachment } from './attachments';
+import { textCaretNear } from './caret-near';
+import { entryLink, registerNoteDrop, type NoteDrop } from './note-drop';
 
 const attachmentDropKey = new PluginKey('solstice-attachment-drop');
 
@@ -49,6 +54,30 @@ async function insertAttachments(
   }
 }
 
+/** Moves the caret to where something was dropped, so the insert lands under the pointer. */
+function caretAt(view: EditorView, left: number, top: number) {
+  const coords = view.posAtCoords({ left, top });
+  const caret = coords && textCaretNear(view.state.doc, coords.pos);
+  if (caret) view.dispatch(view.state.tr.setSelection(caret));
+}
+
+/** A Shift-drop, through the layout's overlay (`dropIntoNoteAt`). */
+function takeNoteDrop(ctx: Ctx, view: EditorView, notePath: string, drop: NoteDrop): boolean {
+  const root = useWorkspace.getState().path;
+  caretAt(view, drop.x, drop.y);
+  if (drop.entry && root) {
+    const { embed, target } = entryLink(drop.entry, root, useWikilinkIndex.getState());
+    const tr = view.state.tr;
+    if (embed) tr.replaceSelectionWith(wikiEmbedSchema.type(ctx).create({ value: target }));
+    else tr.insertText(`[[${target}]]`);
+    view.dispatch(tr.scrollIntoView());
+  } else {
+    void insertAttachments(ctx, view, drop.files, notePath);
+  }
+  view.focus();
+  return true;
+}
+
 /**
  * Turns pasted image files, and dropped files of any kind, into attachments:
  * an image embeds, anything else is linked.
@@ -64,6 +93,10 @@ export const attachmentPasteDrop = (notePath: string) =>
     (ctx) =>
       new Plugin({
         key: attachmentDropKey,
+        view: (view) => {
+          registerNoteDrop(view.dom, (drop) => takeNoteDrop(ctx, view, notePath, drop));
+          return {};
+        },
         props: {
           handlePaste: (view, event) => {
             const files = imageFiles(event.clipboardData);
@@ -80,18 +113,8 @@ export const attachmentPasteDrop = (notePath: string) =>
 
             event.preventDefault();
 
-            // Move the caret to where the file was actually dropped before the
-            // (async) save begins, so the insert lands under the pointer.
-            const coords = view.posAtCoords({
-              left: event.clientX,
-              top: event.clientY,
-            });
-            if (coords) {
-              const { tr, doc } = view.state;
-              view.dispatch(
-                tr.setSelection(TextSelection.near(doc.resolve(coords.pos))),
-              );
-            }
+            // Before the (async) save begins.
+            caretAt(view, event.clientX, event.clientY);
 
             void insertAttachments(ctx, view, files, notePath);
             return true;

@@ -1,10 +1,13 @@
 import { commands } from '@/lib/backend';
 import { applyFsChanges, selfChange } from '@/lib/fs-sync';
 import type { FileTreeNode } from '@/hooks/use-files';
+import { useFiles } from '@/hooks/use-files';
 import { useLayout } from '@/hooks/use-layout';
+import { useWorkspace } from '@/hooks/use-workspace';
 import { joinPath, parentOf } from '@/lib/path-utils';
 import { getPresetForName, type FileTypePreset } from '@/lib/stores/entry-input';
 import { useTreeMeta } from '@/lib/stores/tree-meta';
+import { useFileIndex } from '@/lib/stores/use-file-index';
 
 /**
  * In-app operations apply optimistically through the same reconciler the
@@ -203,8 +206,32 @@ async function importFiles(folder: string, sources: string[]): Promise<string[]>
   return made;
 }
 
+/**
+ * Copies what was just dropped from another app into `folder`: by path where
+ * the webview told us them (`take_dropped_paths`), folders included, else by
+ * the drop's bytes. A folder comes in whole, so what's there is read again.
+ */
+async function copyDropped(folder: string, files: File[]) {
+  const sources = await commands.takeDroppedPaths(false);
+  for (const source of sources) {
+    const result = await commands.importAttachment(source, folder);
+    if (result.status === 'error') logFailure('copy', result.error);
+  }
+  if (sources.length === 0) {
+    for (const file of files) {
+      const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+      const result = await commands.saveAttachment(folder, file.name, bytes);
+      if (result.status === 'error') logFailure('copy', result.error);
+    }
+  }
+  await useFiles.getState().refreshDirectory(folder);
+  const root = useWorkspace.getState().path;
+  if (root) await useFileIndex.getState().loadIndex(root);
+}
+
 export const fileOperations = {
   importFiles,
+  copyDropped,
   createFile,
   createFolder,
   rename,
