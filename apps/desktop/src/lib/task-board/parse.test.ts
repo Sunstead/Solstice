@@ -10,10 +10,12 @@ describe('parseBoard', () => {
     const board = parseBoard('## To Do\n- [ ] Milk\n- [x] Eggs\n\n## Done\n- [X] Bread\n');
     expect(board.columns.map((c) => c.name)).toEqual(['To Do', 'Done']);
     expect(board.columns[0].cards).toMatchObject([
-      { title: 'Milk', checked: false, start: 1, end: 2 },
-      { title: 'Eggs', checked: true, start: 2, end: 3 },
+      { title: 'Milk', start: 1, end: 2 },
+      { title: 'Eggs', start: 2, end: 3 },
     ]);
-    expect(board.columns[1].cards[0]).toMatchObject({ title: 'Bread', checked: true });
+    expect(board.columns[1].cards[0]).toMatchObject({ title: 'Bread' });
+    // Cards aren't ticked on a board; an old [x] is still a card, read as any other.
+    for (const card of board.columns.flatMap((c) => c.cards)) expect(card).not.toHaveProperty('checked');
     expect(board.columns[0]).toMatchObject({ heading: 0, end: 4 });
   });
 

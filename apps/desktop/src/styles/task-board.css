@@ -162,10 +162,6 @@
   background: color-mix(in oklab, var(--accent) 45%, var(--card));
 }
 
-:root:not([data-pointer='touch']) .board-card:hover > .board-card-head > .board-check {
-  border-color: var(--primary);
-}
-
 .board-card-head {
   display: flex;
   align-items: flex-start;
@@ -209,7 +205,7 @@
 .board-subtasks {
   display: flex;
   flex-direction: column;
-  margin: 0.125rem 0 0 1.25rem;
+  margin: 0.125rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -350,8 +346,7 @@
   border-color: var(--primary);
 }
 
-[data-checked] > .board-check,
-.board-card[data-checked] > .board-card-head > .board-check {
+[data-checked] > .board-check {
   border-color: var(--primary);
   background: var(--primary);
 }
@@ -369,14 +364,8 @@
   margin-bottom: 0;
 }
 
-.board-card[data-checked] .board-card-title {
-  color: var(--muted-foreground);
-  text-decoration: line-through;
-}
-
 .board-count {
   align-self: flex-start;
-  margin-inline-start: 1.5rem;
   color: var(--muted-foreground);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
@@ -468,13 +457,3 @@
   background: var(--card);
 }
 
-.board-preview-card .board-check {
-  width: 0.75rem;
-  height: 0.75rem;
-  margin: 0;
-}
-
-.board-preview-card[data-checked] > :last-child {
-  color: var(--muted-foreground);
-  text-decoration: line-through;
-}

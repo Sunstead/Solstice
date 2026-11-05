@@ -7,11 +7,6 @@ import type { Card } from '@/lib/task-board/parse';
 import { revealField } from '@/lib/task-board/reveal-field';
 import { cn } from '@/lib/utils';
 
-/** A mouse's second click edits, so its first waits this long to tick. */
-const DOUBLE_CLICK_MS = 250;
-
-const isMouse = () => document.documentElement.dataset.pointer === 'mouse';
-
 /** Opens a link a click landed on; returns whether it did. */
 function openLinkAt(event: React.MouseEvent): boolean {
   const link = (event.target as Element).closest<HTMLElement>('[data-static-wikilink]');
@@ -24,15 +19,15 @@ function openLinkAt(event: React.MouseEvent): boolean {
 
 /**
  * One card: its title and notes rendered as a note would render them, then
- * its sub-tasks as rows to tick, add to and take out. A click ticks the card
- * (a mouse's double click edits it instead); its links open.
+ * its sub-tasks as rows to tick, add to and take out. A click edits the card,
+ * as on any kanban board (cards aren't ticked; they move between columns);
+ * its links open.
  */
 export function BoardCard({
   card,
   index,
   path,
   addingSubtask,
-  onToggle,
   onToggleSubtask,
   onDeleteSubtask,
   onStartSubtask,
@@ -45,7 +40,6 @@ export function BoardCard({
   path: string;
   /** Whether its new sub-task field is open. */
   addingSubtask: boolean;
-  onToggle: () => void;
   onToggleSubtask: (line: number) => void;
   onDeleteSubtask: (line: number) => void;
   onStartSubtask: () => void;
@@ -54,32 +48,16 @@ export function BoardCard({
   onEdit: () => void;
 }) {
   const done = card.subtasks.filter((s) => s.checked).length;
-  const pending = useRef(0);
-
-  useEffect(() => () => clearTimeout(pending.current), []);
-
-  const onClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (openLinkAt(event)) return;
-    clearTimeout(pending.current);
-    if (!isMouse()) onToggle();
-    else if (event.detail === 1) pending.current = window.setTimeout(onToggle, DOUBLE_CLICK_MS);
-  };
 
   return (
     <div
       data-card={index}
-      data-checked={card.checked || undefined}
       className='board-card'
-      onClick={onClick}
-      onDoubleClick={() => {
-        clearTimeout(pending.current);
-        onEdit();
+      onClick={(event) => {
+        if (!openLinkAt(event)) onEdit();
       }}
     >
       <div className='board-card-head'>
-        <span className='board-check' aria-hidden>
-          {card.checked && <Check className='size-3' strokeWidth={3} />}
-        </span>
         <div className='min-w-0 flex-1'>
           <StaticMarkdown markdown={card.title || ' '} sourcePath={path} className='board-card-text board-card-title' />
           {card.notes && <StaticMarkdown markdown={card.notes} sourcePath={path} className='board-card-text board-card-notes' />}

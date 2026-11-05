@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
-import { Check, Copy, ListPlus, MoreHorizontal, PencilLine, Plus, Square, Trash2, Trash2Icon } from 'lucide-react';
+import { Copy, ListPlus, MoreHorizontal, PencilLine, Plus, Trash2, Trash2Icon } from 'lucide-react';
 
 import { CanvasColorPicker } from '@/components/canvas/canvas-color-picker';
 import { resolveCanvasColor } from '@/lib/canvas/color';
@@ -41,7 +41,6 @@ import {
   moveColumn,
   renameColumn,
   setColumnColor,
-  toggleCard,
   toggleSubtask,
 } from '@/lib/task-board/edit';
 import { cardAt, cardMarkdown, parseBoard, type CardRef } from '@/lib/task-board/parse';
@@ -206,10 +205,6 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
                     index={i}
                     path={path}
                     addingSubtask={subtaskOf?.column === c && subtaskOf.card === i}
-                    onToggle={() => {
-                      haptics.play('select');
-                      change((t) => toggleCard(t, { column: c, card: i }));
-                    }}
                     onToggleSubtask={(line) => {
                       haptics.play('select');
                       change((t) => toggleSubtask(t, line));
@@ -289,10 +284,6 @@ export function Board({ path, store }: { path: string; store: BoardStore }) {
               <DropdownMenuItem onClick={afterMenu(() => startSubtask(menuTarget.ref))}>
                 <ListPlus />
                 Add Sub-task
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => change((t) => toggleCard(t, menuTarget.ref))}>
-                {menuCard?.checked ? <Square /> : <Check />}
-                {menuCard?.checked ? 'Mark Not Done' : 'Mark Done'}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {

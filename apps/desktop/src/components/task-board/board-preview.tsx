@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check } from 'lucide-react';
 
 import { useLayout } from '@/hooks/use-layout';
 import { resolveCanvasColor } from '@/lib/canvas/color';
@@ -55,8 +54,7 @@ export function BoardPreview({ path }: { path: string }) {
               <span className='board-column-count'>{column.cards.length}</span>
             </span>
             {column.cards.map((card, i) => (
-              <span key={i} className='board-preview-card' data-checked={card.checked || undefined}>
-                <span className='board-check'>{card.checked && <Check className='size-2.5' strokeWidth={3} />}</span>
+              <span key={i} className='board-preview-card'>
                 <span className='min-w-0 truncate'>{plainTitle(card.title)}</span>
               </span>
             ))}

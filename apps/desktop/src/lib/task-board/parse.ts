@@ -5,6 +5,8 @@ import { wikilinkLabel } from '@/lib/wikilink/target';
  * A task board is a note (`*.task.md`): each `##` heading is a column and
  * each top-level checkbox item under it a card; a `#` heading above the
  * columns is the board's title. Everything else stays in the file, unseen.
+ * A card's box isn't a state (cards move between columns, as on any kanban
+ * board); only its sub-tasks tick.
  *
  * The board is read by lines rather than through the editor's parser, since
  * every edit (`edit.ts`) is a splice of the lines it touches: the rest of the
@@ -19,7 +21,6 @@ export interface Subtask {
 }
 
 export interface Card {
-  checked: boolean;
   /** Its lines in the file, `end` exclusive: the item and what's nested under it. */
   start: number;
   end: number;
@@ -137,7 +138,7 @@ function literalLines(text: string, lines: string[]): boolean[] {
 
 /** The card starting at `start`, whose block runs while lines are indented under it. */
 function readCard(lines: string[], literal: boolean[], start: number, limit: number, match: RegExpExecArray): Card {
-  const [, spaces, marker, gap, box, title] = match;
+  const [, spaces, marker, gap, , title] = match;
   const indent = spaces.length;
   // A gap of 5 or more spaces is indented code inside the item: content
   // starts one space after the marker.
@@ -162,7 +163,6 @@ function readCard(lines: string[], literal: boolean[], start: number, limit: num
   }
 
   return {
-    checked: box !== ' ',
     start,
     end,
     title,

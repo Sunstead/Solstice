@@ -12,7 +12,6 @@ import {
   moveColumn,
   renameColumn,
   setColumnColor,
-  toggleCard,
   toggleSubtask,
 } from './edit';
 
@@ -40,13 +39,6 @@ const BOARD = [
 ].join('\n');
 
 describe('card edits', () => {
-  it('ticks and unticks a card, touching only its box', () => {
-    const ticked = toggleCard(BOARD, { column: 0, card: 1 });
-    expect(ticked).toBe(BOARD.replace('- [ ] Clean', '- [x] Clean'));
-    expect(toggleCard(ticked, { column: 0, card: 1 })).toBe(BOARD);
-    expect(toggleCard(BOARD, { column: 2, card: 0 })).toBe(BOARD.replace('* [x] Plan', '* [ ] Plan'));
-  });
-
   it('ticks a sub-task by its line', () => {
     expect(toggleSubtask(BOARD, 11)).toBe(BOARD.replace('  - [ ] Buy paint', '  - [x] Buy paint'));
     expect(toggleSubtask(BOARD, 12)).toBe(BOARD.replace('  - [x] Tape', '  - [ ] Tape'));
@@ -99,7 +91,20 @@ describe('card edits', () => {
   it('edits a card’s markdown, keeping its box and marker', () => {
     const edited = editCard(BOARD, { column: 0, card: 0 }, 'Paint walls\n- [ ] Buy paint');
     expect(edited).toBe(BOARD.replace('- [ ] Paint\n  - [ ] Buy paint\n  - [x] Tape', '- [ ] Paint walls\n  - [ ] Buy paint'));
-    expect(editCard(BOARD, { column: 2, card: 0 }, 'Plan it')).toBe(BOARD.replace('* [x] Plan', '* [x] Plan it'));
+  });
+
+  it('clears an old tick when a card is edited, as cards are no longer ticked', () => {
+    expect(editCard(BOARD, { column: 2, card: 0 }, 'Plan it')).toBe(BOARD.replace('* [x] Plan', '* [ ] Plan it'));
+  });
+
+  it('clears an old tick when a card moves, leaving every other line as it was', () => {
+    const moved = moveCard(BOARD, { column: 2, card: 0 }, { column: 1, card: 0 });
+    expect(moved).toBe(BOARD.replace('## Doing\n', '## Doing\n* [ ] Plan\n').replace('## Done\n* [x] Plan\n', '## Done\n'));
+  });
+
+  it('keeps a sub-task’s tick when its card moves', () => {
+    const moved = moveCard(BOARD, { column: 0, card: 0 }, { column: 1, card: 0 });
+    expect(moved).toContain('## Doing\n- [ ] Paint\n  - [ ] Buy paint\n  - [x] Tape\n');
   });
 
   it('deletes a card and its nested lines', () => {
@@ -107,7 +112,7 @@ describe('card edits', () => {
   });
 
   it('leaves the text alone for a card that isn’t there', () => {
-    expect(toggleCard(BOARD, { column: 1, card: 0 })).toBe(BOARD);
+    expect(editCard(BOARD, { column: 1, card: 0 }, 'x')).toBe(BOARD);
     expect(deleteCard(BOARD, { column: 9, card: 0 })).toBe(BOARD);
     expect(moveCard(BOARD, { column: 0, card: 5 }, { column: 1, card: 0 })).toBe(BOARD);
   });

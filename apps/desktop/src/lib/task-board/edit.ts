@@ -25,40 +25,34 @@ function edit(text: string, change: (lines: string[], board: Board) => string[] 
 
 const isBlank = (line: string) => line.trim() === '';
 
-/** Flips the box on `line`, if it holds a task item. */
-function flip(line: string): string | null {
+/** Sets the box on `line` (or flips it), if it holds a task item. */
+function setBox(line: string, box?: ' ' | 'x'): string | null {
   const match = TASK_ITEM.exec(line);
   if (!match) return null;
   const at = match[1].length + match[2].length + match[3].length + 1;
-  return line.slice(0, at) + (match[4] === ' ' ? 'x' : ' ') + line.slice(at + 1);
-}
-
-export function toggleCard(text: string, ref: CardRef): string {
-  return edit(text, (lines, board) => {
-    const card = cardAt(board, ref);
-    const flipped = card && flip(lines[card.start]);
-    if (!card || flipped === null) return null;
-    lines[card.start] = flipped;
-    return lines;
-  });
+  return line.slice(0, at) + (box ?? (match[4] === ' ' ? 'x' : ' ')) + line.slice(at + 1);
 }
 
 /** Ticks a card's sub-task, by its line. */
 export function toggleSubtask(text: string, line: number): string {
   return edit(text, (lines, board) => {
     const owned = board.columns.some((column) => column.cards.some((card) => card.subtasks.some((s) => s.line === line)));
-    const flipped = owned ? flip(lines[line]) : null;
+    const flipped = owned ? setBox(lines[line]) : null;
     if (flipped === null) return null;
     lines[line] = flipped;
     return lines;
   });
 }
 
-/** A card's lines from its markdown: the title on the box's line, the rest indented under it. */
-function cardLines(markdown: string, card: Pick<Card, 'indent' | 'marker' | 'contentIndent'>, checked: boolean): string[] {
+/**
+ * A card's lines from its markdown: the title on the box's line, the rest
+ * indented under it. Cards aren't ticked, so the box is always empty (an old
+ * `[x]` clears whenever its card is written).
+ */
+function cardLines(markdown: string, card: Pick<Card, 'indent' | 'marker' | 'contentIndent'>): string[] {
   const [title, ...rest] = markdown.replace(/\r\n/g, '\n').split('\n');
   const pad = ' '.repeat(card.contentIndent);
-  const box = `${' '.repeat(card.indent)}${card.marker} [${checked ? 'x' : ' '}]`;
+  const box = `${' '.repeat(card.indent)}${card.marker} [ ]`;
   return [title ? `${box} ${title}` : box, ...rest.map((line) => (isBlank(line) ? '' : pad + line))];
 }
 
@@ -78,6 +72,7 @@ export function moveCard(text: string, from: CardRef, to: CardRef): string {
 
   const { lines, eol, finalNewline } = splitLines(text);
   const block = lines.splice(card.start, card.end - card.start);
+  block[0] = setBox(block[0], ' ') ?? block[0];
   const without = joinLines(lines, eol, finalNewline);
   const slot = cardSlot(parseBoard(without), to.column, to.card);
   if (slot === null) return text;
@@ -94,17 +89,17 @@ export function addCard(text: string, column: number, markdown: string): string 
     const marker = like ? like.marker.replace(/^\d+/, String(target.cards.length + 1)) : '-';
     const indent = like?.indent ?? 0;
     const shape = { indent, marker, contentIndent: indent + marker.length + 1 };
-    lines.splice(cardSlot(board, column, target.cards.length)!, 0, ...cardLines(markdown, shape, false));
+    lines.splice(cardSlot(board, column, target.cards.length)!, 0, ...cardLines(markdown, shape));
     return lines;
   });
 }
 
-/** Replaces a card's markdown (`cardMarkdown`), keeping its box and marker. */
+/** Replaces a card's markdown (`cardMarkdown`), keeping its marker. */
 export function editCard(text: string, ref: CardRef, markdown: string): string {
   return edit(text, (lines, board) => {
     const card = cardAt(board, ref);
     if (!card) return null;
-    lines.splice(card.start, card.end - card.start, ...cardLines(markdown, card, card.checked));
+    lines.splice(card.start, card.end - card.start, ...cardLines(markdown, card));
     return lines;
   });
 }
