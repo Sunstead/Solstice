@@ -142,7 +142,8 @@ let modal = false;
 let sentRects = '';
 
 let easing = false;
-const easeListeners = new Set<(phase: 'play' | 'end') => void>();
+type EasePhase = 'begin' | 'play' | 'end';
+const easeListeners = new Set<(phase: EasePhase) => void>();
 
 /**
  * A Zen switch is about to change every surface's size. Each takes its new
@@ -153,6 +154,8 @@ const easeListeners = new Set<(phase: 'play' | 'end') => void>();
  */
 export function beginSurfaceEase() {
   easing = true;
+  // Mid-motion, a held surface waits for this switch's play.
+  easeListeners.forEach((listener) => listener('begin'));
 }
 
 /** The page's motion starts: the held content eases with it. */
@@ -174,7 +177,7 @@ export function surfaceEasing(): boolean {
 }
 
 /** Each surface listens for the switch's phases while it's open. */
-export function onSurfaceEase(listener: (phase: 'play' | 'end') => void): () => void {
+export function onSurfaceEase(listener: (phase: EasePhase) => void): () => void {
   easeListeners.add(listener);
   return () => easeListeners.delete(listener);
 }

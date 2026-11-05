@@ -791,32 +791,42 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   /// tiled ink.
   private var picture: UIView?
   private var cover: UIView?
-  private var pictureScale: CGFloat = 1
 
   override func easeHold(to newFrame: CGRect) {
-    if held != nil { return place(newFrame) }
-    let old = frame.size
-    guard !isHidden, pdfView.document != nil, old.width > 0, newFrame.width > 0, old != newFrame.size,
-      let shot = pdfView.snapshotView(afterScreenUpdates: false)
-    else { return place(newFrame) }
-    held = (old, newFrame.size)
-    frame = CGRect(origin: newFrame.origin, size: old)
-    let ground = UIView(
-      frame: CGRect(x: 0, y: 0, width: max(old.width, newFrame.width), height: max(old.height, newFrame.height)))
-    ground.backgroundColor = backgroundColor
-    ground.isUserInteractionEnabled = false
-    shot.frame = CGRect(origin: .zero, size: old)
-    ground.addSubview(shot)
-    clipsToBounds = false
-    addSubview(ground)
-    picture = shot
-    cover = ground
-    pictureScale = newFrame.width / old.width
+    let canBegin = !isHidden && pdfView.document != nil
+    switch ease.hold(from: frame.size, to: newFrame.size, canBegin: canBegin) {
+    case .none:
+      frame = newFrame
+    case .began:
+      guard let shot = pdfView.snapshotView(afterScreenUpdates: false) else {
+        _ = ease.end()
+        frame = newFrame
+        return
+      }
+      let old = ease.from
+      frame = CGRect(origin: newFrame.origin, size: old)
+      let ground = UIView(frame: CGRect(origin: .zero, size: ease.size))
+      ground.backgroundColor = backgroundColor
+      ground.isUserInteractionEnabled = false
+      shot.frame = CGRect(origin: .zero, size: old)
+      ground.addSubview(shot)
+      clipsToBounds = false
+      addSubview(ground)
+      picture = shot
+      cover = ground
+    case .kept(let grew, let interrupted):
+      // The PDF keeps its old size until the end; only the cover grows.
+      frame.origin = newFrame.origin
+      if interrupted, let picture { freeze(picture) }
+      if grew { cover?.frame.size = ease.size }
+    }
   }
 
   override func easePlay() {
-    guard let shot = picture else { return }
-    let k = pictureScale
+    let step = ease.play()
+    guard step != .none, let shot = picture, ease.from.width > 0 else { return }
+    if step == .restart { freeze(shot) }
+    let k = ease.target.width / ease.from.width
     let size = shot.bounds.size
     UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState]) {
       shot.transform = CGAffineTransform(translationX: (k - 1) * size.width / 2, y: (k - 1) * size.height / 2)
@@ -825,10 +835,9 @@ final class PdfSurface: SurfaceView, PDFPageOverlayViewProvider, PaperMarkupView
   }
 
   override func easeEnd() {
-    guard let held else { return }
-    self.held = nil
+    guard let target = ease.end() else { return }
     beforeEaseResize()
-    frame = CGRect(origin: frame.origin, size: held.target)
+    frame = CGRect(origin: frame.origin, size: target)
     setNeedsLayout()
     layoutIfNeeded()
     pdfView.layoutIfNeeded()

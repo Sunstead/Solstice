@@ -60,7 +60,7 @@ export function NativeSurface({ id, kind, path }: { id: string; kind: SurfaceKin
     };
     const stopEase = onSurfaceEase((phase) => {
       playing = phase === 'play';
-      if (!held) return;
+      if (!held || phase === 'begin') return;
       if (phase === 'end') held = false;
       void nativeSurfaces.ease(id, phase);
     });

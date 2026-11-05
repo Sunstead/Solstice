@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { bandPieces, paneOffset } from '@/lib/zen-motion';
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { bandPieces, paneOffset, paneOrigin, playZen, zenMarks } from '@/lib/zen-motion';
+import { fakeMotion } from '@/lib/test/fake-motion';
 
 const rect = (left: number, top: number) => ({ left, top });
 
@@ -46,5 +48,86 @@ describe('bandPieces', () => {
       { left: 0, top: 900, width: 400, height: 40 },
       { left: 810, top: 0, width: 300, height: 100 },
     ]);
+  });
+});
+
+describe('playZen', () => {
+  let motion: ReturnType<typeof fakeMotion>;
+  let inset: HTMLElement;
+  let column: HTMLElement;
+  let mark: HTMLElement;
+  /** Where layout puts the editor area; a running inset animation adds its first frame. */
+  let at = { left: 300, top: 40, width: 700 };
+
+  const shift = (el: Element) => {
+    const t = motion.live(el)[0]?.keyframes[0]?.transform as string | undefined;
+    const m = t?.match(/translate\((-?[\d.]+)px, (-?[\d.]+)px\)/);
+    return m ? { x: +m[1], y: +m[2] } : { x: 0, y: 0 };
+  };
+  const rect = (left: number, top: number, width: number, height: number) =>
+    ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top }) as DOMRect;
+
+  beforeEach(() => {
+    motion = fakeMotion();
+    at = { left: 300, top: 40, width: 700 };
+    inset = document.createElement('div');
+    inset.style.padding = '0px';
+    inset.getBoundingClientRect = () => {
+      const s = shift(inset);
+      return rect(at.left + s.x, at.top + s.y, at.width, 600);
+    };
+    const tab = document.createElement('div');
+    tab.className = 'flexlayout__tab';
+    tab.getBoundingClientRect = () => inset.getBoundingClientRect();
+    mark = document.createElement('div');
+    // Kept by its right edge, so it moves within the pane as that widens.
+    mark.dataset.zenFlip = 'end';
+    mark.getBoundingClientRect = () => {
+      const r = inset.getBoundingClientRect();
+      return rect(r.right - 60, r.top + 5, 50, 20);
+    };
+    tab.append(mark);
+    inset.append(tab);
+    column = document.createElement('div');
+    document.body.append(column, inset);
+  });
+  afterEach(() => {
+    motion.restore();
+    document.body.replaceChildren();
+  });
+
+  it('hands back a cancel that stops its animations, frames, band and header copies', async () => {
+    const before = paneOrigin(inset);
+    const marks = zenMarks(inset);
+    at = { left: 0, top: 0, width: 1000 };
+    const run = playZen({ inset, column, entering: true, before, marks });
+    expect(motion.live(inset)).toHaveLength(1);
+    expect(motion.live(column)).toHaveLength(1);
+    expect(inset.children.length).toBe(3);
+    expect(mark.style.visibility).toBe('hidden');
+
+    run.cancel();
+    expect(motion.animations.every((a) => a.state === 'idle')).toBe(true);
+    expect(inset.children.length).toBe(1);
+    expect(mark.style.visibility).toBe('');
+    expect(motion.pendingFrames()).toBe(0);
+    await run.finished;
+  });
+
+  it('eases the column from where it is', () => {
+    const before = paneOrigin(inset);
+    at = { left: 0, top: 0, width: 1000 };
+    playZen({ inset, column, entering: true, before, columnFrom: '-120px 0px' });
+    expect(motion.live(column)[0].keyframes).toEqual([{ translate: '-120px 0px' }, { translate: '-100% 0' }]);
+  });
+
+  it('reads a header part from its moving copy, where it is on screen', () => {
+    const before = paneOrigin(inset);
+    const marks = zenMarks(inset);
+    at = { left: 0, top: 0, width: 1000 };
+    playZen({ inset, column, entering: true, before, marks });
+    const copy = inset.lastElementChild!.firstElementChild as HTMLElement;
+    copy.getBoundingClientRect = () => rect(123, 45, 50, 20);
+    expect(zenMarks(inset).get(mark)).toEqual({ x: 173, top: 45 });
   });
 });

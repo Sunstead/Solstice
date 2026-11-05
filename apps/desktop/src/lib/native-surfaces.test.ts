@@ -53,7 +53,15 @@ vi.mock('@/lib/settings/store', () => ({
 }));
 
 import { useEditingFocus } from './keyboard';
-import { follow, retainHost, seeThrough } from './native-surfaces';
+import {
+  beginSurfaceEase,
+  endSurfaceEase,
+  follow,
+  onSurfaceEase,
+  playSurfaceEase,
+  retainHost,
+  seeThrough,
+} from './native-surfaces';
 
 describe('web focus, while surfaces are open', () => {
   let release: () => void;
@@ -89,6 +97,20 @@ describe('web focus, while surfaces are open', () => {
     useEditingFocus.setState({ element: document.createElement('textarea') });
     vi.advanceTimersByTime(200);
     expect(webFocus.mock.calls).toEqual([[true]]);
+  });
+});
+
+describe('a Zen switch', () => {
+  it('tells each surface when a new switch begins, so a held one waits for its play', () => {
+    const phases: string[] = [];
+    const stop = onSurfaceEase((phase) => phases.push(phase));
+    beginSurfaceEase();
+    playSurfaceEase();
+    beginSurfaceEase();
+    playSurfaceEase();
+    endSurfaceEase();
+    stop();
+    expect(phases).toEqual(['begin', 'play', 'begin', 'play', 'end']);
   });
 });
 
