@@ -32,6 +32,7 @@ import { imageWithSize, insertImageWithSizeInputRule } from '@/lib/image/schema'
 import { attachmentPasteDrop } from './paste-drop';
 import { trailingTap } from './trailing-tap';
 import { caretClearance } from './caret-clearance';
+import { hiddenRanges } from './hidden-ranges';
 import { slashMenu } from '@/lib/slash';
 import { wikilinkSuggest } from '@/lib/wikilink/suggest-menu';
 
@@ -182,6 +183,8 @@ export function createEditorFeatures({
     // tried before the generic pairs. Input rules inside a `code` textblock
     // never run at all, so code blocks need no special case here.
     autoPair,
+
+    hiddenRanges,
 
     attachmentPasteDrop(notePath),
 

@@ -20,7 +20,8 @@ import { attributeFromEvent } from '@/lib/editor/event-target';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { resolveWikilink, useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { openWikilink } from './actions';
-import { findWikilinks, wikilinkAt } from './scan';
+import { findWikilinks, wikilinkAt, type WikilinkMatch } from './scan';
+import { touches, type HiddenSource } from '@/lib/editor/hidden-ranges';
 import { WIKILINK_MDAST_TYPE, remarkWikilink } from './syntax';
 import {
   WIKILINK_CLOSE,
@@ -147,63 +148,83 @@ const wikilinkSync = $prose((ctx) => {
  * ---------------------------------------------------------------------- */
 
 /**
+ * Where a link's collapsed label sits in its source. It has to be a
+ * contiguous slice of the source, because the surrounding text is hidden by
+ * position rather than replaced: an explicit `|alias` runs to the end of the
+ * target, and otherwise the file name sits at a known offset into the path.
+ */
+function layout(link: WikilinkMatch) {
+  const parts = parseWikilinkTarget(link.target);
+  const targetFrom = link.from + WIKILINK_OPEN.length;
+  const targetTo = link.to - WIKILINK_CLOSE.length;
+  const aliasAt = link.target.indexOf('|');
+  const labelFrom =
+    parts.suffix === null
+      ? targetFrom + basenameOffset(parts.path)
+      : targetFrom + aliasAt + 1;
+  const label =
+    parts.suffix === null
+      ? stripExtension(basename(parts.path))
+      : parts.suffix;
+  return { parts, targetFrom, targetTo, labelFrom, labelTo: labelFrom + label.length };
+}
+
+/**
+ * Whether a link shows as its label: not while the selection touches it, and
+ * not with no file name to show (`[[notes/.md]]`).
+ */
+function collapsed(selection: EditorState['selection'], link: WikilinkMatch, at: ReturnType<typeof layout>) {
+  return !touches(selection, link.from, link.to) && at.labelTo !== at.labelFrom;
+}
+
+/**
  * Collapses each link to its file name unless the selection touches it, in
- * which case the raw source is shown so it can be edited in place. Because the
- * source is revealed whenever the cursor is near, the cursor can never end up
- * stranded inside a collapsed range.
+ * which case the raw source is shown so it can be edited in place.
  */
 function buildDecorations(state: EditorState, markType: MarkType) {
   const index = useWikilinkIndex.getState();
-  const { selection } = state;
 
   const decorations = findWikilinks(state.doc, markType).flatMap((link) => {
-    const parts = parseWikilinkTarget(link.target);
-    const { status } = parts.path
-      ? resolveWikilink(parts.path, index)
+    const at = layout(link);
+    const { status } = at.parts.path
+      ? resolveWikilink(at.parts.path, index)
       : ({ status: 'unresolved' } as const);
     const linkClass = `wikilink wikilink-${status}`;
 
-    const targetFrom = link.from + WIKILINK_OPEN.length;
-    const targetTo = link.to - WIKILINK_CLOSE.length;
-
-    // What the collapsed link reads as. It has to be a contiguous slice of the
-    // source, because the surrounding text is hidden by position rather than
-    // replaced: an explicit `|alias` runs to the end of the target, and
-    // otherwise the file name sits at a known offset into the path.
-    const aliasAt = link.target.indexOf('|');
-    const labelFrom =
-      parts.suffix === null
-        ? targetFrom + basenameOffset(parts.path)
-        : targetFrom + aliasAt + 1;
-    const label =
-      parts.suffix === null
-        ? stripExtension(basename(parts.path))
-        : parts.suffix;
-    const labelTo = labelFrom + label.length;
-
-    const revealed = selection.from <= link.to && selection.to >= link.from;
-
-    // A target with no file name to show (`[[notes/.md]]`) has nothing to
-    // collapse to, so it stays in source form.
-    if (revealed || labelTo === labelFrom) {
+    if (!collapsed(state.selection, link, at)) {
       return [
-        Decoration.inline(link.from, targetFrom, { class: 'wikilink-bracket' }),
-        Decoration.inline(targetFrom, targetTo, { class: linkClass }),
-        Decoration.inline(targetTo, link.to, { class: 'wikilink-bracket' }),
+        Decoration.inline(link.from, at.targetFrom, { class: 'wikilink-bracket' }),
+        Decoration.inline(at.targetFrom, at.targetTo, { class: linkClass }),
+        Decoration.inline(at.targetTo, link.to, { class: 'wikilink-bracket' }),
       ];
     }
 
     return [
-      Decoration.inline(link.from, labelFrom, { class: 'wikilink-hidden' }),
-      Decoration.inline(labelFrom, labelTo, {
+      Decoration.inline(link.from, at.labelFrom, { class: 'wikilink-hidden' }),
+      Decoration.inline(at.labelFrom, at.labelTo, {
         class: linkClass,
         [TARGET_ATTRIBUTE]: link.target,
       }),
-      Decoration.inline(labelTo, link.to, { class: 'wikilink-hidden' }),
+      Decoration.inline(at.labelTo, link.to, { class: 'wikilink-hidden' }),
     ];
   });
 
   return DecorationSet.create(state.doc, decorations);
+}
+
+function hiddenSource(state: EditorState, markType: MarkType): HiddenSource[] {
+  return findWikilinks(state.doc, markType).map((link) => {
+    const at = layout(link);
+    return {
+      from: link.from,
+      to: link.to,
+      hidden: [
+        { from: link.from, to: at.labelFrom },
+        { from: at.labelTo, to: link.to },
+      ],
+      collapsed: collapsed(state.selection, link, at),
+    };
+  });
 }
 
 function clickedTarget(event: MouseEvent): string | null {
@@ -215,6 +236,7 @@ const wikilinkDecorations = $prose((ctx) => {
 
   return new Plugin({
     key: new PluginKey('wikilink-decorations'),
+    hiddenSource: (state: EditorState) => hiddenSource(state, markType),
     state: {
       init: (_, state) => buildDecorations(state, markType),
       apply(tr, previous, _oldState, state) {

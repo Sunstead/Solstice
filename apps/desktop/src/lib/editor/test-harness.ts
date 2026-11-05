@@ -160,9 +160,9 @@ export async function createTestEditor(): Promise<TestEditor> {
       }
       return serialize(tr.doc)
         .replace(/\\([[\]$!|_])/g, '$1')
-        .replaceAll(SENTINEL, CARET)
-        .replaceAll(OPEN, '[')
-        .replaceAll(CLOSE, ']');
+        .split(SENTINEL).join(CARET)
+        .split(OPEN).join('[')
+        .split(CLOSE).join(']');
     },
   };
 }
