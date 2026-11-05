@@ -44,6 +44,8 @@ type LayoutState = {
   activeTabId: string | null;
   setActiveTabId: (id: string | null) => void;
   loadForWorkspace: (path: string) => Promise<void>;
+  /** A window with no workspace showing files opened from outside (`openExternalFiles`); not saved. */
+  openLoose: () => void;
   persistCurrent: () => void;
   openFile: (path: string, name: string) => void;
   /**
@@ -217,11 +219,18 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
   setRedrawTabContent: (redraw) => set({ redrawTabContent: redraw }),
 
+  openLoose: () => {
+    const model = Model.fromJson(defaultLayoutJson);
+    set({ model, workspacePath: null, activeTabId: getActiveTabId(model) });
+  },
+
   loadForWorkspace: (path) => {
     // Opening a workspace loads it twice (its stores, then the layout
     // session); the second must not undo the first, which in a new editor
     // window took the tab it was opened with.
     if (loading?.path === path) return loading.promise;
+    // Files opened before there was a workspace come along into it.
+    const loose = get().workspacePath === null ? get().listTabPaths() : [];
     const promise = (async () => {
       const stored = await getStoredLayout();
       let model = Model.fromJson(stored ?? defaultLayoutJson);
@@ -248,6 +257,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
         workspacePath: path,
         activeTabId: getActiveTabId(model),
       });
+      for (const file of loose) get().openFile(file, getFileNameFromPath(file));
     })().finally(() => {
       if (loading?.promise === promise) loading = null;
     });

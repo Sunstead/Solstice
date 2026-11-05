@@ -179,7 +179,9 @@ fn build(app: &AppHandle, label: &str, bounds: Option<Bounds>) -> tauri::Result<
     #[cfg(all(desktop, not(target_os = "macos")))]
     let builder = builder.decorations(false);
 
-    builder.build()
+    let window = builder.build()?;
+    crate::external_drop::watch(&window);
+    Ok(window)
 }
 
 /// Opens the windows open when the app last quit, or one full window.
@@ -356,7 +358,26 @@ pub fn open_window(
     Ok(label)
 }
 
-fn focus(app: &AppHandle, label: &str) {
+/// Every window the session knows of, oldest first.
+pub fn session_windows(app: &AppHandle) -> Vec<WindowEntry> {
+    app.state::<WindowsState>().session.lock().unwrap().windows.clone()
+}
+
+/// Opens an empty full window (nothing else to open a file in); its label.
+pub fn open_empty(app: &AppHandle) -> tauri::Result<String> {
+    let label = random_label();
+    {
+        let state = app.state::<WindowsState>();
+        let mut session = state.session.lock().unwrap();
+        session.add(WindowEntry { label: label.clone(), kind: WindowKind::Full, workspace: None, bounds: None });
+        save(app, &session);
+    }
+    build(app, &label, None)?;
+    WindowsChanged.emit(app).ok();
+    Ok(label)
+}
+
+pub fn focus(app: &AppHandle, label: &str) {
     if let Some(w) = app.get_webview_window(label) {
         #[cfg(desktop)]
         let _ = w.unminimize();

@@ -5,7 +5,7 @@ import {
   type WikilinkIndexSnapshot,
 } from '@/lib/stores/wikilink-index';
 import { basename, indexKey, joinWorkspacePath } from '@/lib/wikilink/target';
-import { getRelativePath, normalizePath, parentPath } from '@/lib/path-utils';
+import { getRelativePath, isWithin, normalizePath, parentPath } from '@/lib/path-utils';
 
 export type ResolvedAsset =
   /** A remote or already-absolute URL; handed to the browser untouched. */
@@ -73,7 +73,12 @@ export function resolveAsset(
     return { status: 'resolved', absolutePath: decoded, url: assetUrl(decoded) };
   }
 
-  if (!workspaceRoot) return { status: 'unresolved' };
+  // A note opened from outside the workspace (Finder, a drop) has its images
+  // beside it, as any other editor of it would look for them.
+  if (!workspaceRoot || !isWithin(notePath, workspaceRoot)) {
+    const absolutePath = resolveSegments(parentPath(notePath), decoded);
+    return { status: 'resolved', absolutePath, url: assetUrl(absolutePath) };
+  }
 
   const noteDir = parentPath(getRelativePath(notePath, workspaceRoot));
   const candidates = [

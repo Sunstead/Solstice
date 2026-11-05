@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { createElement, Fragment } from 'react';
 import { useWorkspace } from '@/hooks/use-workspace';
 import {
   Breadcrumb,
@@ -10,7 +10,7 @@ import {
 } from '@sunstead/ui/components/breadcrumb';
 import { getFileIconFor } from '@/assets/icons';
 import { cn } from '@/lib/utils';
-import { getWorkspaceRelativeSegments } from '@/lib/path-utils';
+import { getFileNameFromPath, getWorkspaceRelativeSegments, isWithin, parentPath } from '@/lib/path-utils';
 import { FormattedFileName } from './file-tree';
 
 interface FileBreadcrumbProps {
@@ -25,13 +25,34 @@ export default function FileBreadcrumb({
   className,
 }: FileBreadcrumbProps) {
   const workspacePath = useWorkspace((s) => s.path);
+  const Icon = getFileIconFor(filePath);
 
-  if (!workspacePath) return null;
+  // A file opened from outside the workspace (Finder, a drop): its own
+  // folder, whose full path is its title, then the file.
+  if (!workspacePath || !isWithin(filePath, workspacePath)) {
+    const folder = parentPath(filePath);
+    return (
+      <Breadcrumb className={cn('min-w-0 max-w-full', className)}>
+        <BreadcrumbList className='flex-nowrap overflow-hidden'>
+          <BreadcrumbItem className='min-w-0 shrink' title={`${folder} (outside the workspace)`}>
+            <BreadcrumbPage className='block truncate'>{getFileNameFromPath(folder) || folder}</BreadcrumbPage>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator className='shrink-0' />
+          <BreadcrumbItem className='min-w-0 shrink-0'>
+            <BreadcrumbPage>
+              <div className='flex items-center gap-2 whitespace-nowrap'>
+                <span className='shrink-0'>{createElement(Icon)}</span>
+                <FormattedFileName name={getFileNameFromPath(filePath)} />
+              </div>
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }
 
   const { workspaceName, normalizedWorkspace, crumbs } =
     getWorkspaceRelativeSegments(filePath, workspacePath);
-
-  const Icon = getFileIconFor(filePath);
 
   return (
     <Breadcrumb className={cn('min-w-0 max-w-full', className)}>

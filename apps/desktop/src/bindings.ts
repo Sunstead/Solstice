@@ -212,6 +212,10 @@ export const commands = {
 	 */
 	syncVaultNames: (paths: string[]) => __TAURI_INVOKE<(string | null)[]>("sync_vault_names", { paths }),
 	getWindowInit: () => __TAURI_INVOKE<WindowInit>("get_window_init"),
+	/**  The files (and links) waiting for this window, once. */
+	takePendingOpens: () => __TAURI_INVOKE<string[]>("take_pending_opens"),
+	/**  The files the last drop on a window carried, once. */
+	takeDroppedPaths: () => __TAURI_INVOKE<string[]>("take_dropped_paths"),
 	listWindows: () => __TAURI_INVOKE<WindowEntry[]>("list_windows"),
 	/**
 	 *  Opens a window, and returns its label. A full window of a workspace that
@@ -257,6 +261,7 @@ export const events = {
 	flushRequested: makeEvent<FlushRequested>("flush-requested"),
 	keymapChanged: makeEvent<KeymapChanged>("keymap-changed"),
 	menuCommand: makeEvent<MenuCommand>("menu-command"),
+	openFilesQueued: makeEvent<OpenFilesQueued>("open-files-queued"),
 	storeChanged: makeEvent<StoreChanged>("store-changed"),
 	syncChanged: makeEvent<SyncChanged>("sync-changed"),
 	tabAdopted: makeEvent<TabAdopted>("tab-adopted"),
@@ -399,6 +404,9 @@ export type MenuCommand = CommandId;
  *  shown there).
  */
 export type NativeItem = "Undo" | "Redo" | "Cut" | "Copy" | "Paste" | "SelectAll";
+
+/**  Files are waiting for this window: `take_pending_opens`. */
+export type OpenFilesQueued = null;
 
 export type OpenWindow = {
 	/**  An editor window of the calling window's workspace, else a full one. */

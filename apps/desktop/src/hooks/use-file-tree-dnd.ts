@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { getEmptyImage } from 'react-dnd-html5-backend';
+import { getEmptyImage, NativeTypes } from 'react-dnd-html5-backend';
+import { commands } from '@/lib/backend';
+import { can } from '@/lib/backend/platform';
+import { openExternalFiles } from '@/lib/open-files';
 import { canMove, type MovableEntry } from '@/lib/file-operations';
 import { fileOperations } from '@/lib/file-operations';
 import { useDragHoverStore } from '@/hooks/use-drag-hover';
@@ -175,5 +178,19 @@ export function useFileTreeExternalDropZone() {
     [],
   );
 
+  return drop;
+}
+
+/**
+ * Files from another app dropped on the tree open as tabs, wherever they
+ * are (the rows only take the tree's own entries). Connect it around the
+ * tree.
+ */
+export function useOsFileDrop() {
+  const [, drop] = useDrop(() => ({
+    accept: NativeTypes.FILE,
+    canDrop: () => can.dropToOpen,
+    drop: () => void commands.takeDroppedPaths().then(openExternalFiles),
+  }));
   return drop;
 }

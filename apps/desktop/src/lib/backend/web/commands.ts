@@ -242,6 +242,9 @@ export const webCommands: Commands = {
   listWindows: () => Promise.resolve([]),
   openWindow: () => desktopOnly('Opening a window'),
   focusWindow: () => Promise.resolve(),
+  // Nothing outside the browser opens files in it.
+  takePendingOpens: () => Promise.resolve([]),
+  takeDroppedPaths: () => Promise.resolve([]),
   focusFullWindowFor: () => Promise.resolve(false),
   beginTabDrag: () => Promise.resolve(),
   endTabDrag: () => Promise.resolve(null),

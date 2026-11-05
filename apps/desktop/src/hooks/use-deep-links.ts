@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { getCurrent, onOpenUrl } from '@/lib/backend/shell';
+import { can } from '@/lib/backend/platform';
 import { message } from '@/lib/backend/shell';
 import { commands } from '@/lib/backend';
 import { useLayout } from '@/hooks/use-layout';
@@ -12,7 +13,7 @@ async function warn(text: string) {
   await message(text, { title: "Can't open link", kind: 'warning' });
 }
 
-async function openDeepLink(raw: string) {
+export async function openDeepLink(raw: string) {
   const link = parseDeepLink(raw);
   if (!link) {
     await warn('That link is not a Solstice note link.');
@@ -70,7 +71,9 @@ export function useDeepLinks() {
   const ready = noWorkspace || hasLayout;
 
   useEffect(() => {
-    if (!ready) return;
+    // On a computer Rust sends each link to one window (`useOpenFiles`):
+    // the plugin's own event reaches every window.
+    if (!ready || can.multiWindow) return;
     let cancelled = false;
     let unlisten: (() => void) | undefined;
 

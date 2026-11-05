@@ -131,6 +131,8 @@ export function useLayoutSession(afterChange?: () => void) {
         log.info(`editor window: no tabs left, closing (${JSON.stringify(changed.toJson().layout)})`);
         void getCurrentWindow().close();
       }
+      // Files opened with no workspace: the last one closed, it's empty again.
+      else if (!useWorkspace.getState().path) useLayout.setState({ model: null });
       else layout.newBlankTab();
     }
   }, []);

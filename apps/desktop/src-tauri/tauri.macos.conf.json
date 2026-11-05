@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown"
+        ],
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "rank": "Default"
+      },
+      {
+        "ext": [
+          "txt",
+          "log",
+          "csv",
+          "json",
+          "yaml",
+          "yml",
+          "toml",
+          "ini",
+          "xml",
+          "html",
+          "css",
+          "scss",
+          "js",
+          "mjs",
+          "jsx",
+          "ts",
+          "tsx",
+          "py",
+          "rb",
+          "rs",
+          "go",
+          "c",
+          "h",
+          "cpp",
+          "hpp",
+          "java",
+          "kt",
+          "swift",
+          "sh",
+          "bash",
+          "zsh",
+          "sql",
+          "lua"
+        ],
+        "name": "Text or Code",
+        "role": "Editor",
+        "rank": "Alternate"
+      }
+    ]
+  }
+}

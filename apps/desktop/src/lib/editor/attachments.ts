@@ -1,6 +1,6 @@
 import { commands } from '@/lib/backend';
 import { applyFsChanges, selfChange } from '@/lib/fs-sync';
-import { joinPath, parentOf, relativeFromDirectory } from '@/lib/path-utils';
+import { isWithin, joinPath, parentOf, relativeFromDirectory } from '@/lib/path-utils';
 import { getSetting } from '@/lib/settings/store';
 import { useWorkspace } from '@/hooks/use-workspace';
 
@@ -35,7 +35,9 @@ function normalizeFolder(raw: string): string {
 }
 
 /** Where a new attachment is written, per `attachments.location`. */
-function attachmentDirectory(notePath: string, workspaceRoot: string): string {
+function attachmentDirectory(notePath: string, workspaceRoot: string | null): string {
+  // A note from outside the workspace keeps what's put in it beside it.
+  if (!workspaceRoot || !isWithin(notePath, workspaceRoot)) return parentOf(notePath);
   const folder = normalizeFolder(getSetting('attachments.folder'));
   const noteDir = parentOf(notePath);
 
@@ -90,10 +92,7 @@ export async function saveAttachment(
   file: File,
   notePath: string,
 ): Promise<SavedAttachment | null> {
-  const workspaceRoot = useWorkspace.getState().path;
-  if (!workspaceRoot) return null;
-
-  const directory = attachmentDirectory(notePath, workspaceRoot);
+  const directory = attachmentDirectory(notePath, useWorkspace.getState().path);
   const name = file.name || pastedImageName(file.type);
 
   // Bytes cross the IPC boundary as a JSON number array, which is the only
@@ -115,10 +114,7 @@ export async function importAttachment(
   sourcePath: string,
   notePath: string,
 ): Promise<SavedAttachment | null> {
-  const workspaceRoot = useWorkspace.getState().path;
-  if (!workspaceRoot) return null;
-
-  const directory = attachmentDirectory(notePath, workspaceRoot);
+  const directory = attachmentDirectory(notePath, useWorkspace.getState().path);
   const result = await commands.importAttachment(sourcePath, directory);
 
   if (result.status === 'error') {

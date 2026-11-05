@@ -8,6 +8,11 @@ import { saveAttachment } from './attachments';
 
 const attachmentDropKey = new PluginKey('solstice-attachment-drop');
 
+/** Every file a drop carries, images first (they embed), then the rest (linked). */
+function droppedFiles(transfer: DataTransfer | null): File[] {
+  return transfer ? Array.from(transfer.files) : [];
+}
+
 function imageFiles(transfer: DataTransfer | null): File[] {
   if (!transfer) return [];
 
@@ -22,7 +27,7 @@ function imageFiles(transfer: DataTransfer | null): File[] {
  * driven through the selection so each insert lands after the previous one
  * without any position arithmetic.
  */
-async function insertImages(
+async function insertAttachments(
   ctx: Ctx,
   view: EditorView,
   files: File[],
@@ -32,13 +37,21 @@ async function insertImages(
     const saved = await saveAttachment(file, notePath);
     if (!saved) continue;
 
-    const node = imageWithSize.type(ctx).create({ src: saved.src });
-    view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
+    if (file.type.startsWith('image/')) {
+      const node = imageWithSize.type(ctx).create({ src: saved.src });
+      view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
+    } else {
+      // Anything else is a link to its copy, named for the file.
+      const link = view.state.schema.marks.link.create({ href: saved.src });
+      const text = view.state.schema.text(file.name || saved.src, [link]);
+      view.dispatch(view.state.tr.replaceSelectionWith(text, false).insertText(' ').scrollIntoView());
+    }
   }
 }
 
 /**
- * Turns pasted and dropped image files into attachments.
+ * Turns pasted image files, and dropped files of any kind, into attachments:
+ * an image embeds, anything else is linked.
  *
  * Both handlers bail unless the payload actually carries an image file, so an
  * ordinary markdown paste still falls through to `@milkdown/plugin-clipboard`.
@@ -57,12 +70,12 @@ export const attachmentPasteDrop = (notePath: string) =>
             if (files.length === 0) return false;
 
             event.preventDefault();
-            void insertImages(ctx, view, files, notePath);
+            void insertAttachments(ctx, view, files, notePath);
             return true;
           },
 
           handleDrop: (view, event) => {
-            const files = imageFiles(event.dataTransfer);
+            const files = droppedFiles(event.dataTransfer);
             if (files.length === 0) return false;
 
             event.preventDefault();
@@ -80,7 +93,7 @@ export const attachmentPasteDrop = (notePath: string) =>
               );
             }
 
-            void insertImages(ctx, view, files, notePath);
+            void insertAttachments(ctx, view, files, notePath);
             return true;
           },
         },

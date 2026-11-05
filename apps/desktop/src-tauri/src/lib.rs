@@ -15,6 +15,8 @@ mod commands;
 mod watcher;
 mod sync;
 mod windows;
+mod open_files;
+mod external_drop;
 
 #[cfg(desktop)]
 use commands::command_registry::CommandId;
@@ -88,6 +90,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             sync::sync_editor_opened,
             sync::sync_vault_names,
             windows::get_window_init,
+            open_files::take_pending_opens,
+            external_drop::take_dropped_paths,
             windows::list_windows,
             windows::open_window,
             windows::focus_window,
@@ -101,6 +105,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             windows::windows_flushed,
         ])
         .events(tauri_specta::collect_events![
+            open_files::OpenFilesQueued,
             KeymapChanged,
             MenuCommand,
             FileSystemChanged,
@@ -157,7 +162,12 @@ pub fn run() {
     // app runs) hands its arguments to this process and exits. The
     // `deep-link` feature passes the link on to the deep-link plugin.
     #[cfg(desktop)]
-    let app = app.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let app = app.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+        // Files named on a second launch (Open With on Windows and Linux).
+        let files = open_files::paths_from_args(&args, std::path::Path::new(&cwd));
+        if !files.is_empty() {
+            return open_files::route(app, files);
+        }
         if let Some(window) = windows::current(app) {
             let _ = window.unminimize();
             let _ = window.set_focus();
@@ -204,6 +214,7 @@ pub fn run() {
         .manage(commands::keymap::MenuAccelerators::default())
         .manage(export::ExportJobs::default())
         .manage(windows::WindowsState::default())
+        .manage(open_files::PendingOpens::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             // Registers the event registry so `events.keymapChanged.listen(...)`
@@ -221,7 +232,33 @@ pub fn run() {
                 }
             }
 
+            // Links go to one window (`open_files::route_links`): the one
+            // that launched the app, once its window is up, and any after.
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    open_files::route_links(&handle, event.urls().iter().map(|u| u.to_string()).collect());
+                });
+            }
+
             windows::restore(app.handle())?;
+
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    open_files::route_links(app.handle(), urls.iter().map(|u| u.to_string()).collect());
+                }
+            }
+
+            // Files named at launch (Windows and Linux; macOS sends `Opened`).
+            #[cfg(desktop)]
+            if let Ok(cwd) = std::env::current_dir() {
+                let args: Vec<String> = std::env::args().collect();
+                open_files::route(app.handle(), open_files::paths_from_args(&args, &cwd));
+            }
 
             #[cfg(target_os = "macos")]
             {
@@ -279,6 +316,12 @@ pub fn run() {
         .run(|_app, _event| {
             if let tauri::RunEvent::ExitRequested { .. } = _event {
                 windows::quitting(_app);
+            }
+            // Finder's double click, Open With, or a drop on the Dock icon.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &_event {
+                let files = urls.iter().filter_map(|url| url.to_file_path().ok()).collect();
+                open_files::route(_app, files);
             }
             #[cfg(mobile)]
             if let tauri::RunEvent::Resumed = _event {

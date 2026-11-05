@@ -43,6 +43,8 @@ import { useTabLongPress, type TabMenuRequest } from '@/lib/tab-long-press';
 import { ownsDrag, soleStrip, useTabGesture } from '@/lib/tab-gesture';
 import { incomingDrag, useTabTransfer } from '@/lib/tab-transfer';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { commands } from '@/lib/backend';
+import { fillDropped, isOsFileDrag } from '@/lib/external-drop';
 
 /** A tab's name; on mount, it grows its button in if the tab was just opened. */
 function TabLabel({ id, children }: { id: string; children: string }) {
@@ -269,8 +271,23 @@ export default function FlexLayoutRoot() {
   // here on; anything that needs to know which file a tab points to
   // (FileEditor's factory, onRenderTab below, closeFileTab) reads that.
   const handleExternalDrag = useCallback(
-    (_event: React.DragEvent<HTMLElement>) => {
+    (event: React.DragEvent<HTMLElement>) => {
       const entry = useFileTreeDragState.getState().draggedEntry;
+      // Files from another app: a placeholder where they land, then a tab
+      // each once the drop says which (`fillDropped`).
+      // Not where it entered over a note's text, which takes it in itself
+      // (`attachmentPasteDrop`).
+      const intoText = (event.target as Element | null)?.closest?.('.ProseMirror, .cm-editor');
+      if (!entry && can.dropToOpen && isOsFileDrag(event.dataTransfer) && !intoText) {
+        return {
+          json: { id: makeDraggedTabId(), name: 'Opening…', component: 'blank' },
+          onDrop: (node?: { getId(): string }) => {
+            const m = useLayout.getState().model;
+            if (!node || !m) return;
+            void commands.takeDroppedPaths().then((paths) => fillDropped(m, node.getId(), paths));
+          },
+        };
+      }
       // A tab another window is dragging lands wherever it's dropped too.
       if (!entry) return incomingDrag(useWorkspace.getState().path);
       if (entry.is_dir) return undefined;
