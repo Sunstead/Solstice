@@ -1,8 +1,15 @@
-import type { MilkdownPlugin } from '@milkdown/kit/ctx';
+import type { Ctx, MilkdownPlugin } from '@milkdown/kit/ctx';
 import { chainCommands, deleteSelection, joinTextblockBackward, selectNodeBackward } from '@milkdown/kit/prose/commands';
 import { InputRule, undoInputRule } from '@milkdown/kit/prose/inputrules';
 import { findWrapping } from '@milkdown/kit/prose/transform';
-import { bulletListSchema, listItemSchema, paragraphSchema } from '@milkdown/kit/preset/commonmark';
+import {
+  bulletListKeymap,
+  bulletListSchema,
+  listItemKeymap,
+  listItemSchema,
+  orderedListKeymap,
+  paragraphSchema,
+} from '@milkdown/kit/preset/commonmark';
 import { keymap } from '@milkdown/kit/prose/keymap';
 import { Plugin } from '@milkdown/kit/prose/state';
 import { $inputRule, $prose } from '@milkdown/kit/utils';
@@ -78,3 +85,16 @@ const taskFromParagraph = $inputRule(
 );
 
 export const listEditing: MilkdownPlugin[] = [listKeys, listBackspaceInput, taskFromParagraph].flat();
+
+/** The preset's list keys as the note editor has them. Call in `.config`. */
+export function configureListKeys(ctx: Ctx) {
+  // Mod-] and Mod-[ are `edit.indent`/`edit.outdent` now; Tab stays.
+  ctx.update(listItemKeymap.key, (keys) => ({
+    ...keys,
+    SinkListItem: { ...keys.SinkListItem, shortcuts: ['Tab'] },
+    LiftListItem: { ...keys.LiftListItem, shortcuts: ['Shift-Tab'] },
+  }));
+  // The list toggles (`toggleList`) are app commands, with app keys.
+  ctx.update(bulletListKeymap.key, (keys) => ({ ...keys, WrapInBulletList: { shortcuts: [] } }));
+  ctx.update(orderedListKeymap.key, (keys) => ({ ...keys, WrapInOrderedList: { shortcuts: [] } }));
+}
