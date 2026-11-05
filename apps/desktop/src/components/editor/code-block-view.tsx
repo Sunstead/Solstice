@@ -397,7 +397,7 @@ export const CodeBlockView: React.FC = () => {
   // from being editable.
   return (
     <div
-      className={cn('solstice-code-block', selected && 'is-selected')}
+      className={selected ? 'solstice-code-block is-selected' : 'solstice-code-block'}
       data-not-typeset
       contentEditable={false}
     >
