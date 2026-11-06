@@ -54,8 +54,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 0.8.0
-        CFBundleVersion: "0.8.0"
+        CFBundleShortVersionString: 0.9.0
+        CFBundleVersion: "0.9.0"
     entitlements:
       path: solstice_iOS/solstice_iOS.entitlements
     scheme:
