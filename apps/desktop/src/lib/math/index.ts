@@ -17,6 +17,7 @@ import {
 } from '@milkdown/kit/utils';
 
 import { closestFromEvent } from '@/lib/editor/event-target';
+import { touches, type HiddenSource } from '@/lib/editor/hidden-ranges';
 import { findInlineMath } from './scan';
 import { MATH_SOURCE_ATTRIBUTE, renderMathElement } from './render';
 import {
@@ -113,7 +114,7 @@ function buildDecorations(state: EditorState, markType: MarkType) {
   const { selection } = state;
 
   const decorations = findInlineMath(state.doc, markType).flatMap((match) => {
-    const revealed = selection.from <= match.to && selection.to >= match.from;
+    const revealed = touches(selection, match.from, match.to);
 
     if (revealed) {
       return [Decoration.inline(match.from, match.to, { class: 'math-inline-source' })];
@@ -142,6 +143,13 @@ const mathInlineDecorations = $prose((ctx) => {
 
   return new Plugin<DecorationSet>({
     key,
+    hiddenSource: (state: EditorState): HiddenSource[] =>
+      findInlineMath(state.doc, markType).map((match) => ({
+        from: match.from,
+        to: match.to,
+        hidden: [{ from: match.from, to: match.to }],
+        collapsed: !touches(state.selection, match.from, match.to),
+      })),
     state: {
       init: (_config, state) => buildDecorations(state, markType),
       apply: (tr, previous, _oldState, newState) =>

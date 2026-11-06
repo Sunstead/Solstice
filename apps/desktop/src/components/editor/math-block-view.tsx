@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNodeViewContext } from '@prosemirror-adapter/react';
-import { Selection, TextSelection } from '@milkdown/kit/prose/state';
+import { leaveBlock } from '@/lib/editor/block-edges';
 
 import { renderMath } from '@/lib/math/render';
 import { cn } from '@/lib/utils';
@@ -62,27 +62,7 @@ export const MathBlockView: React.FC = () => {
     if (pos === undefined) return;
 
     setEditing(false);
-
-    const { state } = view;
-    const boundary = direction < 0 ? pos : pos + node.nodeSize;
-    const near = Selection.near(state.doc.resolve(boundary), direction);
-
-    // `Selection.near` falls back to the node itself when it cannot find a
-    // text position, which would land us straight back inside.
-    const escaped = near.from < pos || near.from > pos + node.nodeSize;
-
-    if (escaped) {
-      view.dispatch(state.tr.setSelection(near).scrollIntoView());
-      view.focus();
-      return;
-    }
-
-    const paragraph = state.schema.nodes.paragraph?.createAndFill();
-    if (!paragraph) return;
-
-    const tr = state.tr.insert(boundary, paragraph);
-    tr.setSelection(TextSelection.create(tr.doc, boundary + 1));
-    view.dispatch(tr.scrollIntoView());
+    leaveBlock(pos, direction)(view.state, view.dispatch);
     view.focus();
   };
 

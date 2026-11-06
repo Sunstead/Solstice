@@ -8,7 +8,6 @@ import { EditorView as CodeMirrorView } from '@codemirror/view';
 
 import { CodeBlockView } from '@/components/editor/code-block-view';
 import { syncFromDoc } from '@/lib/codeblock/bridge';
-import { codeBlockKeymap } from '@/lib/codeblock/keymap';
 import { createEmbedView } from '@/components/editor/embed-view';
 import { ImageView } from '@/components/editor/image-view';
 import {
@@ -32,6 +31,9 @@ import { imageWithSize, insertImageWithSizeInputRule } from '@/lib/image/schema'
 import { attachmentPasteDrop } from './paste-drop';
 import { trailingTap } from './trailing-tap';
 import { caretClearance } from './caret-clearance';
+import { hiddenRanges } from './hidden-ranges';
+import { blockEdges } from './block-edges';
+import { deleteKeys } from './delete-keys';
 import { slashMenu } from '@/lib/slash';
 import { wikilinkSuggest } from '@/lib/wikilink/suggest-menu';
 
@@ -124,7 +126,6 @@ export function createEditorFeatures({
       nodeViewFactory({ component: createEmbedView(ctx) }),
     ),
 
-    codeBlockKeymap,
     // CodeMirror owns everything inside a code block: `stopEvent` keeps
     // ProseMirror's keymap and input rules out, and `ignoreMutation` stops it
     // trying to reconcile DOM it did not write -- including selection changes,
@@ -182,6 +183,12 @@ export function createEditorFeatures({
     // tried before the generic pairs. Input rules inside a `code` textblock
     // never run at all, so code blocks need no special case here.
     autoPair,
+
+    hiddenRanges,
+
+    deleteKeys,
+
+    blockEdges,
 
     attachmentPasteDrop(notePath),
 

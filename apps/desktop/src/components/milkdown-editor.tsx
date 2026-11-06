@@ -30,14 +30,11 @@ import {
   inlineCodeKeymap,
   headingKeymap,
   blockquoteKeymap,
-  bulletListKeymap,
-  orderedListKeymap,
   codeBlockKeymap,
   hardbreakKeymap,
   paragraphKeymap,
   bulletListSchema,
   orderedListSchema,
-  listItemKeymap,
   listItemSchema,
   liftListItemCommand,
   sinkListItemCommand,
@@ -67,6 +64,7 @@ import { createEditorFeatures, editorOuterMarks } from '@/lib/editor/plugins';
 import { insertImagesFromDialog } from '@/lib/editor/insert-image';
 import { activeFormats } from '@/lib/editor/active-formats';
 import { toggleList, type ListKind, type ListTypes } from '@/lib/editor/list-commands';
+import { configureListKeys } from '@/lib/editor/list-keymap';
 import { toggleHighlightCommand } from '@/lib/highlight';
 import { blockIdOf, findAnchor, newBlockId } from '@/lib/blockid';
 import { clearAnchor, useAnchorRequest } from '@/lib/stores/anchor';
@@ -361,15 +359,7 @@ const MilkdownEditor: React.FC<MilkdownEditorProps> = ({
             }
             ctx.set(keymapKey, patch);
           }
-          // Mod-] and Mod-[ are `edit.indent`/`edit.outdent` now; Tab stays.
-          ctx.update(listItemKeymap.key, (keys) => ({
-            ...keys,
-            SinkListItem: { ...keys.SinkListItem, shortcuts: ['Tab'] },
-            LiftListItem: { ...keys.LiftListItem, shortcuts: ['Shift-Tab'] },
-          }));
-          // The list toggles (`toggleList`) are app commands, with app keys.
-          ctx.update(bulletListKeymap.key, (keys) => ({ ...keys, WrapInBulletList: { shortcuts: [] } }));
-          ctx.update(orderedListKeymap.key, (keys) => ({ ...keys, WrapInOrderedList: { shortcuts: [] } }));
+          configureListKeys(ctx);
         })
         .use(listener)
         .use(editorOuterMarks())

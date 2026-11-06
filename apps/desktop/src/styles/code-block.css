@@ -13,6 +13,18 @@
   overflow: hidden;
 }
 
+/*
+ * Selected whole: Backspace or Delete beside a block selects it first, so
+ * the second press shows what it will take. Images, embeds and formulas
+ * outline themselves; tables, rules and front matter take ProseMirror's class.
+ */
+.solstice-code-block.is-selected,
+.ProseMirror :is(table, hr).ProseMirror-selectednode,
+.ProseMirror .ProseMirror-selectednode > .solstice-frontmatter {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .solstice-code-block-bar {
   display: flex;
   align-items: center;

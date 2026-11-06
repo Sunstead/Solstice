@@ -103,9 +103,13 @@ describe('listEnter', async () => {
     expect(await enter('* Milk\n  * |\n')).toBe('* Milk\n* <br />\n');
   });
 
-  it("leaves plain items and top-level empties to the preset", async () => {
+  it('leaves plain items to the preset', async () => {
     expect(await enter('* Milk|\n')).toBeNull();
-    expect(await enter('* Milk\n* |\n')).toBeNull();
+  });
+
+  it('makes an empty top-level item a paragraph, the numbers after it counting on', async () => {
+    expect(await enter('* Milk\n* |\n')).toBe('* Milk\n\n');
+    expect(await enter('1. a\n2. |\n3. c\n')).toBe('1. a\n\n<br />\n\n2. c\n');
   });
 });
 

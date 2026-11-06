@@ -10,6 +10,7 @@ import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { $mark, $prose, $remark } from '@milkdown/kit/utils';
 
 import { attributeFromEvent } from '@/lib/editor/event-target';
+import { touches, type HiddenSource } from '@/lib/editor/hidden-ranges';
 import { calloutIcon, chevronIcon } from './icons';
 import { CALLOUT_MDAST_TYPE, remarkCallout } from './syntax';
 import { parseCallout, type CalloutMarker } from './types';
@@ -117,6 +118,18 @@ function isFolded(folds: FoldState, found: Found): boolean {
   return folds.get(found.pos) ?? found.marker.collapsed;
 }
 
+/** Whether `[!type]` is hidden: while the selection is outside the title line. */
+function markerCollapsed(state: EditorState, found: Found): boolean {
+  return !touches(state.selection, found.titleFrom, found.titleTo);
+}
+
+function hiddenSource(state: EditorState): HiddenSource[] {
+  return findCallouts(state.doc).map((found) => {
+    const marker = { from: found.titleFrom, to: found.titleFrom + found.marker.length };
+    return { ...marker, hidden: [marker], collapsed: markerCollapsed(state, found) };
+  });
+}
+
 function buildDecorations(state: EditorState, folds: FoldState) {
   const decorations: Decoration[] = [];
 
@@ -180,11 +193,9 @@ function buildDecorations(state: EditorState, folds: FoldState) {
     );
 
     // The marker text is hidden rather than removed -- it is the source, and
-    // it is revealed whenever the caret is inside the line, so it can always
+    // it is revealed whenever the caret is in the title line, so it can always
     // be edited and the caret can never be stranded behind it.
-    const { selection } = state;
-    const revealed = selection.from <= markerTo && selection.to >= markerFrom;
-    if (!revealed) {
+    if (markerCollapsed(state, found)) {
       decorations.push(
         Decoration.inline(markerFrom, markerTo, { class: 'callout-marker-hidden' }),
       );
@@ -212,6 +223,7 @@ const calloutPlugin = $prose(() => {
 
   return new Plugin<PluginState>({
     key,
+    hiddenSource,
     state: {
       init: (_config, state) => {
         const folds: FoldState = new Map();
