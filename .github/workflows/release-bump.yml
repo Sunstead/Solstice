@@ -4,6 +4,11 @@ name: Release bump
 # set its version only on its own checkout. This commits that version to main
 # (package.json, Cargo.toml, the lockfiles, the iOS project), so the repo says
 # what was last shipped.
+#
+# main is protected by a ruleset (pull requests only), which the Actions bot
+# can't bypass; a write deploy key (secret RELEASE_BUMP_DEPLOY_KEY) can, and is
+# a bypass actor there. A push with it, unlike GITHUB_TOKEN's, runs workflows,
+# so the commit says [skip ci].
 
 on:
   release:
@@ -26,6 +31,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+          ssh-key: ${{ secrets.RELEASE_BUMP_DEPLOY_KEY }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
