@@ -10,7 +10,9 @@ Solstice ships two things, versioned apart:
 ## The desktop app
 
 Releases are automatic and driven by **conventional commits**. Merging to
-`main` keeps a draft up to date; **you** decide when to publish it.
+`main` keeps a draft up to date; **you** decide when to publish it. The whole
+system, with rules for agents and troubleshooting, is in
+[docs/release-automation.md](docs/release-automation.md).
 
 ### Commits
 
