@@ -4,24 +4,40 @@ Solstice ships two things, versioned apart:
 
 | Tag | Workflow | Output |
 |---|---|---|
-| `app-v<version>` | App release | A draft GitHub Release with the desktop app for macOS, Windows and Linux |
+| `app-v<version>` | App release | One rolling draft GitHub Release with the desktop app for macOS, Windows and Linux; the tag is made when you publish it |
 | `sync-v<version>` | Sync image | `ghcr.io/sunstead/solstice-sync:<version>`: the sync server, with the web app built in |
 
 ## The desktop app
 
-The version lives in `apps/desktop/package.json` (`tauri.conf.json` reads it
-from there) and `apps/desktop/src-tauri/Cargo.toml`. Don't edit them by hand:
-the release script keeps them in step.
+Releases are automatic and driven by **conventional commits**. Merging to
+`main` keeps a draft up to date; **you** decide when to publish it.
 
-1. Merge your changes to `main` as usual.
-2. From the repository root, on an up-to-date, clean `main`:
-   ```bash
-   npm run release:app -- 0.2.0 --push
-   ```
-   This sets the version, commits `Release Solstice 0.2.0`, tags
-   `app-v0.2.0`, and pushes both. Leave off `--push` to check the commit
-   first; the script prints the push command, and how to undo it.
-3. **App release** builds:
+### Commits
+
+Pull requests are squash-merged, so the **PR title is the commit**. It must be
+
+```
+type(scope)!: subject        e.g.  fix(sync): keep bookmarks on rename
+```
+
+| Type | Release |
+|---|---|
+| `feat` | minor (0.9.1 to 0.10.0) |
+| `fix`, `perf`, `revert` | patch (0.9.1 to 0.9.2) |
+| any type with `!`, or a `BREAKING CHANGE:` line in the body | major (while 0.x, a minor) |
+| `docs`, `style`, `refactor`, `test`, `build`, `ci`, `chore` | none; ships with the next release |
+
+The **Conventional commits** workflow fails a PR whose title doesn't fit.
+Branch names (`feat/...`, `fix/...`) are a habit, not checked. A commit that
+touches only the sync server, docs or workflows never releases the app.
+
+### What happens on a merge
+
+1. **App release** looks at the commits touching the app (`apps/desktop`,
+   `crates`, the lockfiles) since the newest **published** `app-v*` release.
+   The biggest bump among them picks the version (a `fix` then a `feat` is a
+   minor). With nothing releasing, it stops.
+2. It builds, on `main`:
    - `Solstice_<version>_universal.dmg` (Apple Silicon and Intel)
    - `Solstice_<version>_x64-setup.exe` and `Solstice_<version>_x64_en-US.msi`
    - `Solstice_<version>_amd64.AppImage` and `.deb`, and the same for
@@ -29,18 +45,53 @@ the release script keeps them in step.
      enough for most distributions. The AppImage updates itself; a `.deb`
      install updates through a new `.deb`.
 
-   It attaches them to a **draft** release. Try them, then press Publish on
-   GitHub.
+   into **one draft** named `app-v<version>`, with release notes from the
+   commit titles. Each build replaces the draft, so it always matches the
+   latest merge. If the next version changed (a `feat` after a `fix`), the
+   earlier version's draft is deleted once the new one is built. The version
+   is set only on the build's checkout; the repo isn't touched.
+3. When you want to ship, check that all four jobs of the newest run are green,
+   try the installers, and press **Publish** on GitHub. That makes the tag, at
+   the commit that was built, and **Release bump** commits
+   `chore(release): <version> [skip ci]` to `main` so `package.json`, the
+   Cargo manifests and the lockfiles say what shipped. Publishing ships
+   everything merged since the last publish.
 
-Versions with a suffix (`0.3.0-beta.1`) are marked as pre-releases. The
-script refuses a version that isn't newer, a tag that exists, a dirty tree,
-or a branch other than `main`. The workflow refuses a tag that doesn't match
-`package.json`. If a build fails, fix it on `main` and release the next patch
-version; don't move a tag that's already pushed.
+If a build fails, the draft is missing or incomplete until a later merge (a
+`fix:`) or a manual run builds it again. Don't publish a draft that has fewer
+assets than the last release.
 
-Pull requests that touch `apps/desktop/src-tauri/` build both platforms
-without releasing, and upload the installers as workflow artifacts for 7
-days, so a change can be tried before it merges.
+**Manual runs:** Actions > App release > Run workflow. On `main` it builds a
+draft even if no commit releases, at the next patch version, or at a version
+you type (`1.0.0`, `0.11.0-beta.1`; a suffix makes a pre-release, which
+installed apps never see). On another branch it only builds, with installers
+as artifacts.
+
+**Pull requests** build nothing by default, so a merged `feat` costs one build,
+not two. `ci.yml` (lint, tests, build, clippy) still runs. To try the
+installers before merging, or to check a change to packaging (the Tauri
+config, `scripts/tauri-linux.sh`, the dmg), add the **`build`** label: all four
+platforms build and upload the installers as workflow artifacts for 7 days,
+and nothing is published.
+
+**Speed:** only `main` saves the Rust build cache (PRs and manual runs restore
+it), so a build is about 7 minutes on a warm cache and 15 on a cold one. Docs,
+chore and other non-releasing merges build nothing.
+
+The pieces: `scripts/release/conventional.mjs` (the rules),
+`plan.mjs` (what to build), `set-version.mjs` (the files that carry the
+version), tested by `npm run test:release` (also run in CI).
+
+### Repository settings this relies on
+
+- Pull requests merge by **squash** only, with the default commit message set
+  to the **PR title** and **PR description** (Settings > General > Pull
+  Requests), so the linted title is the commit.
+- A `build` label exists.
+- `main` isn't protected, so **Release bump** can push; with a ruleset, let
+  `github-actions[bot]` bypass it. Optionally make **Conventional commits /
+  title** a required check, so a bad title can't merge (a commit that doesn't
+  fit is skipped, with a warning in the plan job).
 
 ### Updates
 
@@ -50,7 +101,7 @@ says so. They read `latest.json` from the newest published release
 (`plugins.updater` in `tauri.conf.json`), so **pressing Publish ships the
 release to everyone**; a draft or a pre-release never reaches them.
 
-Tag builds sign the update bundles (`tauri.updater.conf.json` turns them on)
+Draft builds sign the update bundles (`tauri.updater.conf.json` turns them on)
 with the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; the public half is the `pubkey` in
 `tauri.conf.json`. Keep the private key and its password backed up outside

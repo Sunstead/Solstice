@@ -1,33 +1,100 @@
 name: App release
 
-# Builds the desktop app and attaches installers to a draft GitHub Release.
-# Mirrors Cosmos's app-release.yml.
+# Builds the desktop app and keeps ONE rolling draft GitHub Release up to date.
 #
-# Release:  npm run release:app -- 0.2.0 --push   (from the repo root, on main)
-#           pushes tag app-v0.2.0, which runs this workflow.
-# Check:    pull requests touching the Tauri shell build without releasing,
-#           and upload the installers as workflow artifacts.
-# Updates:  tag builds sign update bundles with TAURI_SIGNING_PRIVATE_KEY and
+# main:     every merge that releases (feat, fix, perf or a breaking change that
+#           touches the app: scripts/release/conventional.mjs) rebuilds the
+#           draft for the next version, which the commits since the newest
+#           published release decide. Merges that don't release build nothing.
+#           Publish the draft when you want to ship; the git tag is made then,
+#           and release-bump.yml commits the version into the repo.
+# PR:       add the `build` label to build the installers (uploaded as
+#           artifacts, nothing published). The checks in ci.yml run on every PR.
+# Manual:   Run workflow on main to build a draft whatever the commits say,
+#           optionally with a version (e.g. 1.0.0); on another branch it only
+#           builds.
+# Updates:  draft builds sign update bundles with TAURI_SIGNING_PRIVATE_KEY and
 #           attach latest.json; publishing the draft ships it to every install.
 
 on:
   push:
-    tags: ['app-v*']
-  pull_request:
+    branches: [main]
     paths:
-      - apps/desktop/src-tauri/**
+      - apps/desktop/**
+      - crates/**
+      - Cargo.toml
+      - Cargo.lock
+      - package.json
+      - package-lock.json
       - .github/workflows/app-release.yml
+  pull_request:
+    types: [labeled, synchronize]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (default: from the commits since the last release)"
+        required: false
+        type: string
 
+# A build on main finishes before the next starts, and only the newest waiting
+# run is kept: the draft always ends at the latest merge. Adding another label
+# to a PR gets its own group, so it doesn't cancel a build under way.
 concurrency:
-  group: app-release-${{ github.ref }}
-  cancel-in-progress: true
+  group: app-release-${{ github.ref }}-${{ github.event.action != 'labeled' || github.event.label.name == 'build' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  # What to do: scripts/release/plan.mjs.
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      publish: ${{ steps.plan.outputs.publish }}
+      version: ${{ steps.plan.outputs.version }}
+      notes: ${{ steps.plan.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Plan the release
+        id: plan
+        run: node scripts/release/plan.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HAS_BUILD_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'build') }}
+          INPUT_VERSION: ${{ inputs.version }}
+
+      # tauri-action reuses a draft with the same tag but never updates its
+      # notes or the commit its tag will point at, and a platform that fails
+      # would leave the last build's installers beside the new ones. So each
+      # build starts a fresh draft. A draft of another version is removed once
+      # this one is built (cleanup).
+      - name: Clear this version's old draft
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: app-v${{ steps.plan.outputs.version }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq '.[] | select(.draft and .tag_name == env.TAG) | .id' |
+          while read -r id; do
+            echo "Deleting the old draft of $TAG"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+          done
+
   build:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -56,21 +123,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check tag matches app version
-        id: version
-        if: startsWith(github.ref, 'refs/tags/app-v')
-        shell: bash
-        run: |
-          app_version=$(node -p "require('./apps/desktop/package.json').version")
-          if [ "${GITHUB_REF_NAME#app-v}" != "$app_version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match apps/desktop/package.json version $app_version. Use npm run release:app."
-            exit 1
-          fi
-          # A suffix (0.3.0-beta.1) is a pre-release. Read off the version, not
-          # the tag, whose own "app-" has a dash in it.
-          if [[ "$app_version" == *-* ]]; then pre=true; else pre=false; fi
-          echo "prerelease=$pre" >> "$GITHUB_OUTPUT"
-
       # WebKitGTK and what the app links on Linux, as CI installs them.
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -81,9 +133,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust-targets }}
+      # Only main saves a cache: PRs and manual runs restore main's, which is
+      # what makes a build fast, and tags and PRs would crowd it out of the
+      # repository's 10 GB.
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.os }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: actions/setup-node@v4
         with:
@@ -93,6 +149,13 @@ jobs:
       # One lockfile at the root (npm workspaces); git fetches @sunstead/ui.
       - name: Install frontend dependencies
         run: npm ci --no-audit --no-fund
+
+      # After the caches above, whose keys hash the lockfiles this rewrites:
+      # a new version must not be a new cache.
+      - name: Set the version
+        if: needs.plan.outputs.publish == 'true'
+        shell: bash
+        run: node scripts/release/set-version.mjs "${{ needs.plan.outputs.version }}"
 
       - uses: tauri-apps/tauri-action@v0
         id: tauri
@@ -108,22 +171,22 @@ jobs:
           # On Linux, scripts/tauri-linux.sh is `tauri` and then takes the bundled
           # libwayland out of the AppImage (a blank window on Arch otherwise).
           tauriScript: ${{ runner.os == 'Linux' && 'bash scripts/tauri-linux.sh' || 'npm run tauri' }}
-          # Tag builds also make the signed update bundles and latest.json the
+          # Draft builds also make the signed update bundles and latest.json the
           # app's updater reads; other builds have no key to sign them with.
-          args: ${{ matrix.args }} ${{ startsWith(github.ref, 'refs/tags/app-v') && '--config src-tauri/tauri.updater.conf.json' || '' }}
-          # Only tag builds publish; everything else just builds.
-          tagName: ${{ startsWith(github.ref, 'refs/tags/app-v') && github.ref_name || '' }}
+          args: ${{ matrix.args }} ${{ needs.plan.outputs.publish == 'true' && '--config src-tauri/tauri.updater.conf.json' || '' }}
+          # Only draft builds publish; everything else just builds. The tag is
+          # made when the draft is published, at the commit built here.
+          tagName: ${{ needs.plan.outputs.publish == 'true' && format('app-v{0}', needs.plan.outputs.version) || '' }}
+          releaseCommitish: ${{ github.sha }}
           releaseName: Solstice __VERSION__
           releaseBody: |
-            Solstice __VERSION__.
+            ${{ needs.plan.outputs.notes }}
 
             **macOS:** Solstice_*_universal.dmg (Apple Silicon and Intel). The app is not notarised yet: on first launch use right-click > Open, or System Settings > Privacy & Security > Open Anyway.
             **Windows:** the -setup.exe or .msi installer. SmartScreen may warn about an unrecognised app: More info > Run anyway.
             **Linux:** the .AppImage (any distribution; `chmod +x` it, and it updates itself) or the .deb (Debian, Ubuntu). x86_64 and aarch64. Signing in to Sync needs a keyring (GNOME Keyring or KWallet).
           releaseDraft: true
-          # The updater only reads the latest full release, so this decides
-          # whether installs see it.
-          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          prerelease: ${{ contains(needs.plan.outputs.version, '-') }}
 
       # The one retry. Nothing was uploaded by the failed attempt: tauri-action
       # attaches installers only after they have all been built.
@@ -135,25 +198,19 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/desktop
-          # On Linux, scripts/tauri-linux.sh is `tauri` and then takes the bundled
-          # libwayland out of the AppImage (a blank window on Arch otherwise).
           tauriScript: ${{ runner.os == 'Linux' && 'bash scripts/tauri-linux.sh' || 'npm run tauri' }}
-          # Tag builds also make the signed update bundles and latest.json the
-          # app's updater reads; other builds have no key to sign them with.
-          args: ${{ matrix.args }} ${{ startsWith(github.ref, 'refs/tags/app-v') && '--config src-tauri/tauri.updater.conf.json' || '' }}
-          # Only tag builds publish; everything else just builds.
-          tagName: ${{ startsWith(github.ref, 'refs/tags/app-v') && github.ref_name || '' }}
+          args: ${{ matrix.args }} ${{ needs.plan.outputs.publish == 'true' && '--config src-tauri/tauri.updater.conf.json' || '' }}
+          tagName: ${{ needs.plan.outputs.publish == 'true' && format('app-v{0}', needs.plan.outputs.version) || '' }}
+          releaseCommitish: ${{ github.sha }}
           releaseName: Solstice __VERSION__
           releaseBody: |
-            Solstice __VERSION__.
+            ${{ needs.plan.outputs.notes }}
 
             **macOS:** Solstice_*_universal.dmg (Apple Silicon and Intel). The app is not notarised yet: on first launch use right-click > Open, or System Settings > Privacy & Security > Open Anyway.
             **Windows:** the -setup.exe or .msi installer. SmartScreen may warn about an unrecognised app: More info > Run anyway.
             **Linux:** the .AppImage (any distribution; `chmod +x` it, and it updates itself) or the .deb (Debian, Ubuntu). x86_64 and aarch64. Signing in to Sync needs a keyring (GNOME Keyring or KWallet).
           releaseDraft: true
-          # The updater only reads the latest full release, so this decides
-          # whether installs see it.
-          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          prerelease: ${{ contains(needs.plan.outputs.version, '-') }}
 
       # Opens the AppImage on current Arch Linux under a virtual display and
       # fails on a blank window. Runs after the upload, so a failure shows red
@@ -172,7 +229,7 @@ jobs:
           retention-days: 7
 
       - name: Upload installers
-        if: ${{ !startsWith(github.ref, 'refs/tags/app-v') }}
+        if: needs.plan.outputs.publish != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: solstice-${{ runner.os }}-${{ runner.arch }}
@@ -184,3 +241,25 @@ jobs:
             target/release/bundle/deb/*.deb
           if-no-files-found: error
           retention-days: 7
+
+  # The draft is rolling: when a merge changes the next version (a fix, then a
+  # feat), the earlier version's draft is stale. Only drafts are touched,
+  # never a published release.
+  cleanup:
+    needs: [plan, build]
+    if: needs.plan.outputs.publish == 'true' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Delete superseded drafts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: app-v${{ needs.plan.outputs.version }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq '.[] | select(.draft and (.tag_name | startswith("app-v")) and .tag_name != env.KEEP) | "\(.id) \(.tag_name)"' |
+          while read -r id tag; do
+            echo "Deleting stale draft $tag"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+          done
