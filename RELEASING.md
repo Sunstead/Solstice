@@ -5,7 +5,7 @@ Solstice ships two things, versioned apart:
 | Tag | Workflow | Output |
 |---|---|---|
 | `app-v<version>` | App release | One rolling draft GitHub Release with the desktop app for macOS, Windows and Linux; the tag is made when you publish it |
-| `sync-v<version>` | Sync image | `ghcr.io/sunstead/solstice-sync:<version>`: the sync server, with the web app built in |
+| `sync-v<version>` | Sync image | `ghcr.io/sunstead/solstice-sync:<version>`: the sync server, with the web app built in. The tag is made by the workflow once the image is pushed; there is no GitHub Release |
 
 ## The desktop app
 
@@ -120,11 +120,26 @@ the app would look for `latest.json` there.
 
 ## The sync server and web app
 
-1. Bump `version` in `apps/sync/Cargo.toml` (and its `Cargo.lock` entry) in a
-   pull request, and merge it.
-2. Tag the merge: `git tag -a sync-v0.2.1 -m "Solstice Sync 0.2.1"` and push
-   the tag. **Sync image** publishes the image.
+Versioned apart from the desktop app, by the same conventional-commit rules
+(see [docs/release-automation.md](docs/release-automation.md)). Server and
+apps are compatible by the sync **protocol** number (`/v1/info`), not by
+version, and the app's release notes and the image's
+`com.sunstead.solstice.sync-protocol` label both say which one.
+
+1. Merge as usual (squash, conventional PR title). **Sync image** runs when a
+   merge touches the image: `apps/sync`, the crates the server links
+   (`solstice-core`, `-sync`, `-sync-fs`, `-search`), the desktop frontend
+   (`apps/desktop` except `src-tauri`; it is the web app), or the lockfiles.
+   Every such merge pushes `:latest`, `:main` and `:sha-<short>`.
+2. If a `feat`, `fix`, `perf` or breaking commit among them is new since the
+   newest `sync-v*` tag, it also pushes `:<version>`, tags `sync-v<version>` at
+   the commit built, and commits `chore(release): sync <version> [skip ci]`
+   to `main` (so `apps/sync/Cargo.toml` says what shipped).
 3. Bump `compose/solstice.yml` in Jupiter (a pull request; merging deploys).
+
+Nothing in these steps needs a person to bump a version or push a tag. To
+force a release (or set a version), run **Sync image** manually on `main`.
+Don't push `sync-v*` tags by hand; they no longer build anything.
 
 The web app is the desktop frontend built for the browser, so any frontend
 change reaches the web with the next sync release.

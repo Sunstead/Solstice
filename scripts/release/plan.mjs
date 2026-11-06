@@ -7,8 +7,13 @@
  *   GH_TOKEN=... GITHUB_EVENT_NAME=push GITHUB_REF=refs/heads/main \
  *     node scripts/release/plan.mjs
  *
- * Environment: GITHUB_EVENT_NAME, GITHUB_REF, PR_HAS_BUILD_LABEL ("true" on a
- * pull request labelled `build`), INPUT_VERSION (a manual run's override).
+ * Environment: PRODUCT (`app`, the default, or `sync`), GITHUB_EVENT_NAME,
+ * GITHUB_REF, PR_HAS_BUILD_LABEL ("true" on a pull request labelled `build`),
+ * INPUT_VERSION (a manual run's override).
+ *
+ * The app's last release is its newest published GitHub release; the sync
+ * server has no GitHub Releases (the app's updater reads the newest one), so
+ * its last release is its newest `sync-v*` tag.
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -16,10 +21,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { SEMVER } from './set-version.mjs';
 import { bumpVersion, nextVersion, parseCommit, levelOf, releaseNotes } from './conventional.mjs';
-
-/** What goes into the app's binary; a commit touching none of it doesn't release. */
-const APP_PATHS = [/^apps\/desktop\//, /^crates\//, /^Cargo\.(toml|lock)$/, /^package(-lock)?\.json$/];
-export const touchesApp = (files) => files.some((f) => APP_PATHS.some((re) => re.test(f)));
+import { PRODUCTS, touches } from './products.mjs';
 
 const triple = (v) => v.split('-')[0].split('.').map(Number);
 function newer(a, b) {
@@ -66,32 +68,47 @@ function sh(cmd, args) {
   return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim();
 }
 
-/** The newest published, non-pre-release app release: { tag, version }. */
-function lastPublished() {
-  const releases = JSON.parse(sh('gh', ['release', 'list', '--exclude-drafts', '--limit', '200', '--json', 'tagName,isPrerelease']));
-  const found = releases
-    .filter((r) => !r.isPrerelease && /^app-v\d+\.\d+\.\d+$/.test(r.tagName))
-    .map((r) => ({ tag: r.tagName, version: r.tagName.slice('app-v'.length) }))
+/** The newest published, non-pre-release release of `product`: { tag, version }. */
+function lastPublished(product) {
+  const { tagPrefix } = PRODUCTS[product];
+  const exact = new RegExp(`^${tagPrefix}\\d+\\.\\d+\\.\\d+$`);
+  const tags =
+    product === 'app'
+      ? JSON.parse(sh('gh', ['release', 'list', '--exclude-drafts', '--limit', '200', '--json', 'tagName,isPrerelease']))
+          .filter((r) => !r.isPrerelease)
+          .map((r) => r.tagName)
+      : sh('git', ['tag', '--list', `${tagPrefix}*`]).split('\n');
+  const found = tags
+    .filter((t) => exact.test(t))
+    .map((t) => ({ tag: t, version: t.slice(tagPrefix.length) }))
     .sort((a, b) => (newer(a.version, b.version) ? -1 : 1));
   return found[0] ?? null;
 }
 
-/** First-parent commits since `tag` that touch the app. */
-function appCommitsSince(tag) {
+/** First-parent commits since `tag` that touch `product`. */
+function commitsSince(product, tag) {
   const log = sh('git', ['log', '--first-parent', '--reverse', '--format=%H%x1f%s%x1f%b%x1e', `${tag}..HEAD`]);
   const commits = [];
   for (const entry of log.split('\x1e')) {
     if (!entry.trim()) continue;
     const [sha, title, body] = entry.trim().split('\x1f');
     const files = sh('git', ['diff', '--name-only', `${sha}^`, sha]).split('\n').filter(Boolean);
-    if (!touchesApp(files)) continue;
+    if (!touches(product, files)) continue;
     if (!parseCommit(title, body)) console.log(`::warning::Not a conventional commit, so it can't release: ${title} (${sha.slice(0, 7)})`);
     commits.push({ title, body: body ?? '' });
   }
   return commits;
 }
 
+/** The sync protocol the server speaks and the app's client expects. */
+function syncProtocol(root) {
+  const src = readFileSync(path.join(root, 'crates/solstice-sync/src/protocol.rs'), 'utf8');
+  return /pub const PROTOCOL: u16 = (\d+);/.exec(src)?.[1] ?? '';
+}
+
 function main() {
+  const product = process.env.PRODUCT || 'app';
+  if (!PRODUCTS[product]) throw new Error(`unknown product "${product}"`);
   const event = process.env.GITHUB_EVENT_NAME ?? 'workflow_dispatch';
   const onMain = process.env.GITHUB_REF === 'refs/heads/main';
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -99,10 +116,14 @@ function main() {
   let last = null;
   let commits = [];
   if (event !== 'pull_request') {
-    last = lastPublished();
-    if (last) commits = appCommitsSince(last.tag);
+    last = lastPublished(product);
+    if (last) commits = commitsSince(product, last.tag);
   }
-  const lastVersion = last?.version ?? JSON.parse(readFileSync(path.join(root, 'apps/desktop/package.json'), 'utf8')).version;
+  const lastVersion =
+    last?.version ??
+    (product === 'app'
+      ? JSON.parse(readFileSync(path.join(root, 'apps/desktop/package.json'), 'utf8')).version
+      : /^version = "([^"]*)"/m.exec(readFileSync(path.join(root, 'apps/sync/Cargo.toml'), 'utf8'))[1]);
 
   const plan = decide({
     event,
@@ -114,11 +135,11 @@ function main() {
   });
 
   const releasing = commits.filter((c) => levelOf(parseCommit(c.title, c.body)));
-  console.log(`Last published: ${last ? last.tag : '(none)'}; ${commits.length} app commit(s) since, ${releasing.length} releasing.`);
+  console.log(`${product}: last published ${last ? last.tag : '(none)'}; ${commits.length} commit(s) touching it since, ${releasing.length} releasing.`);
   console.log(`build=${plan.build} publish=${plan.publish} version=${plan.version}`);
 
   const out = process.env.GITHUB_OUTPUT;
-  const lines = [`build=${plan.build}`, `publish=${plan.publish}`, `version=${plan.version}`, 'notes<<NOTES_EOF', plan.notes, 'NOTES_EOF'];
+  const lines = [`build=${plan.build}`, `publish=${plan.publish}`, `version=${plan.version}`, `protocol=${syncProtocol(root)}`, 'notes<<NOTES_EOF', plan.notes, 'NOTES_EOF'];
   if (out) appendFileSync(out, `${lines.join('\n')}\n`);
   else console.log(lines.join('\n'));
 
@@ -126,7 +147,7 @@ function main() {
   if (summary) {
     appendFileSync(
       summary,
-      `### Release plan\n\n${plan.build ? `Building **${plan.version}**${plan.publish ? ' as a draft release' : ' (not published)'}.` : 'Nothing to release.'}\n\n${plan.notes}\n`,
+      `### Release plan (${product})\n\n${plan.build ? `Building **${plan.version}**${plan.publish ? ' as a draft release' : ' (not published)'}.` : 'Nothing to release.'}\n\n${plan.notes}\n`,
     );
   }
 }

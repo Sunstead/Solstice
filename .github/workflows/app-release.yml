@@ -57,6 +57,7 @@ jobs:
       publish: ${{ steps.plan.outputs.publish }}
       version: ${{ steps.plan.outputs.version }}
       notes: ${{ steps.plan.outputs.notes }}
+      protocol: ${{ steps.plan.outputs.protocol }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -185,6 +186,8 @@ jobs:
             **macOS:** Solstice_*_universal.dmg (Apple Silicon and Intel). The app is not notarised yet: on first launch use right-click > Open, or System Settings > Privacy & Security > Open Anyway.
             **Windows:** the -setup.exe or .msi installer. SmartScreen may warn about an unrecognised app: More info > Run anyway.
             **Linux:** the .AppImage (any distribution; `chmod +x` it, and it updates itself) or the .deb (Debian, Ubuntu). x86_64 and aarch64. Signing in to Sync needs a keyring (GNOME Keyring or KWallet).
+
+            **Sync:** speaks Solstice Sync protocol ${{ needs.plan.outputs.protocol }}; it works with any server that speaks the same protocol.
           releaseDraft: true
           prerelease: ${{ contains(needs.plan.outputs.version, '-') }}
 
@@ -209,6 +212,8 @@ jobs:
             **macOS:** Solstice_*_universal.dmg (Apple Silicon and Intel). The app is not notarised yet: on first launch use right-click > Open, or System Settings > Privacy & Security > Open Anyway.
             **Windows:** the -setup.exe or .msi installer. SmartScreen may warn about an unrecognised app: More info > Run anyway.
             **Linux:** the .AppImage (any distribution; `chmod +x` it, and it updates itself) or the .deb (Debian, Ubuntu). x86_64 and aarch64. Signing in to Sync needs a keyring (GNOME Keyring or KWallet).
+
+            **Sync:** speaks Solstice Sync protocol ${{ needs.plan.outputs.protocol }}; it works with any server that speaks the same protocol.
           releaseDraft: true
           prerelease: ${{ contains(needs.plan.outputs.version, '-') }}
 

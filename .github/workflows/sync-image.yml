@@ -1,31 +1,102 @@
 name: Sync image
 
-# Builds the Solstice Sync server and publishes it to GHCR.
-#   main           -> :latest, :main, :sha-<short>
-#   sync-v1.2.3    -> :1.2.3, :sha-<short>
-# Pull requests build and smoke-test without pushing. Mirrors Atlas's
-# image.yml.
+# Builds the Solstice Sync server (and the web app inside it) and publishes it
+# to GHCR. Mirrors Atlas's image.yml. Versioned apart from the desktop app, by
+# the same conventional-commit rules (scripts/release/, docs/release-automation.md).
+#
+#   every merge that touches the image  ->  :latest, :main, :sha-<short>
+#   ... and releases (feat, fix, perf or a breaking change touching it)
+#                                       ->  also :<version>, the git tag
+#                                           sync-v<version>, and a
+#                                           chore(release) commit to main
+# Pull requests build and smoke-test without pushing. Deploying is still a
+# bump of compose/solstice.yml in Jupiter.
+#
+# The paths are what the image is made of: scripts/release/products.mjs lists
+# the same files for the planner.
 
 on:
   push:
     branches: [main]
-    tags: ['sync-v*']
+    paths:
+      - apps/sync/**
+      - crates/solstice-core/**
+      - crates/solstice-sync/**
+      - crates/solstice-sync-fs/**
+      - crates/solstice-search/**
+      - apps/desktop/**
+      - '!apps/desktop/src-tauri/**'
+      - Cargo.toml
+      - Cargo.lock
+      - package.json
+      - package-lock.json
+      - .github/workflows/sync-image.yml
   pull_request:
+    paths:
+      - apps/sync/**
+      - crates/solstice-core/**
+      - crates/solstice-sync/**
+      - crates/solstice-sync-fs/**
+      - crates/solstice-search/**
+      - apps/desktop/**
+      - '!apps/desktop/src-tauri/**'
+      - Cargo.toml
+      - Cargo.lock
+      - package.json
+      - package-lock.json
+      - .github/workflows/sync-image.yml
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (default: from the commits since the last sync-v tag)"
+        required: false
+        type: string
 
+# On main, runs queue instead of cancelling, so each sees the tag the one before
+# it made.
 concurrency:
   group: sync-image-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
   packages: write
 
 jobs:
+  # What version this is, if it releases: scripts/release/plan.mjs, product sync.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.plan.outputs.publish }}
+      version: ${{ steps.plan.outputs.version }}
+      notes: ${{ steps.plan.outputs.notes }}
+      protocol: ${{ steps.plan.outputs.protocol }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Plan the release
+        id: plan
+        run: node scripts/release/plan.mjs
+        env:
+          PRODUCT: sync
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+
   image:
+    needs: plan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # The server reports its version at /v1/info. Set on this checkout only;
+      # the release job commits it once the image is out.
+      - name: Set the version
+        if: needs.plan.outputs.publish == 'true'
+        run: node scripts/release/set-version.mjs --product sync "${{ needs.plan.outputs.version }}"
 
       # GHCR image names must be lowercase; the owner may not be.
       - name: Image name
@@ -47,12 +118,13 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
-            type=match,pattern=sync-v(.*),group=1
+            type=raw,value=${{ needs.plan.outputs.version }},enable=${{ needs.plan.outputs.publish == 'true' }}
             type=sha,format=short
           labels: |
             org.opencontainers.image.title=solstice-sync
             org.opencontainers.image.description=Solstice Sync: notes synced between devices as plain files
-
+            com.sunstead.solstice.sync-protocol=${{ needs.plan.outputs.protocol }}
+            ${{ needs.plan.outputs.publish == 'true' && format('org.opencontainers.image.version={0}', needs.plan.outputs.version) || '' }}
       - name: Build
         uses: docker/build-push-action@v6
         with:
@@ -109,3 +181,55 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=sync
+
+  # A release is the image under its version plus a git tag, which is all the
+  # sync server has (no GitHub Release: the app's updater reads the newest
+  # one). The tag marks the commit that was built; then the version goes into
+  # the repo. main is protected by a ruleset, so this pushes with the deploy key
+  # (as release-bump.yml does); its push runs workflows, hence [skip ci].
+  release:
+    needs: [plan, image]
+    if: needs.plan.outputs.publish == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_BUMP_DEPLOY_KEY }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tag the release
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+          NOTES: ${{ needs.plan.outputs.notes }}
+          SHA: ${{ github.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          tag="sync-v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists."
+          else
+            git tag -a "$tag" -m "Solstice Sync $VERSION" -m "$NOTES" "$SHA"
+            git push origin "$tag"
+          fi
+      - name: Put the version in main
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          node scripts/release/set-version.mjs --product sync "$VERSION"
+          if git diff --quiet; then
+            echo "main already says $VERSION."
+            exit 0
+          fi
+          git commit -a -m "chore(release): sync $VERSION [skip ci]"
+          # main may have moved while this ran.
+          for attempt in 1 2 3; do
+            git pull --rebase --quiet origin main
+            git push origin HEAD:main && exit 0
+            sleep 5
+          done
+          echo "::error::Could not push the version bump to main."
+          exit 1
