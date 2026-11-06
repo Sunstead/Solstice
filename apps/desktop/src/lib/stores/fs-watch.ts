@@ -6,9 +6,9 @@ import { getSetting, subscribeToSetting } from '@/lib/settings/store';
 import { useFiles } from '@/hooks/use-files';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { applyFsChanges, handleRemoval } from '@/lib/fs-sync';
+import { goneTabs } from '@/lib/workspace/gone-tabs';
 import { useLayout } from '@/hooks/use-layout';
 import { bumpResync } from '@/lib/stores/external-changes';
-import { isSamePath } from '@/lib/path-utils';
 import { useFileIndex } from '@/lib/stores/use-file-index';
 import { useWikilinkIndex } from '@/lib/stores/wikilink-index';
 import { useSync } from '@/lib/stores/sync';
@@ -185,11 +185,8 @@ export async function resyncFromDisk(force = false): Promise<void> {
   // as a live deletion would be. Not when the walk failed: then nothing is
   // known to be gone.
   if (indexed) {
-    const known = useFileIndex.getState().files;
-    for (const tabPath of useLayout.getState().listTabPaths()) {
-      const stillThere = known.some((file) => isSamePath(file.path, tabPath));
-      if (!stillThere) handleRemoval(tabPath);
-    }
+    const tabs = useLayout.getState().listTabPaths();
+    for (const path of await goneTabs(tabs, useFileIndex.getState().files, root, commands.exists)) handleRemoval(path);
   }
 
   // Push, rather than have the reconciler reach for editor handles: every

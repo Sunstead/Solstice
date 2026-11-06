@@ -18,6 +18,7 @@ import {
   type FlushRequested,
   type KeymapChanged,
   type MenuCommand,
+  type OpenFilesQueued,
   type StoreChanged,
   type SyncChanged,
   type TabAdopted,
@@ -59,6 +60,8 @@ export interface Events {
   windowsChanged: EventSource<WindowsChanged>;
   storeChanged: EventSource<StoreChanged>;
   flushRequested: EventSource<FlushRequested>;
+  /** Files from outside wait for this window (`take_pending_opens`). */
+  openFilesQueued: EventSource<OpenFilesQueued>;
 }
 
 export const commands: Commands = inTauri ? tauriCommands : webCommands;
@@ -82,6 +85,7 @@ function tauriEventsFor(): Events {
     tabSent: tauriEvents.tabSent(own),
     storeChanged: tauriEvents.storeChanged(own),
     flushRequested: tauriEvents.flushRequested(own),
+    openFilesQueued: tauriEvents.openFilesQueued(own),
   };
 }
 
@@ -102,6 +106,7 @@ export const events: Events = inTauri
       windowsChanged: new Emitter<WindowsChanged>(),
       storeChanged: new Emitter<StoreChanged>(),
       flushRequested: new Emitter<FlushRequested>(),
+      openFilesQueued: new Emitter<OpenFilesQueued>(),
     };
 
 /** A command's data, or a throw with its error, as a raw `invoke` gives. */

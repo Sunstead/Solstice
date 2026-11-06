@@ -1,0 +1,130 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown"
+        ],
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "rank": "Default"
+      },
+      {
+        "ext": [
+          "txt"
+        ],
+        "role": "Editor",
+        "mimeType": "text/plain"
+      },
+      {
+        "ext": [
+          "json"
+        ],
+        "role": "Editor",
+        "mimeType": "application/json"
+      },
+      {
+        "ext": [
+          "yaml"
+        ],
+        "role": "Editor",
+        "mimeType": "application/x-yaml"
+      },
+      {
+        "ext": [
+          "toml"
+        ],
+        "role": "Editor",
+        "mimeType": "application/toml"
+      },
+      {
+        "ext": [
+          "xml"
+        ],
+        "role": "Editor",
+        "mimeType": "application/xml"
+      },
+      {
+        "ext": [
+          "css"
+        ],
+        "role": "Editor",
+        "mimeType": "text/css"
+      },
+      {
+        "ext": [
+          "js"
+        ],
+        "role": "Editor",
+        "mimeType": "text/javascript"
+      },
+      {
+        "ext": [
+          "ts"
+        ],
+        "role": "Editor",
+        "mimeType": "text/x-typescript"
+      },
+      {
+        "ext": [
+          "py"
+        ],
+        "role": "Editor",
+        "mimeType": "text/x-python"
+      },
+      {
+        "ext": [
+          "rs"
+        ],
+        "role": "Editor",
+        "mimeType": "text/rust"
+      },
+      {
+        "ext": [
+          "go"
+        ],
+        "role": "Editor",
+        "mimeType": "text/x-go"
+      },
+      {
+        "ext": [
+          "c"
+        ],
+        "role": "Editor",
+        "mimeType": "text/x-csrc"
+      },
+      {
+        "ext": [
+          "cpp"
+        ],
+        "role": "Editor",
+        "mimeType": "text/x-c++src"
+      },
+      {
+        "ext": [
+          "java"
+        ],
+        "role": "Editor",
+        "mimeType": "text/x-java"
+      },
+      {
+        "ext": [
+          "sh"
+        ],
+        "role": "Editor",
+        "mimeType": "application/x-shellscript"
+      },
+      {
+        "ext": [
+          "sql"
+        ],
+        "role": "Editor",
+        "mimeType": "application/sql"
+      }
+    ]
+  }
+}

@@ -41,8 +41,11 @@ import { watchStickyDock } from '@/lib/tab-dock';
 import { TabMenu } from './tab-menu';
 import { useTabLongPress, type TabMenuRequest } from '@/lib/tab-long-press';
 import { ownsDrag, soleStrip, useTabGesture } from '@/lib/tab-gesture';
-import { incomingDrag, useTabTransfer } from '@/lib/tab-transfer';
+import { endLayoutDrag, incomingDrag, useTabTransfer } from '@/lib/tab-transfer';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { commands } from '@/lib/backend';
+import { fillDropped, isOsFileDrag, undoLayoutDrop, watchShiftDrops } from '@/lib/external-drop';
+import { watchLayoutDrags } from '@/lib/layout-drag-end';
 
 /** A tab's name; on mount, it grows its button in if the tab was just opened. */
 function TabLabel({ id, children }: { id: string; children: string }) {
@@ -132,6 +135,17 @@ export default function FlexLayoutRoot() {
 
   // Tabs dragged out to a window of their own, or in from another window.
   useTabTransfer(containerRef, model);
+
+  useEffect(() => {
+    const stopDrags = watchLayoutDrags(window, () => {
+      if (containerRef.current) endLayoutDrag(containerRef.current);
+    });
+    const stopShift = watchShiftDrops(() => useLayout.getState().model);
+    return () => {
+      stopDrags();
+      stopShift();
+    };
+  }, []);
 
   // Stable, so swapping the close icon for a save spinner is driven by
   // TabCloseIcon's own subscription rather than by re-rendering every tab.
@@ -269,8 +283,20 @@ export default function FlexLayoutRoot() {
   // here on; anything that needs to know which file a tab points to
   // (FileEditor's factory, onRenderTab below, closeFileTab) reads that.
   const handleExternalDrag = useCallback(
-    (_event: React.DragEvent<HTMLElement>) => {
+    (event: React.DragEvent<HTMLElement>) => {
       const entry = useFileTreeDragState.getState().draggedEntry;
+      // Files from another app: a placeholder where they land, then a tab
+      // each once the drop says which (`fillDropped`).
+      if (!entry && can.dropToOpen && isOsFileDrag(event.dataTransfer)) {
+        return {
+          json: { id: makeDraggedTabId(), name: 'Opening…', component: 'blank' },
+          onDrop: (node?: { getId(): string }) => {
+            const m = useLayout.getState().model;
+            if (!node || !m || undoLayoutDrop(m, node.getId())) return;
+            void commands.takeDroppedPaths(true).then((paths) => fillDropped(m, node.getId(), paths));
+          },
+        };
+      }
       // A tab another window is dragging lands wherever it's dropped too.
       if (!entry) return incomingDrag(useWorkspace.getState().path);
       if (entry.is_dir) return undefined;
@@ -285,8 +311,10 @@ export default function FlexLayoutRoot() {
         // Called once this specific drag's drop completes (or is
         // cancelled) — the natural place to clear the tracked drag entry,
         // since it's scoped to this drag rather than a global Layout event.
-        onDrop: () => {
+        onDrop: (node?: { getId(): string }) => {
           useFileTreeDragState.getState().setDraggedEntry(null);
+          const m = useLayout.getState().model;
+          if (node && m) undoLayoutDrop(m, node.getId());
         },
       };
     },

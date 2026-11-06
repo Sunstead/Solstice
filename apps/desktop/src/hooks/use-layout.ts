@@ -11,7 +11,8 @@ import {
   getStoredLayout,
   setStoredLayout,
 } from '@/lib/stores/workspace-layout';
-import { getFileNameFromPath, normalizePath } from '@/lib/path-utils';
+import { getFileNameFromPath, isWithin, normalizePath } from '@/lib/path-utils';
+import { commands } from '@/lib/backend';
 import { markEntering } from '@/lib/tab-motion';
 import { getSetting } from '@/lib/settings/store';
 import { useRecentFiles } from '@/lib/stores/recent-files';
@@ -44,6 +45,8 @@ type LayoutState = {
   activeTabId: string | null;
   setActiveTabId: (id: string | null) => void;
   loadForWorkspace: (path: string) => Promise<void>;
+  /** A window with no workspace showing files opened from outside (`openExternalFiles`); not saved. */
+  openLoose: () => void;
   persistCurrent: () => void;
   openFile: (path: string, name: string) => void;
   /**
@@ -203,6 +206,17 @@ export function isReplacingBlankTab(): boolean {
   return replacingBlankTab;
 }
 
+/** Every file a tab has open, once each. */
+function tabPathsOf(model: Model): string[] {
+  const paths = new Set<string>();
+  model.visitNodes((node) => {
+    if (node.getType() !== 'tab') return;
+    const config = (node as TabNode).getConfig() as { path?: string } | undefined;
+    if (config?.path) paths.add(config.path);
+  });
+  return [...paths];
+}
+
 export const useLayout = create<LayoutState>((set, get) => ({
   model: null,
   workspacePath: null,
@@ -217,11 +231,18 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
   setRedrawTabContent: (redraw) => set({ redrawTabContent: redraw }),
 
+  openLoose: () => {
+    const model = Model.fromJson(defaultLayoutJson);
+    set({ model, workspacePath: null, activeTabId: getActiveTabId(model) });
+  },
+
   loadForWorkspace: (path) => {
     // Opening a workspace loads it twice (its stores, then the layout
     // session); the second must not undo the first, which in a new editor
     // window took the tab it was opened with.
     if (loading?.path === path) return loading.promise;
+    // Files opened before there was a workspace come along into it.
+    const loose = get().workspacePath === null ? get().listTabPaths() : [];
     const promise = (async () => {
       const stored = await getStoredLayout();
       let model = Model.fromJson(stored ?? defaultLayoutJson);
@@ -242,12 +263,20 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
       syncTabsetDeletion(model);
       if (shell === 'mobile') rerootTabs(model, path);
+      // Files opened from outside the workspace show their images once
+      // their folders are allowed again (`allow_outside_file`).
+      await Promise.all(
+        tabPathsOf(model)
+          .filter((file) => !isWithin(file, path))
+          .map((file) => commands.allowOutsideFile(file).catch(() => {})),
+      );
 
       set({
         model,
         workspacePath: path,
         activeTabId: getActiveTabId(model),
       });
+      for (const file of loose) get().openFile(file, getFileNameFromPath(file));
     })().finally(() => {
       if (loading?.promise === promise) loading = null;
     });
@@ -484,19 +513,7 @@ export const useLayout = create<LayoutState>((set, get) => ({
 
   listTabPaths: () => {
     const { model } = get();
-    if (!model) return [];
-
-    const paths = new Set<string>();
-
-    model.visitNodes((node) => {
-      if (node.getType() !== 'tab') return;
-      const config = (node as TabNode).getConfig() as
-        | { path?: string }
-        | undefined;
-      if (config?.path) paths.add(config.path);
-    });
-
-    return [...paths];
+    return model ? tabPathsOf(model) : [];
   },
 
   getActiveFilePath: () => {

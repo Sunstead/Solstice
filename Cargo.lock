@@ -4904,6 +4904,7 @@ dependencies = [
  "font-kit",
  "futures-util",
  "getrandom 0.3.4",
+ "gtk",
  "keyring",
  "libc",
  "log",
@@ -4941,6 +4942,7 @@ dependencies = [
  "trash",
  "ts-rs",
  "url",
+ "webkit2gtk",
  "windows-sys 0.59.0",
 ]
 

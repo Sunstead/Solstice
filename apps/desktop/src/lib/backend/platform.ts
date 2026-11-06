@@ -64,6 +64,11 @@ export const can = {
    */
   writePdf: (shell === 'mobile' && platform() === 'ios') || (shell === 'desktop' && platform() === 'macos'),
   /**
+   * Opening files dropped from another app as tabs: the paths come from the
+   * webview (`external_drop` in Rust), watched on macOS and Linux.
+   */
+  dropToOpen: shell === 'desktop' && (platform() === 'macos' || platform() === 'linux'),
+  /**
    * More than one tab: everywhere but the iPhone app, which shows one note at
    * a time. A phone-width window elsewhere (a narrow desktop window, the
    * iPad's Slide Over) keeps its tabs for when it widens.

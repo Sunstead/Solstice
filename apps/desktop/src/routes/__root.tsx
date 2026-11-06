@@ -21,6 +21,7 @@ import { startFsWatch } from '@/lib/stores/fs-watch';
 import { useSettingsDomBindings } from '@/lib/settings/apply';
 import { useThemeEffect } from '@/hooks/use-theme';
 import { useFileCommands } from '@/hooks/use-file-commands';
+import { useOpenFiles } from '@/lib/open-files';
 import { useDeepLinks } from '@/hooks/use-deep-links';
 import { useSyncStatus } from '@/lib/stores/sync';
 import { useTreeMetaSync } from '@/lib/stores/tree-meta';
@@ -95,6 +96,7 @@ export const Route = createRootRoute({
     useThemeEffect();
     useSettingsDomBindings();
     useDeepLinks();
+    useOpenFiles();
     useLaunchActions();
     useSpotlightIndex();
     useSystemAccessibility();
