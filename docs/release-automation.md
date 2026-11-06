@@ -1,13 +1,16 @@
 # Release automation
 
-How the desktop app gets from a merged pull request to a published release:
-conventional commits pick the version, `main` builds one rolling draft, and
-publishing it is the only manual step. [RELEASING.md](../RELEASING.md) is the
+How the two things Solstice ships get from a merged pull request to a
+release: conventional commits pick the version, and `main` builds. The
+**desktop app** gets one rolling draft that you publish; the **sync server and
+web app** get an image and a `sync-v*` tag automatically, versioned on their
+own. [RELEASING.md](../RELEASING.md) is the
 short how-to; this is the whole system, for people and for agents (Claude
 sessions) that open PRs here.
 
 Introduced in PR 85 (2026-11-06), replacing `npm run release:app`, which
-bumped the version, tagged it and pushed by hand.
+bumped the version, tagged it and pushed by hand; the sync image joined it
+afterwards. Sections below that don't say "sync" are about the desktop app.
 
 ## At a glance
 
@@ -60,10 +63,15 @@ type(scope)!: subject
   `Revert "…"` titles are **not** valid; the title check fails them.
 - The biggest bump among the commits since the last published release wins:
   a `fix` then a `feat` is one minor release.
-- Only commits that **touch the app** count (`apps/desktop/`, `crates/`,
-  `Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`). A `fix:`
-  that only changes the sync server (`apps/sync/`), docs or workflows releases
-  nothing.
+- Only commits that **touch the product** count. For the app: `apps/desktop/`,
+  `crates/`, `Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`.
+  For the sync image: `apps/sync/`, the crates the server links
+  (`solstice-core`, `-sync`, `-sync-fs`, `-search`), `apps/desktop/` except
+  `src-tauri/` (the web app is the desktop frontend), and the same root files.
+  So a `fix(sync):` in `apps/sync/` releases the image and not the app, a
+  frontend `fix:` releases both, and a Tauri-shell `fix:` releases only the app.
+  Docs and workflows release neither. The lists are in
+  `scripts/release/products.mjs` (`sync-image.yml` filters on the same files).
 - Write the subject for the release notes: it is shown as written, so make it
   readable by a user (`wrap code lines`, not `fix wrapLines bug in cm ext`).
 
@@ -128,6 +136,7 @@ the major.
 | Draft has some platforms only | A platform job failed. Re-run its job from the run page, or merge/dispatch again. |
 | `Found release with tag … but it's NOT a draft` | You published that version and the workflow tried to build it again; it can't happen from normal merges, since the next version is above the published one. |
 | No bump commit after publishing | Pre-releases don't bump. Otherwise see the **Release bump** run: the deploy key, the ruleset's bypass or a rebase race. |
+| Sync image built but no `sync-v*` tag | The merge didn't release the image (no `feat`/`fix`/`perf`/breaking commit touching it), or the image job failed, or the `release` job could not push (deploy key, ruleset). Run **Sync image** manually on `main` to force it. |
 | Cold build after a long quiet spell | GitHub drops caches unused for 7 days. Harmless: the next `main` build refills it. |
 | Linux AppImage: blank gray window on Arch | The smoke test catches it. See "The Linux AppImage" in RELEASING.md. |
 
@@ -148,13 +157,17 @@ Follow these when you open or merge pull requests in this repo.
    explain in the PR description with a `BREAKING CHANGE:` line, since that
    text becomes the commit body.
 4. **Never bump versions or tag.** Don't edit `version` in
-   `apps/desktop/package.json`, `Cargo.toml`, `Cargo.lock`'s `solstice` entry or
-   the iOS project by hand, don't push `app-v*` tags and don't run
-   `set-version.mjs` on a branch. The build and the bump workflow do it.
-   `npm run release:app` no longer exists.
+   `apps/desktop/package.json`, `apps/desktop/src-tauri/Cargo.toml`,
+   `apps/sync/Cargo.toml`, `Cargo.lock`'s `solstice` or `solstice-sync-server`
+   entries or the iOS project by hand, don't push `app-v*` or `sync-v*` tags,
+   and don't run `set-version.mjs` on a branch. The workflows do it.
+   `npm run release:app` no longer exists. A change that touches both products
+   (a shared crate, the frontend) releases both: write one honest title.
 5. **Never push to `main`.** It is protected: changes go through a PR, squash
    only, with the title check passing. Don't try to bypass the ruleset.
-6. **Never publish, edit or delete a release or its draft**, and don't run the
+6. **Never create a GitHub Release for the sync server** (the app's updater
+   reads the newest one). **Never publish, edit or delete the app's release or
+   its draft**, and don't run the
    manual workflow on `main` unless the user asks (it builds a real draft,
    ~15 minutes of four runners). Publishing ships to every install and is the
    user's call alone.
@@ -185,21 +198,27 @@ Follow these when you open or merge pull requests in this repo.
 |---|---|
 | `scripts/release/conventional.mjs` | The rules: `TYPES`, `parseCommit`, `levelOf`, `bumpVersion`, `nextVersion`, `releaseNotes`. No dependencies. |
 | `scripts/release/plan.mjs` | Decides what a workflow run does (`decide`, pure) and gathers its inputs from `gh` and `git` (the CLI). |
-| `scripts/release/set-version.mjs` | Writes a version into every file that carries it (`setVersion`). Replaces what `release.mjs` did. |
+| `scripts/release/set-version.mjs` | Writes a version into every file that carries it (`setVersion`, `--product app|sync`). Replaces what `release.mjs` did. |
 | `scripts/release/check-title.mjs` | The PR title check's command. |
 | `scripts/release/release.test.mjs` | `node --test` suite for all of the above, including `setVersion` on a copy of the real files. `npm run test:release`. |
 | `.github/workflows/app-release.yml` | Plan → build → cleanup. |
-| `.github/workflows/release-bump.yml` | On publish, commits the version to `main`. |
+| `.github/workflows/release-bump.yml` | On publish, commits the app's version to `main`. |
+| `.github/workflows/sync-image.yml` | Sync server image: plan → image → release (tag and bump). |
+| `scripts/release/products.mjs` | The two products, their tag prefixes and the files each is made of. |
 | `.github/workflows/conventional.yml` | PR title check, and the script tests. |
 | `apps/desktop/scripts/tauri-linux.sh`, `appimage-unbundle-wayland.sh`, `test-appimage.sh` | Unchanged by this system: the Linux AppImage repack and smoke test. |
 
 ### The planner
 
-`plan.mjs` runs first in **App release** (`plan` job, with full git history):
+`plan.mjs` runs first in **App release** and in **Sync image** (`plan` job,
+with full git history). `PRODUCT=app` (the default) or `PRODUCT=sync` picks the
+tag prefix and the files that count; the rest is the same.
 
-1. **Last release:** the newest *published, non-pre-release* GitHub release
-   whose tag is exactly `app-v<major>.<minor>.<patch>` (drafts and
-   pre-releases are ignored, so the baseline is what users actually have).
+1. **Last release:** for the app, the newest *published, non-pre-release*
+   GitHub release whose tag is exactly `app-v<major>.<minor>.<patch>` (drafts
+   and pre-releases are ignored, so the baseline is what users actually have).
+   For the sync server, which has no GitHub Releases, the newest
+   `sync-v<major>.<minor>.<patch>` git tag.
 2. **Commits:** first-parent commits `tag..HEAD`; for each, the files changed
    against its first parent. Commits touching no app path are dropped. A kept
    commit whose title isn't conventional gets a `::warning::` and releases
@@ -212,7 +231,8 @@ Follow these when you open or merge pull requests in this repo.
 | `pull_request` (`labeled`, `synchronize`) | only with the `build` label | never | the last release's (unused) |
 | manual run | always | only on `main` | the input, else `nextVersion`, else next patch |
 
-4. **Outputs:** `build`, `publish`, `version`, and `notes` (markdown, by
+4. **Outputs:** `build`, `publish`, `version`, `protocol` (the sync
+   protocol number, read from `crates/solstice-sync/src/protocol.rs`), and `notes` (markdown, by
    section: Breaking changes, Features, Fixes, Performance, Reverts). Also a
    job summary.
 
@@ -289,8 +309,51 @@ releases nothing, so the planner ignores it anyway.
 `tauri.conf.json` reads) and its entry in `package-lock.json`;
 `apps/desktop/src-tauri/Cargo.toml` and the `solstice` entry in `Cargo.lock`;
 and the iOS project (`Info.plist`, `project.yml`: iOS takes only numbers, so a
-pre-release ships as its release's). The sync server (`sync-v*`, its own
-workflow) and the library crates keep their own versions.
+pre-release ships as its release's). The sync server has its own
+(`--product sync`, below); the library crates keep their own.
+
+### The sync server and web app
+
+**Sync image** (`sync-image.yml`) is versioned and released apart from the app,
+by the same rules. Why apart: server and clients are compatible by the sync
+**protocol** number (`/v1/info`, `PROTOCOL` in `crates/solstice-sync`), not by
+version; installed apps lag the server and old clients must keep working; a
+server-only fix should not need a four-platform build and a desktop update
+published to every install, and a Tauri-shell-only change changes nothing in
+the image. The one real coupling is that the web app *is* the desktop frontend,
+which is why `apps/desktop/` (minus `src-tauri/`) counts for the image.
+
+- **Triggers:** push to `main` and pull requests touching the image's files
+  (the `paths:` list; keep it equal to `products.mjs`), and a manual run.
+  Other merges (docs, desktop-shell-only changes) build nothing, and the bump
+  commits say `[skip ci]`.
+- **`plan`:** `PRODUCT=sync`. `publish` is true when a `feat`, `fix`, `perf` or
+  breaking commit touching the image is new since the newest `sync-v*` tag.
+- **`image`:** sets the version on the checkout when publishing
+  (`set-version.mjs --product sync`: `apps/sync/Cargo.toml` and its `Cargo.lock`
+  entry; the server reports it at `/v1/info`), builds the Dockerfile, runs the
+  smoke test, and pushes: `:latest`, `:main`, `:sha-<short>` on every run on
+  `main`, plus `:<version>` when publishing. The image carries the label
+  `com.sunstead.solstice.sync-protocol` (and `org.opencontainers.image.version`
+  when releasing). Pull requests build and smoke test only.
+- **`release`** (publishing, on `main`, after the image is pushed): with the
+  deploy key it creates the annotated tag `sync-v<version>` at the commit that
+  was built (message: the notes), then commits
+  `chore(release): sync <version> [skip ci]` to `main`. A failed image means no
+  tag, so the next run computes the same version and tries again.
+- **No GitHub Release is made, and none may be:** the desktop app's updater
+  reads the newest published release, so a sync release would break updates.
+- **Concurrency:** runs on `main` queue, so each one sees the tag the last one
+  made. Pull requests cancel their previous run.
+- **Deploying is unchanged and manual:** bump `compose/solstice.yml` in Jupiter.
+- **Compatibility information** lives in the protocol number, shown in the
+  app's release notes (**Sync:** line) and the image label. There is no
+  maintained "minimum client" field; if the protocol ever changes
+  incompatibly, bump `PROTOCOL` and say so in the PR (`!`).
+- **Baseline:** the last tag before this system is `sync-v0.5.0`. The commits
+  since are old-style (merge commits), so the planner skips them with warnings,
+  and nothing releases until the first conventional commit; that release
+  contains everything merged since 0.5.0.
 
 ### Updater
 
@@ -343,6 +406,9 @@ check these first.
 | Label `build` | Builds a PR's installers. |
 | Secrets | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (updater signing); `RELEASE_BUMP_DEPLOY_KEY` (above). |
 
+The same deploy key and ruleset bypass serve **Sync image**'s `release` job
+(tag push and bump commit).
+
 **Rotating the deploy key:** make a new ed25519 key, add its public half as a
 write deploy key, `gh secret set RELEASE_BUMP_DEPLOY_KEY < key`, then delete the
 old key (the ruleset's bypass entry is "DeployKey", not a specific key).
@@ -358,6 +424,9 @@ turn on required approvals, remember the bump push relies on the bypass.
   the first time on the first releasing merge or manual run. `actionlint` was
   not run.
 - A failed platform leaves an incomplete draft; nothing stops you publishing it.
+- The sync image's `paths:` in `sync-image.yml` must be kept equal to
+  `products.mjs` by hand (a new crate the server links needs both).
+- The sync release job, like the app's, has not run yet.
 - Packaging problems surface after merge unless the PR was labelled `build`.
 - The bump is a direct commit to `main` by a bot; between publishing and the
   bump (about a minute) the repo's version files still show the old version.
@@ -371,3 +440,6 @@ turn on required approvals, remember the bump push relies on the bypass.
   (`app-v0.9.1`) for "commits since".
 - 2026-11-06: PR 85 replaced the tag workflow with this system; PR 86 moved the
   bump onto a deploy key; the `main` ruleset and squash-only merging followed.
+- 2026-11-06: Sync image joined the same automation (own versions and tags, path
+  sets in `products.mjs`, protocol in the app's notes and the image label); the
+  `sync-v*` tag trigger was removed.

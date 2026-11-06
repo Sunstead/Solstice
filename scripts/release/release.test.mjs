@@ -5,7 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { bumpLevel, bumpVersion, levelOf, nextVersion, parseCommit, releaseNotes } from './conventional.mjs';
-import { decide, touchesApp } from './plan.mjs';
+import { decide } from './plan.mjs';
+import { touches } from './products.mjs';
 import { setVersion } from './set-version.mjs';
 
 const c = (title, body = '') => ({ title, body });
@@ -80,11 +81,22 @@ test('release notes group commits, and a breaking feature is listed once', () =>
   assert.equal(releaseNotes([c('docs: x')]), '');
 });
 
-test('only commits touching the app count', () => {
-  assert.equal(touchesApp(['apps/desktop/src/app.tsx']), true);
-  assert.equal(touchesApp(['crates/solstice-core/src/lib.rs']), true);
-  assert.equal(touchesApp(['Cargo.lock']), true);
-  assert.equal(touchesApp(['apps/sync/src/main.rs', 'docs/sync.md', 'RELEASING.md']), false);
+test('each product counts only the commits that touch it', () => {
+  assert.equal(touches('app', ['apps/desktop/src/app.tsx']), true);
+  assert.equal(touches('app', ['crates/solstice-sync-client/src/lib.rs']), true);
+  assert.equal(touches('app', ['Cargo.lock']), true);
+  assert.equal(touches('app', ['apps/sync/src/main.rs', 'docs/sync.md', 'RELEASING.md']), false);
+
+  // The server: its own code, the crates it links, and the web app (the
+  // desktop frontend), but not the Tauri shell or desktop-only crates.
+  assert.equal(touches('sync', ['apps/sync/src/api.rs']), true);
+  assert.equal(touches('sync', ['crates/solstice-sync/src/protocol.rs']), true);
+  assert.equal(touches('sync', ['crates/solstice-search/src/lib.rs']), true);
+  assert.equal(touches('sync', ['apps/desktop/src/components/file-editor.tsx']), true);
+  assert.equal(touches('sync', ['apps/desktop/package.json']), true);
+  assert.equal(touches('sync', ['apps/desktop/src-tauri/src/lib.rs']), false);
+  assert.equal(touches('sync', ['crates/solstice-sync-client/src/lib.rs']), false);
+  assert.equal(touches('sync', ['crates/solstice-pdf/src/lib.rs', 'docs/sync.md']), false);
 });
 
 test('a push to main releases only when the commits ask for it', () => {
@@ -135,4 +147,16 @@ test('set-version rewrites every file that carries the version, and nothing else
   const before = readFileSync(path.join(repo, 'Cargo.lock'), 'utf8').split('\n').length;
   assert.equal(read('Cargo.lock').split('\n').length, before);
   assert.throws(() => setVersion('1.2', tmp), /not a version/);
+});
+
+test('set-version --product sync rewrites only the server', () => {
+  const tmp = mkdtempSync(path.join(tmpdir(), 'set-version-sync-'));
+  for (const f of ['apps/sync/Cargo.toml', 'Cargo.lock']) cpSync(path.join(repo, f), path.join(tmp, f), { recursive: true });
+  setVersion('7.6.5', tmp, 'sync');
+  const read = (f) => readFileSync(path.join(tmp, f), 'utf8');
+  assert.match(read('apps/sync/Cargo.toml'), /^version = "7\.6\.5"/m);
+  assert.match(read('Cargo.lock'), /name = "solstice-sync-server"\r?\nversion = "7\.6\.5"/);
+  // The app's crate keeps its own version.
+  assert.doesNotMatch(read('Cargo.lock'), /name = "solstice"\r?\nversion = "7\.6\.5"/);
+  assert.throws(() => setVersion('7.6.5', tmp, 'nope'), /unknown product/);
 });
