@@ -188,3 +188,22 @@ fn a_huge_drawings_handwriting_is_found() {
     index.refresh().unwrap();
     assert_eq!(paths(&index, "by parts"), vec!["Big.drawing.svg"]);
 }
+
+/// Code and text files are found, a hit going to its line and column.
+#[test]
+fn indexes_code_and_text() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "src/main.py", "import os\n  needle = 1\n");
+    write(dir.path(), "Makefile", "all:\n\tneedle\n");
+    write(dir.path(), "notes.txt", "a needle");
+    write(dir.path(), "blob", "needle\0\0\0");
+    let mut index = Index::open(dir.path().into(), None);
+    index.refresh().unwrap();
+    assert_eq!(paths(&index, "needle"), vec!["Makefile", "notes.txt", "src/main.py"]);
+
+    let query = Query { text: "needle".into(), ..Query::default() };
+    let results = index.search(&query, Limits::default());
+    let py = results.files.iter().find(|f| f.path == "src/main.py").unwrap();
+    assert_eq!(py.kind, solstice_search::Kind::Text);
+    assert_eq!(py.hits[0].jump, solstice_search::Jump::Line { line: 1, column: 2, ordinal: None });
+}

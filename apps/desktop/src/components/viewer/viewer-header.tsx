@@ -24,6 +24,8 @@ type ViewerHeaderProps = {
    * offers a bar that would report zero matches forever.
    */
   find?: boolean;
+  /** The editor draws its own find (CodeMirror's panel), so no bar here. */
+  ownFind?: boolean;
   /** Rendered in the left grid cell, which is otherwise empty. */
   leading?: React.ReactNode;
 };
@@ -40,9 +42,10 @@ export function ViewerHeader({
   path,
   sticky = false,
   find = false,
+  ownFind = false,
   leading,
 }: ViewerHeaderProps) {
-  const findOpen = useFindStore((s) => s.openPath === path);
+  const findOpen = useFindStore((s) => s.openPath === path) && !ownFind;
   const overSurface = useOverSurface();
   // A phone's note pane has its own header with the name and the actions; only
   // the find bar is left to hang here.

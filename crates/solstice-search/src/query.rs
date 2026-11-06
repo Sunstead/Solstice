@@ -33,7 +33,7 @@ impl Default for Limits {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Jump {
-    /// In a note's text, zero-based, the column in UTF-16 units. `ordinal`
+    /// In a note's or text file's text, zero-based, the column in UTF-16 units. `ordinal`
     /// is the hit's index among the rich editor's find matches (which see
     /// comments but not front matter or link destinations), or `None` when
     /// the hit is where the rich editor has no text.

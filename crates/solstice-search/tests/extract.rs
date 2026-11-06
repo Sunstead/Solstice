@@ -20,6 +20,35 @@ fn kinds_by_name() {
     assert_eq!(kind_of("photo.png"), None);
 }
 
+/// Code and plain text: what the app opens in a code tab.
+#[test]
+fn text_kinds_by_name() {
+    assert_eq!(kind_of("main.py"), Some(Kind::Text));
+    assert_eq!(kind_of("data.JSON"), Some(Kind::Text));
+    assert_eq!(kind_of("notes.txt"), Some(Kind::Text));
+    assert_eq!(kind_of("server.log"), Some(Kind::Text));
+    assert_eq!(kind_of("Makefile"), Some(Kind::Text));
+    assert_eq!(kind_of("LICENSE"), Some(Kind::Text));
+    assert_eq!(kind_of("archive.bin"), None);
+    assert_eq!(kind_of("song.mp3"), None);
+}
+
+#[test]
+fn text_is_its_whole_contents() {
+    let code = "def main():\n    return 1  # %%not a comment%%\n";
+    let doc = extract(Kind::Text, code.as_bytes());
+    assert_eq!(doc.kind, Kind::Text);
+    assert_eq!(texts(&doc), vec![(&Place::Text, code)]);
+    assert!(doc.segments[0].skip.is_empty());
+}
+
+/// An extensionless file may be anything: binary has nothing to search.
+#[test]
+fn binary_text_has_nothing() {
+    assert!(extract(Kind::Text, b"ELF\x00\x01\x02needle").segments.is_empty());
+    assert!(extract(Kind::Text, b"needle \xff\xfe").segments.is_empty());
+}
+
 /// The same cases as `lib/comment/comment.test.ts`, from one file.
 #[test]
 fn comment_ranges_agree_with_strip_comments() {

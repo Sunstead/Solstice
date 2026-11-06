@@ -1,31 +1,14 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { defaultKeymap, history, historyKeymap, indentWithTab, redo, selectAll, undo } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
-import { openSearchPanel, search, SearchQuery, searchKeymap, setSearchQuery } from '@codemirror/search';
-import { Annotation, EditorState } from '@codemirror/state';
+import { search, searchKeymap } from '@codemirror/search';
 import { EditorView, keymap } from '@codemirror/view';
 
-import { ExternalChangeBar } from '@/components/external-change-bar';
-import { SaveFailedBar } from '@/components/save-failed-bar';
-import { ReviewBar } from '@/components/sync/review-bar';
-import { useExternalFileChanges } from '@/hooks/use-external-file-changes';
-import { useLayout } from '@/hooks/use-layout';
-import { createAutosaver, type Autosaver } from '@/lib/autosave';
+import { useCodeMirrorFile } from '@/hooks/use-codemirror-file';
 import { createSearchPanel } from '@/lib/codeblock/search-panel';
 import { sourceCaretClearance } from '@/lib/editor/caret-clearance';
 import { codeBlockHighlighting } from '@/lib/codeblock/theme';
-import { registerScopedCommand, unregisterScopedCommand, type ScopedCommandId } from '@/lib/commands';
-import { useActiveEditorStore } from '@/lib/stores/active-editor';
-import { useFindStore } from '@/lib/stores/find';
-import { registerTextSource } from '@/lib/stores/editor-text';
-import { abandonPendingWrites, clearAbandoned } from '@/lib/stores/external-changes';
-import { useSaveFailure } from '@/lib/stores/save-status';
-import { useReviewFor } from '@/lib/stores/sync';
 import { sourceWikilinkSuggest } from '@/lib/wikilink/suggest-menu';
-
-/** A reload from disk, which mustn't count as an edit. */
-const external = Annotation.define<boolean>();
 
 /** Markdown as written: the note's own fonts, syntax tinted, lines wrapped. */
 const sourceTheme = EditorView.theme({
@@ -52,170 +35,29 @@ const sourceTheme = EditorView.theme({
   '.cm-panels': { backgroundColor: 'transparent', border: 'none' },
 });
 
+const extensions = () => [
+  history(),
+  sourceWikilinkSuggest,
+  keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+  markdown({ codeLanguages: languages }),
+  codeBlockHighlighting,
+  sourceTheme,
+  EditorView.lineWrapping,
+  EditorView.contentAttributes.of({ 'data-command-surface': 'true', spellcheck: 'true' }),
+  search({ createPanel: createSearchPanel, top: true }),
+  sourceCaretClearance,
+];
+
 /**
  * A note as raw markdown, in CodeMirror: every character as it is in the file,
  * for whatever the rich editor can't show or would normalize. Saving, sync and
  * changes on disk work exactly as they do there.
  */
 export function SourceEditor({ path, initialContent }: { path: string; initialContent: string }) {
-  const instanceId = useId();
-  const autosaver = useRef<Autosaver | null>(null);
-  const [view, setView] = useState<EditorView | null>(null);
-
-  // Built in a ref callback (its cleanup tears it down), so the view exists
-  // exactly while its element does.
-  const attach = useCallback(
-    (parent: HTMLDivElement | null) => {
-      if (!parent) return;
-      const saver = createAutosaver(path, initialContent);
-      autosaver.current = saver;
-
-      const editor = new EditorView({
-        parent,
-        state: EditorState.create({
-          doc: initialContent,
-          extensions: [
-            history(),
-            sourceWikilinkSuggest,
-            keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
-            markdown({ codeLanguages: languages }),
-            codeBlockHighlighting,
-            sourceTheme,
-            EditorView.lineWrapping,
-            EditorView.contentAttributes.of({ 'data-command-surface': 'true', spellcheck: 'true' }),
-            search({ createPanel: createSearchPanel, top: true }),
-            sourceCaretClearance,
-            EditorView.updateListener.of((update) => {
-              if (!update.docChanged || update.transactions.some((tr) => tr.annotation(external))) return;
-              saver.markDirty();
-              saver.schedule(update.state.doc.toString());
-            }),
-          ],
-        }),
-      });
-      const unregisterText = registerTextSource(path, () => editor.state.doc.toString());
-      setView(editor);
-
-      return () => {
-        unregisterText();
-        saver.dispose();
-        editor.destroy();
-        autosaver.current = null;
-        setView(null);
-      };
-    },
-    [path, initialContent],
-  );
-
-  useEffect(() => {
-    if (!view) return;
-    const commands: [ScopedCommandId, () => void][] = [
-      ['native.undo', () => undo(view)],
-      ['native.redo', () => redo(view)],
-      ['native.select_all', () => selectAll(view)],
-      ['native.cut', () => document.execCommand('cut')],
-      ['native.copy', () => document.execCommand('copy')],
-      ['edit.find', () => openSearchPanel(view)],
-    ];
-    for (const [id, run] of commands) {
-      registerScopedCommand(instanceId, id, () => {
-        view.focus();
-        run();
-      });
-    }
-    const activate = () => useActiveEditorStore.getState().setActiveEditor(instanceId);
-    view.contentDOM.addEventListener('focus', activate);
-    return () => {
-      view.contentDOM.removeEventListener('focus', activate);
-      for (const [id] of commands) unregisterScopedCommand(instanceId, id);
-      if (useActiveEditorStore.getState().activeEditorId === instanceId) {
-        useActiveEditorStore.getState().setActiveEditor(null);
-      }
-    };
-  }, [view, instanceId]);
-
-  // A full-text search hit: selected where it is, with the search panel
-  // open on the search's query.
-  const jumpRequest = useFindStore((s) => (s.jump?.path === path ? s.jump : null));
-  useEffect(() => {
-    if (!view || !jumpRequest) return;
-    const taken = useFindStore.getState().takeJump(path);
-    if (taken?.jump.type !== 'line') return;
-    const { doc } = view.state;
-    const line = doc.line(Math.min(taken.jump.line + 1, doc.lines));
-    const from = Math.min(line.from + taken.jump.column, line.to);
-    const to = Math.min(from + taken.length, doc.length);
-    const { query, caseSensitive, wholeWord } = useFindStore.getState();
-    // Opened first: it seeds its query from the selection, which this replaces.
-    openSearchPanel(view);
-    view.dispatch({
-      selection: { anchor: from, head: to },
-      effects: [
-        setSearchQuery.of(new SearchQuery({ search: query, caseSensitive, wholeWord })),
-        EditorView.scrollIntoView(from, { y: 'center' }),
-      ],
-    });
-  }, [view, jumpRequest, path]);
-
-  const text = () => view?.state.doc.toString() ?? null;
-
-  const applyDiskContent = useCallback(
-    (content: string) => {
-      if (!view) return;
-      const head = Math.min(view.state.selection.main.head, content.length);
-      view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: content },
-        selection: { anchor: head },
-        annotations: [external.of(true)],
-      });
-    },
-    [view],
-  );
-
-  const { status, reload, keepMine, dismiss } = useExternalFileChanges({
-    path,
-    ready: view !== null,
-    isDirty: () => autosaver.current?.isDirty() ?? false,
-    getLastWritten: () => autosaver.current?.getLastWritten() ?? initialContent,
-    matchesBuffer: (disk) => disk === text(),
-    applyDiskContent,
-    adopt: (content) => autosaver.current?.adopt(content),
-    hold: () => autosaver.current?.hold(),
-    release: () => autosaver.current?.release(),
-    flush: () => {
-      const current = text();
-      if (current === null) return;
-      autosaver.current?.schedule(current);
-      autosaver.current?.flush();
-    },
-  });
-
-  const review = useReviewFor(path);
-  const saveFailure = useSaveFailure(path);
-
+  const { attach, bars } = useCodeMirrorFile({ path, initialContent, extensions, merges: true });
   return (
     <>
-      {status.kind !== 'none' && (
-        <ExternalChangeBar
-          variant={status.kind}
-          onReload={reload}
-          onKeepMine={() => {
-            const current = text();
-            keepMine();
-            if (current === null) return;
-            clearAbandoned(path);
-            autosaver.current?.schedule(current);
-            autosaver.current?.flush();
-          }}
-          onClose={() => {
-            abandonPendingWrites(path);
-            dismiss();
-            useLayout.getState().closeFileTab(path);
-          }}
-        />
-      )}
-      {saveFailure && <SaveFailedBar message={saveFailure} onRetry={() => autosaver.current?.retry()} />}
-      {review && <ReviewBar review={review} />}
+      {bars}
       <div ref={attach} className='solstice-source flex-1' />
     </>
   );

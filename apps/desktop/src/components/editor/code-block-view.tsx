@@ -15,29 +15,14 @@ import { redo, undo } from '@milkdown/kit/prose/history';
 import { TextSelection } from '@milkdown/kit/prose/state';
 import { codeToParagraphs, leaveBlock } from '@/lib/editor/block-edges';
 import { exitCode } from '@milkdown/kit/prose/commands';
-import { Check, ChevronsUpDown, Copy } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 
 import { Button } from '@sunstead/ui/components/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@sunstead/ui/components/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@sunstead/ui/components/popover';
 import { isSyncingFromDoc, syncFromDoc } from '@/lib/codeblock/bridge';
 import { createSearchPanel } from '@/lib/codeblock/search-panel';
 import { codeBlockHighlighting, codeBlockTheme } from '@/lib/codeblock/theme';
-import {
-  languageLabel,
-  languageNames,
-  loadLanguage,
-} from '@/lib/codeblock/languages';
+import { loadLanguage } from '@/lib/codeblock/languages';
+import { LanguagePicker } from '@/components/editor/language-picker';
 import {
   registerScopedCommand,
   unregisterScopedCommand,
@@ -45,7 +30,6 @@ import {
 } from '@/lib/commands';
 import { useActiveEditorStore } from '@/lib/stores/active-editor';
 import { useSetting } from '@/lib/settings/store';
-import { cn } from '@/lib/utils';
 
 /** Smallest edit that turns `before` into `after`, as CodeMirror wants it. */
 function computeChange(before: string, after: string) {
@@ -72,9 +56,6 @@ function computeChange(before: string, after: string) {
 
   return { from: start, to: endBefore, insert: after.slice(start, endAfter) };
 }
-
-/** Shown for a fence with no info string, and the entry that clears one. */
-const PLAIN_TEXT = 'plain text';
 
 /**
  * Pins the scroller to CodeMirror's own measured height.
@@ -119,7 +100,6 @@ export const CodeBlockView: React.FC = () => {
   const languageCompartment = useMemo(() => new Compartment(), []);
   const gutterCompartment = useMemo(() => new Compartment(), []);
 
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -378,7 +358,6 @@ export const CodeBlockView: React.FC = () => {
         language: next,
       }),
     );
-    setPickerOpen(false);
   };
 
   const copy = () => {
@@ -402,43 +381,7 @@ export const CodeBlockView: React.FC = () => {
       contentEditable={false}
     >
       <div className='solstice-code-block-bar'>
-        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-          <PopoverTrigger
-            render={
-              <Button variant='ghost' size='xs' className='font-mono'>
-                {language ? languageLabel(language) : PLAIN_TEXT}
-                <ChevronsUpDown />
-              </Button>
-            }
-          />
-          <PopoverContent align='start' className='w-56 p-0'>
-            <Command>
-              <CommandInput placeholder='Language…' />
-              <CommandList>
-                <CommandEmpty>No language found.</CommandEmpty>
-                {[PLAIN_TEXT, ...languageNames].map((name) => (
-                  <CommandItem
-                    key={name}
-                    value={name}
-                    onSelect={() =>
-                      setLanguage(name === PLAIN_TEXT ? '' : name)
-                    }
-                  >
-                    <Check
-                      className={cn(
-                        'size-3.5',
-                        (language || PLAIN_TEXT) === name
-                          ? 'opacity-100'
-                          : 'opacity-0',
-                      )}
-                    />
-                    {languageLabel(name)}
-                  </CommandItem>
-                ))}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+        <LanguagePicker value={language} onChange={setLanguage} />
 
         <Button variant='ghost' size='icon-xs' onClick={copy} title='Copy code'>
           {copied ? <Check /> : <Copy />}

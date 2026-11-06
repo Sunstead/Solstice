@@ -1,3 +1,5 @@
+import { languages } from '@codemirror/language-data';
+
 import { getFileExtension } from '@/lib/utils';
 
 export type EmbedKind =
@@ -45,6 +47,52 @@ export function embedKind(path: string): EmbedKind {
   if (!extension) return 'markdown';
 
   return BY_EXTENSION[extension] ?? 'unknown';
+}
+
+/** What a tab shows a file as: an embed's kind, or code and plain text. */
+export type FileViewKind = EmbedKind | 'code';
+
+const known = (extension: string) => Object.prototype.hasOwnProperty.call(BY_EXTENSION, extension);
+
+/** Plain text that no grammar claims. */
+const TEXT_EXTENSIONS = ['txt', 'log', 'csv', 'tsv', 'env', 'conf'];
+
+const CODE_EXTENSIONS = new Set([
+  ...languages.flatMap((language) => language.extensions.map((e) => e.toLowerCase())),
+  ...TEXT_EXTENSIONS,
+]);
+
+/**
+ * A file opened in a tab. Unlike `embedKind`, an extensionless file is code
+ * (`Makefile`, `LICENSE`), not a note; `'unknown'` is left to be tried as
+ * text (`readsAsText`).
+ */
+export function fileViewKind(path: string): FileViewKind {
+  const extension = getFileExtension(path).toLowerCase();
+  if (!extension) return 'code';
+  if (known(extension)) return BY_EXTENSION[extension];
+  return CODE_EXTENSIONS.has(extension) ? 'code' : 'unknown';
+}
+
+/**
+ * What `solstice-search` reads as text (its `text_extensions.json`): code
+ * tabs' extensions, less those shown some other way.
+ */
+export function searchedTextExtensions(): string[] {
+  return [...CODE_EXTENSIONS].filter((e) => !known(e)).sort();
+}
+
+const MAX_TEXT = 10 * 1024 * 1024;
+const SNIFF = 8 * 1024;
+
+/**
+ * Whether a file of unknown type, read, is text to open: binary has NULs
+ * early on, or bytes that didn't decode (the web reads lossily).
+ */
+export function readsAsText(text: string): boolean {
+  if (text.length > MAX_TEXT) return false;
+  const head = text.slice(0, SNIFF);
+  return !head.includes('\u0000') && !head.includes('\uFFFD');
 }
 
 /**
