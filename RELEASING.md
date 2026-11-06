@@ -4,7 +4,7 @@ Solstice ships two things, versioned apart:
 
 | Tag | Workflow | Output |
 |---|---|---|
-| `app-v<version>` | App release | A draft GitHub Release with the desktop app for macOS and Windows |
+| `app-v<version>` | App release | A draft GitHub Release with the desktop app for macOS, Windows and Linux |
 | `sync-v<version>` | Sync image | `ghcr.io/sunstead/solstice-sync:<version>`: the sync server, with the web app built in |
 
 ## The desktop app
@@ -24,6 +24,10 @@ the release script keeps them in step.
 3. **App release** builds:
    - `Solstice_<version>_universal.dmg` (Apple Silicon and Intel)
    - `Solstice_<version>_x64-setup.exe` and `Solstice_<version>_x64_en-US.msi`
+   - `Solstice_<version>_amd64.AppImage` and `.deb`, and the same for
+     `aarch64`/`arm64`, built on Ubuntu 22.04 so the AppImage's glibc is old
+     enough for most distributions. The AppImage updates itself; a `.deb`
+     install updates through a new `.deb`.
 
    It attaches them to a **draft** release. Try them, then press Publish on
    GitHub.
@@ -86,7 +90,8 @@ locally; `npm run icons:mac -w @solstice/desktop` needs a Mac with Xcode 26.
 
 Builds aren't signed yet. The macOS app is ad-hoc signed, so first launch
 needs right-click > Open (or System Settings > Privacy & Security > Open
-Anyway). Windows SmartScreen shows "More info > Run anyway".
+Anyway). Windows SmartScreen shows "More info > Run anyway". Linux has no
+gate: an AppImage only needs `chmod +x`.
 
 To remove those prompts later:
 - **macOS:** an Apple Developer ID. Add `APPLE_CERTIFICATE`,

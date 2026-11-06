@@ -125,6 +125,14 @@
         "role": "Editor",
         "mimeType": "application/sql"
       }
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/solstice.desktop.hbs"
+      },
+      "rpm": {
+        "desktopTemplate": "linux/solstice.desktop.hbs"
+      }
+    }
   }
 }

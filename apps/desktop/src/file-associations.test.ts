@@ -27,3 +27,20 @@ describe('file associations', () => {
     expect(associations('windows')).toHaveLength(1);
   });
 });
+
+// Tauri's own .desktop has no field code, so a file manager would start the
+// app without the file: the template passes them (`%U`, as `file://` URIs
+// that `paths_from_args` reads), and lists the types itself.
+describe('the Linux desktop entry', () => {
+  const template = readFileSync(path.resolve(__dirname, '../src-tauri/linux/solstice.desktop.hbs'), 'utf8');
+  const mimeTypes = template.match(/^MimeType=(.*)$/m)![1].split(';').filter(Boolean);
+
+  it('passes what it opens to the app', () => {
+    expect(template).toMatch(/^Exec=\{\{exec\}\} %U$/m);
+  });
+
+  it('lists every type the Linux bundle registers, and solstice:// links', () => {
+    for (const a of associations('linux')) if (a.mimeType) expect(mimeTypes).toContain(a.mimeType);
+    expect(mimeTypes).toContain('x-scheme-handler/solstice');
+  });
+});
