@@ -15,7 +15,7 @@
     "build": "npm run build -w @solstice/desktop",
     "lint": "eslint .",
     "test": "npm test --workspaces --if-present",
-    "release:app": "node apps/desktop/scripts/release.mjs"
+    "test:release": "node --test 'scripts/release/*.test.mjs'"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

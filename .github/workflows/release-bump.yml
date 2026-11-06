@@ -1,0 +1,54 @@
+name: Release bump
+
+# Publishing the draft from App release is what makes a release, and the build
+# set its version only on its own checkout. This commits that version to main
+# (package.json, Cargo.toml, the lockfiles, the iOS project), so the repo says
+# what was last shipped.
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: release-bump
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    # Only the desktop app's releases, and not a pre-release (the repo keeps
+    # the last full release's version, which the updater reads).
+    if: startsWith(github.event.release.tag_name, 'app-v') && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set the version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: node scripts/release/set-version.mjs "${TAG#app-v}"
+      - name: Commit and push
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if git diff --quiet; then
+            echo "main already says ${TAG#app-v}."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -a -m "chore(release): ${TAG#app-v} [skip ci]"
+          # main may have moved while this ran.
+          for attempt in 1 2 3; do
+            git pull --rebase --quiet origin main
+            git push origin HEAD:main && exit 0
+            sleep 5
+          done
+          echo "::error::Could not push the version bump to main."
+          exit 1
