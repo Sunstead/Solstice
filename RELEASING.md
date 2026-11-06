@@ -86,6 +86,26 @@ them), download its `app-icons` artifact over `apps/desktop`, and commit the
 result. `npm run icons -w @solstice/desktop` rebuilds the non-macOS ones
 locally; `npm run icons:mac -w @solstice/desktop` needs a Mac with Xcode 26.
 
+## The Linux AppImage
+
+linuxdeploy bundles the build machine's `libwayland-*` (Ubuntu 22.04's), and
+a current Mesa (Arch, Fedora) can't start WebKit's EGL against them: the window
+opens blank gray and the log says `Could not create default EGL display`.
+`scripts/tauri-linux.sh` (the Linux `tauriScript`) runs `tauri` and then
+`scripts/appimage-unbundle-wayland.sh`, which repacks the AppImage without them
+and signs it again for the updater, before `tauri-action` uploads anything.
+
+To check an AppImage from your own machine (Docker Desktop is enough; the Arch
+image matches the machine, so pass the aarch64 file on Apple Silicon):
+
+```bash
+apps/desktop/scripts/test-appimage.sh Solstice_<version>_aarch64.AppImage
+```
+
+It runs the app in Arch Linux under a virtual display, writes
+`appimage-test/screenshot.png` and `app.log`, and fails on a blank window. CI
+runs it after every Linux build.
+
 ## Signing
 
 Builds aren't signed yet. The macOS app is ad-hoc signed, so first launch
